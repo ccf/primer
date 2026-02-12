@@ -39,7 +39,9 @@ def create_engineer(
     db.add(engineer)
     db.commit()
     db.refresh(engineer)
-    return EngineerCreateResponse(engineer=EngineerResponse.model_validate(engineer), api_key=raw_key)
+    return EngineerCreateResponse(
+        engineer=EngineerResponse.model_validate(engineer), api_key=raw_key
+    )
 
 
 @router.get("", response_model=list[EngineerResponse])

@@ -6,3 +6,15 @@ build/
 *.db
 .pytest_cache/
 .ruff_cache/
+.venv/
+venv/
+htmlcov/
+coverage.xml
+.coverage
+.vscode/
+.idea/
+*.swp
+.env
+.env.*
+.DS_Store
+uv.lock

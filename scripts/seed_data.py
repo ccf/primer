@@ -1,10 +1,8 @@
 """Seed the database with test data for development."""
 
-import secrets
 import uuid
 from datetime import datetime, timedelta
 
-import bcrypt
 import httpx
 
 SERVER_URL = "http://localhost:8000"
@@ -59,6 +57,7 @@ def main():
     friction_types = ["tool_error", "permission_denied", "timeout", "context_limit"]
 
     import random
+
     random.seed(42)
 
     now = datetime.utcnow()
@@ -75,8 +74,7 @@ def main():
                 # Random tool usages
                 session_tools = random.sample(tools, k=random.randint(1, min(4, len(tools))))
                 tool_usages = [
-                    {"tool_name": t, "call_count": random.randint(1, 15)}
-                    for t in session_tools
+                    {"tool_name": t, "call_count": random.randint(1, 15)} for t in session_tools
                 ]
 
                 # Random model usage
@@ -91,8 +89,9 @@ def main():
                     if random.random() < 0.3:
                         ft = random.choice(friction_types)
                         friction = {ft: random.randint(1, 5)}
+                    goal = random.choice(["feature", "bug fix", "refactor", "docs"])
                     facets = {
-                        "underlying_goal": f"Working on {random.choice(['feature', 'bug fix', 'refactor', 'docs'])}",
+                        "underlying_goal": f"Working on {goal}",
                         "outcome": outcome,
                         "session_type": random.choice(session_types),
                         "brief_summary": f"Session on day -{day_offset}",
@@ -102,8 +101,12 @@ def main():
                 payload = {
                     "session_id": session_id,
                     "api_key": api_key,
-                    "project_name": random.choice(["api-service", "web-app", "cli-tool", "shared-lib"]),
-                    "started_at": (now - timedelta(days=day_offset, hours=random.randint(0, 8))).isoformat(),
+                    "project_name": random.choice(
+                        ["api-service", "web-app", "cli-tool", "shared-lib"]
+                    ),
+                    "started_at": (
+                        now - timedelta(days=day_offset, hours=random.randint(0, 8))
+                    ).isoformat(),
                     "duration_seconds": duration,
                     "message_count": msg_count,
                     "user_message_count": msg_count // 2,
@@ -115,7 +118,11 @@ def main():
                     "first_prompt": "Help me with this task",
                     "tool_usages": tool_usages,
                     "model_usages": [
-                        {"model_name": model, "input_tokens": inp_tokens, "output_tokens": out_tokens}
+                        {
+                            "model_name": model,
+                            "input_tokens": inp_tokens,
+                            "output_tokens": out_tokens,
+                        }
                     ],
                     "facets": facets,
                 }

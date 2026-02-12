@@ -27,6 +27,7 @@ def list_sessions(
         q = q.filter(SessionModel.engineer_id == engineer_id)
     if team_id:
         from primer.common.models import Engineer
+
         q = q.join(Engineer).filter(Engineer.team_id == team_id)
     if start_date:
         q = q.filter(SessionModel.started_at >= start_date)

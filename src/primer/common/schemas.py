@@ -1,9 +1,9 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, EmailStr, Field
-
+from pydantic import BaseModel, Field
 
 # --- Team ---
+
 
 class TeamCreate(BaseModel):
     name: str
@@ -18,6 +18,7 @@ class TeamResponse(BaseModel):
 
 
 # --- Engineer ---
+
 
 class EngineerCreate(BaseModel):
     name: str
@@ -41,6 +42,7 @@ class EngineerCreateResponse(BaseModel):
 
 
 # --- Session Facets ---
+
 
 class SessionFacetsPayload(BaseModel):
     underlying_goal: str | None = None
@@ -73,6 +75,7 @@ class SessionFacetsResponse(BaseModel):
 
 # --- Tool / Model Usage ---
 
+
 class ToolUsagePayload(BaseModel):
     tool_name: str
     call_count: int
@@ -104,6 +107,7 @@ class ModelUsageResponse(BaseModel):
 
 
 # --- Session Ingest ---
+
 
 class SessionIngestPayload(BaseModel):
     session_id: str
@@ -151,6 +155,7 @@ class BulkIngestResponse(BaseModel):
 
 # --- Session Response ---
 
+
 class SessionResponse(BaseModel):
     id: str
     engineer_id: str
@@ -187,6 +192,7 @@ class SessionDetailResponse(SessionResponse):
 
 
 # --- Analytics ---
+
 
 class OverviewStats(BaseModel):
     total_sessions: int
@@ -229,6 +235,7 @@ class Recommendation(BaseModel):
 
 
 # --- Daily Stats ---
+
 
 class DailyStatsResponse(BaseModel):
     date: date

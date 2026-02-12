@@ -64,4 +64,5 @@ def recommendations(
     _admin: str = Depends(require_admin),
 ):
     from primer.server.services.synthesis_service import get_recommendations
+
     return get_recommendations(db, team_id=team_id)

@@ -28,19 +28,31 @@ def test_overview_empty(client, admin_headers):
 
 
 def test_overview_with_data(client, engineer_with_key, admin_headers):
-    eng, api_key = engineer_with_key
-    _ingest_session(client, api_key, facets={
-        "outcome": "success",
-        "session_type": "feature",
-    })
-    _ingest_session(client, api_key, facets={
-        "outcome": "success",
-        "session_type": "debugging",
-    })
-    _ingest_session(client, api_key, facets={
-        "outcome": "partial",
-        "session_type": "feature",
-    })
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        facets={
+            "outcome": "success",
+            "session_type": "feature",
+        },
+    )
+    _ingest_session(
+        client,
+        api_key,
+        facets={
+            "outcome": "success",
+            "session_type": "debugging",
+        },
+    )
+    _ingest_session(
+        client,
+        api_key,
+        facets={
+            "outcome": "partial",
+            "session_type": "feature",
+        },
+    )
 
     r = client.get("/api/v1/analytics/overview", headers=admin_headers)
     assert r.status_code == 200
@@ -54,15 +66,23 @@ def test_overview_with_data(client, engineer_with_key, admin_headers):
 
 
 def test_tool_rankings(client, engineer_with_key, admin_headers):
-    eng, api_key = engineer_with_key
-    _ingest_session(client, api_key, tool_usages=[
-        {"tool_name": "Read", "call_count": 10},
-        {"tool_name": "Edit", "call_count": 5},
-    ])
-    _ingest_session(client, api_key, tool_usages=[
-        {"tool_name": "Read", "call_count": 8},
-        {"tool_name": "Bash", "call_count": 3},
-    ])
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        tool_usages=[
+            {"tool_name": "Read", "call_count": 10},
+            {"tool_name": "Edit", "call_count": 5},
+        ],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        tool_usages=[
+            {"tool_name": "Read", "call_count": 8},
+            {"tool_name": "Bash", "call_count": 3},
+        ],
+    )
 
     r = client.get("/api/v1/analytics/tools", headers=admin_headers)
     assert r.status_code == 200
@@ -73,14 +93,30 @@ def test_tool_rankings(client, engineer_with_key, admin_headers):
 
 
 def test_model_rankings(client, engineer_with_key, admin_headers):
-    eng, api_key = engineer_with_key
-    _ingest_session(client, api_key, model_usages=[
-        {"model_name": "claude-sonnet-4-5-20250929", "input_tokens": 1000, "output_tokens": 500},
-    ])
-    _ingest_session(client, api_key, model_usages=[
-        {"model_name": "claude-sonnet-4-5-20250929", "input_tokens": 2000, "output_tokens": 1000},
-        {"model_name": "claude-haiku-3.5", "input_tokens": 100, "output_tokens": 50},
-    ])
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 1000,
+                "output_tokens": 500,
+            },
+        ],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 2000,
+                "output_tokens": 1000,
+            },
+            {"model_name": "claude-haiku-3.5", "input_tokens": 100, "output_tokens": 50},
+        ],
+    )
 
     r = client.get("/api/v1/analytics/models", headers=admin_headers)
     assert r.status_code == 200
@@ -90,15 +126,23 @@ def test_model_rankings(client, engineer_with_key, admin_headers):
 
 
 def test_friction_report(client, engineer_with_key, admin_headers):
-    eng, api_key = engineer_with_key
-    _ingest_session(client, api_key, facets={
-        "friction_counts": {"tool_error": 3, "permission_denied": 1},
-        "friction_detail": "Tool failed on large files",
-    })
-    _ingest_session(client, api_key, facets={
-        "friction_counts": {"tool_error": 2},
-        "friction_detail": "Timeout on edit",
-    })
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        facets={
+            "friction_counts": {"tool_error": 3, "permission_denied": 1},
+            "friction_detail": "Tool failed on large files",
+        },
+    )
+    _ingest_session(
+        client,
+        api_key,
+        facets={
+            "friction_counts": {"tool_error": 2},
+            "friction_detail": "Timeout on edit",
+        },
+    )
 
     r = client.get("/api/v1/analytics/friction", headers=admin_headers)
     assert r.status_code == 200
@@ -109,7 +153,7 @@ def test_friction_report(client, engineer_with_key, admin_headers):
 
 
 def test_sessions_list(client, engineer_with_key, admin_headers):
-    eng, api_key = engineer_with_key
+    _eng, api_key = engineer_with_key
     sid = _ingest_session(client, api_key, project_name="my-project")
 
     r = client.get("/api/v1/sessions", headers=admin_headers)
@@ -119,8 +163,10 @@ def test_sessions_list(client, engineer_with_key, admin_headers):
 
 
 def test_session_detail(client, engineer_with_key, admin_headers):
-    eng, api_key = engineer_with_key
-    sid = _ingest_session(client, api_key,
+    _eng, api_key = engineer_with_key
+    sid = _ingest_session(
+        client,
+        api_key,
         tool_usages=[{"tool_name": "Read", "call_count": 5}],
         facets={"outcome": "success", "brief_summary": "Fixed it"},
     )
@@ -135,13 +181,17 @@ def test_session_detail(client, engineer_with_key, admin_headers):
 
 
 def test_recommendations(client, engineer_with_key, admin_headers):
-    eng, api_key = engineer_with_key
+    _eng, api_key = engineer_with_key
     # Ingest enough sessions with friction to trigger recommendations
     for _ in range(6):
-        _ingest_session(client, api_key, facets={
-            "friction_counts": {"tool_error": 2},
-            "friction_detail": "Something went wrong",
-        })
+        _ingest_session(
+            client,
+            api_key,
+            facets={
+                "friction_counts": {"tool_error": 2},
+                "friction_detail": "Something went wrong",
+            },
+        )
 
     r = client.get("/api/v1/analytics/recommendations", headers=admin_headers)
     assert r.status_code == 200

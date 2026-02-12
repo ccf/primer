@@ -39,7 +39,7 @@ def ingest_session(
         db.rollback()
         log_ingest_event(db, engineer.id, "session", payload.session_id, None, "error", str(e))
         db.commit()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/bulk", response_model=BulkIngestResponse)
@@ -53,16 +53,16 @@ def ingest_bulk(
         try:
             created = upsert_session(db, engineer.id, session_payload)
             log_ingest_event(db, engineer.id, "bulk", session_payload.session_id, None, "ok")
-            results.append(IngestResponse(
-                status="ok", session_id=session_payload.session_id, created=created
-            ))
+            results.append(
+                IngestResponse(status="ok", session_id=session_payload.session_id, created=created)
+            )
         except Exception as e:
             log_ingest_event(
                 db, engineer.id, "bulk", session_payload.session_id, None, "error", str(e)
             )
-            results.append(IngestResponse(
-                status="error", session_id=session_payload.session_id, created=False
-            ))
+            results.append(
+                IngestResponse(status="error", session_id=session_payload.session_id, created=False)
+            )
     db.commit()
     return BulkIngestResponse(status="ok", results=results)
 

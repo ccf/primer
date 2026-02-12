@@ -7,11 +7,10 @@ from primer.hook.extractor import extract_from_jsonl, load_facets
 
 def _write_jsonl(lines: list[dict]) -> str:
     """Write JSONL lines to a temp file and return the path."""
-    tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False)
-    for line in lines:
-        tmp.write(json.dumps(line) + "\n")
-    tmp.close()
-    return tmp.name
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as tmp:
+        for line in lines:
+            tmp.write(json.dumps(line) + "\n")
+        return tmp.name
 
 
 def test_extract_empty_file():
@@ -131,16 +130,19 @@ def test_load_facets(tmp_path):
     facets_dir = tmp_path / ".claude" / "usage-data" / "facets"
     facets_dir.mkdir(parents=True)
     facets_file = facets_dir / "test-session.json"
-    facets_file.write_text(json.dumps({
-        "underlyingGoal": "Fix a bug",
-        "outcome": "success",
-        "sessionType": "debugging",
-        "briefSummary": "Fixed the null pointer bug",
-        "frictionCounts": {"tool_error": 2},
-    }))
+    facets_file.write_text(
+        json.dumps(
+            {
+                "underlyingGoal": "Fix a bug",
+                "outcome": "success",
+                "sessionType": "debugging",
+                "briefSummary": "Fixed the null pointer bug",
+                "frictionCounts": {"tool_error": 2},
+            }
+        )
+    )
 
     # Monkey-patch Path.home for this test
-    import primer.hook.extractor as extractor
     original_home = Path.home
 
     def mock_home():

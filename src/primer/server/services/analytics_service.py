@@ -6,9 +6,11 @@ from sqlalchemy.orm import Session
 from primer.common.models import (
     Engineer,
     ModelUsage,
-    Session as SessionModel,
     SessionFacets,
     ToolUsage,
+)
+from primer.common.models import (
+    Session as SessionModel,
 )
 from primer.common.schemas import (
     FrictionReport,

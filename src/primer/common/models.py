@@ -95,9 +95,7 @@ class SessionFacets(Base):
     __tablename__ = "session_facets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    session_id: Mapped[str] = mapped_column(
-        ForeignKey("sessions.id"), nullable=False, unique=True
-    )
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), nullable=False, unique=True)
     underlying_goal: Mapped[str | None] = mapped_column(Text)
     goal_categories: Mapped[dict | None] = mapped_column(JSON)
     outcome: Mapped[str | None] = mapped_column(String(50))
