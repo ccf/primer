@@ -42,6 +42,16 @@ def upgrade() -> None:
         sa.Column("team_id", sa.String(length=36), nullable=True),
         sa.Column("api_key_hash", sa.String(length=255), nullable=False),
         sa.Column(
+            "role",
+            sa.String(length=20),
+            server_default="engineer",
+            nullable=False,
+        ),
+        sa.Column("github_id", sa.Integer(), nullable=True),
+        sa.Column("github_username", sa.String(length=255), nullable=True),
+        sa.Column("avatar_url", sa.String(length=1024), nullable=True),
+        sa.Column("display_name", sa.String(length=255), nullable=True),
+        sa.Column(
             "created_at",
             sa.DateTime(),
             server_default=sa.text("(CURRENT_TIMESTAMP)"),
@@ -59,6 +69,27 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("email"),
+        sa.UniqueConstraint("github_id"),
+    )
+    op.create_table(
+        "refresh_tokens",
+        sa.Column("id", sa.String(length=36), nullable=False),
+        sa.Column("engineer_id", sa.String(length=36), nullable=False),
+        sa.Column("token_hash", sa.String(length=255), nullable=False),
+        sa.Column("expires_at", sa.DateTime(), nullable=False),
+        sa.Column("revoked", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(),
+            server_default=sa.text("(CURRENT_TIMESTAMP)"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["engineer_id"],
+            ["engineers.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("token_hash"),
     )
     op.create_table(
         "daily_stats",
@@ -204,6 +235,7 @@ def downgrade() -> None:
     op.drop_table("sessions")
     op.drop_table("ingest_events")
     op.drop_table("daily_stats")
+    op.drop_table("refresh_tokens")
     op.drop_table("engineers")
     op.drop_table("teams")
     # ### end Alembic commands ###
