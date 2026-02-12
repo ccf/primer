@@ -102,3 +102,70 @@ def test_ingest_invalid_key(client):
         },
     )
     assert r.status_code == 401
+
+
+def test_ingest_facets_success(client, engineer_with_key):
+    _eng, api_key = engineer_with_key
+    session_id = str(uuid.uuid4())
+    # First ingest a session
+    payload = {
+        "session_id": session_id,
+        "api_key": api_key,
+        "message_count": 5,
+    }
+    r = client.post("/api/v1/ingest/session", json=payload)
+    assert r.status_code == 200
+
+    # Now ingest facets for that session
+    r2 = client.post(
+        f"/api/v1/ingest/facets/{session_id}",
+        json={"outcome": "success", "brief_summary": "All good"},
+        headers={"x-api-key": api_key},
+    )
+    assert r2.status_code == 200
+    assert r2.json()["status"] == "ok"
+
+
+def test_ingest_facets_session_not_found(client, engineer_with_key):
+    _eng, api_key = engineer_with_key
+    r = client.post(
+        "/api/v1/ingest/facets/nonexistent-session",
+        json={"outcome": "success"},
+        headers={"x-api-key": api_key},
+    )
+    assert r.status_code == 404
+
+
+def test_ingest_facets_wrong_engineer(client, engineer_with_key, db_session):
+    import secrets
+
+    import bcrypt
+
+    from primer.common.models import Engineer
+
+    _eng1, api_key1 = engineer_with_key
+
+    # Create a second engineer
+    raw_key2 = f"primer_{secrets.token_urlsafe(32)}"
+    hashed2 = bcrypt.hashpw(raw_key2.encode(), bcrypt.gensalt()).decode()
+    eng2 = Engineer(
+        name="Other", email=f"other-{uuid.uuid4().hex[:8]}@co.com", api_key_hash=hashed2
+    )
+    db_session.add(eng2)
+    db_session.flush()
+
+    # Ingest a session as engineer 1
+    session_id = str(uuid.uuid4())
+    r = client.post(
+        "/api/v1/ingest/session",
+        json={"session_id": session_id, "api_key": api_key1, "message_count": 1},
+    )
+    assert r.status_code == 200
+
+    # Try to ingest facets as engineer 2 -> 403
+    r2 = client.post(
+        f"/api/v1/ingest/facets/{session_id}",
+        json={"outcome": "success"},
+        headers={"x-api-key": raw_key2},
+    )
+    assert r2.status_code == 403
