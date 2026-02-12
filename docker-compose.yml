@@ -1,0 +1,26 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: primer
+      POSTGRES_PASSWORD: primer
+      POSTGRES_DB: primer
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "8000:8000"
+    environment:
+      PRIMER_DATABASE_URL: postgresql://primer:primer@db:5432/primer
+      PRIMER_ADMIN_API_KEY: ${PRIMER_ADMIN_API_KEY:-primer-admin-dev-key}
+    depends_on:
+      - db
+
+volumes:
+  pgdata:
