@@ -152,6 +152,69 @@ def test_friction_report(client, engineer_with_key, admin_headers):
     assert tool_error["count"] == 5
 
 
+def test_daily_stats_endpoint(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        started_at="2025-01-15T10:00:00",
+        message_count=10,
+        tool_call_count=5,
+    )
+    _ingest_session(
+        client,
+        api_key,
+        started_at="2025-01-15T14:00:00",
+        message_count=8,
+        tool_call_count=3,
+    )
+    _ingest_session(
+        client,
+        api_key,
+        started_at="2025-01-16T09:00:00",
+        message_count=12,
+        tool_call_count=7,
+    )
+
+    r = client.get("/api/v1/analytics/daily", headers=admin_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) >= 2
+
+    # Results are ordered by date descending
+    day_16 = next(d for d in data if d["date"] == "2025-01-16")
+    assert day_16["session_count"] == 1
+    assert day_16["message_count"] == 12
+    assert day_16["tool_call_count"] == 7
+
+    day_15 = next(d for d in data if d["date"] == "2025-01-15")
+    assert day_15["session_count"] == 2
+    assert day_15["message_count"] == 18
+    assert day_15["tool_call_count"] == 8
+
+
+def test_daily_stats_with_team_filter(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(client, api_key, started_at="2025-02-01T10:00:00")
+
+    # Filter by the engineer's team
+    r = client.get(
+        f"/api/v1/analytics/daily?team_id={_eng.team_id}",
+        headers=admin_headers,
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) >= 1
+
+    # Filter by non-existent team
+    r = client.get(
+        "/api/v1/analytics/daily?team_id=nonexistent",
+        headers=admin_headers,
+    )
+    assert r.status_code == 200
+    assert r.json() == []
+
+
 def test_sessions_list(client, engineer_with_key, admin_headers):
     _eng, api_key = engineer_with_key
     sid = _ingest_session(client, api_key, project_name="my-project")

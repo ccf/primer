@@ -1,0 +1,60 @@
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import type { DailyStatsResponse } from "@/types/api"
+import { format, parseISO } from "date-fns"
+
+interface DailyActivityChartProps {
+  data: DailyStatsResponse[]
+}
+
+export function DailyActivityChart({ data }: DailyActivityChartProps) {
+  const chartData = [...data]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((d) => ({
+      date: format(parseISO(d.date), "MMM d"),
+      sessions: d.session_count,
+      messages: d.message_count,
+    }))
+
+  return (
+    <Card className="col-span-full">
+      <CardHeader>
+        <CardTitle className="text-sm font-medium">Daily Activity</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={280}>
+          <AreaChart data={chartData}>
+            <defs>
+              <linearGradient id="colorSessions" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="colorMessages" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#22c55e" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+            <Tooltip />
+            <Area
+              type="monotone"
+              dataKey="sessions"
+              stroke="#6366f1"
+              fill="url(#colorSessions)"
+              strokeWidth={2}
+            />
+            <Area
+              type="monotone"
+              dataKey="messages"
+              stroke="#22c55e"
+              fill="url(#colorMessages)"
+              strokeWidth={2}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  )
+}

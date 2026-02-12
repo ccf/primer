@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from primer.common.database import get_db
 from primer.common.schemas import (
+    DailyStatsResponse,
     FrictionReport,
     ModelRanking,
     OverviewStats,
@@ -11,6 +12,7 @@ from primer.common.schemas import (
 )
 from primer.server.deps import require_admin
 from primer.server.services.analytics_service import (
+    get_daily_stats,
     get_friction_report,
     get_model_rankings,
     get_overview,
@@ -27,6 +29,16 @@ def overview(
     _admin: str = Depends(require_admin),
 ):
     return get_overview(db, team_id=team_id)
+
+
+@router.get("/daily", response_model=list[DailyStatsResponse])
+def daily(
+    team_id: str | None = None,
+    days: int = Query(default=30, le=365),
+    db: Session = Depends(get_db),
+    _admin: str = Depends(require_admin),
+):
+    return get_daily_stats(db, team_id=team_id, days=days)
 
 
 @router.get("/friction", response_model=list[FrictionReport])

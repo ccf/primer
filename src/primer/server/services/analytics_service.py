@@ -13,6 +13,7 @@ from primer.common.models import (
     Session as SessionModel,
 )
 from primer.common.schemas import (
+    DailyStatsResponse,
     FrictionReport,
     ModelRanking,
     OverviewStats,
@@ -81,6 +82,35 @@ def get_overview(db: Session, team_id: str | None = None) -> OverviewStats:
         outcome_counts=outcome_counts,
         session_type_counts=session_type_counts,
     )
+
+
+def get_daily_stats(
+    db: Session, team_id: str | None = None, days: int = 30
+) -> list[DailyStatsResponse]:
+    q = db.query(
+        func.date(SessionModel.started_at).label("date"),
+        func.count(SessionModel.id).label("session_count"),
+        func.coalesce(func.sum(SessionModel.message_count), 0).label("message_count"),
+        func.coalesce(func.sum(SessionModel.tool_call_count), 0).label("tool_call_count"),
+    ).filter(SessionModel.started_at.isnot(None))
+
+    if team_id:
+        q = q.join(Engineer).filter(Engineer.team_id == team_id)
+
+    q = q.group_by(func.date(SessionModel.started_at)).order_by(
+        func.date(SessionModel.started_at).desc()
+    )
+
+    rows = q.limit(days).all()
+    return [
+        DailyStatsResponse(
+            date=row.date,
+            session_count=row.session_count,
+            message_count=row.message_count,
+            tool_call_count=row.tool_call_count,
+        )
+        for row in rows
+    ]
 
 
 def get_friction_report(db: Session, team_id: str | None = None) -> list[FrictionReport]:
