@@ -24,6 +24,22 @@ class ApiError extends Error {
 
 export { ApiError }
 
+let refreshPromise: Promise<boolean> | null = null
+
+async function tryRefresh(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise
+  refreshPromise = fetch("/api/v1/auth/refresh", {
+    method: "POST",
+    credentials: "include",
+  })
+    .then((res) => res.ok)
+    .catch(() => false)
+    .finally(() => {
+      refreshPromise = null
+    })
+  return refreshPromise
+}
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const apiKey = getApiKey()
   const headers: Record<string, string> = {
@@ -32,9 +48,20 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     ...(init?.headers as Record<string, string> | undefined),
   }
 
-  const res = await fetch(path, { ...init, headers })
+  const doFetch = () =>
+    fetch(path, { ...init, headers, credentials: "include" })
 
-  if (res.status === 403) {
+  let res = await doFetch()
+
+  // On 401 with no API key (cookie auth), attempt silent refresh
+  if (res.status === 401 && !apiKey) {
+    const refreshed = await tryRefresh()
+    if (refreshed) {
+      res = await doFetch()
+    }
+  }
+
+  if (res.status === 403 && apiKey) {
     clearApiKey()
     window.location.reload()
     throw new ApiError(403, "Unauthorized")

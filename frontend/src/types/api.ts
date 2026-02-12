@@ -9,6 +9,10 @@ export interface EngineerResponse {
   name: string
   email: string
   team_id: string | null
+  role: string
+  avatar_url: string | null
+  github_username: string | null
+  display_name: string | null
   created_at: string
 }
 

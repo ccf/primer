@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from primer.common.config import settings
-from primer.server.routers import analytics, engineers, health, ingest, sessions, teams
+from primer.server.routers import analytics, auth, engineers, health, ingest, sessions, teams
 
 FRONTEND_DIST = pathlib.Path(__file__).resolve().parent.parent.parent.parent / "frontend" / "dist"
 
@@ -22,6 +22,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health.router)
+    app.include_router(auth.router)
     app.include_router(engineers.router)
     app.include_router(teams.router)
     app.include_router(ingest.router)

@@ -25,13 +25,13 @@ def main():
     # Create engineers
     engineers = []
     engineer_data = [
-        ("Alice Chen", "alice@example.com", 0),
-        ("Bob Smith", "bob@example.com", 0),
-        ("Carol Davis", "carol@example.com", 1),
-        ("Dan Wilson", "dan@example.com", 1),
-        ("Eve Martinez", "eve@example.com", 2),
+        ("Alice Chen", "alice@example.com", 0, "admin", "alicechen", 1001),
+        ("Bob Smith", "bob@example.com", 0, "team_lead", "bobsmith", 1002),
+        ("Carol Davis", "carol@example.com", 1, "team_lead", "caroldavis", 1003),
+        ("Dan Wilson", "dan@example.com", 1, "engineer", "danwilson", 1004),
+        ("Eve Martinez", "eve@example.com", 2, "engineer", "evemartinez", 1005),
     ]
-    for name, email, team_idx in engineer_data:
+    for name, email, team_idx, role, _github_user, _github_id in engineer_data:
         team_id = teams[team_idx]["id"] if teams else None
         r = httpx.post(
             f"{SERVER_URL}/api/v1/engineers",
@@ -42,6 +42,14 @@ def main():
             data = r.json()
             engineers.append(data)
             print(f"Created engineer: {name} (key: {data['api_key'][:20]}...)")
+
+            # Set role and GitHub fields via PATCH
+            eng_id = data["engineer"]["id"]
+            httpx.patch(
+                f"{SERVER_URL}/api/v1/engineers/{eng_id}",
+                json={"role": role},
+                headers=ADMIN_HEADERS,
+            )
         elif r.status_code == 409:
             print(f"Engineer {email} already exists")
 

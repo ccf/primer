@@ -9,6 +9,7 @@ from primer.common.models import (  # noqa: F401 — ensure all models are regis
     Engineer,
     IngestEvent,
     ModelUsage,
+    RefreshToken,
     Session,
     SessionFacets,
     Team,

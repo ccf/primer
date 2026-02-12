@@ -2,7 +2,9 @@ import { useState } from "react"
 import { BrowserRouter, Route, Routes } from "react-router-dom"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { getApiKey } from "@/lib/api"
-import { LoginGate } from "@/components/shared/login-gate"
+import { AuthProvider, useAuth } from "@/lib/auth-context"
+import { LoginPage } from "@/pages/login"
+import { AuthCallbackPage } from "@/pages/auth-callback"
 import { AppShell } from "@/components/layout/app-shell"
 import { OverviewPage } from "@/pages/overview"
 import { SessionsPage } from "@/pages/sessions"
@@ -19,30 +21,47 @@ const queryClient = new QueryClient({
   },
 })
 
-export default function App() {
+function AuthenticatedApp() {
+  const { user, loading } = useAuth()
   const [teamId, setTeamId] = useState<string | null>(null)
 
-  if (!getApiKey()) {
+  if (loading) {
     return (
-      <QueryClientProvider client={queryClient}>
-        <LoginGate />
-      </QueryClientProvider>
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
     )
   }
 
+  // Check both OAuth user and legacy API key
+  if (!user && !getApiKey()) {
+    return <LoginPage />
+  }
+
+  return (
+    <AppShell teamId={teamId} onTeamChange={setTeamId}>
+      <Routes>
+        <Route path="/" element={<OverviewPage teamId={teamId} />} />
+        <Route path="/sessions" element={<SessionsPage teamId={teamId} />} />
+        <Route path="/sessions/:id" element={<SessionDetailPage />} />
+        <Route path="/engineers" element={<EngineersPage />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </AppShell>
+  )
+}
+
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AppShell teamId={teamId} onTeamChange={setTeamId}>
+      <AuthProvider>
+        <BrowserRouter>
           <Routes>
-            <Route path="/" element={<OverviewPage teamId={teamId} />} />
-            <Route path="/sessions" element={<SessionsPage teamId={teamId} />} />
-            <Route path="/sessions/:id" element={<SessionDetailPage />} />
-            <Route path="/engineers" element={<EngineersPage />} />
-            <Route path="*" element={<NotFoundPage />} />
+            <Route path="/auth/callback" element={<AuthCallbackPage />} />
+            <Route path="/*" element={<AuthenticatedApp />} />
           </Routes>
-        </AppShell>
-      </BrowserRouter>
+        </BrowserRouter>
+      </AuthProvider>
     </QueryClientProvider>
   )
 }

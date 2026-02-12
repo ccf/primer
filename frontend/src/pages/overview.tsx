@@ -1,4 +1,5 @@
 import { Activity, MessageSquare, Users, Wrench, Zap, FileCode } from "lucide-react"
+import { useAuth } from "@/lib/auth-context"
 import { useOverview, useDailyStats, useToolRankings, useModelRankings, useRecommendations } from "@/hooks/use-api-queries"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { OutcomeChart } from "@/components/dashboard/outcome-chart"
@@ -15,6 +16,8 @@ interface OverviewPageProps {
 }
 
 export function OverviewPage({ teamId }: OverviewPageProps) {
+  const { user } = useAuth()
+  const role = user?.role ?? "admin"
   const { data: overview, isLoading: loadingOverview } = useOverview(teamId)
   const { data: daily, isLoading: loadingDaily } = useDailyStats(teamId)
   const { data: tools, isLoading: loadingTools } = useToolRankings(teamId)
@@ -36,7 +39,9 @@ export function OverviewPage({ teamId }: OverviewPageProps) {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Overview</h1>
+      <h1 className="text-2xl font-bold">
+        {role === "engineer" ? "My Dashboard" : role === "team_lead" ? "Team Overview" : "Overview"}
+      </h1>
 
       {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

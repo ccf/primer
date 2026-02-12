@@ -10,7 +10,7 @@ from primer.common.schemas import (
     Recommendation,
     ToolRanking,
 )
-from primer.server.deps import require_admin
+from primer.server.deps import AuthContext, get_auth_context
 from primer.server.services.analytics_service import (
     get_daily_stats,
     get_friction_report,
@@ -22,13 +22,26 @@ from primer.server.services.analytics_service import (
 router = APIRouter(prefix="/api/v1/analytics", tags=["analytics"])
 
 
+def _resolve_scope(
+    auth: AuthContext, requested_team_id: str | None
+) -> tuple[str | None, str | None]:
+    """Return (team_id, engineer_id) based on role."""
+    if auth.role == "admin":
+        return requested_team_id, None
+    if auth.role == "team_lead":
+        return auth.team_id, None
+    # engineer
+    return None, auth.engineer_id
+
+
 @router.get("/overview", response_model=OverviewStats)
 def overview(
     team_id: str | None = None,
     db: Session = Depends(get_db),
-    _admin: str = Depends(require_admin),
+    auth: AuthContext = Depends(get_auth_context),
 ):
-    return get_overview(db, team_id=team_id)
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_overview(db, team_id=tid, engineer_id=eid)
 
 
 @router.get("/daily", response_model=list[DailyStatsResponse])
@@ -36,18 +49,20 @@ def daily(
     team_id: str | None = None,
     days: int = Query(default=30, le=365),
     db: Session = Depends(get_db),
-    _admin: str = Depends(require_admin),
+    auth: AuthContext = Depends(get_auth_context),
 ):
-    return get_daily_stats(db, team_id=team_id, days=days)
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_daily_stats(db, team_id=tid, days=days, engineer_id=eid)
 
 
 @router.get("/friction", response_model=list[FrictionReport])
 def friction(
     team_id: str | None = None,
     db: Session = Depends(get_db),
-    _admin: str = Depends(require_admin),
+    auth: AuthContext = Depends(get_auth_context),
 ):
-    return get_friction_report(db, team_id=team_id)
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_friction_report(db, team_id=tid, engineer_id=eid)
 
 
 @router.get("/tools", response_model=list[ToolRanking])
@@ -55,26 +70,29 @@ def tools(
     team_id: str | None = None,
     limit: int = Query(default=20, le=100),
     db: Session = Depends(get_db),
-    _admin: str = Depends(require_admin),
+    auth: AuthContext = Depends(get_auth_context),
 ):
-    return get_tool_rankings(db, team_id=team_id, limit=limit)
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_tool_rankings(db, team_id=tid, limit=limit, engineer_id=eid)
 
 
 @router.get("/models", response_model=list[ModelRanking])
 def models(
     team_id: str | None = None,
     db: Session = Depends(get_db),
-    _admin: str = Depends(require_admin),
+    auth: AuthContext = Depends(get_auth_context),
 ):
-    return get_model_rankings(db, team_id=team_id)
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_model_rankings(db, team_id=tid, engineer_id=eid)
 
 
 @router.get("/recommendations", response_model=list[Recommendation])
 def recommendations(
     team_id: str | None = None,
     db: Session = Depends(get_db),
-    _admin: str = Depends(require_admin),
+    auth: AuthContext = Depends(get_auth_context),
 ):
     from primer.server.services.synthesis_service import get_recommendations
 
-    return get_recommendations(db, team_id=team_id)
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_recommendations(db, team_id=tid, engineer_id=eid)

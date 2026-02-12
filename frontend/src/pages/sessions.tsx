@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useAuth } from "@/lib/auth-context"
 import { useSessions, useEngineers, useFriction } from "@/hooks/use-api-queries"
 import { SessionTable } from "@/components/sessions/session-table"
 import { SessionFilters } from "@/components/sessions/session-filters"
@@ -15,6 +16,8 @@ interface SessionsPageProps {
 const PAGE_SIZE = 50
 
 export function SessionsPage({ teamId }: SessionsPageProps) {
+  const { user } = useAuth()
+  const role = user?.role ?? "admin"
   const [engineerId, setEngineerId] = useState("")
   const [offset, setOffset] = useState(0)
 
@@ -30,15 +33,19 @@ export function SessionsPage({ teamId }: SessionsPageProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Sessions</h1>
-        <SessionFilters
-          engineers={engineers ?? []}
-          engineerId={engineerId}
-          onEngineerChange={(id) => {
-            setEngineerId(id)
-            setOffset(0)
-          }}
-        />
+        <h1 className="text-2xl font-bold">
+          {role === "engineer" ? "My Sessions" : "Sessions"}
+        </h1>
+        {role === "admin" && (
+          <SessionFilters
+            engineers={engineers ?? []}
+            engineerId={engineerId}
+            onEngineerChange={(id) => {
+              setEngineerId(id)
+              setOffset(0)
+            }}
+          />
+        )}
       </div>
 
       {loadingSessions ? (

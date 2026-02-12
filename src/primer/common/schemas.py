@@ -31,9 +31,18 @@ class EngineerResponse(BaseModel):
     name: str
     email: str
     team_id: str | None
+    role: str = "engineer"
+    avatar_url: str | None = None
+    github_username: str | None = None
+    display_name: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class EngineerUpdate(BaseModel):
+    role: str | None = None
+    team_id: str | None = None
 
 
 class EngineerCreateResponse(BaseModel):

@@ -21,15 +21,19 @@ from primer.common.schemas import (
 )
 
 
-def _base_session_query(db: Session, team_id: str | None = None):
+def _base_session_query(db: Session, team_id: str | None = None, engineer_id: str | None = None):
     q = db.query(SessionModel)
-    if team_id:
+    if engineer_id:
+        q = q.filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
         q = q.join(Engineer).filter(Engineer.team_id == team_id)
     return q
 
 
-def get_overview(db: Session, team_id: str | None = None) -> OverviewStats:
-    q = _base_session_query(db, team_id)
+def get_overview(
+    db: Session, team_id: str | None = None, engineer_id: str | None = None
+) -> OverviewStats:
+    q = _base_session_query(db, team_id, engineer_id)
 
     total_sessions = q.count()
 
@@ -50,13 +54,17 @@ def get_overview(db: Session, team_id: str | None = None) -> OverviewStats:
 
     # Count unique engineers
     eng_q = db.query(func.count(func.distinct(SessionModel.engineer_id)))
-    if team_id:
+    if engineer_id:
+        eng_q = eng_q.filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
         eng_q = eng_q.join(Engineer).filter(Engineer.team_id == team_id)
     total_engineers = eng_q.scalar() or 0
 
     # Outcome counts from facets
     facets_q = db.query(SessionFacets.outcome)
-    if team_id:
+    if engineer_id:
+        facets_q = facets_q.join(SessionModel).filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
         facets_q = facets_q.join(SessionModel).join(Engineer).filter(Engineer.team_id == team_id)
     outcome_counts: dict[str, int] = {}
     for (outcome,) in facets_q.filter(SessionFacets.outcome.isnot(None)).all():
@@ -64,7 +72,9 @@ def get_overview(db: Session, team_id: str | None = None) -> OverviewStats:
 
     # Session type counts
     type_q = db.query(SessionFacets.session_type)
-    if team_id:
+    if engineer_id:
+        type_q = type_q.join(SessionModel).filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
         type_q = type_q.join(SessionModel).join(Engineer).filter(Engineer.team_id == team_id)
     session_type_counts: dict[str, int] = {}
     for (st,) in type_q.filter(SessionFacets.session_type.isnot(None)).all():
@@ -85,7 +95,7 @@ def get_overview(db: Session, team_id: str | None = None) -> OverviewStats:
 
 
 def get_daily_stats(
-    db: Session, team_id: str | None = None, days: int = 30
+    db: Session, team_id: str | None = None, days: int = 30, engineer_id: str | None = None
 ) -> list[DailyStatsResponse]:
     q = db.query(
         func.date(SessionModel.started_at).label("date"),
@@ -94,7 +104,9 @@ def get_daily_stats(
         func.coalesce(func.sum(SessionModel.tool_call_count), 0).label("tool_call_count"),
     ).filter(SessionModel.started_at.isnot(None))
 
-    if team_id:
+    if engineer_id:
+        q = q.filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
         q = q.join(Engineer).filter(Engineer.team_id == team_id)
 
     q = q.group_by(func.date(SessionModel.started_at)).order_by(
@@ -113,9 +125,13 @@ def get_daily_stats(
     ]
 
 
-def get_friction_report(db: Session, team_id: str | None = None) -> list[FrictionReport]:
+def get_friction_report(
+    db: Session, team_id: str | None = None, engineer_id: str | None = None
+) -> list[FrictionReport]:
     facets_q = db.query(SessionFacets)
-    if team_id:
+    if engineer_id:
+        facets_q = facets_q.join(SessionModel).filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
         facets_q = facets_q.join(SessionModel).join(Engineer).filter(Engineer.team_id == team_id)
 
     friction_counter: Counter[str] = Counter()
@@ -141,14 +157,16 @@ def get_friction_report(db: Session, team_id: str | None = None) -> list[Frictio
 
 
 def get_tool_rankings(
-    db: Session, team_id: str | None = None, limit: int = 20
+    db: Session, team_id: str | None = None, limit: int = 20, engineer_id: str | None = None
 ) -> list[ToolRanking]:
     q = db.query(
         ToolUsage.tool_name,
         func.sum(ToolUsage.call_count).label("total_calls"),
         func.count(func.distinct(ToolUsage.session_id)).label("session_count"),
     )
-    if team_id:
+    if engineer_id:
+        q = q.join(SessionModel).filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
         q = q.join(SessionModel).join(Engineer).filter(Engineer.team_id == team_id)
     q = q.group_by(ToolUsage.tool_name).order_by(func.sum(ToolUsage.call_count).desc())
     return [
@@ -157,14 +175,18 @@ def get_tool_rankings(
     ]
 
 
-def get_model_rankings(db: Session, team_id: str | None = None) -> list[ModelRanking]:
+def get_model_rankings(
+    db: Session, team_id: str | None = None, engineer_id: str | None = None
+) -> list[ModelRanking]:
     q = db.query(
         ModelUsage.model_name,
         func.sum(ModelUsage.input_tokens).label("total_input"),
         func.sum(ModelUsage.output_tokens).label("total_output"),
         func.count(func.distinct(ModelUsage.session_id)).label("session_count"),
     )
-    if team_id:
+    if engineer_id:
+        q = q.join(SessionModel).filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
         q = q.join(SessionModel).join(Engineer).filter(Engineer.team_id == team_id)
     q = q.group_by(ModelUsage.model_name).order_by(func.sum(ModelUsage.input_tokens).desc())
     return [
