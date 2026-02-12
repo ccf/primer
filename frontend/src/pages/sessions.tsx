@@ -8,18 +8,24 @@ import { TableSkeleton, ChartSkeleton } from "@/components/shared/loading-skelet
 import { EmptyState } from "@/components/shared/empty-state"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight } from "lucide-react"
+import { useKeyboardNavigation } from "@/hooks/use-keyboard-navigation"
+import type { DateRange } from "@/components/layout/date-range-picker"
 
 interface SessionsPageProps {
   teamId: string | null
+  dateRange: DateRange | null
 }
 
 const PAGE_SIZE = 50
 
-export function SessionsPage({ teamId }: SessionsPageProps) {
+export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
   const { user } = useAuth()
   const role = user?.role ?? "admin"
   const [engineerId, setEngineerId] = useState("")
   const [offset, setOffset] = useState(0)
+
+  const startDate = dateRange?.startDate
+  const endDate = dateRange?.endDate
 
   const { data: engineers } = useEngineers()
   const { data: sessions, isLoading: loadingSessions } = useSessions({
@@ -28,7 +34,12 @@ export function SessionsPage({ teamId }: SessionsPageProps) {
     limit: PAGE_SIZE,
     offset,
   })
-  const { data: friction, isLoading: loadingFriction } = useFriction(teamId)
+  const { data: friction, isLoading: loadingFriction } = useFriction(teamId, startDate, endDate)
+
+  const { selectedIndex } = useKeyboardNavigation({
+    items: sessions ?? [],
+    enabled: !loadingSessions && !!sessions && sessions.length > 0,
+  })
 
   return (
     <div className="space-y-6">
@@ -54,7 +65,7 @@ export function SessionsPage({ teamId }: SessionsPageProps) {
         <EmptyState message="No sessions found" />
       ) : (
         <>
-          <SessionTable sessions={sessions} />
+          <SessionTable sessions={sessions} selectedIndex={selectedIndex} />
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
               Showing {offset + 1}–{offset + sessions.length}

@@ -18,6 +18,11 @@ vi.mock("@/lib/auth-context", async () => {
   }
 })
 
+vi.mock("@/lib/theme-context", () => ({
+  ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
+  useTheme: vi.fn(() => ({ theme: "light", resolved: "light", setTheme: vi.fn() })),
+}))
+
 vi.mock("@/hooks/use-api-queries", () => ({
   useTeams: vi.fn(),
   useOverview: vi.fn().mockReturnValue({ data: undefined, isLoading: true }),
@@ -25,6 +30,7 @@ vi.mock("@/hooks/use-api-queries", () => ({
   useToolRankings: vi.fn().mockReturnValue({ data: undefined, isLoading: true }),
   useModelRankings: vi.fn().mockReturnValue({ data: undefined, isLoading: true }),
   useRecommendations: vi.fn().mockReturnValue({ data: undefined, isLoading: true }),
+  useCostAnalytics: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useEngineers: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useSessions: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useSessionDetail: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),

@@ -5,8 +5,9 @@ Aggregate Claude Code usage insights across an engineering organization.
 Primer is a self-hosted analytics platform with three components:
 
 1. **REST API Server** — FastAPI service that stores and analyzes session data
-2. **Claude Code Hook** — SessionEnd hook that automatically uploads transcripts after each session
-3. **MCP Sidecar** — Model Context Protocol server that lets Claude query your team's usage patterns
+2. **Frontend Dashboard** — React + Tailwind CSS dashboard with cost analysis, dark mode, and date filtering
+3. **Claude Code Hook** — SessionEnd hook that automatically uploads transcripts after each session
+4. **MCP Sidecar** — Model Context Protocol server that lets Claude query your team's usage patterns
 
 ## Quickstart
 
@@ -20,11 +21,22 @@ pip install -e ".[dev]"
 # Initialize the database
 alembic upgrade head
 
-# Start the server
+# Start the API server
 uvicorn primer.server.app:app --reload
 
 # (Optional) Seed sample data
 python scripts/seed_data.py
+```
+
+### Frontend Development
+
+```bash
+cd frontend
+npm install
+npm run dev        # Vite dev server on :5173
+npm run build      # Production build
+npm run lint       # ESLint
+npx tsc -b --noEmit  # Type check
 ```
 
 ### Docker Compose
@@ -53,7 +65,7 @@ services:
 
 ## API Reference
 
-All management and analytics endpoints require the `x-admin-key` header. Ingest endpoints authenticate via engineer API keys.
+All management and analytics endpoints require authentication. Ingest endpoints authenticate via engineer API keys. Analytics endpoints support optional `start_date` and `end_date` query parameters for date range filtering.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
@@ -68,13 +80,27 @@ All management and analytics endpoints require the `x-admin-key` header. Ingest 
 | POST | `/api/v1/ingest/facets/{session_id}` | API Key | Upsert session facets |
 | GET | `/api/v1/sessions` | Admin | List sessions (with filters) |
 | GET | `/api/v1/sessions/{session_id}` | Admin | Get session details |
-| GET | `/api/v1/analytics/overview` | Admin | Aggregate usage stats |
-| GET | `/api/v1/analytics/friction` | Admin | Friction point report |
-| GET | `/api/v1/analytics/tools` | Admin | Tool usage rankings |
-| GET | `/api/v1/analytics/models` | Admin | Model usage rankings |
-| GET | `/api/v1/analytics/recommendations` | Admin | Actionable recommendations |
+| GET | `/api/v1/analytics/overview` | JWT/Admin | Aggregate usage stats (includes estimated cost) |
+| GET | `/api/v1/analytics/daily` | JWT/Admin | Daily session/message/tool activity |
+| GET | `/api/v1/analytics/friction` | JWT/Admin | Friction point report |
+| GET | `/api/v1/analytics/tools` | JWT/Admin | Tool usage rankings |
+| GET | `/api/v1/analytics/models` | JWT/Admin | Model usage rankings |
+| GET | `/api/v1/analytics/costs` | JWT/Admin | Cost breakdown by model + daily cost trend |
+| GET | `/api/v1/analytics/recommendations` | JWT/Admin | Actionable recommendations |
+| GET | `/api/v1/auth/github/login` | None | Initiate GitHub OAuth login |
+| GET | `/api/v1/auth/github/callback` | None | GitHub OAuth callback |
+| GET | `/api/v1/auth/me` | JWT | Get current user info |
+| POST | `/api/v1/auth/logout` | JWT | Logout (revoke refresh token) |
 
 See [docs/api.md](docs/api.md) for full request/response schemas and examples.
+
+## Frontend Features
+
+- **Cost Analysis** — Estimated spend per model with daily cost trend charts
+- **Date Range Picker** — Filter all analytics by 7d / 30d / 90d / 1y
+- **Dark Mode** — Toggle between light, dark, and system themes (persisted in localStorage)
+- **Session Deep Links** — Copy-to-clipboard button on session detail pages
+- **Keyboard Navigation** — Arrow keys to navigate session tables, Enter to open
 
 ## MCP Sidecar Setup
 
@@ -126,6 +152,9 @@ All settings use the `PRIMER_` environment variable prefix.
 | `PRIMER_SERVER_HOST` | `0.0.0.0` | Server bind host |
 | `PRIMER_SERVER_PORT` | `8000` | Server bind port |
 | `PRIMER_LOG_LEVEL` | `info` | Logging level |
+| `PRIMER_GITHUB_CLIENT_ID` | — | GitHub OAuth app client ID |
+| `PRIMER_GITHUB_CLIENT_SECRET` | — | GitHub OAuth app client secret |
+| `PRIMER_JWT_SECRET` | — | Secret key for JWT token signing |
 
 For the hook and MCP sidecar:
 

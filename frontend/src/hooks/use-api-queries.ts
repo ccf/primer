@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { apiFetch } from "@/lib/api"
 import type {
+  CostAnalytics,
   DailyStatsResponse,
   EngineerResponse,
   FrictionReport,
@@ -13,8 +14,13 @@ import type {
   ToolRanking,
 } from "@/types/api"
 
-function teamParam(teamId: string | null) {
-  return teamId ? `?team_id=${teamId}` : ""
+function buildParams(params: Record<string, string | number | null | undefined>): string {
+  const sp = new URLSearchParams()
+  for (const [key, val] of Object.entries(params)) {
+    if (val != null && val !== "") sp.set(key, String(val))
+  }
+  const qs = sp.toString()
+  return qs ? `?${qs}` : ""
 }
 
 export function useTeams() {
@@ -31,49 +37,78 @@ export function useEngineers() {
   })
 }
 
-export function useOverview(teamId: string | null) {
+export function useOverview(teamId: string | null, startDate?: string, endDate?: string) {
   return useQuery({
-    queryKey: ["overview", teamId],
-    queryFn: () => apiFetch<OverviewStats>(`/api/v1/analytics/overview${teamParam(teamId)}`),
-  })
-}
-
-export function useDailyStats(teamId: string | null, days = 30) {
-  return useQuery({
-    queryKey: ["daily", teamId, days],
+    queryKey: ["overview", teamId, startDate, endDate],
     queryFn: () =>
-      apiFetch<DailyStatsResponse[]>(
-        `/api/v1/analytics/daily${teamParam(teamId)}${teamId ? "&" : "?"}days=${days}`,
+      apiFetch<OverviewStats>(
+        `/api/v1/analytics/overview${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
       ),
   })
 }
 
-export function useFriction(teamId: string | null) {
+export function useDailyStats(
+  teamId: string | null,
+  days = 30,
+  startDate?: string,
+  endDate?: string,
+) {
   return useQuery({
-    queryKey: ["friction", teamId],
-    queryFn: () => apiFetch<FrictionReport[]>(`/api/v1/analytics/friction${teamParam(teamId)}`),
-  })
-}
-
-export function useToolRankings(teamId: string | null) {
-  return useQuery({
-    queryKey: ["tools", teamId],
-    queryFn: () => apiFetch<ToolRanking[]>(`/api/v1/analytics/tools${teamParam(teamId)}`),
-  })
-}
-
-export function useModelRankings(teamId: string | null) {
-  return useQuery({
-    queryKey: ["models", teamId],
-    queryFn: () => apiFetch<ModelRanking[]>(`/api/v1/analytics/models${teamParam(teamId)}`),
-  })
-}
-
-export function useRecommendations(teamId: string | null) {
-  return useQuery({
-    queryKey: ["recommendations", teamId],
+    queryKey: ["daily", teamId, days, startDate, endDate],
     queryFn: () =>
-      apiFetch<Recommendation[]>(`/api/v1/analytics/recommendations${teamParam(teamId)}`),
+      apiFetch<DailyStatsResponse[]>(
+        `/api/v1/analytics/daily${buildParams({ team_id: teamId, days, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useFriction(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["friction", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<FrictionReport[]>(
+        `/api/v1/analytics/friction${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useToolRankings(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["tools", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<ToolRanking[]>(
+        `/api/v1/analytics/tools${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useModelRankings(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["models", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<ModelRanking[]>(
+        `/api/v1/analytics/models${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useRecommendations(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["recommendations", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<Recommendation[]>(
+        `/api/v1/analytics/recommendations${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useCostAnalytics(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["costs", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<CostAnalytics>(
+        `/api/v1/analytics/costs${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
   })
 }
 

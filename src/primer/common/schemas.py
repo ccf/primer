@@ -210,6 +210,7 @@ class OverviewStats(BaseModel):
     total_tool_calls: int
     total_input_tokens: int
     total_output_tokens: int
+    estimated_cost: float | None = None
     avg_session_duration: float | None
     avg_messages_per_session: float | None
     outcome_counts: dict[str, int]
@@ -253,3 +254,27 @@ class DailyStatsResponse(BaseModel):
     tool_call_count: int
 
     model_config = {"from_attributes": True}
+
+
+# --- Cost Analytics ---
+
+
+class ModelCostBreakdown(BaseModel):
+    model_name: str
+    input_tokens: int
+    output_tokens: int
+    cache_read_tokens: int
+    cache_creation_tokens: int
+    estimated_cost: float
+
+
+class DailyCostEntry(BaseModel):
+    date: date
+    estimated_cost: float
+    session_count: int
+
+
+class CostAnalytics(BaseModel):
+    total_estimated_cost: float
+    model_breakdown: list[ModelCostBreakdown]
+    daily_costs: list[DailyCostEntry]

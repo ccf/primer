@@ -243,6 +243,103 @@ def test_session_detail(client, engineer_with_key, admin_headers):
     assert len(data["tool_usages"]) == 1
 
 
+def test_cost_analytics(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 1_000_000,
+                "output_tokens": 500_000,
+            },
+        ],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        model_usages=[
+            {
+                "model_name": "claude-opus-4-20250514",
+                "input_tokens": 100_000,
+                "output_tokens": 50_000,
+            },
+        ],
+    )
+
+    r = client.get("/api/v1/analytics/costs", headers=admin_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total_estimated_cost"] > 0
+    assert len(data["model_breakdown"]) == 2
+    # Opus should cost more per token
+    opus = next(m for m in data["model_breakdown"] if "opus" in m["model_name"])
+    assert opus["estimated_cost"] > 0
+
+
+def test_overview_includes_estimated_cost(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 1000,
+                "output_tokens": 500,
+            },
+        ],
+    )
+    r = client.get("/api/v1/analytics/overview", headers=admin_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["estimated_cost"] is not None
+    assert data["estimated_cost"] > 0
+
+
+def test_date_range_filtering(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(client, api_key, started_at="2025-01-10T10:00:00", message_count=5)
+    _ingest_session(client, api_key, started_at="2025-01-20T10:00:00", message_count=10)
+    _ingest_session(client, api_key, started_at="2025-02-01T10:00:00", message_count=15)
+
+    # Filter to January only
+    r = client.get(
+        "/api/v1/analytics/overview?start_date=2025-01-01T00:00:00&end_date=2025-01-31T23:59:59",
+        headers=admin_headers,
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total_sessions"] == 2
+    assert data["total_messages"] == 15
+
+    # Filter to February
+    r = client.get(
+        "/api/v1/analytics/overview?start_date=2025-02-01T00:00:00&end_date=2025-02-28T23:59:59",
+        headers=admin_headers,
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total_sessions"] == 1
+    assert data["total_messages"] == 15
+
+
+def test_daily_stats_date_range(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(client, api_key, started_at="2025-03-01T10:00:00")
+    _ingest_session(client, api_key, started_at="2025-03-15T10:00:00")
+    _ingest_session(client, api_key, started_at="2025-04-01T10:00:00")
+
+    r = client.get(
+        "/api/v1/analytics/daily?start_date=2025-03-01T00:00:00&end_date=2025-03-31T23:59:59",
+        headers=admin_headers,
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) == 2
+
+
 def test_recommendations(client, engineer_with_key, admin_headers):
     _eng, api_key = engineer_with_key
     # Ingest enough sessions with friction to trigger recommendations

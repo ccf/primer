@@ -1,12 +1,16 @@
 import type { TeamResponse } from "@/types/api"
 import { useTeams } from "@/hooks/use-api-queries"
 import { useAuth } from "@/lib/auth-context"
+import { useTheme } from "@/lib/theme-context"
 import { clearApiKey, getApiKey } from "@/lib/api"
-import { LogOut } from "lucide-react"
+import { LogOut, Sun, Moon } from "lucide-react"
+import { DateRangePicker, type DateRange } from "./date-range-picker"
 
 interface HeaderProps {
   teamId: string | null
   onTeamChange: (id: string | null) => void
+  dateRange: DateRange | null
+  onDateRangeChange: (range: DateRange | null) => void
 }
 
 const roleBadgeColors: Record<string, string> = {
@@ -21,9 +25,10 @@ const roleLabels: Record<string, string> = {
   engineer: "Engineer",
 }
 
-export function Header({ teamId, onTeamChange }: HeaderProps) {
+export function Header({ teamId, onTeamChange, dateRange, onDateRangeChange }: HeaderProps) {
   const { data: teams } = useTeams()
   const { user, logout } = useAuth()
+  const { resolved, setTheme } = useTheme()
   const isApiKeyUser = !user && !!getApiKey()
   const role = user?.role ?? (isApiKeyUser ? "admin" : "engineer")
   const showTeamFilter = role === "admin"
@@ -36,6 +41,10 @@ export function Header({ teamId, onTeamChange }: HeaderProps) {
       clearApiKey()
       window.location.reload()
     }
+  }
+
+  const toggleTheme = () => {
+    setTheme(resolved === "dark" ? "light" : "dark")
   }
 
   return (
@@ -56,6 +65,8 @@ export function Header({ teamId, onTeamChange }: HeaderProps) {
             ))}
           </select>
         )}
+
+        <DateRangePicker value={dateRange} onChange={onDateRangeChange} />
 
         {user && (
           <div className="flex items-center gap-2">
@@ -80,6 +91,14 @@ export function Header({ teamId, onTeamChange }: HeaderProps) {
             </span>
           </div>
         )}
+
+        <button
+          onClick={toggleTheme}
+          className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          title={resolved === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          {resolved === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
 
         <button
           onClick={handleLogout}

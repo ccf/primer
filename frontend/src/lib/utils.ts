@@ -21,3 +21,8 @@ export function formatDuration(seconds: number | null | undefined): string {
 export function formatNumber(n: number): string {
   return n.toLocaleString()
 }
+
+export function formatCost(dollars: number): string {
+  if (dollars >= 1_000) return `$${(dollars / 1_000).toFixed(1)}K`
+  return `$${dollars.toFixed(2)}`
+}

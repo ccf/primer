@@ -1,28 +1,35 @@
-import { Activity, MessageSquare, Users, Wrench, Zap, FileCode } from "lucide-react"
+import { Activity, MessageSquare, Users, Wrench, Zap, FileCode, DollarSign } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
-import { useOverview, useDailyStats, useToolRankings, useModelRankings, useRecommendations } from "@/hooks/use-api-queries"
+import { useOverview, useDailyStats, useToolRankings, useModelRankings, useRecommendations, useCostAnalytics } from "@/hooks/use-api-queries"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { OutcomeChart } from "@/components/dashboard/outcome-chart"
 import { SessionTypeChart } from "@/components/dashboard/session-type-chart"
 import { DailyActivityChart } from "@/components/dashboard/daily-activity-chart"
 import { ToolRankingChart } from "@/components/dashboard/tool-ranking-chart"
 import { ModelUsageChart } from "@/components/dashboard/model-usage-chart"
+import { DailyCostChart } from "@/components/dashboard/daily-cost-chart"
+import { CostBreakdownChart } from "@/components/dashboard/cost-breakdown-chart"
 import { RecommendationsPanel } from "@/components/dashboard/recommendations-panel"
 import { CardSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleton"
-import { formatNumber, formatTokens, formatDuration } from "@/lib/utils"
+import { formatNumber, formatTokens, formatDuration, formatCost } from "@/lib/utils"
+import type { DateRange } from "@/components/layout/date-range-picker"
 
 interface OverviewPageProps {
   teamId: string | null
+  dateRange: DateRange | null
 }
 
-export function OverviewPage({ teamId }: OverviewPageProps) {
+export function OverviewPage({ teamId, dateRange }: OverviewPageProps) {
   const { user } = useAuth()
   const role = user?.role ?? "admin"
-  const { data: overview, isLoading: loadingOverview } = useOverview(teamId)
-  const { data: daily, isLoading: loadingDaily } = useDailyStats(teamId)
-  const { data: tools, isLoading: loadingTools } = useToolRankings(teamId)
-  const { data: models, isLoading: loadingModels } = useModelRankings(teamId)
-  const { data: recs, isLoading: loadingRecs } = useRecommendations(teamId)
+  const startDate = dateRange?.startDate
+  const endDate = dateRange?.endDate
+  const { data: overview, isLoading: loadingOverview } = useOverview(teamId, startDate, endDate)
+  const { data: daily, isLoading: loadingDaily } = useDailyStats(teamId, 30, startDate, endDate)
+  const { data: tools, isLoading: loadingTools } = useToolRankings(teamId, startDate, endDate)
+  const { data: models, isLoading: loadingModels } = useModelRankings(teamId, startDate, endDate)
+  const { data: recs, isLoading: loadingRecs } = useRecommendations(teamId, startDate, endDate)
+  const { data: costs, isLoading: loadingCosts } = useCostAnalytics(teamId, startDate, endDate)
 
   if (loadingOverview) {
     return (
@@ -62,9 +69,9 @@ export function OverviewPage({ teamId }: OverviewPageProps) {
           icon={MessageSquare}
         />
         <StatCard
-          label="Tool Calls"
-          value={formatNumber(overview.total_tool_calls)}
-          icon={Wrench}
+          label="Estimated Cost"
+          value={overview.estimated_cost != null ? formatCost(overview.estimated_cost) : "-"}
+          icon={DollarSign}
         />
       </div>
 
@@ -85,14 +92,28 @@ export function OverviewPage({ teamId }: OverviewPageProps) {
           icon={Activity}
         />
         <StatCard
-          label="Total Tokens"
-          value={formatTokens(overview.total_input_tokens + overview.total_output_tokens)}
-          icon={FileCode}
+          label="Tool Calls"
+          value={formatNumber(overview.total_tool_calls)}
+          icon={Wrench}
         />
       </div>
 
       {/* Daily Activity */}
       {loadingDaily ? <ChartSkeleton /> : daily && <DailyActivityChart data={daily} />}
+
+      {/* Daily Cost + Cost Breakdown */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {loadingCosts ? (
+          <ChartSkeleton />
+        ) : (
+          costs && costs.daily_costs.length > 0 && <DailyCostChart data={costs.daily_costs} />
+        )}
+        {loadingCosts ? (
+          <ChartSkeleton />
+        ) : (
+          costs && costs.model_breakdown.length > 0 && <CostBreakdownChart data={costs.model_breakdown} />
+        )}
+      </div>
 
       {/* Charts Grid */}
       <div className="grid gap-4 lg:grid-cols-2">

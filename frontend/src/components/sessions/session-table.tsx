@@ -1,15 +1,24 @@
+import { useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { format, parseISO } from "date-fns"
 import { Badge } from "@/components/ui/badge"
 import type { SessionResponse } from "@/types/api"
-import { formatDuration, formatTokens } from "@/lib/utils"
+import { formatDuration, formatTokens, cn } from "@/lib/utils"
 
 interface SessionTableProps {
   sessions: SessionResponse[]
+  selectedIndex?: number
 }
 
-export function SessionTable({ sessions }: SessionTableProps) {
+export function SessionTable({ sessions, selectedIndex = -1 }: SessionTableProps) {
   const navigate = useNavigate()
+  const selectedRef = useRef<HTMLTableRowElement>(null)
+
+  useEffect(() => {
+    if (selectedIndex >= 0 && selectedRef.current) {
+      selectedRef.current.scrollIntoView({ block: "nearest" })
+    }
+  }, [selectedIndex])
 
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
@@ -27,11 +36,15 @@ export function SessionTable({ sessions }: SessionTableProps) {
           </tr>
         </thead>
         <tbody>
-          {sessions.map((s) => (
+          {sessions.map((s, i) => (
             <tr
               key={s.id}
+              ref={i === selectedIndex ? selectedRef : undefined}
               onClick={() => navigate(`/sessions/${s.id}`)}
-              className="cursor-pointer border-b border-border transition-colors hover:bg-muted/30 last:border-0"
+              className={cn(
+                "cursor-pointer border-b border-border transition-colors hover:bg-muted/30 last:border-0",
+                i === selectedIndex && "ring-2 ring-ring ring-inset",
+              )}
             >
               <td className="px-4 py-3 font-medium">{s.project_name || s.project_path?.split("/").pop() || "-"}</td>
               <td className="px-4 py-3 text-muted-foreground">

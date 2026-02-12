@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 
 from primer.common.schemas import Recommendation
@@ -9,17 +11,25 @@ from primer.server.services.analytics_service import (
 
 
 def get_recommendations(
-    db: Session, team_id: str | None = None, engineer_id: str | None = None
+    db: Session,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
 ) -> list[Recommendation]:
     """Rule-based recommendation engine. Analyzes usage patterns and returns actionable recs."""
     recs: list[Recommendation] = []
-    overview = get_overview(db, team_id=team_id, engineer_id=engineer_id)
+    overview = get_overview(
+        db, team_id=team_id, engineer_id=engineer_id, start_date=start_date, end_date=end_date
+    )
 
     if overview.total_sessions == 0:
         return recs
 
     # High friction check
-    friction = get_friction_report(db, team_id=team_id, engineer_id=engineer_id)
+    friction = get_friction_report(
+        db, team_id=team_id, engineer_id=engineer_id, start_date=start_date, end_date=end_date
+    )
     for fr in friction:
         if fr.count >= 5:
             recs.append(
@@ -72,7 +82,14 @@ def get_recommendations(
             )
 
     # Tool diversity check
-    tools = get_tool_rankings(db, team_id=team_id, limit=5, engineer_id=engineer_id)
+    tools = get_tool_rankings(
+        db,
+        team_id=team_id,
+        limit=5,
+        engineer_id=engineer_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
     if tools and tools[0].total_calls > 0:
         top_tool_share = tools[0].total_calls / sum(t.total_calls for t in tools)
         if top_tool_share > 0.6:

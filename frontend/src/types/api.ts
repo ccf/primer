@@ -83,6 +83,7 @@ export interface OverviewStats {
   total_tool_calls: number
   total_input_tokens: number
   total_output_tokens: number
+  estimated_cost: number | null
   avg_session_duration: number | null
   avg_messages_per_session: number | null
   outcome_counts: Record<string, number>
@@ -121,4 +122,25 @@ export interface DailyStatsResponse {
   message_count: number
   session_count: number
   tool_call_count: number
+}
+
+export interface ModelCostBreakdown {
+  model_name: string
+  input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  cache_creation_tokens: number
+  estimated_cost: number
+}
+
+export interface DailyCostEntry {
+  date: string
+  estimated_cost: number
+  session_count: number
+}
+
+export interface CostAnalytics {
+  total_estimated_cost: number
+  model_breakdown: ModelCostBreakdown[]
+  daily_costs: DailyCostEntry[]
 }

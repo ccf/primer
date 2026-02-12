@@ -8,6 +8,7 @@ vi.mock("@/hooks/use-api-queries", () => ({
   useToolRankings: vi.fn(),
   useModelRankings: vi.fn(),
   useRecommendations: vi.fn(),
+  useCostAnalytics: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useTeams: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useEngineers: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useSessions: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
@@ -37,6 +38,7 @@ const mockOverview = {
   total_tool_calls: 200,
   total_input_tokens: 50000,
   total_output_tokens: 25000,
+  estimated_cost: 12.50,
   avg_session_duration: 120,
   avg_messages_per_session: 5,
   outcome_counts: { success: 80, partial: 20 },
@@ -66,7 +68,7 @@ describe("OverviewPage", () => {
   const renderPage = () =>
     render(
       <MemoryRouter>
-        <OverviewPage teamId={null} />
+        <OverviewPage teamId={null} dateRange={null} />
       </MemoryRouter>,
     )
 
