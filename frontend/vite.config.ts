@@ -16,4 +16,15 @@ export default defineConfig({
       "/health": "http://localhost:8000",
     },
   },
+  test: {
+    globals: true,
+    environment: "jsdom",
+    setupFiles: ["./src/test-setup.ts"],
+    css: false,
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/main.tsx", "src/test-setup.ts", "src/**/*.test.{ts,tsx}", "src/types/**"],
+    },
+  },
 })
