@@ -9,6 +9,10 @@ const engineers: EngineerResponse[] = [
     name: "Alice",
     email: "a@t.com",
     team_id: "t1",
+    role: "engineer",
+    avatar_url: null,
+    github_username: null,
+    display_name: null,
     created_at: "2025-01-15T00:00:00",
   },
   {
@@ -16,6 +20,10 @@ const engineers: EngineerResponse[] = [
     name: "Bob",
     email: "b@t.com",
     team_id: null,
+    role: "engineer",
+    avatar_url: null,
+    github_username: null,
+    display_name: null,
     created_at: "2025-02-01T00:00:00",
   },
 ]
@@ -32,10 +40,9 @@ describe("EngineerTable", () => {
   it("renders table headers", () => {
     render(<EngineerTable engineers={engineers} teams={teams} />)
 
-    const headers = ["Name", "Email", "Team", "Joined"]
-    for (const header of headers) {
-      expect(screen.getByText(header)).toBeInTheDocument()
-    }
+    const headerRow = screen.getAllByRole("columnheader")
+    const headerTexts = headerRow.map((th) => th.textContent)
+    expect(headerTexts).toEqual(["Engineer", "Email", "Role", "Team", "Joined"])
   })
 
   it("renders engineer data", () => {
@@ -60,6 +67,6 @@ describe("EngineerTable", () => {
     // Row 0 is header, row 1 is Alice (has team), row 2 is Bob (no team)
     const bobRow = rows[2]
     const cells = bobRow.querySelectorAll("td")
-    expect(cells[2]).toHaveTextContent("-")
+    expect(cells[3]).toHaveTextContent("-")
   })
 })

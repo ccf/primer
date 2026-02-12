@@ -9,6 +9,10 @@ const engineers: EngineerResponse[] = [
     name: "Alice",
     email: "a@t.com",
     team_id: "t1",
+    role: "engineer",
+    avatar_url: null,
+    github_username: null,
+    display_name: null,
     created_at: "2025-01-01T00:00:00",
   },
 ]

@@ -96,6 +96,7 @@ describe("apiFetch", () => {
     await apiFetch("/api/v1/test")
 
     expect(mockFetch).toHaveBeenCalledWith("/api/v1/test", {
+      credentials: "include",
       headers: expect.objectContaining({
         "Content-Type": "application/json",
       }),
@@ -109,6 +110,7 @@ describe("apiFetch", () => {
     await apiFetch("/api/v1/test")
 
     expect(mockFetch).toHaveBeenCalledWith("/api/v1/test", {
+      credentials: "include",
       headers: expect.objectContaining({
         "Content-Type": "application/json",
         "x-admin-key": "admin-key-456",
@@ -145,6 +147,7 @@ describe("apiFetch", () => {
   })
 
   it("on 403 throws ApiError with status 403 and 'Unauthorized' message", async () => {
+    storageMap.set("primer_admin_key", "some-key")
     mockFetch.mockResolvedValue(mockResponse(403, "Forbidden"))
 
     await expect(apiFetch("/api/v1/test")).rejects.toThrow(
@@ -188,6 +191,7 @@ describe("apiFetch", () => {
     })
 
     expect(mockFetch).toHaveBeenCalledWith("/api/v1/test", {
+      credentials: "include",
       headers: expect.objectContaining({
         "Content-Type": "application/json",
         "X-Custom-Header": "custom-value",
@@ -206,6 +210,7 @@ describe("apiFetch", () => {
     expect(mockFetch).toHaveBeenCalledWith("/api/v1/test", {
       method: "POST",
       body: JSON.stringify({ name: "new item" }),
+      credentials: "include",
       headers: expect.objectContaining({
         "Content-Type": "application/json",
       }),

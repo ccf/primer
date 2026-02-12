@@ -6,6 +6,7 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-json
+        exclude: ^frontend/tsconfig
       - id: check-added-large-files
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -20,3 +21,21 @@ repos:
     hooks:
       - id: bandit
         args: [-r, src/, -c, pyproject.toml]
+        pass_filenames: false
+
+  - repo: local
+    hooks:
+      - id: frontend-eslint
+        name: frontend-eslint
+        entry: bash -c 'cd frontend && npx eslint src'
+        language: system
+        types_or: [ts, tsx]
+        files: ^frontend/src/
+        pass_filenames: false
+      - id: frontend-tsc
+        name: frontend-tsc
+        entry: bash -c 'cd frontend && npx tsc -b --noEmit'
+        language: system
+        types_or: [ts, tsx]
+        files: ^frontend/src/
+        pass_filenames: false

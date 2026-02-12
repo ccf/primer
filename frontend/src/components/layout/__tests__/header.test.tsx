@@ -1,4 +1,5 @@
 import { render, screen, fireEvent } from "@testing-library/react"
+import { vi, describe, it, expect, beforeEach } from "vitest"
 import { Header } from "../header"
 
 const mockUseTeams = vi.fn()
@@ -8,9 +9,17 @@ vi.mock("@/hooks/use-api-queries", () => ({
 }))
 
 const mockClearApiKey = vi.fn()
+const mockGetApiKey = vi.fn()
 
 vi.mock("@/lib/api", () => ({
   clearApiKey: () => mockClearApiKey(),
+  getApiKey: () => mockGetApiKey(),
+}))
+
+const mockLogout = vi.fn().mockResolvedValue(undefined)
+
+vi.mock("@/lib/auth-context", () => ({
+  useAuth: () => ({ user: null, logout: mockLogout }),
 }))
 
 describe("Header", () => {
@@ -19,6 +28,8 @@ describe("Header", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockUseTeams.mockReturnValue({ data: undefined })
+    // Default: API key auth (admin role, team filter visible)
+    mockGetApiKey.mockReturnValue("test-key")
   })
 
   it("renders the 'All teams' default option", () => {

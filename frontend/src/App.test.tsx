@@ -1,3 +1,4 @@
+import type React from "react"
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 
@@ -7,6 +8,15 @@ vi.mock("@/lib/api", () => ({
   clearApiKey: vi.fn(),
   apiFetch: vi.fn(),
 }))
+
+vi.mock("@/lib/auth-context", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/auth-context")>("@/lib/auth-context")
+  return {
+    ...actual,
+    AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+    useAuth: vi.fn(() => ({ user: null, loading: false, login: vi.fn(), logout: vi.fn() })),
+  }
+})
 
 vi.mock("@/hooks/use-api-queries", () => ({
   useTeams: vi.fn(),
@@ -42,7 +52,7 @@ describe("App", () => {
 
     render(<App />)
     expect(screen.getByText("Primer Dashboard")).toBeInTheDocument()
-    expect(screen.getByPlaceholderText("primer-admin-dev-key")).toBeInTheDocument()
+    expect(screen.getByText("Sign in with GitHub")).toBeInTheDocument()
   })
 
   it("shows app shell with navigation when API key is present", () => {

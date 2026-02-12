@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react"
 import type { AuthUser } from "@/types/auth"
-import { getApiKey, clearApiKey } from "@/lib/api"
+import { clearApiKey } from "@/lib/api"
 
 interface AuthContextValue {
   user: AuthUser | null
@@ -16,6 +16,7 @@ const AuthContext = createContext<AuthContextValue>({
   logout: async () => {},
 })
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   return useContext(AuthContext)
 }

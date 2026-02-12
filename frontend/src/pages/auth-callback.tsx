@@ -1,27 +1,28 @@
 import { useEffect, useState } from "react"
-import { useNavigate, useSearchParams } from "react-router-dom"
+import { useSearchParams } from "react-router-dom"
 import { BarChart3, Loader2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 export function AuthCallbackPage() {
   const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
-  const [error, setError] = useState("")
+  const [fetchError, setFetchError] = useState("")
+
+  const code = searchParams.get("code")
+  const state = searchParams.get("state")
+
+  // Derive validation errors during render instead of setting state in an effect
+  const validationError =
+    !code || !state
+      ? "Missing authorization code or state"
+      : state !== sessionStorage.getItem("primer_oauth_state")
+        ? "Invalid OAuth state — possible CSRF attack"
+        : ""
+
+  const error = validationError || fetchError
 
   useEffect(() => {
-    const code = searchParams.get("code")
-    const state = searchParams.get("state")
-    const savedState = sessionStorage.getItem("primer_oauth_state")
-
-    if (!code || !state) {
-      setError("Missing authorization code or state")
-      return
-    }
-
-    if (state !== savedState) {
-      setError("Invalid OAuth state — possible CSRF attack")
-      return
-    }
+    if (!code || !state) return
+    if (state !== sessionStorage.getItem("primer_oauth_state")) return
 
     sessionStorage.removeItem("primer_oauth_state")
 
@@ -40,9 +41,9 @@ export function AuthCallbackPage() {
         window.location.href = "/"
       })
       .catch((err) => {
-        setError(err.message || "Authentication failed")
+        setFetchError(err.message || "Authentication failed")
       })
-  }, [searchParams, navigate])
+  }, [code, state])
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
