@@ -4,9 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from primer.common.database import get_db
+from primer.common.models import Engineer
 from primer.common.models import Session as SessionModel
 from primer.common.schemas import SessionDetailResponse, SessionResponse
-from primer.server.deps import require_admin
+from primer.server.deps import AuthContext, get_auth_context
 
 router = APIRouter(prefix="/api/v1/sessions", tags=["sessions"])
 
@@ -20,14 +21,22 @@ def list_sessions(
     limit: int = Query(default=100, le=1000),
     offset: int = 0,
     db: Session = Depends(get_db),
-    _admin: str = Depends(require_admin),
+    auth: AuthContext = Depends(get_auth_context),
 ):
     q = db.query(SessionModel)
-    if engineer_id:
-        q = q.filter(SessionModel.engineer_id == engineer_id)
-    if team_id:
-        from primer.common.models import Engineer
-        q = q.join(Engineer).filter(Engineer.team_id == team_id)
+
+    # Role-based scoping
+    if auth.role == "engineer":
+        q = q.filter(SessionModel.engineer_id == auth.engineer_id)
+    elif auth.role == "team_lead":
+        q = q.join(Engineer).filter(Engineer.team_id == auth.team_id)
+    else:
+        # Admin: apply optional filters
+        if engineer_id:
+            q = q.filter(SessionModel.engineer_id == engineer_id)
+        if team_id:
+            q = q.join(Engineer).filter(Engineer.team_id == team_id)
+
     if start_date:
         q = q.filter(SessionModel.started_at >= start_date)
     if end_date:
@@ -39,9 +48,18 @@ def list_sessions(
 def get_session(
     session_id: str,
     db: Session = Depends(get_db),
-    _admin: str = Depends(require_admin),
+    auth: AuthContext = Depends(get_auth_context),
 ):
     session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+
+    # Role-based ownership check
+    if auth.role == "engineer" and session.engineer_id != auth.engineer_id:
+        raise HTTPException(status_code=403, detail="Not your session")
+    if auth.role == "team_lead":
+        eng = db.query(Engineer).filter(Engineer.id == session.engineer_id).first()
+        if not eng or eng.team_id != auth.team_id:
+            raise HTTPException(status_code=403, detail="Not your team's session")
+
     return session

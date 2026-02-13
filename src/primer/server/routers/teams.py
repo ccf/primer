@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from primer.common.database import get_db
 from primer.common.models import Team
 from primer.common.schemas import TeamCreate, TeamResponse
-from primer.server.deps import require_admin
+from primer.server.deps import AuthContext, get_auth_context, require_role
 
 router = APIRouter(prefix="/api/v1/teams", tags=["teams"])
 
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/v1/teams", tags=["teams"])
 def create_team(
     payload: TeamCreate,
     db: Session = Depends(get_db),
-    _admin: str = Depends(require_admin),
+    auth: AuthContext = Depends(require_role("admin")),
 ):
     existing = db.query(Team).filter(Team.name == payload.name).first()
     if existing:
@@ -29,6 +29,11 @@ def create_team(
 @router.get("", response_model=list[TeamResponse])
 def list_teams(
     db: Session = Depends(get_db),
-    _admin: str = Depends(require_admin),
+    auth: AuthContext = Depends(get_auth_context),
 ):
-    return db.query(Team).all()
+    if auth.role == "admin":
+        return db.query(Team).all()
+    # engineer and team_lead: only own team
+    if auth.team_id:
+        return db.query(Team).filter(Team.id == auth.team_id).all()
+    return []

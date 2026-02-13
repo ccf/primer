@@ -20,19 +20,19 @@ def engine():
     Base.metadata.create_all(eng)
     yield eng
     Base.metadata.drop_all(eng)
+    import contextlib
     import os
-    try:
+
+    with contextlib.suppress(FileNotFoundError):
         os.remove("test_primer.db")
-    except FileNotFoundError:
-        pass
 
 
 @pytest.fixture
 def db_session(engine):
     connection = engine.connect()
     transaction = connection.begin()
-    TestingSession = sessionmaker(bind=connection)
-    session = TestingSession()
+    testing_session = sessionmaker(bind=connection)
+    session = testing_session()
     yield session
     session.close()
     transaction.rollback()
@@ -63,7 +63,9 @@ def engineer_with_key(db_session):
     team = Team(name="Test Team")
     db_session.add(team)
     db_session.flush()
-    eng = Engineer(name="Test Engineer", email="test@example.com", team_id=team.id, api_key_hash=hashed)
+    eng = Engineer(
+        name="Test Engineer", email="test@example.com", team_id=team.id, api_key_hash=hashed
+    )
     db_session.add(eng)
     db_session.flush()
     return eng, raw_key

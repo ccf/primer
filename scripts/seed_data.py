@@ -1,10 +1,8 @@
 """Seed the database with test data for development."""
 
-import secrets
 import uuid
 from datetime import datetime, timedelta
 
-import bcrypt
 import httpx
 
 SERVER_URL = "http://localhost:8000"
@@ -27,13 +25,13 @@ def main():
     # Create engineers
     engineers = []
     engineer_data = [
-        ("Alice Chen", "alice@example.com", 0),
-        ("Bob Smith", "bob@example.com", 0),
-        ("Carol Davis", "carol@example.com", 1),
-        ("Dan Wilson", "dan@example.com", 1),
-        ("Eve Martinez", "eve@example.com", 2),
+        ("Alice Chen", "alice@example.com", 0, "admin", "alicechen", 1001),
+        ("Bob Smith", "bob@example.com", 0, "team_lead", "bobsmith", 1002),
+        ("Carol Davis", "carol@example.com", 1, "team_lead", "caroldavis", 1003),
+        ("Dan Wilson", "dan@example.com", 1, "engineer", "danwilson", 1004),
+        ("Eve Martinez", "eve@example.com", 2, "engineer", "evemartinez", 1005),
     ]
-    for name, email, team_idx in engineer_data:
+    for name, email, team_idx, role, _github_user, _github_id in engineer_data:
         team_id = teams[team_idx]["id"] if teams else None
         r = httpx.post(
             f"{SERVER_URL}/api/v1/engineers",
@@ -44,6 +42,14 @@ def main():
             data = r.json()
             engineers.append(data)
             print(f"Created engineer: {name} (key: {data['api_key'][:20]}...)")
+
+            # Set role and GitHub fields via PATCH
+            eng_id = data["engineer"]["id"]
+            httpx.patch(
+                f"{SERVER_URL}/api/v1/engineers/{eng_id}",
+                json={"role": role},
+                headers=ADMIN_HEADERS,
+            )
         elif r.status_code == 409:
             print(f"Engineer {email} already exists")
 
@@ -59,6 +65,7 @@ def main():
     friction_types = ["tool_error", "permission_denied", "timeout", "context_limit"]
 
     import random
+
     random.seed(42)
 
     now = datetime.utcnow()
@@ -75,8 +82,7 @@ def main():
                 # Random tool usages
                 session_tools = random.sample(tools, k=random.randint(1, min(4, len(tools))))
                 tool_usages = [
-                    {"tool_name": t, "call_count": random.randint(1, 15)}
-                    for t in session_tools
+                    {"tool_name": t, "call_count": random.randint(1, 15)} for t in session_tools
                 ]
 
                 # Random model usage
@@ -91,8 +97,9 @@ def main():
                     if random.random() < 0.3:
                         ft = random.choice(friction_types)
                         friction = {ft: random.randint(1, 5)}
+                    goal = random.choice(["feature", "bug fix", "refactor", "docs"])
                     facets = {
-                        "underlying_goal": f"Working on {random.choice(['feature', 'bug fix', 'refactor', 'docs'])}",
+                        "underlying_goal": f"Working on {goal}",
                         "outcome": outcome,
                         "session_type": random.choice(session_types),
                         "brief_summary": f"Session on day -{day_offset}",
@@ -102,8 +109,12 @@ def main():
                 payload = {
                     "session_id": session_id,
                     "api_key": api_key,
-                    "project_name": random.choice(["api-service", "web-app", "cli-tool", "shared-lib"]),
-                    "started_at": (now - timedelta(days=day_offset, hours=random.randint(0, 8))).isoformat(),
+                    "project_name": random.choice(
+                        ["api-service", "web-app", "cli-tool", "shared-lib"]
+                    ),
+                    "started_at": (
+                        now - timedelta(days=day_offset, hours=random.randint(0, 8))
+                    ).isoformat(),
                     "duration_seconds": duration,
                     "message_count": msg_count,
                     "user_message_count": msg_count // 2,
@@ -115,7 +126,11 @@ def main():
                     "first_prompt": "Help me with this task",
                     "tool_usages": tool_usages,
                     "model_usages": [
-                        {"model_name": model, "input_tokens": inp_tokens, "output_tokens": out_tokens}
+                        {
+                            "model_name": model,
+                            "input_tokens": inp_tokens,
+                            "output_tokens": out_tokens,
+                        }
                     ],
                     "facets": facets,
                 }

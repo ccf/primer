@@ -36,7 +36,12 @@ class Engineer(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     team_id: Mapped[str | None] = mapped_column(ForeignKey("teams.id"), nullable=True)
-    api_key_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    api_key_hash: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    role: Mapped[str] = mapped_column(String(20), nullable=False, server_default="engineer")
+    github_id: Mapped[int | None] = mapped_column(Integer, unique=True, nullable=True)
+    github_username: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    avatar_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
@@ -46,6 +51,7 @@ class Engineer(Base):
     sessions: Mapped[list["Session"]] = relationship(back_populates="engineer")
     daily_stats: Mapped[list["DailyStats"]] = relationship(back_populates="engineer")
     ingest_events: Mapped[list["IngestEvent"]] = relationship(back_populates="engineer")
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="engineer")
 
 
 class Session(Base):
@@ -95,9 +101,7 @@ class SessionFacets(Base):
     __tablename__ = "session_facets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    session_id: Mapped[str] = mapped_column(
-        ForeignKey("sessions.id"), nullable=False, unique=True
-    )
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), nullable=False, unique=True)
     underlying_goal: Mapped[str | None] = mapped_column(Text)
     goal_categories: Mapped[dict | None] = mapped_column(JSON)
     outcome: Mapped[str | None] = mapped_column(String(50))
@@ -165,3 +169,16 @@ class IngestEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     engineer: Mapped[Engineer] = relationship(back_populates="ingest_events")
+
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    engineer_id: Mapped[str] = mapped_column(ForeignKey("engineers.id"), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    engineer: Mapped[Engineer] = relationship(back_populates="refresh_tokens")

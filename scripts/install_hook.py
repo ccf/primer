@@ -5,7 +5,6 @@ triggers data upload to the Primer server.
 """
 
 import json
-import sys
 from pathlib import Path
 
 
@@ -33,10 +32,12 @@ def install_hook() -> None:
             print("Primer hook already installed.")
             return
 
-    session_end_hooks.append({
-        "command": hook_command,
-        "timeout": 10000,
-    })
+    session_end_hooks.append(
+        {
+            "command": hook_command,
+            "timeout": 10000,
+        }
+    )
 
     with open(settings_path, "w") as f:
         json.dump(settings, f, indent=2)

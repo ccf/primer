@@ -28,19 +28,31 @@ def test_overview_empty(client, admin_headers):
 
 
 def test_overview_with_data(client, engineer_with_key, admin_headers):
-    eng, api_key = engineer_with_key
-    _ingest_session(client, api_key, facets={
-        "outcome": "success",
-        "session_type": "feature",
-    })
-    _ingest_session(client, api_key, facets={
-        "outcome": "success",
-        "session_type": "debugging",
-    })
-    _ingest_session(client, api_key, facets={
-        "outcome": "partial",
-        "session_type": "feature",
-    })
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        facets={
+            "outcome": "success",
+            "session_type": "feature",
+        },
+    )
+    _ingest_session(
+        client,
+        api_key,
+        facets={
+            "outcome": "success",
+            "session_type": "debugging",
+        },
+    )
+    _ingest_session(
+        client,
+        api_key,
+        facets={
+            "outcome": "partial",
+            "session_type": "feature",
+        },
+    )
 
     r = client.get("/api/v1/analytics/overview", headers=admin_headers)
     assert r.status_code == 200
@@ -54,15 +66,23 @@ def test_overview_with_data(client, engineer_with_key, admin_headers):
 
 
 def test_tool_rankings(client, engineer_with_key, admin_headers):
-    eng, api_key = engineer_with_key
-    _ingest_session(client, api_key, tool_usages=[
-        {"tool_name": "Read", "call_count": 10},
-        {"tool_name": "Edit", "call_count": 5},
-    ])
-    _ingest_session(client, api_key, tool_usages=[
-        {"tool_name": "Read", "call_count": 8},
-        {"tool_name": "Bash", "call_count": 3},
-    ])
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        tool_usages=[
+            {"tool_name": "Read", "call_count": 10},
+            {"tool_name": "Edit", "call_count": 5},
+        ],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        tool_usages=[
+            {"tool_name": "Read", "call_count": 8},
+            {"tool_name": "Bash", "call_count": 3},
+        ],
+    )
 
     r = client.get("/api/v1/analytics/tools", headers=admin_headers)
     assert r.status_code == 200
@@ -73,14 +93,30 @@ def test_tool_rankings(client, engineer_with_key, admin_headers):
 
 
 def test_model_rankings(client, engineer_with_key, admin_headers):
-    eng, api_key = engineer_with_key
-    _ingest_session(client, api_key, model_usages=[
-        {"model_name": "claude-sonnet-4-5-20250929", "input_tokens": 1000, "output_tokens": 500},
-    ])
-    _ingest_session(client, api_key, model_usages=[
-        {"model_name": "claude-sonnet-4-5-20250929", "input_tokens": 2000, "output_tokens": 1000},
-        {"model_name": "claude-haiku-3.5", "input_tokens": 100, "output_tokens": 50},
-    ])
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 1000,
+                "output_tokens": 500,
+            },
+        ],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 2000,
+                "output_tokens": 1000,
+            },
+            {"model_name": "claude-haiku-3.5", "input_tokens": 100, "output_tokens": 50},
+        ],
+    )
 
     r = client.get("/api/v1/analytics/models", headers=admin_headers)
     assert r.status_code == 200
@@ -90,15 +126,23 @@ def test_model_rankings(client, engineer_with_key, admin_headers):
 
 
 def test_friction_report(client, engineer_with_key, admin_headers):
-    eng, api_key = engineer_with_key
-    _ingest_session(client, api_key, facets={
-        "friction_counts": {"tool_error": 3, "permission_denied": 1},
-        "friction_detail": "Tool failed on large files",
-    })
-    _ingest_session(client, api_key, facets={
-        "friction_counts": {"tool_error": 2},
-        "friction_detail": "Timeout on edit",
-    })
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        facets={
+            "friction_counts": {"tool_error": 3, "permission_denied": 1},
+            "friction_detail": "Tool failed on large files",
+        },
+    )
+    _ingest_session(
+        client,
+        api_key,
+        facets={
+            "friction_counts": {"tool_error": 2},
+            "friction_detail": "Timeout on edit",
+        },
+    )
 
     r = client.get("/api/v1/analytics/friction", headers=admin_headers)
     assert r.status_code == 200
@@ -108,8 +152,71 @@ def test_friction_report(client, engineer_with_key, admin_headers):
     assert tool_error["count"] == 5
 
 
+def test_daily_stats_endpoint(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        started_at="2025-01-15T10:00:00",
+        message_count=10,
+        tool_call_count=5,
+    )
+    _ingest_session(
+        client,
+        api_key,
+        started_at="2025-01-15T14:00:00",
+        message_count=8,
+        tool_call_count=3,
+    )
+    _ingest_session(
+        client,
+        api_key,
+        started_at="2025-01-16T09:00:00",
+        message_count=12,
+        tool_call_count=7,
+    )
+
+    r = client.get("/api/v1/analytics/daily", headers=admin_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) >= 2
+
+    # Results are ordered by date descending
+    day_16 = next(d for d in data if d["date"] == "2025-01-16")
+    assert day_16["session_count"] == 1
+    assert day_16["message_count"] == 12
+    assert day_16["tool_call_count"] == 7
+
+    day_15 = next(d for d in data if d["date"] == "2025-01-15")
+    assert day_15["session_count"] == 2
+    assert day_15["message_count"] == 18
+    assert day_15["tool_call_count"] == 8
+
+
+def test_daily_stats_with_team_filter(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(client, api_key, started_at="2025-02-01T10:00:00")
+
+    # Filter by the engineer's team
+    r = client.get(
+        f"/api/v1/analytics/daily?team_id={_eng.team_id}",
+        headers=admin_headers,
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) >= 1
+
+    # Filter by non-existent team
+    r = client.get(
+        "/api/v1/analytics/daily?team_id=nonexistent",
+        headers=admin_headers,
+    )
+    assert r.status_code == 200
+    assert r.json() == []
+
+
 def test_sessions_list(client, engineer_with_key, admin_headers):
-    eng, api_key = engineer_with_key
+    _eng, api_key = engineer_with_key
     sid = _ingest_session(client, api_key, project_name="my-project")
 
     r = client.get("/api/v1/sessions", headers=admin_headers)
@@ -119,8 +226,10 @@ def test_sessions_list(client, engineer_with_key, admin_headers):
 
 
 def test_session_detail(client, engineer_with_key, admin_headers):
-    eng, api_key = engineer_with_key
-    sid = _ingest_session(client, api_key,
+    _eng, api_key = engineer_with_key
+    sid = _ingest_session(
+        client,
+        api_key,
         tool_usages=[{"tool_name": "Read", "call_count": 5}],
         facets={"outcome": "success", "brief_summary": "Fixed it"},
     )
@@ -134,14 +243,115 @@ def test_session_detail(client, engineer_with_key, admin_headers):
     assert len(data["tool_usages"]) == 1
 
 
+def test_cost_analytics(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 1_000_000,
+                "output_tokens": 500_000,
+            },
+        ],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        model_usages=[
+            {
+                "model_name": "claude-opus-4-20250514",
+                "input_tokens": 100_000,
+                "output_tokens": 50_000,
+            },
+        ],
+    )
+
+    r = client.get("/api/v1/analytics/costs", headers=admin_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total_estimated_cost"] > 0
+    assert len(data["model_breakdown"]) == 2
+    # Opus should cost more per token
+    opus = next(m for m in data["model_breakdown"] if "opus" in m["model_name"])
+    assert opus["estimated_cost"] > 0
+
+
+def test_overview_includes_estimated_cost(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 1000,
+                "output_tokens": 500,
+            },
+        ],
+    )
+    r = client.get("/api/v1/analytics/overview", headers=admin_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["estimated_cost"] is not None
+    assert data["estimated_cost"] > 0
+
+
+def test_date_range_filtering(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(client, api_key, started_at="2025-01-10T10:00:00", message_count=5)
+    _ingest_session(client, api_key, started_at="2025-01-20T10:00:00", message_count=10)
+    _ingest_session(client, api_key, started_at="2025-02-01T10:00:00", message_count=15)
+
+    # Filter to January only
+    r = client.get(
+        "/api/v1/analytics/overview?start_date=2025-01-01T00:00:00&end_date=2025-01-31T23:59:59",
+        headers=admin_headers,
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total_sessions"] == 2
+    assert data["total_messages"] == 15
+
+    # Filter to February
+    r = client.get(
+        "/api/v1/analytics/overview?start_date=2025-02-01T00:00:00&end_date=2025-02-28T23:59:59",
+        headers=admin_headers,
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total_sessions"] == 1
+    assert data["total_messages"] == 15
+
+
+def test_daily_stats_date_range(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(client, api_key, started_at="2025-03-01T10:00:00")
+    _ingest_session(client, api_key, started_at="2025-03-15T10:00:00")
+    _ingest_session(client, api_key, started_at="2025-04-01T10:00:00")
+
+    r = client.get(
+        "/api/v1/analytics/daily?start_date=2025-03-01T00:00:00&end_date=2025-03-31T23:59:59",
+        headers=admin_headers,
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) == 2
+
+
 def test_recommendations(client, engineer_with_key, admin_headers):
-    eng, api_key = engineer_with_key
+    _eng, api_key = engineer_with_key
     # Ingest enough sessions with friction to trigger recommendations
     for _ in range(6):
-        _ingest_session(client, api_key, facets={
-            "friction_counts": {"tool_error": 2},
-            "friction_detail": "Something went wrong",
-        })
+        _ingest_session(
+            client,
+            api_key,
+            facets={
+                "friction_counts": {"tool_error": 2},
+                "friction_detail": "Something went wrong",
+            },
+        )
 
     r = client.get("/api/v1/analytics/recommendations", headers=admin_headers)
     assert r.status_code == 200

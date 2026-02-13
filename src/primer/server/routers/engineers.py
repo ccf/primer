@@ -10,9 +10,10 @@ from primer.common.schemas import (
     EngineerCreate,
     EngineerCreateResponse,
     EngineerResponse,
+    EngineerUpdate,
     SessionResponse,
 )
-from primer.server.deps import require_admin
+from primer.server.deps import AuthContext, get_auth_context, require_role
 
 router = APIRouter(prefix="/api/v1/engineers", tags=["engineers"])
 
@@ -21,7 +22,7 @@ router = APIRouter(prefix="/api/v1/engineers", tags=["engineers"])
 def create_engineer(
     payload: EngineerCreate,
     db: Session = Depends(get_db),
-    _admin: str = Depends(require_admin),
+    auth: AuthContext = Depends(require_role("admin")),
 ):
     existing = db.query(Engineer).filter(Engineer.email == payload.email).first()
     if existing:
@@ -39,14 +40,20 @@ def create_engineer(
     db.add(engineer)
     db.commit()
     db.refresh(engineer)
-    return EngineerCreateResponse(engineer=EngineerResponse.model_validate(engineer), api_key=raw_key)
+    return EngineerCreateResponse(
+        engineer=EngineerResponse.model_validate(engineer), api_key=raw_key
+    )
 
 
 @router.get("", response_model=list[EngineerResponse])
 def list_engineers(
     db: Session = Depends(get_db),
-    _admin: str = Depends(require_admin),
+    auth: AuthContext = Depends(get_auth_context),
 ):
+    if auth.role == "engineer":
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    if auth.role == "team_lead":
+        return db.query(Engineer).filter(Engineer.team_id == auth.team_id).all()
     return db.query(Engineer).all()
 
 
@@ -54,9 +61,39 @@ def list_engineers(
 def list_engineer_sessions(
     engineer_id: str,
     db: Session = Depends(get_db),
-    _admin: str = Depends(require_admin),
+    auth: AuthContext = Depends(get_auth_context),
 ):
     engineer = db.query(Engineer).filter(Engineer.id == engineer_id).first()
     if not engineer:
         raise HTTPException(status_code=404, detail="Engineer not found")
+
+    # Scope check
+    if auth.role == "engineer" and engineer.id != auth.engineer_id:
+        raise HTTPException(status_code=403, detail="Not your sessions")
+    if auth.role == "team_lead" and engineer.team_id != auth.team_id:
+        raise HTTPException(status_code=403, detail="Not your team")
+
     return engineer.sessions
+
+
+@router.patch("/{engineer_id}", response_model=EngineerResponse)
+def update_engineer(
+    engineer_id: str,
+    payload: EngineerUpdate,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_role("admin")),
+):
+    engineer = db.query(Engineer).filter(Engineer.id == engineer_id).first()
+    if not engineer:
+        raise HTTPException(status_code=404, detail="Engineer not found")
+
+    if payload.role is not None:
+        if payload.role not in ("engineer", "team_lead", "admin"):
+            raise HTTPException(status_code=400, detail="Invalid role")
+        engineer.role = payload.role
+    if payload.team_id is not None:
+        engineer.team_id = payload.team_id
+
+    db.commit()
+    db.refresh(engineer)
+    return EngineerResponse.model_validate(engineer)

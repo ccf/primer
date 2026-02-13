@@ -1,0 +1,41 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+        exclude: ^frontend/tsconfig
+      - id: check-added-large-files
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.6
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: "1.8.3"
+    hooks:
+      - id: bandit
+        args: [-r, src/, -c, pyproject.toml]
+        pass_filenames: false
+
+  - repo: local
+    hooks:
+      - id: frontend-eslint
+        name: frontend-eslint
+        entry: bash -c 'cd frontend && npx eslint src'
+        language: system
+        types_or: [ts, tsx]
+        files: ^frontend/src/
+        pass_filenames: false
+      - id: frontend-tsc
+        name: frontend-tsc
+        entry: bash -c 'cd frontend && npx tsc -b --noEmit'
+        language: system
+        types_or: [ts, tsx]
+        files: ^frontend/src/
+        pass_filenames: false

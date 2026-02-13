@@ -35,12 +35,14 @@ def list_local_sessions() -> list[LocalSession]:
         session_id = transcript.stem
         facets_path = facets_dir / f"{session_id}.json"
         has_facets = facets_path.exists()
-        results.append(LocalSession(
-            session_id=session_id,
-            transcript_path=str(transcript),
-            facets_path=str(facets_path) if has_facets else None,
-            has_facets=has_facets,
-        ))
+        results.append(
+            LocalSession(
+                session_id=session_id,
+                transcript_path=str(transcript),
+                facets_path=str(facets_path) if has_facets else None,
+                has_facets=has_facets,
+            )
+        )
     return results
 
 

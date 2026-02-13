@@ -58,8 +58,7 @@ class SessionMetadata:
             "first_prompt": self.first_prompt[:500] if self.first_prompt else None,
             "summary": self.summary or None,
             "tool_usages": [
-                {"tool_name": name, "call_count": count}
-                for name, count in self.tool_counts.items()
+                {"tool_name": name, "call_count": count} for name, count in self.tool_counts.items()
             ],
             "model_usages": [
                 {
@@ -101,8 +100,13 @@ def extract_from_jsonl(transcript_path: str) -> SessionMetadata:
                 continue
 
             _process_entry(
-                entry, meta, tool_counter, model_tokens,
-                first_ts, last_ts, first_user_prompt_found,
+                entry,
+                meta,
+                tool_counter,
+                model_tokens,
+                first_ts,
+                last_ts,
+                first_user_prompt_found,
             )
 
             # Track timestamps
@@ -179,7 +183,8 @@ def _process_entry(
                     meta.tool_call_count += 1
 
     # Token usage
-    usage = entry.get("message", {}).get("usage", {}) if isinstance(entry.get("message"), dict) else {}
+    msg = entry.get("message")
+    usage = msg.get("usage", {}) if isinstance(msg, dict) else {}
     if usage:
         model = entry.get("message", {}).get("model", "unknown")
         if model not in model_tokens:

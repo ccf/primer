@@ -1,9 +1,9 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, EmailStr, Field
-
+from pydantic import BaseModel, Field
 
 # --- Team ---
+
 
 class TeamCreate(BaseModel):
     name: str
@@ -19,6 +19,7 @@ class TeamResponse(BaseModel):
 
 # --- Engineer ---
 
+
 class EngineerCreate(BaseModel):
     name: str
     email: str
@@ -30,9 +31,18 @@ class EngineerResponse(BaseModel):
     name: str
     email: str
     team_id: str | None
+    role: str = "engineer"
+    avatar_url: str | None = None
+    github_username: str | None = None
+    display_name: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class EngineerUpdate(BaseModel):
+    role: str | None = None
+    team_id: str | None = None
 
 
 class EngineerCreateResponse(BaseModel):
@@ -41,6 +51,7 @@ class EngineerCreateResponse(BaseModel):
 
 
 # --- Session Facets ---
+
 
 class SessionFacetsPayload(BaseModel):
     underlying_goal: str | None = None
@@ -73,6 +84,7 @@ class SessionFacetsResponse(BaseModel):
 
 # --- Tool / Model Usage ---
 
+
 class ToolUsagePayload(BaseModel):
     tool_name: str
     call_count: int
@@ -104,6 +116,7 @@ class ModelUsageResponse(BaseModel):
 
 
 # --- Session Ingest ---
+
 
 class SessionIngestPayload(BaseModel):
     session_id: str
@@ -151,6 +164,7 @@ class BulkIngestResponse(BaseModel):
 
 # --- Session Response ---
 
+
 class SessionResponse(BaseModel):
     id: str
     engineer_id: str
@@ -188,6 +202,7 @@ class SessionDetailResponse(SessionResponse):
 
 # --- Analytics ---
 
+
 class OverviewStats(BaseModel):
     total_sessions: int
     total_engineers: int
@@ -195,6 +210,7 @@ class OverviewStats(BaseModel):
     total_tool_calls: int
     total_input_tokens: int
     total_output_tokens: int
+    estimated_cost: float | None = None
     avg_session_duration: float | None
     avg_messages_per_session: float | None
     outcome_counts: dict[str, int]
@@ -230,6 +246,7 @@ class Recommendation(BaseModel):
 
 # --- Daily Stats ---
 
+
 class DailyStatsResponse(BaseModel):
     date: date
     message_count: int
@@ -237,3 +254,27 @@ class DailyStatsResponse(BaseModel):
     tool_call_count: int
 
     model_config = {"from_attributes": True}
+
+
+# --- Cost Analytics ---
+
+
+class ModelCostBreakdown(BaseModel):
+    model_name: str
+    input_tokens: int
+    output_tokens: int
+    cache_read_tokens: int
+    cache_creation_tokens: int
+    estimated_cost: float
+
+
+class DailyCostEntry(BaseModel):
+    date: date
+    estimated_cost: float
+    session_count: int
+
+
+class CostAnalytics(BaseModel):
+    total_estimated_cost: float
+    model_breakdown: list[ModelCostBreakdown]
+    daily_costs: list[DailyCostEntry]

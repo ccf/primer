@@ -7,11 +7,10 @@ from primer.hook.extractor import extract_from_jsonl, load_facets
 
 def _write_jsonl(lines: list[dict]) -> str:
     """Write JSONL lines to a temp file and return the path."""
-    tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False)
-    for line in lines:
-        tmp.write(json.dumps(line) + "\n")
-    tmp.close()
-    return tmp.name
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as tmp:
+        for line in lines:
+            tmp.write(json.dumps(line) + "\n")
+        return tmp.name
 
 
 def test_extract_empty_file():
@@ -127,20 +126,93 @@ def test_load_facets_nonexistent():
     assert result is None
 
 
+def test_extract_blank_lines():
+    """Blank lines in JSONL are skipped."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as tmp:
+        tmp.write('{"type": "human", "message": {"content": "Hi"}}\n')
+        tmp.write("\n")
+        tmp.write("   \n")
+        line = '{"type": "assistant", "message": {"content": [{"type": "text", "text": "Hello"}]}}'
+        tmp.write(line + "\n")
+        path = tmp.name
+    meta = extract_from_jsonl(path)
+    assert meta.message_count == 2
+
+
+def test_extract_malformed_json():
+    """Invalid JSON lines are skipped gracefully."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as tmp:
+        tmp.write('{"type": "human", "message": {"content": "Hi"}}\n')
+        tmp.write("not valid json {{\n")
+        tmp.write('{"type": "assistant", "message": {"content": "Bye"}}\n')
+        path = tmp.name
+    meta = extract_from_jsonl(path)
+    assert meta.message_count == 2
+
+
+def test_extract_text_string_content():
+    """Content as a plain string is extracted."""
+    from primer.hook.extractor import _extract_text
+
+    entry = {"message": {"content": "Hello world"}}
+    assert _extract_text(entry) == "Hello world"
+
+
+def test_extract_text_list_with_strings():
+    """Content list with bare string items."""
+    from primer.hook.extractor import _extract_text
+
+    entry = {"message": {"content": ["Hello", "World"]}}
+    assert _extract_text(entry) == "Hello World"
+
+
+def test_parse_timestamp_invalid():
+    """Malformed timestamp doesn't crash."""
+    from primer.hook.extractor import _parse_timestamp
+
+    result = _parse_timestamp({"timestamp": "not-a-date"})
+    assert result is None
+    result2 = _parse_timestamp({"createdAt": 12345})
+    assert result2 is None
+
+
+def test_load_facets_corrupt_json(tmp_path):
+    """Returns None on bad JSON in facets file."""
+    facets_dir = tmp_path / ".claude" / "usage-data" / "facets"
+    facets_dir.mkdir(parents=True)
+    facets_file = facets_dir / "corrupt-session.json"
+    facets_file.write_text("{not valid json")
+
+    original_home = Path.home
+
+    def mock_home():
+        return tmp_path
+
+    Path.home = staticmethod(mock_home)
+    try:
+        result = load_facets("corrupt-session")
+        assert result is None
+    finally:
+        Path.home = original_home
+
+
 def test_load_facets(tmp_path):
     facets_dir = tmp_path / ".claude" / "usage-data" / "facets"
     facets_dir.mkdir(parents=True)
     facets_file = facets_dir / "test-session.json"
-    facets_file.write_text(json.dumps({
-        "underlyingGoal": "Fix a bug",
-        "outcome": "success",
-        "sessionType": "debugging",
-        "briefSummary": "Fixed the null pointer bug",
-        "frictionCounts": {"tool_error": 2},
-    }))
+    facets_file.write_text(
+        json.dumps(
+            {
+                "underlyingGoal": "Fix a bug",
+                "outcome": "success",
+                "sessionType": "debugging",
+                "briefSummary": "Fixed the null pointer bug",
+                "frictionCounts": {"tool_error": 2},
+            }
+        )
+    )
 
     # Monkey-patch Path.home for this test
-    import primer.hook.extractor as extractor
     original_home = Path.home
 
     def mock_home():

@@ -55,6 +55,7 @@ def main() -> None:
     else:
         # Minimal payload if no transcript
         from primer.hook.extractor import SessionMetadata
+
         meta = SessionMetadata(session_id=session_id, project_path=cwd)
 
     # Check for facets
