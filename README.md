@@ -1,8 +1,19 @@
-# Primer
+<p align="center">
+  <img src="brand/logo-wordmark.svg" alt="Primer" width="280">
+</p>
 
-Aggregate Claude Code usage insights across an engineering organization.
+<p align="center">
+  <a href="https://github.com/ccf/primer/actions/workflows/ci.yml"><img src="https://github.com/ccf/primer/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/ccf/primer/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python 3.12+">
+  <img src="https://img.shields.io/badge/node-20+-green.svg" alt="Node 20+">
+</p>
 
-Primer is a self-hosted analytics platform with three components:
+<p align="center">Aggregate Claude Code usage insights across an engineering organization.</p>
+
+---
+
+Primer is a self-hosted analytics platform with four components:
 
 1. **REST API Server** — FastAPI service that stores and analyzes session data
 2. **Frontend Dashboard** — React + Tailwind CSS dashboard with cost analysis, dark mode, and date filtering
@@ -184,6 +195,10 @@ bandit -r src/ -c pyproject.toml
 # Pre-commit hooks
 pre-commit install
 ```
+
+## About the Name
+
+The name comes from Neal Stephenson's *The Diamond Age*, where the Young Lady's Illustrated Primer is an adaptive, AI-driven book that observes its reader, understands her context, and transforms complexity into personalized guidance. Primer brings that same principle to engineering organizations — turning raw AI usage data into the understanding teams need to work effectively.
 
 ## License
 
