@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="brand/logo-wordmark.svg" alt="Primer" width="280">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/logo-wordmark-light.svg">
+    <source media="(prefers-color-scheme: light)" srcset="brand/logo-wordmark.svg">
+    <img src="brand/logo-wordmark.svg" alt="Primer" width="280">
+  </picture>
 </p>
 
 <p align="center">
