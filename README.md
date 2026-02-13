@@ -154,7 +154,7 @@ All settings use the `PRIMER_` environment variable prefix.
 | `PRIMER_LOG_LEVEL` | `info` | Logging level |
 | `PRIMER_GITHUB_CLIENT_ID` | — | GitHub OAuth app client ID |
 | `PRIMER_GITHUB_CLIENT_SECRET` | — | GitHub OAuth app client secret |
-| `PRIMER_JWT_SECRET` | — | Secret key for JWT token signing |
+| `PRIMER_JWT_SECRET_KEY` | — | Secret key for JWT token signing |
 
 For the hook and MCP sidecar:
 

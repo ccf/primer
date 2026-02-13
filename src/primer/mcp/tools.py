@@ -12,10 +12,12 @@ logger = logging.getLogger(__name__)
 
 SERVER_URL = os.environ.get("PRIMER_SERVER_URL", "http://localhost:8000")
 API_KEY = os.environ.get("PRIMER_API_KEY", "")
+ADMIN_API_KEY = os.environ.get("PRIMER_ADMIN_API_KEY", "")
 
 
 def _admin_headers() -> dict:
-    return {"x-admin-key": API_KEY, "x-api-key": API_KEY}
+    admin_key = ADMIN_API_KEY or API_KEY
+    return {"x-admin-key": admin_key, "x-api-key": API_KEY}
 
 
 def primer_sync() -> str:

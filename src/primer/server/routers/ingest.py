@@ -57,6 +57,7 @@ def ingest_bulk(
                 IngestResponse(status="ok", session_id=session_payload.session_id, created=created)
             )
         except Exception as e:
+            db.rollback()
             log_ingest_event(
                 db, engineer.id, "bulk", session_payload.session_id, None, "error", str(e)
             )
