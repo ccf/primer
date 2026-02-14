@@ -21,6 +21,8 @@ def verify_api_key(api_key: str, db: Session) -> Engineer:
     engineers = db.query(Engineer).all()
     for eng in engineers:
         if eng.api_key_hash and bcrypt.checkpw(api_key.encode(), eng.api_key_hash.encode()):
+            if not eng.is_active:
+                raise HTTPException(status_code=403, detail="Account deactivated")
             return eng
     raise HTTPException(status_code=401, detail="Invalid API key")
 
@@ -63,6 +65,8 @@ def get_auth_context(
         engineers = db.query(Engineer).all()
         for eng in engineers:
             if eng.api_key_hash and bcrypt.checkpw(x_api_key.encode(), eng.api_key_hash.encode()):
+                if not eng.is_active:
+                    raise HTTPException(status_code=403, detail="Account deactivated")
                 return AuthContext(
                     engineer_id=eng.id,
                     role=eng.role,

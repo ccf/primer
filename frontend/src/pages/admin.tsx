@@ -1,5 +1,8 @@
 import { useState } from "react"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/lib/auth-context"
+import { getApiKey } from "@/lib/api"
+import { EmptyState } from "@/components/shared/empty-state"
 import { AdminEngineersTab } from "@/components/admin/admin-engineers-tab"
 import { AdminTeamsTab } from "@/components/admin/admin-teams-tab"
 import { AdminAuditTab } from "@/components/admin/admin-audit-tab"
@@ -15,7 +18,14 @@ const tabs = [
 type TabId = (typeof tabs)[number]["id"]
 
 export function AdminPage() {
+  const { user } = useAuth()
+  const isApiKeyUser = !user && !!getApiKey()
+  const role = user?.role ?? (isApiKeyUser ? "admin" : "engineer")
   const [activeTab, setActiveTab] = useState<TabId>("engineers")
+
+  if (role !== "admin") {
+    return <EmptyState message="You do not have permission to access this page" />
+  }
 
   return (
     <div className="space-y-6">
