@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom"
-import { BarChart3, Layout, MonitorDot, Users } from "lucide-react"
+import { FolderKanban, Layout, MonitorDot, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import { getApiKey } from "@/lib/api"
@@ -7,6 +7,7 @@ import { getApiKey } from "@/lib/api"
 const allLinks = [
   { to: "/", label: "Overview", icon: Layout, minRole: "engineer" as const },
   { to: "/sessions", label: "Sessions", icon: MonitorDot, minRole: "engineer" as const },
+  { to: "/projects", label: "Projects", icon: FolderKanban, minRole: "engineer" as const },
   { to: "/engineers", label: "Engineers", icon: Users, minRole: "team_lead" as const },
 ]
 
@@ -27,7 +28,7 @@ export function Sidebar() {
   return (
     <aside className="flex h-full w-56 flex-col border-r border-border bg-card">
       <div className="flex h-14 items-center gap-2 border-b border-border px-4">
-        <BarChart3 className="h-5 w-5 text-primary" />
+        <img src="/logo-mark.svg" alt="Primer" className="h-6 w-6" />
         <span className="text-lg font-semibold">Primer</span>
       </div>
       <nav className="flex-1 space-y-1 p-3">

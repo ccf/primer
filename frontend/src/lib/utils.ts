@@ -26,3 +26,38 @@ export function formatCost(dollars: number): string {
   if (dollars >= 1_000) return `$${(dollars / 1_000).toFixed(1)}K`
   return `$${dollars.toFixed(2)}`
 }
+
+export function formatPercent(value: number | null | undefined): string {
+  if (value == null) return "-"
+  return `${(value * 100).toFixed(0)}%`
+}
+
+const MODEL_PRICING: Record<string, { input: number; output: number; cacheRead: number; cacheCreate: number }> = {
+  "claude-opus-4": { input: 15 / 1e6, output: 75 / 1e6, cacheRead: 1.5 / 1e6, cacheCreate: 18.75 / 1e6 },
+  "claude-sonnet-4": { input: 3 / 1e6, output: 15 / 1e6, cacheRead: 0.3 / 1e6, cacheCreate: 3.75 / 1e6 },
+  "claude-sonnet-3.5": { input: 3 / 1e6, output: 15 / 1e6, cacheRead: 0.3 / 1e6, cacheCreate: 3.75 / 1e6 },
+  "claude-haiku-3.5": { input: 0.8 / 1e6, output: 4 / 1e6, cacheRead: 0.08 / 1e6, cacheCreate: 1 / 1e6 },
+}
+
+function getModelPricing(modelName: string) {
+  let bestKey = ""
+  for (const prefix of Object.keys(MODEL_PRICING)) {
+    if (modelName.startsWith(prefix) && prefix.length > bestKey.length) {
+      bestKey = prefix
+    }
+  }
+  return MODEL_PRICING[bestKey] || MODEL_PRICING["claude-sonnet-4"]
+}
+
+export function estimateModelCost(
+  modelName: string,
+  usage: { input_tokens: number; output_tokens: number; cache_read_tokens?: number; cache_creation_tokens?: number },
+): number {
+  const p = getModelPricing(modelName)
+  return (
+    usage.input_tokens * p.input +
+    usage.output_tokens * p.output +
+    (usage.cache_read_tokens ?? 0) * p.cacheRead +
+    (usage.cache_creation_tokens ?? 0) * p.cacheCreate
+  )
+}

@@ -11,6 +11,7 @@ import { OverviewPage } from "@/pages/overview"
 import { SessionsPage } from "@/pages/sessions"
 import { SessionDetailPage } from "@/pages/session-detail"
 import { EngineersPage } from "@/pages/engineers"
+import { ProjectsPage } from "@/pages/projects"
 import { NotFoundPage } from "@/pages/not-found"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
@@ -52,7 +53,8 @@ function AuthenticatedApp() {
         <Route path="/" element={<OverviewPage teamId={teamId} dateRange={dateRange} />} />
         <Route path="/sessions" element={<SessionsPage teamId={teamId} dateRange={dateRange} />} />
         <Route path="/sessions/:id" element={<SessionDetailPage />} />
-        <Route path="/engineers" element={<EngineersPage />} />
+        <Route path="/engineers" element={<EngineersPage teamId={teamId} dateRange={dateRange} />} />
+        <Route path="/projects" element={<ProjectsPage teamId={teamId} dateRange={dateRange} />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AppShell>

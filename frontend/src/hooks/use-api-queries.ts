@@ -1,12 +1,15 @@
 import { useQuery } from "@tanstack/react-query"
 import { apiFetch } from "@/lib/api"
 import type {
+  ActivityHeatmap,
   CostAnalytics,
   DailyStatsResponse,
+  EngineerAnalytics,
   EngineerResponse,
   FrictionReport,
   ModelRanking,
   OverviewStats,
+  ProjectAnalytics,
   Recommendation,
   SessionDetailResponse,
   SessionResponse,
@@ -115,18 +118,64 @@ export function useCostAnalytics(teamId: string | null, startDate?: string, endD
 export function useSessions(params: {
   teamId: string | null
   engineerId?: string
+  projectName?: string
+  startDate?: string
+  endDate?: string
   limit?: number
   offset?: number
 }) {
   const searchParams = new URLSearchParams()
   if (params.teamId) searchParams.set("team_id", params.teamId)
   if (params.engineerId) searchParams.set("engineer_id", params.engineerId)
+  if (params.projectName) searchParams.set("project_name", params.projectName)
+  if (params.startDate) searchParams.set("start_date", params.startDate)
+  if (params.endDate) searchParams.set("end_date", params.endDate)
   if (params.limit) searchParams.set("limit", String(params.limit))
   if (params.offset) searchParams.set("offset", String(params.offset))
   const qs = searchParams.toString()
   return useQuery({
     queryKey: ["sessions", params],
     queryFn: () => apiFetch<SessionResponse[]>(`/api/v1/sessions${qs ? `?${qs}` : ""}`),
+  })
+}
+
+export function useEngineerAnalytics(
+  teamId: string | null,
+  startDate?: string,
+  endDate?: string,
+  sortBy?: string,
+) {
+  return useQuery({
+    queryKey: ["engineer-analytics", teamId, startDate, endDate, sortBy],
+    queryFn: () =>
+      apiFetch<EngineerAnalytics>(
+        `/api/v1/analytics/engineers${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate, sort_by: sortBy })}`,
+      ),
+  })
+}
+
+export function useProjectAnalytics(
+  teamId: string | null,
+  startDate?: string,
+  endDate?: string,
+  sortBy?: string,
+) {
+  return useQuery({
+    queryKey: ["project-analytics", teamId, startDate, endDate, sortBy],
+    queryFn: () =>
+      apiFetch<ProjectAnalytics>(
+        `/api/v1/analytics/projects${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate, sort_by: sortBy })}`,
+      ),
+  })
+}
+
+export function useActivityHeatmap(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["activity-heatmap", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<ActivityHeatmap>(
+        `/api/v1/analytics/activity-heatmap${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
   })
 }
 

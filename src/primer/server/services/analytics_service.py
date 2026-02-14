@@ -1,7 +1,7 @@
 from collections import Counter
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from primer.common.models import (
@@ -15,13 +15,19 @@ from primer.common.models import (
 )
 from primer.common.pricing import estimate_cost
 from primer.common.schemas import (
+    ActivityHeatmap,
     CostAnalytics,
     DailyCostEntry,
     DailyStatsResponse,
+    EngineerAnalytics,
+    EngineerStats,
     FrictionReport,
+    HeatmapCell,
     ModelCostBreakdown,
     ModelRanking,
     OverviewStats,
+    ProjectAnalytics,
+    ProjectStats,
     ToolRanking,
 )
 
@@ -45,13 +51,38 @@ def _base_session_query(
     return q
 
 
-def get_overview(
+def _compute_success_rate(
+    db: Session,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> float | None:
+    """Compute success rate from session facets."""
+    facets_q = db.query(SessionFacets.outcome).join(SessionModel)
+    if engineer_id:
+        facets_q = facets_q.filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
+        facets_q = facets_q.join(Engineer).filter(Engineer.team_id == team_id)
+    if start_date:
+        facets_q = facets_q.filter(SessionModel.started_at >= start_date)
+    if end_date:
+        facets_q = facets_q.filter(SessionModel.started_at <= end_date)
+    facets_q = facets_q.filter(SessionFacets.outcome.isnot(None))
+    outcomes = [row[0] for row in facets_q.all()]
+    if not outcomes:
+        return None
+    return sum(1 for o in outcomes if o == "success") / len(outcomes)
+
+
+def _build_overview(
     db: Session,
     team_id: str | None = None,
     engineer_id: str | None = None,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
 ) -> OverviewStats:
+    """Internal helper that builds an OverviewStats without previous_period."""
     q = _base_session_query(db, team_id, engineer_id, start_date, end_date)
 
     total_sessions = q.count()
@@ -133,6 +164,9 @@ def get_overview(
     for name, inp, out, cr, cc in cost_q.all():
         estimated_cost += estimate_cost(name, inp or 0, out or 0, cr or 0, cc or 0)
 
+    # Success rate
+    success_rate = _compute_success_rate(db, team_id, engineer_id, start_date, end_date)
+
     return OverviewStats(
         total_sessions=total_sessions,
         total_engineers=total_engineers,
@@ -145,7 +179,40 @@ def get_overview(
         avg_messages_per_session=avg_messages,
         outcome_counts=outcome_counts,
         session_type_counts=session_type_counts,
+        success_rate=success_rate,
     )
+
+
+def get_overview(
+    db: Session,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> OverviewStats:
+    result = _build_overview(db, team_id, engineer_id, start_date, end_date)
+
+    # Compute previous period for comparison
+    if start_date and end_date:
+        delta = end_date - start_date
+        prev_end = start_date
+        prev_start = prev_end - delta
+    elif start_date:
+        # No end_date: use start_date to now, mirror backward
+        delta = datetime.now(UTC) - start_date
+        prev_end = start_date
+        prev_start = prev_end - delta
+    else:
+        # Default to last 30 days vs previous 30 days
+        now = datetime.now(UTC)
+        prev_end = now - timedelta(days=30)
+        prev_start = prev_end - timedelta(days=30)
+
+    previous = _build_overview(db, team_id, engineer_id, prev_start, prev_end)
+    if previous.total_sessions > 0:
+        result.previous_period = previous
+
+    return result
 
 
 def get_daily_stats(
@@ -178,12 +245,41 @@ def get_daily_stats(
     )
 
     rows = q.limit(days).all()
+
+    # Compute per-day success rates from facets
+    date_set = {row.date for row in rows}
+    success_rates: dict[str, float | None] = {}
+    if date_set:
+        sr_q = (
+            db.query(
+                func.date(SessionModel.started_at).label("date"),
+                func.sum(case((SessionFacets.outcome == "success", 1), else_=0)).label("successes"),
+                func.count(SessionFacets.outcome).label("total"),
+            )
+            .join(SessionFacets, SessionFacets.session_id == SessionModel.id)
+            .filter(SessionModel.started_at.isnot(None))
+            .filter(SessionFacets.outcome.isnot(None))
+        )
+        if engineer_id:
+            sr_q = sr_q.filter(SessionModel.engineer_id == engineer_id)
+        elif team_id:
+            sr_q = sr_q.join(Engineer).filter(Engineer.team_id == team_id)
+        if start_date:
+            sr_q = sr_q.filter(SessionModel.started_at >= start_date)
+        if end_date:
+            sr_q = sr_q.filter(SessionModel.started_at <= end_date)
+        sr_q = sr_q.group_by(func.date(SessionModel.started_at))
+        for d, successes, total in sr_q.all():
+            if total > 0:
+                success_rates[str(d)] = successes / total
+
     return [
         DailyStatsResponse(
             date=row.date,
             session_count=row.session_count,
             message_count=row.message_count,
             tool_call_count=row.tool_call_count,
+            success_rate=success_rates.get(str(row.date)),
         )
         for row in rows
     ]
@@ -380,3 +476,270 @@ def get_cost_analytics(
         model_breakdown=breakdown,
         daily_costs=daily_costs,
     )
+
+
+def get_engineer_analytics(
+    db: Session,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    sort_by: str = "total_sessions",
+    limit: int = 50,
+) -> EngineerAnalytics:
+    """Per-engineer analytics: sessions, tokens, cost, success rate, top tools."""
+    # Base query grouping by engineer
+    q = db.query(
+        SessionModel.engineer_id,
+        Engineer.name,
+        Engineer.email,
+        Engineer.team_id,
+        Engineer.avatar_url,
+        Engineer.github_username,
+        func.count(SessionModel.id).label("total_sessions"),
+        func.coalesce(
+            func.sum(SessionModel.input_tokens) + func.sum(SessionModel.output_tokens), 0
+        ).label("total_tokens"),
+        func.avg(SessionModel.duration_seconds).label("avg_duration"),
+    ).join(Engineer, Engineer.id == SessionModel.engineer_id)
+    if engineer_id:
+        q = q.filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
+        q = q.filter(Engineer.team_id == team_id)
+    if start_date:
+        q = q.filter(SessionModel.started_at >= start_date)
+    if end_date:
+        q = q.filter(SessionModel.started_at <= end_date)
+
+    q = q.group_by(
+        SessionModel.engineer_id,
+        Engineer.name,
+        Engineer.email,
+        Engineer.team_id,
+        Engineer.avatar_url,
+        Engineer.github_username,
+    )
+
+    # Sorting
+    token_sum = func.sum(SessionModel.input_tokens) + func.sum(SessionModel.output_tokens)
+    sort_map = {
+        "total_sessions": func.count(SessionModel.id).desc(),
+        "total_tokens": token_sum.desc(),
+        "avg_duration": func.avg(SessionModel.duration_seconds).desc(),
+        "name": Engineer.name.asc(),
+    }
+    q = q.order_by(sort_map.get(sort_by, func.count(SessionModel.id).desc()))
+    rows = q.limit(limit).all()
+
+    engineers: list[EngineerStats] = []
+    for row in rows:
+        eid = row.engineer_id
+
+        # Per-engineer cost
+        cost_q = (
+            db.query(
+                ModelUsage.model_name,
+                func.sum(ModelUsage.input_tokens),
+                func.sum(ModelUsage.output_tokens),
+                func.sum(ModelUsage.cache_read_tokens),
+                func.sum(ModelUsage.cache_creation_tokens),
+            )
+            .join(SessionModel)
+            .filter(SessionModel.engineer_id == eid)
+        )
+        if start_date:
+            cost_q = cost_q.filter(SessionModel.started_at >= start_date)
+        if end_date:
+            cost_q = cost_q.filter(SessionModel.started_at <= end_date)
+        cost_q = cost_q.group_by(ModelUsage.model_name)
+        eng_cost = 0.0
+        for name, inp, out, cr, cc in cost_q.all():
+            eng_cost += estimate_cost(name, inp or 0, out or 0, cr or 0, cc or 0)
+
+        # Per-engineer success rate
+        sr = _compute_success_rate(db, engineer_id=eid, start_date=start_date, end_date=end_date)
+
+        # Top tools for this engineer
+        tool_q = (
+            db.query(ToolUsage.tool_name, func.sum(ToolUsage.call_count).label("tc"))
+            .join(SessionModel)
+            .filter(SessionModel.engineer_id == eid)
+        )
+        if start_date:
+            tool_q = tool_q.filter(SessionModel.started_at >= start_date)
+        if end_date:
+            tool_q = tool_q.filter(SessionModel.started_at <= end_date)
+        tool_q = tool_q.group_by(ToolUsage.tool_name).order_by(
+            func.sum(ToolUsage.call_count).desc()
+        )
+        top_tools = [t[0] for t in tool_q.limit(5).all()]
+
+        engineers.append(
+            EngineerStats(
+                engineer_id=eid,
+                name=row.name,
+                email=row.email,
+                team_id=row.team_id,
+                avatar_url=row.avatar_url,
+                github_username=row.github_username,
+                total_sessions=row.total_sessions,
+                total_tokens=row.total_tokens,
+                estimated_cost=eng_cost,
+                success_rate=sr,
+                avg_duration=float(row.avg_duration) if row.avg_duration else None,
+                top_tools=top_tools,
+            )
+        )
+
+    return EngineerAnalytics(engineers=engineers, total_count=len(engineers))
+
+
+def get_project_analytics(
+    db: Session,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    sort_by: str = "total_sessions",
+    limit: int = 50,
+) -> ProjectAnalytics:
+    """Per-project analytics: sessions, engineers, tokens, cost, outcomes, tools."""
+    q = db.query(
+        SessionModel.project_name,
+        func.count(SessionModel.id).label("total_sessions"),
+        func.count(func.distinct(SessionModel.engineer_id)).label("unique_engineers"),
+        func.coalesce(
+            func.sum(SessionModel.input_tokens) + func.sum(SessionModel.output_tokens), 0
+        ).label("total_tokens"),
+    ).filter(SessionModel.project_name.isnot(None))
+
+    if engineer_id:
+        q = q.filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
+        q = q.join(Engineer).filter(Engineer.team_id == team_id)
+    if start_date:
+        q = q.filter(SessionModel.started_at >= start_date)
+    if end_date:
+        q = q.filter(SessionModel.started_at <= end_date)
+
+    q = q.group_by(SessionModel.project_name)
+
+    token_sum = func.sum(SessionModel.input_tokens) + func.sum(SessionModel.output_tokens)
+    sort_map = {
+        "total_sessions": func.count(SessionModel.id).desc(),
+        "total_tokens": token_sum.desc(),
+        "unique_engineers": func.count(func.distinct(SessionModel.engineer_id)).desc(),
+        "project_name": SessionModel.project_name.asc(),
+    }
+    q = q.order_by(sort_map.get(sort_by, func.count(SessionModel.id).desc()))
+    rows = q.limit(limit).all()
+
+    projects: list[ProjectStats] = []
+    for row in rows:
+        pname = row.project_name
+
+        # Per-project cost
+        cost_q = (
+            db.query(
+                ModelUsage.model_name,
+                func.sum(ModelUsage.input_tokens),
+                func.sum(ModelUsage.output_tokens),
+                func.sum(ModelUsage.cache_read_tokens),
+                func.sum(ModelUsage.cache_creation_tokens),
+            )
+            .join(SessionModel)
+            .filter(SessionModel.project_name == pname)
+        )
+        if engineer_id:
+            cost_q = cost_q.filter(SessionModel.engineer_id == engineer_id)
+        elif team_id:
+            cost_q = cost_q.join(Engineer).filter(Engineer.team_id == team_id)
+        if start_date:
+            cost_q = cost_q.filter(SessionModel.started_at >= start_date)
+        if end_date:
+            cost_q = cost_q.filter(SessionModel.started_at <= end_date)
+        cost_q = cost_q.group_by(ModelUsage.model_name)
+        proj_cost = 0.0
+        for name, inp, out, cr, cc in cost_q.all():
+            proj_cost += estimate_cost(name, inp or 0, out or 0, cr or 0, cc or 0)
+
+        # Outcome distribution
+        outcome_q = (
+            db.query(SessionFacets.outcome)
+            .join(SessionModel)
+            .filter(SessionModel.project_name == pname)
+            .filter(SessionFacets.outcome.isnot(None))
+        )
+        if engineer_id:
+            outcome_q = outcome_q.filter(SessionModel.engineer_id == engineer_id)
+        elif team_id:
+            outcome_q = outcome_q.join(Engineer).filter(Engineer.team_id == team_id)
+        if start_date:
+            outcome_q = outcome_q.filter(SessionModel.started_at >= start_date)
+        if end_date:
+            outcome_q = outcome_q.filter(SessionModel.started_at <= end_date)
+        outcome_dist: dict[str, int] = {}
+        for (o,) in outcome_q.all():
+            outcome_dist[o] = outcome_dist.get(o, 0) + 1
+
+        # Top tools
+        tool_q = (
+            db.query(ToolUsage.tool_name, func.sum(ToolUsage.call_count).label("tc"))
+            .join(SessionModel)
+            .filter(SessionModel.project_name == pname)
+        )
+        if engineer_id:
+            tool_q = tool_q.filter(SessionModel.engineer_id == engineer_id)
+        elif team_id:
+            tool_q = tool_q.join(Engineer).filter(Engineer.team_id == team_id)
+        if start_date:
+            tool_q = tool_q.filter(SessionModel.started_at >= start_date)
+        if end_date:
+            tool_q = tool_q.filter(SessionModel.started_at <= end_date)
+        tool_q = tool_q.group_by(ToolUsage.tool_name).order_by(
+            func.sum(ToolUsage.call_count).desc()
+        )
+        top_tools = [t[0] for t in tool_q.limit(5).all()]
+
+        projects.append(
+            ProjectStats(
+                project_name=pname,
+                total_sessions=row.total_sessions,
+                unique_engineers=row.unique_engineers,
+                total_tokens=row.total_tokens,
+                estimated_cost=proj_cost,
+                outcome_distribution=outcome_dist,
+                top_tools=top_tools,
+            )
+        )
+
+    return ProjectAnalytics(projects=projects, total_count=len(projects))
+
+
+def get_activity_heatmap(
+    db: Session,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> ActivityHeatmap:
+    """Build a 7x24 heatmap of session activity by day-of-week and hour."""
+    q = _base_session_query(db, team_id, engineer_id, start_date, end_date)
+    q = q.filter(SessionModel.started_at.isnot(None))
+
+    sessions = q.with_entities(SessionModel.started_at).all()
+
+    grid: dict[tuple[int, int], int] = {}
+    for (started_at,) in sessions:
+        if started_at:
+            dow = started_at.weekday()  # 0=Monday
+            hour = started_at.hour
+            grid[(dow, hour)] = grid.get((dow, hour), 0) + 1
+
+    cells = [
+        HeatmapCell(day_of_week=dow, hour=hour, count=count)
+        for (dow, hour), count in sorted(grid.items())
+    ]
+    max_count = max((c.count for c in cells), default=0)
+
+    return ActivityHeatmap(cells=cells, max_count=max_count)

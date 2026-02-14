@@ -357,3 +357,168 @@ def test_recommendations(client, engineer_with_key, admin_headers):
     assert r.status_code == 200
     data = r.json()
     assert any(rec["category"] == "friction" for rec in data)
+
+
+def test_engineer_analytics(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        project_name="test-project",
+        facets={"outcome": "success", "session_type": "feature"},
+        tool_usages=[{"tool_name": "Read", "call_count": 10}],
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 5000,
+                "output_tokens": 2000,
+            }
+        ],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        project_name="test-project",
+        facets={"outcome": "failure", "session_type": "debugging"},
+        tool_usages=[{"tool_name": "Bash", "call_count": 5}],
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 3000,
+                "output_tokens": 1000,
+            }
+        ],
+    )
+
+    r = client.get("/api/v1/analytics/engineers", headers=admin_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total_count"] >= 1
+    eng = data["engineers"][0]
+    assert eng["total_sessions"] >= 2
+    assert eng["total_tokens"] > 0
+    assert eng["estimated_cost"] > 0
+    assert eng["success_rate"] is not None
+    assert len(eng["top_tools"]) > 0
+
+
+def test_project_analytics(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        project_name="analytics-test-proj",
+        facets={"outcome": "success"},
+        tool_usages=[{"tool_name": "Read", "call_count": 8}],
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 2000,
+                "output_tokens": 1000,
+            }
+        ],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        project_name="analytics-test-proj",
+        facets={"outcome": "partial"},
+        tool_usages=[{"tool_name": "Edit", "call_count": 4}],
+        model_usages=[
+            {"model_name": "claude-sonnet-4-5-20250929", "input_tokens": 1000, "output_tokens": 500}
+        ],
+    )
+
+    r = client.get("/api/v1/analytics/projects", headers=admin_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total_count"] >= 1
+    proj = next(p for p in data["projects"] if p["project_name"] == "analytics-test-proj")
+    assert proj["total_sessions"] == 2
+    assert proj["unique_engineers"] == 1
+    assert proj["estimated_cost"] > 0
+    assert "success" in proj["outcome_distribution"]
+    assert len(proj["top_tools"]) > 0
+
+
+def test_activity_heatmap(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(client, api_key, started_at="2025-06-10T14:00:00")  # Tuesday 14:00
+    _ingest_session(client, api_key, started_at="2025-06-10T14:30:00")  # Tuesday 14:00
+
+    r = client.get("/api/v1/analytics/activity-heatmap", headers=admin_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data["cells"]) >= 1
+    assert data["max_count"] >= 2
+    # Find the Tuesday 14:00 cell
+    tuesday_14 = next((c for c in data["cells"] if c["day_of_week"] == 1 and c["hour"] == 14), None)
+    assert tuesday_14 is not None
+    assert tuesday_14["count"] >= 2
+
+
+def test_overview_with_trends(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        started_at="2025-01-15T10:00:00",
+        facets={"outcome": "success"},
+    )
+    _ingest_session(
+        client,
+        api_key,
+        started_at="2025-01-20T10:00:00",
+        facets={"outcome": "failure"},
+    )
+
+    r = client.get(
+        "/api/v1/analytics/overview?start_date=2025-01-01T00:00:00&end_date=2025-01-31T23:59:59",
+        headers=admin_headers,
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["success_rate"] is not None
+    assert 0 <= data["success_rate"] <= 1
+
+
+def test_daily_stats_success_rate(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        started_at="2025-05-01T10:00:00",
+        facets={"outcome": "success"},
+    )
+    _ingest_session(
+        client,
+        api_key,
+        started_at="2025-05-01T14:00:00",
+        facets={"outcome": "failure"},
+    )
+
+    r = client.get(
+        "/api/v1/analytics/daily?start_date=2025-05-01T00:00:00&end_date=2025-05-01T23:59:59",
+        headers=admin_headers,
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) >= 1
+    day = data[0]
+    assert day["success_rate"] is not None
+    assert day["success_rate"] == 0.5
+
+
+def test_sessions_filter_by_project(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(client, api_key, project_name="filter-proj-a")
+    _ingest_session(client, api_key, project_name="filter-proj-b")
+
+    r = client.get(
+        "/api/v1/sessions?project_name=filter-proj-a",
+        headers=admin_headers,
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) >= 1
+    assert all(s["project_name"] == "filter-proj-a" for s in data)

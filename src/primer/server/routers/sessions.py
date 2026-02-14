@@ -16,6 +16,7 @@ router = APIRouter(prefix="/api/v1/sessions", tags=["sessions"])
 def list_sessions(
     engineer_id: str | None = None,
     team_id: str | None = None,
+    project_name: str | None = None,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
     limit: int = Query(default=100, le=1000),
@@ -37,6 +38,8 @@ def list_sessions(
         if team_id:
             q = q.join(Engineer).filter(Engineer.team_id == team_id)
 
+    if project_name:
+        q = q.filter(SessionModel.project_name == project_name)
     if start_date:
         q = q.filter(SessionModel.started_at >= start_date)
     if end_date:
