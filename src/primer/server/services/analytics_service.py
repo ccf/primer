@@ -884,19 +884,29 @@ def get_productivity_metrics(
         )
         power_users = sum(1 for _, cnt in per_eng if cnt > power_threshold)
 
-    roi_ratio = estimated_value / total_cost if total_cost > 0 and estimated_value else None
+    roi_ratio = (
+        estimated_value / total_cost if total_cost > 0 and estimated_value is not None else None
+    )
 
     return ProductivityMetrics(
         sessions_per_engineer_per_day=round(sessions_per_engineer_per_day, 3),
-        avg_cost_per_session=round(avg_cost_per_session, 4) if avg_cost_per_session else None,
-        cost_per_successful_outcome=round(cost_per_success, 4) if cost_per_success else None,
-        estimated_time_saved_hours=round(estimated_time_saved, 1) if estimated_time_saved else None,
-        estimated_value_created=round(estimated_value, 2) if estimated_value else None,
+        avg_cost_per_session=(
+            round(avg_cost_per_session, 4) if avg_cost_per_session is not None else None
+        ),
+        cost_per_successful_outcome=(
+            round(cost_per_success, 4) if cost_per_success is not None else None
+        ),
+        estimated_time_saved_hours=(
+            round(estimated_time_saved, 1) if estimated_time_saved is not None else None
+        ),
+        estimated_value_created=(
+            round(estimated_value, 2) if estimated_value is not None else None
+        ),
         adoption_rate=round(adoption_rate, 1),
         power_users=power_users,
         total_engineers_in_scope=total_active_engineers,
         total_cost=round(total_cost, 4),
-        roi_ratio=round(roi_ratio, 2) if roi_ratio else None,
+        roi_ratio=round(roi_ratio, 2) if roi_ratio is not None else None,
     )
 
 

@@ -65,9 +65,11 @@ def _check_alert_access(alert, auth: AuthContext):
     """Verify the caller has access to this alert based on role scoping."""
     if auth.role == "admin":
         return
-    if (auth.role == "team_lead" and alert.team_id != auth.team_id) or (
-        auth.role == "engineer" and alert.engineer_id != auth.engineer_id
-    ):
+    if auth.role == "team_lead":
+        if not auth.team_id or alert.team_id != auth.team_id:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        return
+    if auth.role == "engineer" and alert.engineer_id != auth.engineer_id:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
 

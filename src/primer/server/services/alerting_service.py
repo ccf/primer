@@ -49,27 +49,7 @@ def _recent_window(
     return q
 
 
-def _has_recent_alert(
-    db: Session,
-    alert_type: str,
-    team_id: str | None,
-    engineer_id: str | None,
-) -> bool:
-    """Check if a non-dismissed alert of this type exists within 24h."""
-    cutoff = datetime.now(UTC) - timedelta(hours=24)
-    q = db.query(Alert).filter(
-        Alert.alert_type == alert_type,
-        Alert.dismissed == False,  # noqa: E712
-        Alert.detected_at >= cutoff,
-    )
-    if engineer_id:
-        q = q.filter(Alert.engineer_id == engineer_id)
-    elif team_id:
-        q = q.filter(Alert.team_id == team_id)
-    return q.first() is not None
-
-
-def _create_alert(
+def _create_alert_if_new(
     db: Session,
     team_id: str | None,
     engineer_id: str | None,
@@ -81,7 +61,26 @@ def _create_alert(
     expected_value: float | None,
     actual_value: float | None,
     threshold: float | None,
-) -> Alert:
+) -> Alert | None:
+    """Check for recent duplicate and create alert atomically within the session.
+
+    Combines dedup check + insert in one method with a flush to minimise
+    the race window under concurrent ingest traffic.
+    """
+    cutoff = datetime.now(UTC) - timedelta(hours=24)
+    q = db.query(Alert).filter(
+        Alert.alert_type == alert_type,
+        Alert.dismissed == False,  # noqa: E712
+        Alert.detected_at >= cutoff,
+    )
+    if engineer_id:
+        q = q.filter(Alert.engineer_id == engineer_id)
+    elif team_id:
+        q = q.filter(Alert.team_id == team_id)
+
+    if q.first() is not None:
+        return None
+
     alert = Alert(
         team_id=team_id,
         engineer_id=engineer_id,
@@ -104,9 +103,6 @@ def _detect_friction_spike(
     team_id: str | None = None,
     engineer_id: str | None = None,
 ) -> Alert | None:
-    if _has_recent_alert(db, "friction_spike", team_id, engineer_id):
-        return None
-
     # Last day friction
     day_q = _recent_window(db, team_id, engineer_id, 1)
     day_sessions = day_q.all()
@@ -125,7 +121,7 @@ def _detect_friction_spike(
     avg_daily_friction = week_friction / 7
 
     if avg_daily_friction > 0 and day_friction > avg_daily_friction * 2:
-        return _create_alert(
+        return _create_alert_if_new(
             db,
             team_id=team_id,
             engineer_id=engineer_id,
@@ -149,16 +145,13 @@ def _detect_usage_drop(
     team_id: str | None = None,
     engineer_id: str | None = None,
 ) -> Alert | None:
-    if _has_recent_alert(db, "usage_drop", team_id, engineer_id):
-        return None
-
     day_count = _recent_window(db, team_id, engineer_id, 1).count()
     week_q = _recent_window(db, team_id, engineer_id, 7)
     week_count = week_q.count()
     avg_daily = week_count / 7
 
     if avg_daily >= 2 and day_count < avg_daily * 0.5:
-        return _create_alert(
+        return _create_alert_if_new(
             db,
             team_id=team_id,
             engineer_id=engineer_id,
@@ -182,9 +175,6 @@ def _detect_cost_spike(
     team_id: str | None = None,
     engineer_id: str | None = None,
 ) -> Alert | None:
-    if _has_recent_alert(db, "cost_spike", team_id, engineer_id):
-        return None
-
     def _daily_cost(days: int) -> float:
         cutoff = datetime.now(UTC) - timedelta(days=days)
         q = (
@@ -221,7 +211,7 @@ def _detect_cost_spike(
         else:
             return None
 
-        return _create_alert(
+        return _create_alert_if_new(
             db,
             team_id=team_id,
             engineer_id=engineer_id,
@@ -245,9 +235,6 @@ def _detect_success_rate_drop(
     team_id: str | None = None,
     engineer_id: str | None = None,
 ) -> Alert | None:
-    if _has_recent_alert(db, "success_rate_drop", team_id, engineer_id):
-        return None
-
     def _success_rate(days: int) -> float | None:
         cutoff = datetime.now(UTC) - timedelta(days=days)
         q = (
@@ -273,7 +260,7 @@ def _detect_success_rate_drop(
     if day_rate is not None and week_rate is not None:
         drop_pp = (week_rate - day_rate) * 100
         if drop_pp > 20:
-            return _create_alert(
+            return _create_alert_if_new(
                 db,
                 team_id=team_id,
                 engineer_id=engineer_id,
