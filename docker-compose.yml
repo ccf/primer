@@ -9,6 +9,11 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U primer"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
 
   server:
     build:
@@ -20,7 +25,8 @@ services:
       PRIMER_DATABASE_URL: postgresql://primer:primer@db:5432/primer
       PRIMER_ADMIN_API_KEY: ${PRIMER_ADMIN_API_KEY:-primer-admin-dev-key}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
 volumes:
   pgdata:
