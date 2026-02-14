@@ -13,6 +13,7 @@ from primer.common.models import (  # noqa: F401 — ensure all models are regis
     RefreshToken,
     Session,
     SessionFacets,
+    SessionMessage,
     Team,
     ToolUsage,
 )
@@ -24,7 +25,8 @@ if config.config_file_name is not None:
 # Override sqlalchemy.url from env var if set
 db_url = os.environ.get("PRIMER_DATABASE_URL")
 if db_url:
-    config.set_main_option("sqlalchemy.url", db_url)
+    # Escape % for ConfigParser interpolation (e.g. URL-encoded passwords)
+    config.set_main_option("sqlalchemy.url", db_url.replace("%", "%%"))
 
 target_metadata = Base.metadata
 

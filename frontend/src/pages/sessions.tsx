@@ -36,7 +36,6 @@ export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
   })
 
   const projectFilter = searchParams.get("project") ?? undefined
-  const frictionFilter = searchParams.get("friction_type") ?? undefined
 
   const startDate = dateRange?.startDate
   const endDate = dateRange?.endDate
@@ -109,7 +108,6 @@ export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
 
   const legacyFilters = [
     ...(projectFilter ? [{ key: "project", label: `Project: ${projectFilter}` }] : []),
-    ...(frictionFilter ? [{ key: "friction_type", label: `Friction: ${frictionFilter}` }] : []),
     ...(engineerId ? [{ key: "engineer_id", label: "Engineer filtered" }] : []),
   ]
 

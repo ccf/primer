@@ -1,5 +1,4 @@
-import { useSearchParams } from "react-router-dom"
-import { Activity, CheckCircle2, MessageSquare, Users, Wrench, FileCode, DollarSign, X } from "lucide-react"
+import { Activity, CheckCircle2, MessageSquare, Users, Wrench, FileCode, DollarSign } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useOverview, useDailyStats, useToolRankings, useModelRankings, useRecommendations, useCostAnalytics, useActivityHeatmap } from "@/hooks/use-api-queries"
 import { StatCard } from "@/components/dashboard/stat-card"
@@ -13,7 +12,6 @@ import { CostBreakdownChart } from "@/components/dashboard/cost-breakdown-chart"
 import { ActivityHeatmap } from "@/components/dashboard/activity-heatmap"
 import { RecommendationsPanel } from "@/components/dashboard/recommendations-panel"
 import { CardSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleton"
-import { Button } from "@/components/ui/button"
 import { formatNumber, formatTokens, formatDuration, formatCost, formatPercent } from "@/lib/utils"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
@@ -30,8 +28,6 @@ function computeDelta(current: number | null | undefined, previous: number | nul
 export function OverviewPage({ teamId, dateRange }: OverviewPageProps) {
   const { user } = useAuth()
   const role = user?.role ?? "admin"
-  const [searchParams, setSearchParams] = useSearchParams()
-  const engineerIdFilter = searchParams.get("engineer_id")
 
   const startDate = dateRange?.startDate
   const endDate = dateRange?.endDate
@@ -42,11 +38,6 @@ export function OverviewPage({ teamId, dateRange }: OverviewPageProps) {
   const { data: recs, isLoading: loadingRecs } = useRecommendations(teamId, startDate, endDate)
   const { data: costs, isLoading: loadingCosts } = useCostAnalytics(teamId, startDate, endDate)
   const { data: heatmap, isLoading: loadingHeatmap } = useActivityHeatmap(teamId, startDate, endDate)
-
-  const clearEngineerFilter = () => {
-    searchParams.delete("engineer_id")
-    setSearchParams(searchParams)
-  }
 
   if (loadingOverview) {
     return (
@@ -65,17 +56,9 @@ export function OverviewPage({ teamId, dateRange }: OverviewPageProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-bold">
-          {role === "engineer" ? "My Dashboard" : role === "team_lead" ? "Team Overview" : "Overview"}
-        </h1>
-        {engineerIdFilter && (
-          <Button variant="outline" size="sm" onClick={clearEngineerFilter}>
-            Filtered by engineer
-            <X className="ml-1 h-3 w-3" />
-          </Button>
-        )}
-      </div>
+      <h1 className="text-2xl font-bold">
+        {role === "engineer" ? "My Dashboard" : role === "team_lead" ? "Team Overview" : "Overview"}
+      </h1>
 
       {/* KPI Cards — Row 1 */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
