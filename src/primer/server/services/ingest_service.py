@@ -6,6 +6,7 @@ from primer.common.models import (
     IngestEvent,
     ModelUsage,
     SessionFacets,
+    SessionMessage,
     ToolUsage,
 )
 from primer.common.models import (
@@ -79,6 +80,12 @@ def upsert_session(db: Session, engineer_id: str, payload: SessionIngestPayload)
                     cache_creation_tokens=mu.cache_creation_tokens,
                 )
             )
+
+    # Messages
+    if payload.messages:
+        db.query(SessionMessage).filter(SessionMessage.session_id == session.id).delete()
+        for msg in payload.messages:
+            db.add(SessionMessage(session_id=session.id, **msg.model_dump()))
 
     # Facets
     if payload.facets:

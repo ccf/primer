@@ -95,6 +95,9 @@ class Session(Base):
     model_usages: Mapped[list["ModelUsage"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )
+    messages: Mapped[list["SessionMessage"]] = relationship(
+        back_populates="session", cascade="all, delete-orphan"
+    )
 
 
 class SessionFacets(Base):
@@ -182,3 +185,20 @@ class RefreshToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     engineer: Mapped[Engineer] = relationship(back_populates="refresh_tokens")
+
+
+class SessionMessage(Base):
+    __tablename__ = "session_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), nullable=False)
+    ordinal: Mapped[int] = mapped_column(Integer, nullable=False)
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    content_text: Mapped[str | None] = mapped_column(Text)
+    tool_calls: Mapped[list | None] = mapped_column(JSON)
+    tool_results: Mapped[list | None] = mapped_column(JSON)
+    token_count: Mapped[int | None] = mapped_column(Integer)
+    model: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    session: Mapped[Session] = relationship(back_populates="messages")

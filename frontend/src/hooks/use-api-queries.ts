@@ -12,6 +12,7 @@ import type {
   ProjectAnalytics,
   Recommendation,
   SessionDetailResponse,
+  SessionMessage,
   SessionResponse,
   TeamResponse,
   ToolRanking,
@@ -30,6 +31,14 @@ export function useTeams() {
   return useQuery({
     queryKey: ["teams"],
     queryFn: () => apiFetch<TeamResponse[]>("/api/v1/teams"),
+  })
+}
+
+export function useTeam(teamId: string) {
+  return useQuery({
+    queryKey: ["team", teamId],
+    queryFn: () => apiFetch<TeamResponse>(`/api/v1/teams/${teamId}`),
+    enabled: !!teamId,
   })
 }
 
@@ -119,23 +128,33 @@ export function useSessions(params: {
   teamId: string | null
   engineerId?: string
   projectName?: string
+  search?: string
+  outcome?: string
+  sessionType?: string
+  primaryModel?: string
+  gitBranch?: string
   startDate?: string
   endDate?: string
   limit?: number
   offset?: number
 }) {
-  const searchParams = new URLSearchParams()
-  if (params.teamId) searchParams.set("team_id", params.teamId)
-  if (params.engineerId) searchParams.set("engineer_id", params.engineerId)
-  if (params.projectName) searchParams.set("project_name", params.projectName)
-  if (params.startDate) searchParams.set("start_date", params.startDate)
-  if (params.endDate) searchParams.set("end_date", params.endDate)
-  if (params.limit) searchParams.set("limit", String(params.limit))
-  if (params.offset) searchParams.set("offset", String(params.offset))
-  const qs = searchParams.toString()
+  const qs = buildParams({
+    team_id: params.teamId,
+    engineer_id: params.engineerId,
+    project_name: params.projectName,
+    search: params.search,
+    outcome: params.outcome,
+    session_type: params.sessionType,
+    primary_model: params.primaryModel,
+    git_branch: params.gitBranch,
+    start_date: params.startDate,
+    end_date: params.endDate,
+    limit: params.limit,
+    offset: params.offset,
+  })
   return useQuery({
     queryKey: ["sessions", params],
-    queryFn: () => apiFetch<SessionResponse[]>(`/api/v1/sessions${qs ? `?${qs}` : ""}`),
+    queryFn: () => apiFetch<SessionResponse[]>(`/api/v1/sessions${qs}`),
   })
 }
 
@@ -183,6 +202,14 @@ export function useSessionDetail(sessionId: string) {
   return useQuery({
     queryKey: ["session", sessionId],
     queryFn: () => apiFetch<SessionDetailResponse>(`/api/v1/sessions/${sessionId}`),
+    enabled: !!sessionId,
+  })
+}
+
+export function useTranscript(sessionId: string) {
+  return useQuery({
+    queryKey: ["transcript", sessionId],
+    queryFn: () => apiFetch<SessionMessage[]>(`/api/v1/sessions/${sessionId}/transcript`),
     enabled: !!sessionId,
   })
 }

@@ -1,9 +1,10 @@
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { useSearchParams } from "react-router-dom"
 import { useAuth } from "@/lib/auth-context"
 import { useSessions, useEngineers, useFriction } from "@/hooks/use-api-queries"
 import { SessionTable } from "@/components/sessions/session-table"
 import { SessionFilters } from "@/components/sessions/session-filters"
+import { SessionSearchBar, ActiveFilterChips } from "@/components/sessions/session-search-bar"
 import { FrictionList } from "@/components/analytics/friction-list"
 import { TableSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleton"
 import { EmptyState } from "@/components/shared/empty-state"
@@ -26,6 +27,13 @@ export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const [engineerId, setEngineerId] = useState(searchParams.get("engineer_id") ?? "")
   const [offset, setOffset] = useState(0)
+  const [search, setSearch] = useState("")
+  const [advFilters, setAdvFilters] = useState({
+    outcome: "",
+    sessionType: "",
+    primaryModel: "",
+    gitBranch: "",
+  })
 
   const projectFilter = searchParams.get("project") ?? undefined
   const frictionFilter = searchParams.get("friction_type") ?? undefined
@@ -38,6 +46,11 @@ export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
     teamId,
     engineerId: engineerId || undefined,
     projectName: projectFilter,
+    search: search || undefined,
+    outcome: advFilters.outcome || undefined,
+    sessionType: advFilters.sessionType || undefined,
+    primaryModel: advFilters.primaryModel || undefined,
+    gitBranch: advFilters.gitBranch || undefined,
     startDate,
     endDate,
     limit: PAGE_SIZE,
@@ -50,9 +63,27 @@ export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
     enabled: !loadingSessions && !!sessions && sessions.length > 0,
   })
 
+  const handleSearchChange = useCallback((value: string) => {
+    setSearch(value)
+    setOffset(0)
+  }, [])
+
+  const handleAdvFilterChange = useCallback((filters: typeof advFilters) => {
+    setAdvFilters(filters)
+    setOffset(0)
+  }, [])
+
   const clearFilter = (key: string) => {
-    searchParams.delete(key)
-    setSearchParams(searchParams)
+    if (key === "search") {
+      setSearch("")
+    } else if (key === "engineer_id") {
+      setEngineerId("")
+    } else if (key in advFilters) {
+      setAdvFilters((prev) => ({ ...prev, [key]: "" }))
+    } else {
+      searchParams.delete(key)
+      setSearchParams(searchParams)
+    }
     setOffset(0)
   }
 
@@ -76,7 +107,7 @@ export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
     )
   }
 
-  const activeFilters = [
+  const legacyFilters = [
     ...(projectFilter ? [{ key: "project", label: `Project: ${projectFilter}` }] : []),
     ...(frictionFilter ? [{ key: "friction_type", label: `Friction: ${frictionFilter}` }] : []),
     ...(engineerId ? [{ key: "engineer_id", label: "Engineer filtered" }] : []),
@@ -108,21 +139,24 @@ export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
         </div>
       </div>
 
+      {/* Search and advanced filters */}
+      <SessionSearchBar
+        search={search}
+        onSearchChange={handleSearchChange}
+        filters={advFilters}
+        onFilterChange={handleAdvFilterChange}
+      />
+
       {/* Active filter chips */}
-      {activeFilters.length > 0 && (
+      <ActiveFilterChips filters={advFilters} search={search} onClear={clearFilter} />
+      {legacyFilters.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {activeFilters.map((f) => (
+          {legacyFilters.map((f) => (
             <Button
               key={f.key}
               variant="secondary"
               size="sm"
-              onClick={() => {
-                if (f.key === "engineer_id") {
-                  setEngineerId("")
-                } else {
-                  clearFilter(f.key)
-                }
-              }}
+              onClick={() => clearFilter(f.key)}
             >
               {f.label}
               <X className="ml-1 h-3 w-3" />

@@ -115,6 +115,31 @@ class ModelUsageResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# --- Session Messages ---
+
+
+class SessionMessagePayload(BaseModel):
+    ordinal: int
+    role: str
+    content_text: str | None = None
+    tool_calls: list[dict] | None = None
+    tool_results: list[dict] | None = None
+    token_count: int | None = None
+    model: str | None = None
+
+
+class SessionMessageResponse(BaseModel):
+    ordinal: int
+    role: str
+    content_text: str | None
+    tool_calls: list[dict] | None
+    tool_results: list[dict] | None
+    token_count: int | None
+    model: str | None
+
+    model_config = {"from_attributes": True}
+
+
 # --- Session Ingest ---
 
 
@@ -144,6 +169,7 @@ class SessionIngestPayload(BaseModel):
     facets: SessionFacetsPayload | None = None
     tool_usages: list[ToolUsagePayload] = []
     model_usages: list[ModelUsagePayload] = []
+    messages: list[SessionMessagePayload] = []
 
 
 class BulkIngestPayload(BaseModel):

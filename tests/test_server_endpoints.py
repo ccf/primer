@@ -140,6 +140,150 @@ def test_create_team_duplicate_name(client, admin_headers):
     assert r2.status_code == 409
 
 
+def test_sessions_search(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client, api_key, first_prompt="Fix the authentication bug", summary="Fixed auth"
+    )
+    _ingest_session(client, api_key, first_prompt="Add pagination endpoint", summary="Added pages")
+
+    r = client.get(
+        "/api/v1/sessions",
+        headers=admin_headers,
+        params={"search": "authentication"},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) >= 1
+    assert any("authentication" in (s["first_prompt"] or "").lower() for s in data)
+
+
+def test_sessions_filter_outcome(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        facets={"outcome": "success", "session_type": "feature"},
+    )
+
+    r = client.get(
+        "/api/v1/sessions",
+        headers=admin_headers,
+        params={"outcome": "success"},
+    )
+    assert r.status_code == 200
+    assert len(r.json()) >= 1
+
+
+def test_sessions_filter_session_type(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        facets={"outcome": "success", "session_type": "debugging"},
+    )
+
+    r = client.get(
+        "/api/v1/sessions",
+        headers=admin_headers,
+        params={"session_type": "debugging"},
+    )
+    assert r.status_code == 200
+    assert len(r.json()) >= 1
+
+
+def test_sessions_filter_model(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        primary_model="claude-sonnet-4-5-20250929",
+    )
+
+    r = client.get(
+        "/api/v1/sessions",
+        headers=admin_headers,
+        params={"primary_model": "claude-sonnet-4-5-20250929"},
+    )
+    assert r.status_code == 200
+    assert len(r.json()) >= 1
+
+
+def test_get_team_by_id(client, engineer_with_key, admin_headers):
+    eng, _api_key = engineer_with_key
+    r = client.get(f"/api/v1/teams/{eng.team_id}", headers=admin_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["id"] == eng.team_id
+
+
+def test_get_team_not_found(client, admin_headers):
+    r = client.get("/api/v1/teams/nonexistent", headers=admin_headers)
+    assert r.status_code == 404
+
+
+def test_ingest_with_messages(client, engineer_with_key):
+    _eng, api_key = engineer_with_key
+    session_id = str(uuid.uuid4())
+    payload = {
+        "session_id": session_id,
+        "api_key": api_key,
+        "message_count": 3,
+        "messages": [
+            {"ordinal": 0, "role": "human", "content_text": "Fix the bug"},
+            {
+                "ordinal": 1,
+                "role": "assistant",
+                "content_text": "Let me check.",
+                "model": "claude-sonnet-4-5-20250929",
+                "token_count": 50,
+            },
+            {"ordinal": 2, "role": "human", "content_text": "Thanks!"},
+        ],
+    }
+    r = client.post("/api/v1/ingest/session", json=payload)
+    assert r.status_code == 200
+    assert r.json()["created"] is True
+
+
+def test_transcript_endpoint(client, engineer_with_key, admin_headers):
+    _eng, api_key = engineer_with_key
+    session_id = str(uuid.uuid4())
+    payload = {
+        "session_id": session_id,
+        "api_key": api_key,
+        "message_count": 3,
+        "messages": [
+            {"ordinal": 0, "role": "human", "content_text": "Hello"},
+            {
+                "ordinal": 1,
+                "role": "assistant",
+                "content_text": "Hi there!",
+                "model": "claude-sonnet-4-5-20250929",
+                "token_count": 10,
+            },
+            {"ordinal": 2, "role": "human", "content_text": "Bye"},
+        ],
+    }
+    r = client.post("/api/v1/ingest/session", json=payload)
+    assert r.status_code == 200
+
+    r2 = client.get(f"/api/v1/sessions/{session_id}/transcript", headers=admin_headers)
+    assert r2.status_code == 200
+    messages = r2.json()
+    assert len(messages) == 3
+    assert messages[0]["role"] == "human"
+    assert messages[0]["content_text"] == "Hello"
+    assert messages[1]["role"] == "assistant"
+    assert messages[1]["model"] == "claude-sonnet-4-5-20250929"
+    assert messages[2]["ordinal"] == 2
+
+
+def test_transcript_not_found(client, admin_headers):
+    r = client.get("/api/v1/sessions/nonexistent/transcript", headers=admin_headers)
+    assert r.status_code == 404
+
+
 def test_get_db_generator():
     """Test that get_db() yields a session and closes it."""
     import contextlib

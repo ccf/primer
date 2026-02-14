@@ -390,6 +390,112 @@ FRICTION_DETAILS = {
     ],
 }
 
+ASSISTANT_RESPONSES = [
+    "Let me look at the code first.",
+    "I'll read the file to understand the current implementation.",
+    "I've found the issue. Let me fix it.",
+    "I'll run the tests to verify the fix.",
+    "Here's the implementation. I've added proper error handling.",
+    "Let me check the existing tests for this module.",
+    "I'll create a new test file for this functionality.",
+    "The build is passing. Let me verify the changes.",
+    "I'll refactor this to use the existing pattern in the codebase.",
+    "I've made the changes. Here's a summary of what was modified.",
+]
+
+TOOL_CALL_TEMPLATES = [
+    {"name": "Read", "input_preview": '{"file_path": "src/main.py"}'},
+    {"name": "Edit", "input_preview": '{"file_path": "src/main.py", "old_string": "..."}'},
+    {"name": "Write", "input_preview": '{"file_path": "src/new_file.py", "content": "..."}'},
+    {"name": "Bash", "input_preview": '{"command": "pytest -v tests/"}'},
+    {"name": "Grep", "input_preview": '{"pattern": "def handle_", "path": "src/"}'},
+    {"name": "Glob", "input_preview": '{"pattern": "**/*.py"}'},
+]
+
+TOOL_RESULT_TEMPLATES = [
+    {"name": "Read", "output_preview": "import os\nimport sys\n\ndef main():\n    ..."},
+    {"name": "Edit", "output_preview": "File updated successfully."},
+    {"name": "Bash", "output_preview": "PASSED 12 tests in 0.5s"},
+    {"name": "Grep", "output_preview": "src/handler.py:15: def handle_request"},
+    {"name": "Glob", "output_preview": "src/main.py\nsrc/utils.py\nsrc/handler.py"},
+]
+
+
+def _generate_messages(session_type: str, msg_count: int, model: str) -> list[dict]:
+    """Generate synthetic transcript messages for a session."""
+    messages = []
+    ordinal = 0
+
+    # First human message is always the prompt
+    prompt = random.choice(FIRST_PROMPTS[session_type])
+    messages.append({"ordinal": ordinal, "role": "human", "content_text": prompt})
+    ordinal += 1
+
+    remaining = msg_count - 1
+    while remaining > 0:
+        # Assistant turn
+        text = random.choice(ASSISTANT_RESPONSES)
+        tool_calls = None
+        if random.random() < 0.6:
+            n_tools = random.randint(1, 3)
+            k = min(n_tools, len(TOOL_CALL_TEMPLATES))
+            tool_calls = random.sample(TOOL_CALL_TEMPLATES, k=k)
+        token_count = random.randint(100, 2000)
+        messages.append(
+            {
+                "ordinal": ordinal,
+                "role": "assistant",
+                "content_text": text,
+                "tool_calls": tool_calls,
+                "token_count": token_count,
+                "model": model,
+            }
+        )
+        ordinal += 1
+        remaining -= 1
+
+        # Tool results for each tool call
+        if tool_calls and remaining > 0:
+            for tc in tool_calls:
+                tr_match = [t for t in TOOL_RESULT_TEMPLATES if t["name"] == tc["name"]]
+                tr = random.choice(tr_match) if tr_match else random.choice(TOOL_RESULT_TEMPLATES)
+                messages.append(
+                    {
+                        "ordinal": ordinal,
+                        "role": "tool_result",
+                        "tool_results": [
+                            {"name": tr["name"], "output_preview": tr["output_preview"]}
+                        ],
+                    }
+                )
+                ordinal += 1
+                remaining -= 1
+                if remaining <= 0:
+                    break
+
+        # Human follow-up (not always)
+        if remaining > 0 and random.random() < 0.5:
+            followups = [
+                "Looks good, can you also add tests?",
+                "That works. Now update the documentation.",
+                "Can you refactor that to be cleaner?",
+                "What about error handling?",
+                "Run the full test suite to make sure nothing broke.",
+                "Great, let's move on to the next step.",
+            ]
+            messages.append(
+                {
+                    "ordinal": ordinal,
+                    "role": "human",
+                    "content_text": random.choice(followups),
+                }
+            )
+            ordinal += 1
+            remaining -= 1
+
+    return messages
+
+
 CLAUDE_VERSIONS = ["1.0.17", "1.0.16", "1.0.15", "1.0.14", "1.0.13"]
 PERMISSION_MODES = ["default", "plan", "bypassPermissions"]
 END_REASONS = ["user_exit", "conversation_end", "timeout", "error"]
@@ -515,7 +621,7 @@ def main():
         print("No new engineers created. Skipping session seeding.")
         return
 
-    now = datetime.utcnow()
+    now = datetime.now()
     session_types = list(FIRST_PROMPTS.keys())
     session_type_weights = [35, 25, 15, 15, 10]  # feature-heavy
     project_names = list(PROJECTS.keys())
@@ -671,6 +777,9 @@ def main():
                         "friction_detail": friction_detail,
                     }
 
+                # Generate transcript messages
+                session_messages = _generate_messages(session_type, msg_count, model)
+
                 payload = {
                     "session_id": session_id,
                     "api_key": api_key,
@@ -699,6 +808,7 @@ def main():
                     "summary": summary,
                     "tool_usages": tool_usages,
                     "model_usages": model_usages,
+                    "messages": session_messages,
                     "facets": facets,
                 }
                 r = httpx.post(f"{SERVER_URL}/api/v1/ingest/session", json=payload)
