@@ -1,6 +1,7 @@
-import { Activity, MessageSquare, Users, Wrench, Zap, FileCode, DollarSign } from "lucide-react"
+import { useSearchParams } from "react-router-dom"
+import { Activity, CheckCircle2, MessageSquare, Users, Wrench, FileCode, DollarSign, X } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
-import { useOverview, useDailyStats, useToolRankings, useModelRankings, useRecommendations, useCostAnalytics } from "@/hooks/use-api-queries"
+import { useOverview, useDailyStats, useToolRankings, useModelRankings, useRecommendations, useCostAnalytics, useActivityHeatmap } from "@/hooks/use-api-queries"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { OutcomeChart } from "@/components/dashboard/outcome-chart"
 import { SessionTypeChart } from "@/components/dashboard/session-type-chart"
@@ -9,9 +10,11 @@ import { ToolRankingChart } from "@/components/dashboard/tool-ranking-chart"
 import { ModelUsageChart } from "@/components/dashboard/model-usage-chart"
 import { DailyCostChart } from "@/components/dashboard/daily-cost-chart"
 import { CostBreakdownChart } from "@/components/dashboard/cost-breakdown-chart"
+import { ActivityHeatmap } from "@/components/dashboard/activity-heatmap"
 import { RecommendationsPanel } from "@/components/dashboard/recommendations-panel"
 import { CardSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleton"
-import { formatNumber, formatTokens, formatDuration, formatCost } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { formatNumber, formatTokens, formatDuration, formatCost, formatPercent } from "@/lib/utils"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
 interface OverviewPageProps {
@@ -19,9 +22,17 @@ interface OverviewPageProps {
   dateRange: DateRange | null
 }
 
+function computeDelta(current: number | null | undefined, previous: number | null | undefined): { value: number } | null {
+  if (current == null || previous == null || previous === 0) return null
+  return { value: ((current - previous) / previous) * 100 }
+}
+
 export function OverviewPage({ teamId, dateRange }: OverviewPageProps) {
   const { user } = useAuth()
   const role = user?.role ?? "admin"
+  const [searchParams, setSearchParams] = useSearchParams()
+  const engineerIdFilter = searchParams.get("engineer_id")
+
   const startDate = dateRange?.startDate
   const endDate = dateRange?.endDate
   const { data: overview, isLoading: loadingOverview } = useOverview(teamId, startDate, endDate)
@@ -30,6 +41,12 @@ export function OverviewPage({ teamId, dateRange }: OverviewPageProps) {
   const { data: models, isLoading: loadingModels } = useModelRankings(teamId, startDate, endDate)
   const { data: recs, isLoading: loadingRecs } = useRecommendations(teamId, startDate, endDate)
   const { data: costs, isLoading: loadingCosts } = useCostAnalytics(teamId, startDate, endDate)
+  const { data: heatmap, isLoading: loadingHeatmap } = useActivityHeatmap(teamId, startDate, endDate)
+
+  const clearEngineerFilter = () => {
+    searchParams.delete("engineer_id")
+    setSearchParams(searchParams)
+  }
 
   if (loadingOverview) {
     return (
@@ -44,47 +61,67 @@ export function OverviewPage({ teamId, dateRange }: OverviewPageProps) {
 
   if (!overview) return null
 
+  const prev = overview.previous_period
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">
-        {role === "engineer" ? "My Dashboard" : role === "team_lead" ? "Team Overview" : "Overview"}
-      </h1>
+      <div className="flex items-center gap-3">
+        <h1 className="text-2xl font-bold">
+          {role === "engineer" ? "My Dashboard" : role === "team_lead" ? "Team Overview" : "Overview"}
+        </h1>
+        {engineerIdFilter && (
+          <Button variant="outline" size="sm" onClick={clearEngineerFilter}>
+            Filtered by engineer
+            <X className="ml-1 h-3 w-3" />
+          </Button>
+        )}
+      </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards — Row 1 */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Total Sessions"
           value={formatNumber(overview.total_sessions)}
           icon={Activity}
+          delta={computeDelta(overview.total_sessions, prev?.total_sessions)}
         />
         <StatCard
           label="Engineers"
           value={formatNumber(overview.total_engineers)}
           icon={Users}
+          delta={computeDelta(overview.total_engineers, prev?.total_engineers)}
         />
         <StatCard
           label="Messages"
           value={formatNumber(overview.total_messages)}
           subtitle={overview.avg_messages_per_session ? `~${overview.avg_messages_per_session.toFixed(1)} per session` : undefined}
           icon={MessageSquare}
+          delta={computeDelta(overview.total_messages, prev?.total_messages)}
         />
         <StatCard
           label="Estimated Cost"
           value={overview.estimated_cost != null ? formatCost(overview.estimated_cost) : "-"}
           icon={DollarSign}
+          delta={computeDelta(overview.estimated_cost, prev?.estimated_cost)}
         />
       </div>
 
+      {/* KPI Cards — Row 2 */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Success Rate"
+          value={formatPercent(overview.success_rate)}
+          icon={CheckCircle2}
+          delta={computeDelta(
+            overview.success_rate != null ? overview.success_rate * 100 : null,
+            prev?.success_rate != null ? prev.success_rate * 100 : null,
+          )}
+        />
         <StatCard
           label="Input Tokens"
           value={formatTokens(overview.total_input_tokens)}
           icon={FileCode}
-        />
-        <StatCard
-          label="Output Tokens"
-          value={formatTokens(overview.total_output_tokens)}
-          icon={Zap}
+          delta={computeDelta(overview.total_input_tokens, prev?.total_input_tokens)}
         />
         <StatCard
           label="Avg Duration"
@@ -95,11 +132,15 @@ export function OverviewPage({ teamId, dateRange }: OverviewPageProps) {
           label="Tool Calls"
           value={formatNumber(overview.total_tool_calls)}
           icon={Wrench}
+          delta={computeDelta(overview.total_tool_calls, prev?.total_tool_calls)}
         />
       </div>
 
       {/* Daily Activity */}
       {loadingDaily ? <ChartSkeleton /> : daily && <DailyActivityChart data={daily} />}
+
+      {/* Activity Heatmap */}
+      {loadingHeatmap ? <ChartSkeleton /> : heatmap && heatmap.cells.length > 0 && <ActivityHeatmap data={heatmap} />}
 
       {/* Daily Cost + Cost Breakdown */}
       <div className="grid gap-4 lg:grid-cols-2">

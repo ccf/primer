@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { setApiKey } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
-import { BarChart3, Github, KeyRound, ChevronDown, ChevronUp } from "lucide-react"
+import { Github, KeyRound, ChevronDown, ChevronUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -48,7 +48,7 @@ export function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <BarChart3 className="h-6 w-6 text-primary" />
+            <img src="/logo-mark.svg" alt="Primer" className="h-7 w-7" />
           </div>
           <CardTitle className="text-xl">Primer Dashboard</CardTitle>
           <CardDescription>Sign in to view your Claude Code insights</CardDescription>

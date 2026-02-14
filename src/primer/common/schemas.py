@@ -215,6 +215,8 @@ class OverviewStats(BaseModel):
     avg_messages_per_session: float | None
     outcome_counts: dict[str, int]
     session_type_counts: dict[str, int]
+    success_rate: float | None = None
+    previous_period: "OverviewStats | None" = None
 
 
 class FrictionReport(BaseModel):
@@ -252,6 +254,7 @@ class DailyStatsResponse(BaseModel):
     message_count: int
     session_count: int
     tool_call_count: int
+    success_rate: float | None = None
 
     model_config = {"from_attributes": True}
 
@@ -278,3 +281,58 @@ class CostAnalytics(BaseModel):
     total_estimated_cost: float
     model_breakdown: list[ModelCostBreakdown]
     daily_costs: list[DailyCostEntry]
+
+
+# --- Engineer Analytics ---
+
+
+class EngineerStats(BaseModel):
+    engineer_id: str
+    name: str
+    email: str
+    team_id: str | None
+    avatar_url: str | None = None
+    github_username: str | None = None
+    total_sessions: int
+    total_tokens: int
+    estimated_cost: float
+    success_rate: float | None = None
+    avg_duration: float | None = None
+    top_tools: list[str] = []
+
+
+class EngineerAnalytics(BaseModel):
+    engineers: list[EngineerStats]
+    total_count: int
+
+
+# --- Project Analytics ---
+
+
+class ProjectStats(BaseModel):
+    project_name: str
+    total_sessions: int
+    unique_engineers: int
+    total_tokens: int
+    estimated_cost: float
+    outcome_distribution: dict[str, int] = {}
+    top_tools: list[str] = []
+
+
+class ProjectAnalytics(BaseModel):
+    projects: list[ProjectStats]
+    total_count: int
+
+
+# --- Activity Heatmap ---
+
+
+class HeatmapCell(BaseModel):
+    day_of_week: int  # 0=Monday, 6=Sunday
+    hour: int  # 0-23
+    count: int
+
+
+class ActivityHeatmap(BaseModel):
+    cells: list[HeatmapCell]
+    max_count: int

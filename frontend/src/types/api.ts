@@ -88,6 +88,8 @@ export interface OverviewStats {
   avg_messages_per_session: number | null
   outcome_counts: Record<string, number>
   session_type_counts: Record<string, number>
+  success_rate: number | null
+  previous_period: OverviewStats | null
 }
 
 export interface FrictionReport {
@@ -122,6 +124,7 @@ export interface DailyStatsResponse {
   message_count: number
   session_count: number
   tool_call_count: number
+  success_rate: number | null
 }
 
 export interface ModelCostBreakdown {
@@ -143,4 +146,50 @@ export interface CostAnalytics {
   total_estimated_cost: number
   model_breakdown: ModelCostBreakdown[]
   daily_costs: DailyCostEntry[]
+}
+
+export interface EngineerStats {
+  engineer_id: string
+  name: string
+  email: string
+  team_id: string | null
+  avatar_url: string | null
+  github_username: string | null
+  total_sessions: number
+  total_tokens: number
+  estimated_cost: number
+  success_rate: number | null
+  avg_duration: number | null
+  top_tools: string[]
+}
+
+export interface EngineerAnalytics {
+  engineers: EngineerStats[]
+  total_count: number
+}
+
+export interface ProjectStats {
+  project_name: string
+  total_sessions: number
+  unique_engineers: number
+  total_tokens: number
+  estimated_cost: number
+  outcome_distribution: Record<string, number>
+  top_tools: string[]
+}
+
+export interface ProjectAnalytics {
+  projects: ProjectStats[]
+  total_count: number
+}
+
+export interface HeatmapCell {
+  day_of_week: number
+  hour: number
+  count: number
+}
+
+export interface ActivityHeatmap {
+  cells: HeatmapCell[]
+  max_count: number
 }

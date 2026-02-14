@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useSearchParams } from "react-router-dom"
 import { useAuth } from "@/lib/auth-context"
 import { useSessions, useEngineers, useFriction } from "@/hooks/use-api-queries"
 import { SessionTable } from "@/components/sessions/session-table"
@@ -7,8 +8,9 @@ import { FrictionList } from "@/components/analytics/friction-list"
 import { TableSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleton"
 import { EmptyState } from "@/components/shared/empty-state"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, Download, X } from "lucide-react"
 import { useKeyboardNavigation } from "@/hooks/use-keyboard-navigation"
+import { exportToCsv } from "@/lib/csv-export"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
 interface SessionsPageProps {
@@ -21,8 +23,12 @@ const PAGE_SIZE = 50
 export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
   const { user } = useAuth()
   const role = user?.role ?? "admin"
-  const [engineerId, setEngineerId] = useState("")
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [engineerId, setEngineerId] = useState(searchParams.get("engineer_id") ?? "")
   const [offset, setOffset] = useState(0)
+
+  const projectFilter = searchParams.get("project") ?? undefined
+  const frictionFilter = searchParams.get("friction_type") ?? undefined
 
   const startDate = dateRange?.startDate
   const endDate = dateRange?.endDate
@@ -31,6 +37,9 @@ export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
   const { data: sessions, isLoading: loadingSessions } = useSessions({
     teamId,
     engineerId: engineerId || undefined,
+    projectName: projectFilter,
+    startDate,
+    endDate,
     limit: PAGE_SIZE,
     offset,
   })
@@ -41,23 +50,86 @@ export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
     enabled: !loadingSessions && !!sessions && sessions.length > 0,
   })
 
+  const clearFilter = (key: string) => {
+    searchParams.delete(key)
+    setSearchParams(searchParams)
+    setOffset(0)
+  }
+
+  const handleExport = () => {
+    if (!sessions) return
+    exportToCsv(
+      "sessions.csv",
+      ["ID", "Engineer", "Project", "Started", "Duration (s)", "Messages", "Tool Calls", "Model", "Tokens In", "Tokens Out"],
+      sessions.map((s) => [
+        s.id,
+        s.engineer_id,
+        s.project_name ?? "",
+        s.started_at ?? "",
+        s.duration_seconds ?? "",
+        s.message_count,
+        s.tool_call_count,
+        s.primary_model ?? "",
+        s.input_tokens,
+        s.output_tokens,
+      ]),
+    )
+  }
+
+  const activeFilters = [
+    ...(projectFilter ? [{ key: "project", label: `Project: ${projectFilter}` }] : []),
+    ...(frictionFilter ? [{ key: "friction_type", label: `Friction: ${frictionFilter}` }] : []),
+    ...(engineerId ? [{ key: "engineer_id", label: "Engineer filtered" }] : []),
+  ]
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">
           {role === "engineer" ? "My Sessions" : "Sessions"}
         </h1>
-        {role === "admin" && (
-          <SessionFilters
-            engineers={engineers ?? []}
-            engineerId={engineerId}
-            onEngineerChange={(id) => {
-              setEngineerId(id)
-              setOffset(0)
-            }}
-          />
-        )}
+        <div className="flex items-center gap-2">
+          {sessions && sessions.length > 0 && (
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              <Download className="mr-1 h-4 w-4" />
+              Export CSV
+            </Button>
+          )}
+          {role === "admin" && (
+            <SessionFilters
+              engineers={engineers ?? []}
+              engineerId={engineerId}
+              onEngineerChange={(id) => {
+                setEngineerId(id)
+                setOffset(0)
+              }}
+            />
+          )}
+        </div>
       </div>
+
+      {/* Active filter chips */}
+      {activeFilters.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {activeFilters.map((f) => (
+            <Button
+              key={f.key}
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                if (f.key === "engineer_id") {
+                  setEngineerId("")
+                } else {
+                  clearFilter(f.key)
+                }
+              }}
+            >
+              {f.label}
+              <X className="ml-1 h-3 w-3" />
+            </Button>
+          ))}
+        </div>
+      )}
 
       {loadingSessions ? (
         <TableSkeleton />

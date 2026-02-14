@@ -1,9 +1,10 @@
+import { Link } from "react-router-dom"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import type { FrictionReport } from "@/types/api"
 import { EmptyState } from "@/components/shared/empty-state"
 import { useState } from "react"
-import { ChevronDown, ChevronRight } from "lucide-react"
+import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react"
 
 interface FrictionListProps {
   data: FrictionReport[]
@@ -25,20 +26,29 @@ export function FrictionList({ data }: FrictionListProps) {
         <div className="space-y-2">
           {data.map((f) => (
             <div key={f.friction_type} className="rounded-lg border border-border">
-              <button
-                onClick={() => setExpanded(expanded === f.friction_type ? null : f.friction_type)}
-                className="flex w-full items-center justify-between p-3 text-left text-sm hover:bg-muted/30"
-              >
-                <div className="flex items-center gap-3">
+              <div className="flex w-full items-center justify-between p-3 text-sm">
+                <button
+                  onClick={() => setExpanded(expanded === f.friction_type ? null : f.friction_type)}
+                  className="flex items-center gap-3 text-left hover:text-foreground"
+                >
                   {expanded === f.friction_type ? (
                     <ChevronDown className="h-4 w-4 text-muted-foreground" />
                   ) : (
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   )}
                   <span className="font-medium">{f.friction_type}</span>
+                </button>
+                <div className="flex items-center gap-2">
+                  <Link
+                    to={`/sessions?friction_type=${encodeURIComponent(f.friction_type)}`}
+                    className="text-xs text-muted-foreground hover:text-primary"
+                    title="View sessions with this friction"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </Link>
+                  <Badge variant="secondary">{f.count}</Badge>
                 </div>
-                <Badge variant="secondary">{f.count}</Badge>
-              </button>
+              </div>
               {expanded === f.friction_type && f.details.length > 0 && (
                 <div className="border-t border-border px-4 py-3">
                   <ul className="space-y-1">
