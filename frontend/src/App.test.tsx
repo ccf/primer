@@ -25,16 +25,21 @@ vi.mock("@/lib/theme-context", () => ({
 
 vi.mock("@/hooks/use-api-queries", () => ({
   useTeams: vi.fn(),
+  useTeam: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useOverview: vi.fn().mockReturnValue({ data: undefined, isLoading: true }),
   useDailyStats: vi.fn().mockReturnValue({ data: undefined, isLoading: true }),
   useToolRankings: vi.fn().mockReturnValue({ data: undefined, isLoading: true }),
   useModelRankings: vi.fn().mockReturnValue({ data: undefined, isLoading: true }),
   useRecommendations: vi.fn().mockReturnValue({ data: undefined, isLoading: true }),
   useCostAnalytics: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useActivityHeatmap: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useEngineers: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useEngineerAnalytics: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useSessions: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useSessionDetail: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useTranscript: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useFriction: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useProjectAnalytics: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
 }))
 
 import { getApiKey } from "@/lib/api"

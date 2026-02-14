@@ -9,11 +9,16 @@ vi.mock("@/hooks/use-api-queries", () => ({
   useModelRankings: vi.fn(),
   useRecommendations: vi.fn(),
   useCostAnalytics: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useActivityHeatmap: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useTeams: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useEngineers: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useEngineerAnalytics: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useSessions: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useSessionDetail: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useTranscript: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useFriction: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useTeam: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useProjectAnalytics: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
 }))
 
 import {

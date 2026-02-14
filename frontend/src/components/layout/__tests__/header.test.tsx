@@ -24,6 +24,7 @@ vi.mock("@/lib/auth-context", () => ({
 
 describe("Header", () => {
   const onTeamChange = vi.fn()
+  const onDateRangeChange = vi.fn()
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -32,8 +33,18 @@ describe("Header", () => {
     mockGetApiKey.mockReturnValue("test-key")
   })
 
+  const renderHeader = (props?: { teamId?: string | null }) =>
+    render(
+      <Header
+        teamId={props?.teamId ?? null}
+        onTeamChange={onTeamChange}
+        dateRange={null}
+        onDateRangeChange={onDateRangeChange}
+      />,
+    )
+
   it("renders the 'All teams' default option", () => {
-    render(<Header teamId={null} onTeamChange={onTeamChange} />)
+    renderHeader()
 
     const select = screen.getByRole("combobox")
     expect(select).toBeInTheDocument()
@@ -48,7 +59,7 @@ describe("Header", () => {
       data: [{ id: "t1", name: "Platform", created_at: "2025-01-01T00:00:00" }],
     })
 
-    render(<Header teamId={null} onTeamChange={onTeamChange} />)
+    renderHeader()
 
     const options = screen.getAllByRole("option")
     expect(options).toHaveLength(2)
@@ -61,7 +72,7 @@ describe("Header", () => {
       data: [{ id: "t1", name: "Platform", created_at: "2025-01-01T00:00:00" }],
     })
 
-    render(<Header teamId={null} onTeamChange={onTeamChange} />)
+    renderHeader()
 
     const select = screen.getByRole("combobox")
     fireEvent.change(select, { target: { value: "t1" } })
@@ -74,7 +85,7 @@ describe("Header", () => {
       data: [{ id: "t1", name: "Platform", created_at: "2025-01-01T00:00:00" }],
     })
 
-    render(<Header teamId="t1" onTeamChange={onTeamChange} />)
+    renderHeader({ teamId: "t1" })
 
     const select = screen.getByRole("combobox")
     fireEvent.change(select, { target: { value: "" } })
@@ -86,7 +97,7 @@ describe("Header", () => {
     const reloadMock = vi.fn()
     Object.defineProperty(window, "location", { value: { reload: reloadMock }, writable: true })
 
-    render(<Header teamId={null} onTeamChange={onTeamChange} />)
+    renderHeader()
 
     const signOutButton = screen.getByTitle("Sign out")
     fireEvent.click(signOutButton)
