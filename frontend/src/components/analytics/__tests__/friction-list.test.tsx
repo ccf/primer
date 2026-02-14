@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { render, screen } from "@testing-library/react"
+import { MemoryRouter } from "react-router-dom"
 import userEvent from "@testing-library/user-event"
 import { FrictionList } from "../friction-list"
 import type { FrictionReport } from "@/types/api"
@@ -14,13 +15,21 @@ const frictionData: FrictionReport[] = [
 
 describe("FrictionList", () => {
   it("shows 'No friction detected' when empty", () => {
-    render(<FrictionList data={[]} />)
+    render(
+      <MemoryRouter>
+        <FrictionList data={[]} />
+      </MemoryRouter>,
+    )
 
     expect(screen.getByText("No friction detected")).toBeInTheDocument()
   })
 
   it("renders friction types and counts", () => {
-    render(<FrictionList data={frictionData} />)
+    render(
+      <MemoryRouter>
+        <FrictionList data={frictionData} />
+      </MemoryRouter>,
+    )
 
     expect(screen.getByText("tool_error")).toBeInTheDocument()
     expect(screen.getByText("5")).toBeInTheDocument()
@@ -28,7 +37,11 @@ describe("FrictionList", () => {
 
   it("expands details when clicked", async () => {
     const user = userEvent.setup()
-    render(<FrictionList data={frictionData} />)
+    render(
+      <MemoryRouter>
+        <FrictionList data={frictionData} />
+      </MemoryRouter>,
+    )
 
     expect(screen.queryByText("Failed on large files")).not.toBeInTheDocument()
 
@@ -41,7 +54,11 @@ describe("FrictionList", () => {
 
   it("collapses when clicked again", async () => {
     const user = userEvent.setup()
-    render(<FrictionList data={frictionData} />)
+    render(
+      <MemoryRouter>
+        <FrictionList data={frictionData} />
+      </MemoryRouter>,
+    )
 
     const button = screen.getByRole("button", { name: /tool_error/i })
     await user.click(button)

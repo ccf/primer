@@ -63,7 +63,7 @@ export function DateRangePicker({ value, onChange }: DateRangePickerProps) {
     }
   }
 
-  const isCustom = value?.label !== null && !presets.some((p) => p.label === value?.label) && value !== null
+  const isCustom = value != null && !presets.some((p) => p.label === value.label)
 
   return (
     <div className="flex items-center gap-1">

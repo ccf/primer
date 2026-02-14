@@ -89,14 +89,10 @@ describe("SessionDetailPanel", () => {
     ).toBeInTheDocument()
   })
 
-  it("renders tool usage table", () => {
+  it("renders tool usage chart", () => {
     render(<SessionDetailPanel session={baseSession} />)
 
     expect(screen.getByText("Tool Usage")).toBeInTheDocument()
-    expect(screen.getByText("Read")).toBeInTheDocument()
-    expect(screen.getByText("Edit")).toBeInTheDocument()
-    expect(screen.getByText("5")).toBeInTheDocument()
-    expect(screen.getByText("3")).toBeInTheDocument()
   })
 
   it("renders model usage table", () => {
