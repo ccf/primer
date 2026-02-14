@@ -27,6 +27,7 @@ export function EngineersPage({ teamId, dateRange }: EngineersPageProps) {
     teamId,
     startDate,
     endDate,
+    canBenchmark,
   )
 
   if (isLoading) {

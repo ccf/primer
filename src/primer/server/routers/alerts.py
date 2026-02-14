@@ -59,6 +59,16 @@ def trigger_detection(
     )
 
 
+def _check_alert_access(alert, auth: AuthContext):
+    """Verify the caller has access to this alert based on role scoping."""
+    if auth.role == "admin":
+        return
+    if (auth.role == "team_lead" and alert.team_id != auth.team_id) or (
+        auth.role == "engineer" and alert.engineer_id != auth.engineer_id
+    ):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+
 @router.patch("/{alert_id}/acknowledge", response_model=AlertResponse)
 def ack_alert(
     alert_id: str,
@@ -68,6 +78,7 @@ def ack_alert(
     alert = acknowledge_alert(db, alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
+    _check_alert_access(alert, auth)
     db.commit()
     return alert
 
@@ -81,5 +92,6 @@ def dismiss(
     alert = dismiss_alert(db, alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
+    _check_alert_access(alert, auth)
     db.commit()
     return alert

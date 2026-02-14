@@ -229,13 +229,19 @@ export function useProductivity(teamId: string | null, startDate?: string, endDa
   })
 }
 
-export function useEngineerBenchmarks(teamId: string | null, startDate?: string, endDate?: string) {
+export function useEngineerBenchmarks(
+  teamId: string | null,
+  startDate?: string,
+  endDate?: string,
+  enabled = true,
+) {
   return useQuery({
     queryKey: ["benchmarks", teamId, startDate, endDate],
     queryFn: () =>
       apiFetch<EngineerBenchmarkResponse>(
         `/api/v1/analytics/engineers/benchmarks${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
       ),
+    enabled,
   })
 }
 
