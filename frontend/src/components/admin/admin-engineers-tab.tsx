@@ -12,7 +12,7 @@ import { TableSkeleton } from "@/components/shared/loading-skeleton"
 const roleOptions = ["engineer", "team_lead", "admin"]
 
 export function AdminEngineersTab() {
-  const { data: engineers, isLoading } = useEngineers()
+  const { data: engineers, isLoading } = useEngineers(true)
   const { data: teams } = useTeams()
   const deactivate = useDeactivateEngineer()
   const rotateKey = useRotateApiKey()

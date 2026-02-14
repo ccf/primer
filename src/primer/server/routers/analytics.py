@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from primer.common.database import get_db
@@ -214,7 +214,12 @@ def engineer_benchmarks(
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(require_role("team_lead", "admin")),
 ):
-    tid = team_id if auth.role == "admin" else auth.team_id
+    if auth.role == "admin":
+        tid = team_id
+    elif not auth.team_id:
+        raise HTTPException(status_code=400, detail="No team assigned")
+    else:
+        tid = auth.team_id
     return get_engineer_benchmarks(db, team_id=tid, start_date=start_date, end_date=end_date)
 
 

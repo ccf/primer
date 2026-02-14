@@ -50,6 +50,9 @@ def get_auth_context(
     if primer_access:
         payload = verify_access_token(primer_access)
         if payload:
+            eng = db.query(Engineer).filter(Engineer.id == payload["sub"]).first()
+            if eng and not eng.is_active:
+                raise HTTPException(status_code=403, detail="Account deactivated")
             return AuthContext(
                 engineer_id=payload["sub"],
                 role=payload.get("role", "engineer"),
