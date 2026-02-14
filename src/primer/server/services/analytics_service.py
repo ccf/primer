@@ -1,5 +1,5 @@
 from collections import Counter
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
@@ -192,25 +192,30 @@ def get_overview(
 ) -> OverviewStats:
     result = _build_overview(db, team_id, engineer_id, start_date, end_date)
 
-    # Compute previous period for comparison
+    # Compute previous period for comparison (only when a date range is provided)
     if start_date and end_date:
+        # Ensure both are tz-aware for safe subtraction
+        if start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=UTC)
+        if end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=UTC)
         delta = end_date - start_date
         prev_end = start_date
         prev_start = prev_end - delta
+        previous = _build_overview(db, team_id, engineer_id, prev_start, prev_end)
+        if previous.total_sessions > 0:
+            result.previous_period = previous
     elif start_date:
-        # No end_date: use start_date to now, mirror backward
+        if start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=UTC)
         delta = datetime.now(UTC) - start_date
         prev_end = start_date
         prev_start = prev_end - delta
-    else:
-        # Default to last 30 days vs previous 30 days
-        now = datetime.now(UTC)
-        prev_end = now - timedelta(days=30)
-        prev_start = prev_end - timedelta(days=30)
-
-    previous = _build_overview(db, team_id, engineer_id, prev_start, prev_end)
-    if previous.total_sessions > 0:
-        result.previous_period = previous
+        previous = _build_overview(db, team_id, engineer_id, prev_start, prev_end)
+        if previous.total_sessions > 0:
+            result.previous_period = previous
+    # No date range ("All") → skip deltas since comparing all-time vs an
+    # arbitrary prior window produces misleading percentage changes.
 
     return result
 

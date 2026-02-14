@@ -54,9 +54,12 @@ export function DateRangePicker({ value, onChange }: DateRangePickerProps) {
     setSelected(range)
     if (range.from && range.to) {
       const label = `${format(range.from, "MMM d")} – ${format(range.to, "MMM d")}`
+      // Set end date to end of day so sessions on the selected end date are included
+      const endOfDay = new Date(range.to)
+      endOfDay.setHours(23, 59, 59, 999)
       onChange({
         startDate: range.from.toISOString(),
-        endDate: range.to.toISOString(),
+        endDate: endOfDay.toISOString(),
         label,
       })
       setShowCalendar(false)

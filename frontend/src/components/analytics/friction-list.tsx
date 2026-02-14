@@ -1,10 +1,9 @@
-import { Link } from "react-router-dom"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import type { FrictionReport } from "@/types/api"
 import { EmptyState } from "@/components/shared/empty-state"
 import { useState } from "react"
-import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react"
+import { ChevronDown, ChevronRight } from "lucide-react"
 
 interface FrictionListProps {
   data: FrictionReport[]
@@ -38,16 +37,7 @@ export function FrictionList({ data }: FrictionListProps) {
                   )}
                   <span className="font-medium">{f.friction_type}</span>
                 </button>
-                <div className="flex items-center gap-2">
-                  <Link
-                    to={`/sessions?friction_type=${encodeURIComponent(f.friction_type)}`}
-                    className="text-xs text-muted-foreground hover:text-primary"
-                    title="View sessions with this friction"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </Link>
-                  <Badge variant="secondary">{f.count}</Badge>
-                </div>
+                <Badge variant="secondary">{f.count}</Badge>
               </div>
               {expanded === f.friction_type && f.details.length > 0 && (
                 <div className="border-t border-border px-4 py-3">
