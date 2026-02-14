@@ -6,6 +6,20 @@ const mockUseTeams = vi.fn()
 
 vi.mock("@/hooks/use-api-queries", () => ({
   useTeams: () => mockUseTeams(),
+  useAlerts: vi.fn().mockReturnValue({ data: [], isLoading: false }),
+}))
+
+vi.mock("@/hooks/use-api-mutations", () => ({
+  useAcknowledgeAlert: vi.fn().mockReturnValue({ mutate: vi.fn() }),
+  useDismissAlert: vi.fn().mockReturnValue({ mutate: vi.fn() }),
+}))
+
+vi.mock("../alert-bell", () => ({
+  AlertBell: () => null,
+}))
+
+vi.mock("@/lib/theme-context", () => ({
+  useTheme: vi.fn().mockReturnValue({ resolved: "light", setTheme: vi.fn() }),
 }))
 
 const mockClearApiKey = vi.fn()

@@ -32,6 +32,7 @@ class EngineerResponse(BaseModel):
     email: str
     team_id: str | None
     role: str = "engineer"
+    is_active: bool = True
     avatar_url: str | None = None
     github_username: str | None = None
     display_name: str | None = None
@@ -43,6 +44,7 @@ class EngineerResponse(BaseModel):
 class EngineerUpdate(BaseModel):
     role: str | None = None
     team_id: str | None = None
+    is_active: bool | None = None
 
 
 class EngineerCreateResponse(BaseModel):
@@ -362,3 +364,103 @@ class HeatmapCell(BaseModel):
 class ActivityHeatmap(BaseModel):
     cells: list[HeatmapCell]
     max_count: int
+
+
+# --- Productivity Metrics ---
+
+
+class ProductivityMetrics(BaseModel):
+    sessions_per_engineer_per_day: float
+    avg_cost_per_session: float | None
+    cost_per_successful_outcome: float | None
+    estimated_time_saved_hours: float | None
+    estimated_value_created: float | None
+    adoption_rate: float
+    power_users: int
+    total_engineers_in_scope: int
+    total_cost: float
+    roi_ratio: float | None
+
+
+# --- Peer Benchmarking ---
+
+
+class BenchmarkContext(BaseModel):
+    team_avg_sessions: float
+    team_avg_tokens: float
+    team_avg_cost: float
+    team_avg_success_rate: float
+    team_avg_duration: float | None
+
+
+class EngineerBenchmark(BaseModel):
+    engineer_id: str
+    name: str
+    display_name: str | None = None
+    avatar_url: str | None = None
+    total_sessions: int
+    total_tokens: int
+    estimated_cost: float
+    success_rate: float | None
+    avg_duration: float | None
+    percentile_sessions: int
+    percentile_tokens: int
+    percentile_cost: int
+    vs_team_avg: dict[str, float]
+
+
+class EngineerBenchmarkResponse(BaseModel):
+    engineers: list[EngineerBenchmark]
+    benchmark: BenchmarkContext
+
+
+# --- Alerts ---
+
+
+class AlertResponse(BaseModel):
+    id: str
+    team_id: str | None
+    engineer_id: str | None
+    alert_type: str
+    severity: str
+    title: str
+    message: str
+    metric_name: str
+    expected_value: float | None
+    actual_value: float | None
+    threshold: float | None
+    detected_at: datetime
+    acknowledged_at: datetime | None
+    dismissed: bool
+
+    model_config = {"from_attributes": True}
+
+
+class DetectionResult(BaseModel):
+    alerts_created: int
+    alert_ids: list[str]
+
+
+# --- Admin ---
+
+
+class SystemStats(BaseModel):
+    total_engineers: int
+    active_engineers: int
+    total_teams: int
+    total_sessions: int
+    total_ingest_events: int
+    database_type: str
+
+
+class IngestEventResponse(BaseModel):
+    id: int
+    engineer_id: str
+    event_type: str
+    session_id: str | None
+    payload_size_bytes: int | None
+    status: str
+    error_message: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}

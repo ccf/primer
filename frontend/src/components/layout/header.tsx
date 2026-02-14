@@ -5,6 +5,7 @@ import { useTheme } from "@/lib/theme-context"
 import { clearApiKey, getApiKey } from "@/lib/api"
 import { LogOut, Sun, Moon } from "lucide-react"
 import { DateRangePicker, type DateRange } from "./date-range-picker"
+import { AlertBell } from "./alert-bell"
 
 interface HeaderProps {
   teamId: string | null
@@ -67,6 +68,8 @@ export function Header({ teamId, onTeamChange, dateRange, onDateRangeChange }: H
         )}
 
         <DateRangePicker value={dateRange} onChange={onDateRangeChange} />
+
+        <AlertBell />
 
         {user && (
           <div className="flex items-center gap-2">

@@ -2,12 +2,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
 
+vi.mock("@/lib/auth-context", () => ({
+  useAuth: vi.fn().mockReturnValue({ user: null }),
+}))
+
 vi.mock("@/hooks/use-api-queries", () => ({
   useOverview: vi.fn(),
   useDailyStats: vi.fn(),
   useToolRankings: vi.fn(),
   useModelRankings: vi.fn(),
   useRecommendations: vi.fn(),
+  useProductivity: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useCostAnalytics: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useActivityHeatmap: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useTeams: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),

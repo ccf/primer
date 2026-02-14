@@ -47,6 +47,8 @@ class Engineer(Base):
         DateTime, server_default=func.now(), onupdate=func.now()
     )
 
+    is_active: Mapped[bool] = mapped_column(Boolean, server_default="1", nullable=False)
+
     team: Mapped[Team | None] = relationship(back_populates="engineers")
     sessions: Mapped[list["Session"]] = relationship(back_populates="engineer")
     daily_stats: Mapped[list["DailyStats"]] = relationship(back_populates="engineer")
@@ -202,3 +204,22 @@ class SessionMessage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     session: Mapped[Session] = relationship(back_populates="messages")
+
+
+class Alert(Base):
+    __tablename__ = "alerts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    team_id: Mapped[str | None] = mapped_column(ForeignKey("teams.id"))
+    engineer_id: Mapped[str | None] = mapped_column(ForeignKey("engineers.id"))
+    alert_type: Mapped[str] = mapped_column(String(50))
+    severity: Mapped[str] = mapped_column(String(20))
+    title: Mapped[str] = mapped_column(String(255))
+    message: Mapped[str] = mapped_column(Text)
+    metric_name: Mapped[str] = mapped_column(String(100))
+    expected_value: Mapped[float | None] = mapped_column(Float)
+    actual_value: Mapped[float | None] = mapped_column(Float)
+    threshold: Mapped[float | None] = mapped_column(Float)
+    detected_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime)
+    dismissed: Mapped[bool] = mapped_column(Boolean, default=False)

@@ -1,6 +1,6 @@
 import { Activity, CheckCircle2, MessageSquare, Users, Wrench, FileCode, DollarSign } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
-import { useOverview, useDailyStats, useToolRankings, useModelRankings, useRecommendations, useCostAnalytics, useActivityHeatmap } from "@/hooks/use-api-queries"
+import { useOverview, useDailyStats, useToolRankings, useModelRankings, useRecommendations, useCostAnalytics, useActivityHeatmap, useProductivity } from "@/hooks/use-api-queries"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { OutcomeChart } from "@/components/dashboard/outcome-chart"
 import { SessionTypeChart } from "@/components/dashboard/session-type-chart"
@@ -10,6 +10,7 @@ import { ModelUsageChart } from "@/components/dashboard/model-usage-chart"
 import { DailyCostChart } from "@/components/dashboard/daily-cost-chart"
 import { CostBreakdownChart } from "@/components/dashboard/cost-breakdown-chart"
 import { ActivityHeatmap } from "@/components/dashboard/activity-heatmap"
+import { ProductivitySection } from "@/components/dashboard/productivity-section"
 import { RecommendationsPanel } from "@/components/dashboard/recommendations-panel"
 import { CardSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleton"
 import { formatNumber, formatTokens, formatDuration, formatCost, formatPercent } from "@/lib/utils"
@@ -38,6 +39,7 @@ export function OverviewPage({ teamId, dateRange }: OverviewPageProps) {
   const { data: recs, isLoading: loadingRecs } = useRecommendations(teamId, startDate, endDate)
   const { data: costs, isLoading: loadingCosts } = useCostAnalytics(teamId, startDate, endDate)
   const { data: heatmap, isLoading: loadingHeatmap } = useActivityHeatmap(teamId, startDate, endDate)
+  const { data: productivity, isLoading: loadingProductivity } = useProductivity(teamId, startDate, endDate)
 
   if (loadingOverview) {
     return (
@@ -118,6 +120,11 @@ export function OverviewPage({ teamId, dateRange }: OverviewPageProps) {
           delta={computeDelta(overview.total_tool_calls, prev?.total_tool_calls)}
         />
       </div>
+
+      {/* Productivity / ROI */}
+      {(role === "team_lead" || role === "admin") && (
+        loadingProductivity ? <ChartSkeleton /> : productivity && <ProductivitySection data={productivity} />
+      )}
 
       {/* Daily Activity */}
       {loadingDaily ? <ChartSkeleton /> : daily && <DailyActivityChart data={daily} />}

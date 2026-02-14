@@ -24,5 +24,9 @@ class PrimerSettings(BaseSettings):
     # Base URL (for cookie Secure flag)
     base_url: str = "http://localhost:5173"
 
+    # Productivity / ROI estimation
+    productivity_time_multiplier: float = 3.0
+    productivity_hourly_rate: float = 75.0
+
 
 settings = PrimerSettings()

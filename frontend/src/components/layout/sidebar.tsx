@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom"
-import { FolderKanban, Layout, MonitorDot, Users, Users2 } from "lucide-react"
+import { FolderKanban, Layout, MonitorDot, Settings, Users, Users2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import { getApiKey } from "@/lib/api"
@@ -10,6 +10,7 @@ const allLinks = [
   { to: "/projects", label: "Projects", icon: FolderKanban, minRole: "engineer" as const },
   { to: "/teams", label: "Teams", icon: Users2, minRole: "team_lead" as const },
   { to: "/engineers", label: "Engineers", icon: Users, minRole: "team_lead" as const },
+  { to: "/admin", label: "Admin", icon: Settings, minRole: "admin" as const },
 ]
 
 const roleLevel: Record<string, number> = {

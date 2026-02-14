@@ -31,15 +31,30 @@ vi.mock("@/hooks/use-api-queries", () => ({
   useToolRankings: vi.fn().mockReturnValue({ data: undefined, isLoading: true }),
   useModelRankings: vi.fn().mockReturnValue({ data: undefined, isLoading: true }),
   useRecommendations: vi.fn().mockReturnValue({ data: undefined, isLoading: true }),
+  useProductivity: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useCostAnalytics: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useActivityHeatmap: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useAlerts: vi.fn().mockReturnValue({ data: [], isLoading: false }),
   useEngineers: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useEngineerAnalytics: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useEngineerBenchmarks: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useSessions: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useSessionDetail: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useTranscript: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useFriction: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useProjectAnalytics: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useSystemStats: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useIngestEvents: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+}))
+
+vi.mock("@/hooks/use-api-mutations", () => ({
+  useAcknowledgeAlert: vi.fn().mockReturnValue({ mutate: vi.fn() }),
+  useDismissAlert: vi.fn().mockReturnValue({ mutate: vi.fn() }),
+  useDeactivateEngineer: vi.fn().mockReturnValue({ mutate: vi.fn() }),
+  useRotateApiKey: vi.fn().mockReturnValue({ mutate: vi.fn() }),
+  useUpdateEngineerRole: vi.fn().mockReturnValue({ mutate: vi.fn() }),
+  useCreateTeam: vi.fn().mockReturnValue({ mutate: vi.fn() }),
+  useCreateEngineer: vi.fn().mockReturnValue({ mutate: vi.fn() }),
 }))
 
 import { getApiKey } from "@/lib/api"
