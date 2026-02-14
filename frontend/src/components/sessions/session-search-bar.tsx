@@ -5,8 +5,6 @@ import { Button } from "@/components/ui/button"
 interface FilterState {
   outcome: string
   sessionType: string
-  primaryModel: string
-  gitBranch: string
 }
 
 interface SessionSearchBarProps {
@@ -113,10 +111,6 @@ export function ActiveFilterChips({
     ...(filters.sessionType
       ? [{ key: "sessionType", label: `Type: ${filters.sessionType}` }]
       : []),
-    ...(filters.primaryModel
-      ? [{ key: "primaryModel", label: `Model: ${filters.primaryModel}` }]
-      : []),
-    ...(filters.gitBranch ? [{ key: "gitBranch", label: `Branch: ${filters.gitBranch}` }] : []),
   ]
 
   if (chips.length === 0) return null

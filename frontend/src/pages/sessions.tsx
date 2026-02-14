@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react"
+import { useCallback } from "react"
 import { useSearchParams } from "react-router-dom"
 import { useAuth } from "@/lib/auth-context"
 import { useSessions, useEngineers, useFriction } from "@/hooks/use-api-queries"
@@ -25,17 +25,34 @@ export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
   const { user } = useAuth()
   const role = user?.role ?? "admin"
   const [searchParams, setSearchParams] = useSearchParams()
-  const [engineerId, setEngineerId] = useState(searchParams.get("engineer_id") ?? "")
-  const [offset, setOffset] = useState(0)
-  const [search, setSearch] = useState("")
-  const [advFilters, setAdvFilters] = useState({
-    outcome: "",
-    sessionType: "",
-    primaryModel: "",
-    gitBranch: "",
-  })
 
+  // Derive all filter state from URL params
+  const engineerId = searchParams.get("engineer_id") ?? ""
+  const search = searchParams.get("search") ?? ""
+  const offset = Number(searchParams.get("offset") ?? "0")
+  const advFilters = {
+    outcome: searchParams.get("outcome") ?? "",
+    sessionType: searchParams.get("session_type") ?? "",
+  }
   const projectFilter = searchParams.get("project") ?? undefined
+
+  const updateParam = useCallback(
+    (key: string, value: string) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        if (value) {
+          next.set(key, value)
+        } else {
+          next.delete(key)
+        }
+        if (key !== "offset") {
+          next.delete("offset")
+        }
+        return next
+      })
+    },
+    [setSearchParams],
+  )
 
   const startDate = dateRange?.startDate
   const endDate = dateRange?.endDate
@@ -48,8 +65,6 @@ export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
     search: search || undefined,
     outcome: advFilters.outcome || undefined,
     sessionType: advFilters.sessionType || undefined,
-    primaryModel: advFilters.primaryModel || undefined,
-    gitBranch: advFilters.gitBranch || undefined,
     startDate,
     endDate,
     limit: PAGE_SIZE,
@@ -62,28 +77,31 @@ export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
     enabled: !loadingSessions && !!sessions && sessions.length > 0,
   })
 
-  const handleSearchChange = useCallback((value: string) => {
-    setSearch(value)
-    setOffset(0)
-  }, [])
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      updateParam("search", value)
+    },
+    [updateParam],
+  )
 
-  const handleAdvFilterChange = useCallback((filters: typeof advFilters) => {
-    setAdvFilters(filters)
-    setOffset(0)
-  }, [])
+  const handleAdvFilterChange = useCallback(
+    (filters: typeof advFilters) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        if (filters.outcome) next.set("outcome", filters.outcome)
+        else next.delete("outcome")
+        if (filters.sessionType) next.set("session_type", filters.sessionType)
+        else next.delete("session_type")
+        next.delete("offset")
+        return next
+      })
+    },
+    [setSearchParams],
+  )
 
   const clearFilter = (key: string) => {
-    if (key === "search") {
-      setSearch("")
-    } else if (key === "engineer_id") {
-      setEngineerId("")
-    } else if (key in advFilters) {
-      setAdvFilters((prev) => ({ ...prev, [key]: "" }))
-    } else {
-      searchParams.delete(key)
-      setSearchParams(searchParams)
-    }
-    setOffset(0)
+    const paramKey = key === "sessionType" ? "session_type" : key
+    updateParam(paramKey, "")
   }
 
   const handleExport = () => {
@@ -106,7 +124,7 @@ export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
     )
   }
 
-  const legacyFilters = [
+  const extraFilters = [
     ...(projectFilter ? [{ key: "project", label: `Project: ${projectFilter}` }] : []),
     ...(engineerId ? [{ key: "engineer_id", label: "Engineer filtered" }] : []),
   ]
@@ -129,8 +147,7 @@ export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
               engineers={engineers ?? []}
               engineerId={engineerId}
               onEngineerChange={(id) => {
-                setEngineerId(id)
-                setOffset(0)
+                updateParam("engineer_id", id)
               }}
             />
           )}
@@ -147,9 +164,9 @@ export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
 
       {/* Active filter chips */}
       <ActiveFilterChips filters={advFilters} search={search} onClear={clearFilter} />
-      {legacyFilters.length > 0 && (
+      {extraFilters.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {legacyFilters.map((f) => (
+          {extraFilters.map((f) => (
             <Button
               key={f.key}
               variant="secondary"
@@ -179,7 +196,10 @@ export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
                 variant="outline"
                 size="sm"
                 disabled={offset === 0}
-                onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+                onClick={() => {
+                  const prev = Math.max(0, offset - PAGE_SIZE)
+                  updateParam("offset", prev ? String(prev) : "")
+                }}
               >
                 <ChevronLeft className="mr-1 h-4 w-4" />
                 Previous
@@ -188,7 +208,7 @@ export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
                 variant="outline"
                 size="sm"
                 disabled={sessions.length < PAGE_SIZE}
-                onClick={() => setOffset(offset + PAGE_SIZE)}
+                onClick={() => updateParam("offset", String(offset + PAGE_SIZE))}
               >
                 Next
                 <ChevronRight className="ml-1 h-4 w-4" />

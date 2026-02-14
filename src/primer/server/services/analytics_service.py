@@ -533,8 +533,10 @@ def get_engineer_analytics(
         "avg_duration": func.avg(SessionModel.duration_seconds).desc(),
         "name": Engineer.name.asc(),
     }
+    # estimated_cost and success_rate are computed post-query, so skip SQL limit
+    python_sort = sort_by in ("estimated_cost", "success_rate")
     q = q.order_by(sort_map.get(sort_by, func.count(SessionModel.id).desc()))
-    rows = q.limit(limit).all()
+    rows = q.all() if python_sort else q.limit(limit).all()
 
     engineers: list[EngineerStats] = []
     for row in rows:
@@ -595,6 +597,14 @@ def get_engineer_analytics(
                 top_tools=top_tools,
             )
         )
+
+    # Post-query sorting for computed fields
+    if sort_by == "estimated_cost":
+        engineers.sort(key=lambda e: e.estimated_cost or 0, reverse=True)
+        engineers = engineers[:limit]
+    elif sort_by == "success_rate":
+        engineers.sort(key=lambda e: e.success_rate or 0, reverse=True)
+        engineers = engineers[:limit]
 
     return EngineerAnalytics(engineers=engineers, total_count=len(engineers))
 
