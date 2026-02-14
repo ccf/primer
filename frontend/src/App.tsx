@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { BrowserRouter, Route, Routes } from "react-router-dom"
+import { BrowserRouter, Route, Routes, useParams } from "react-router-dom"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { getApiKey } from "@/lib/api"
 import { AuthProvider, useAuth } from "@/lib/auth-context"
@@ -12,6 +12,8 @@ import { SessionsPage } from "@/pages/sessions"
 import { SessionDetailPage } from "@/pages/session-detail"
 import { EngineersPage } from "@/pages/engineers"
 import { ProjectsPage } from "@/pages/projects"
+import { TeamsPage } from "@/pages/teams"
+import { TeamDetailPage } from "@/pages/team-detail"
 import { NotFoundPage } from "@/pages/not-found"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
@@ -23,6 +25,11 @@ const queryClient = new QueryClient({
     },
   },
 })
+
+function TeamDetailRoute({ dateRange }: { dateRange: DateRange | null }) {
+  const { teamId } = useParams<{ teamId: string }>()
+  return <TeamDetailPage teamId={teamId ?? ""} dateRange={dateRange} />
+}
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth()
@@ -55,6 +62,8 @@ function AuthenticatedApp() {
         <Route path="/sessions/:id" element={<SessionDetailPage />} />
         <Route path="/engineers" element={<EngineersPage teamId={teamId} dateRange={dateRange} />} />
         <Route path="/projects" element={<ProjectsPage teamId={teamId} dateRange={dateRange} />} />
+        <Route path="/teams" element={<TeamsPage />} />
+        <Route path="/teams/:teamId" element={<TeamDetailRoute dateRange={dateRange} />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AppShell>

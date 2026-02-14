@@ -2,6 +2,7 @@ export interface TeamResponse {
   id: string
   name: string
   created_at: string
+  engineer_count?: number
 }
 
 export interface EngineerResponse {
@@ -192,4 +193,14 @@ export interface HeatmapCell {
 export interface ActivityHeatmap {
   cells: HeatmapCell[]
   max_count: number
+}
+
+export interface SessionMessage {
+  ordinal: number
+  role: "human" | "assistant" | "tool_result"
+  content_text: string | null
+  tool_calls: { name: string; input_preview: string }[] | null
+  tool_results: { name: string; output_preview: string }[] | null
+  token_count: number | null
+  model: string | null
 }

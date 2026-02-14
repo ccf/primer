@@ -37,3 +37,20 @@ def list_teams(
     if auth.team_id:
         return db.query(Team).filter(Team.id == auth.team_id).all()
     return []
+
+
+@router.get("/{team_id}", response_model=TeamResponse)
+def get_team(
+    team_id: str,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    # Role-based access
+    if auth.role != "admin" and auth.team_id != team_id:
+        raise HTTPException(status_code=403, detail="Not your team")
+
+    return team

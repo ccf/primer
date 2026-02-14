@@ -32,6 +32,7 @@ class SessionMetadata:
     summary: str = ""
     tool_counts: dict[str, int] = field(default_factory=dict)
     model_tokens: dict[str, dict[str, int]] = field(default_factory=dict)
+    messages: list[dict] = field(default_factory=list)
 
     def to_ingest_payload(self, api_key: str, facets: dict | None = None) -> dict:
         payload: dict = {
@@ -71,6 +72,8 @@ class SessionMetadata:
                 for name, tokens in self.model_tokens.items()
             ],
         }
+        if self.messages:
+            payload["messages"] = self.messages
         if facets:
             payload["facets"] = facets
         return payload
@@ -84,6 +87,7 @@ def extract_from_jsonl(transcript_path: str) -> SessionMetadata:
     first_ts: datetime | None = None
     last_ts: datetime | None = None
     first_user_prompt_found = False
+    ordinal = 0
 
     path = Path(transcript_path)
     if not path.exists():
@@ -122,6 +126,12 @@ def extract_from_jsonl(transcript_path: str) -> SessionMetadata:
                 if text:
                     meta.first_prompt = text[:500]
                     first_user_prompt_found = True
+
+            # Collect messages
+            msg = _extract_message(entry, ordinal)
+            if msg:
+                meta.messages.append(msg)
+                ordinal += 1
 
     meta.tool_counts = dict(tool_counter)
     meta.model_tokens = model_tokens
@@ -226,6 +236,72 @@ def _extract_text(entry: dict) -> str:
                 texts.append(block)
         return " ".join(texts)
     return ""
+
+
+def _extract_message(entry: dict, ordinal: int) -> dict | None:
+    """Extract a transcript message from a JSONL entry."""
+    entry_type = entry.get("type", "")
+
+    if entry_type == "human":
+        text = _extract_text(entry)
+        if not text:
+            return None
+        return {
+            "ordinal": ordinal,
+            "role": "human",
+            "content_text": text[:2000],
+        }
+
+    if entry_type == "assistant":
+        content = entry.get("message", {}).get("content", [])
+        text_parts = []
+        tool_calls = []
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict):
+                    if block.get("type") == "text":
+                        text_parts.append(block.get("text", ""))
+                    elif block.get("type") == "tool_use":
+                        input_str = json.dumps(block.get("input", {}))
+                        tool_calls.append(
+                            {
+                                "name": block.get("name", "unknown"),
+                                "input_preview": input_str[:500],
+                            }
+                        )
+                elif isinstance(block, str):
+                    text_parts.append(block)
+        elif isinstance(content, str):
+            text_parts.append(content)
+
+        msg = entry.get("message", {})
+        usage = msg.get("usage", {})
+        return {
+            "ordinal": ordinal,
+            "role": "assistant",
+            "content_text": " ".join(text_parts)[:2000] if text_parts else None,
+            "tool_calls": tool_calls or None,
+            "token_count": usage.get("output_tokens"),
+            "model": msg.get("model"),
+        }
+
+    if entry_type == "tool_result":
+        content = entry.get("content", entry.get("message", {}).get("content", ""))
+        output = ""
+        tool_name = entry.get("name", entry.get("tool_name", "unknown"))
+        if isinstance(content, str):
+            output = content
+        elif isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    output += block.get("text", "")
+        return {
+            "ordinal": ordinal,
+            "role": "tool_result",
+            "tool_results": [{"name": tool_name, "output_preview": output[:500]}],
+        }
+
+    return None
 
 
 def load_facets(session_id: str) -> dict | None:
