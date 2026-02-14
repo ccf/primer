@@ -779,11 +779,21 @@ def get_productivity_metrics(
     agg = q.with_entities(
         func.count(SessionModel.id),
         func.sum(SessionModel.duration_seconds),
-        func.count(func.distinct(SessionModel.engineer_id)),
     ).first()
     total_sessions = agg[0] or 0
     total_duration = float(agg[1]) if agg[1] else 0.0
-    engineers_with_sessions = agg[2] or 0
+
+    # Count adopters (active engineers with sessions in range only)
+    active_ids = {
+        e.id
+        for e in db.query(Engineer.id)
+        .filter(Engineer.is_active == True)  # noqa: E712
+        .all()
+    }
+    session_engineer_ids = {
+        row[0] for row in q.with_entities(SessionModel.engineer_id).distinct().all()
+    }
+    engineers_with_sessions = len(session_engineer_ids & active_ids)
 
     # Total active engineers in scope
     eng_q = db.query(func.count(Engineer.id)).filter(Engineer.is_active == True)  # noqa: E712
@@ -867,7 +877,7 @@ def get_productivity_metrics(
     estimated_value = estimated_time_saved * hourly_rate if estimated_time_saved else None
 
     adoption_rate = (
-        (engineers_with_sessions / total_active_engineers) * 100
+        min((engineers_with_sessions / total_active_engineers) * 100, 100.0)
         if total_active_engineers > 0
         else 0.0
     )
