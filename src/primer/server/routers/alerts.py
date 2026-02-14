@@ -30,6 +30,8 @@ def list_alerts(
     team_id = None
     engineer_id = None
     if auth.role == "team_lead":
+        if not auth.team_id:
+            return []
         team_id = auth.team_id
     elif auth.role == "engineer":
         engineer_id = auth.engineer_id
