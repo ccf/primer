@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
+from primer.common.config import settings
 from primer.common.models import (
     Engineer,
     ModelUsage,
@@ -16,16 +17,20 @@ from primer.common.models import (
 from primer.common.pricing import estimate_cost
 from primer.common.schemas import (
     ActivityHeatmap,
+    BenchmarkContext,
     CostAnalytics,
     DailyCostEntry,
     DailyStatsResponse,
     EngineerAnalytics,
+    EngineerBenchmark,
+    EngineerBenchmarkResponse,
     EngineerStats,
     FrictionReport,
     HeatmapCell,
     ModelCostBreakdown,
     ModelRanking,
     OverviewStats,
+    ProductivityMetrics,
     ProjectAnalytics,
     ProjectStats,
     ToolRanking,
@@ -758,3 +763,299 @@ def get_activity_heatmap(
     max_count = max((c.count for c in cells), default=0)
 
     return ActivityHeatmap(cells=cells, max_count=max_count)
+
+
+def get_productivity_metrics(
+    db: Session,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> ProductivityMetrics:
+    """Compute ROI / productivity metrics."""
+    q = _base_session_query(db, team_id, engineer_id, start_date, end_date)
+
+    # Session counts and total duration
+    agg = q.with_entities(
+        func.count(SessionModel.id),
+        func.sum(SessionModel.duration_seconds),
+        func.count(func.distinct(SessionModel.engineer_id)),
+    ).first()
+    total_sessions = agg[0] or 0
+    total_duration = float(agg[1]) if agg[1] else 0.0
+    engineers_with_sessions = agg[2] or 0
+
+    # Total active engineers in scope
+    eng_q = db.query(func.count(Engineer.id)).filter(Engineer.is_active == True)  # noqa: E712
+    if engineer_id:
+        eng_q = eng_q.filter(Engineer.id == engineer_id)
+    elif team_id:
+        eng_q = eng_q.filter(Engineer.team_id == team_id)
+    total_active_engineers = eng_q.scalar() or 0
+
+    # Compute total cost
+    cost_q = db.query(
+        ModelUsage.model_name,
+        func.sum(ModelUsage.input_tokens),
+        func.sum(ModelUsage.output_tokens),
+        func.sum(ModelUsage.cache_read_tokens),
+        func.sum(ModelUsage.cache_creation_tokens),
+    ).join(SessionModel)
+    if engineer_id:
+        cost_q = cost_q.filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
+        cost_q = cost_q.join(Engineer).filter(Engineer.team_id == team_id)
+    if start_date:
+        cost_q = cost_q.filter(SessionModel.started_at >= start_date)
+    if end_date:
+        cost_q = cost_q.filter(SessionModel.started_at <= end_date)
+    cost_q = cost_q.group_by(ModelUsage.model_name)
+    total_cost = 0.0
+    for name, inp, out, cr, cc in cost_q.all():
+        total_cost += estimate_cost(name, inp or 0, out or 0, cr or 0, cc or 0)
+
+    # Success count from facets
+    success_q = (
+        db.query(func.count(SessionFacets.id))
+        .join(SessionModel)
+        .filter(SessionFacets.outcome == "success")
+    )
+    if engineer_id:
+        success_q = success_q.filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
+        success_q = success_q.join(Engineer).filter(Engineer.team_id == team_id)
+    if start_date:
+        success_q = success_q.filter(SessionModel.started_at >= start_date)
+    if end_date:
+        success_q = success_q.filter(SessionModel.started_at <= end_date)
+    success_count = success_q.scalar() or 0
+
+    # Compute days in range
+    if start_date and end_date:
+        if start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=UTC)
+        if end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=UTC)
+        days_in_range = max((end_date - start_date).days, 1)
+    else:
+        # Use date range from actual sessions
+        date_range = q.with_entities(
+            func.min(SessionModel.started_at), func.max(SessionModel.started_at)
+        ).first()
+        if date_range[0] and date_range[1]:
+            s, e = date_range[0], date_range[1]
+            if hasattr(s, "tzinfo") and s.tzinfo is None:
+                s = s.replace(tzinfo=UTC)
+            if hasattr(e, "tzinfo") and e.tzinfo is None:
+                e = e.replace(tzinfo=UTC)
+            days_in_range = max((e - s).days, 1)
+        else:
+            days_in_range = 1
+
+    active_eng_count = max(total_active_engineers, 1)
+    sessions_per_engineer_per_day = total_sessions / (active_eng_count * days_in_range)
+
+    avg_cost_per_session = total_cost / total_sessions if total_sessions > 0 else None
+    cost_per_success = total_cost / success_count if success_count > 0 else None
+
+    # Time saved estimation
+    multiplier = settings.productivity_time_multiplier
+    hourly_rate = settings.productivity_hourly_rate
+    estimated_time_saved = (
+        (total_duration / 3600) * (multiplier - 1) if total_duration > 0 else None
+    )
+    estimated_value = estimated_time_saved * hourly_rate if estimated_time_saved else None
+
+    adoption_rate = (
+        (engineers_with_sessions / total_active_engineers) * 100
+        if total_active_engineers > 0
+        else 0.0
+    )
+
+    # Power users: engineers with > 2x average session count
+    avg_sessions = total_sessions / engineers_with_sessions if engineers_with_sessions > 0 else 0
+    power_threshold = avg_sessions * 2
+    power_users = 0
+    if power_threshold > 0:
+        per_eng = (
+            q.with_entities(SessionModel.engineer_id, func.count(SessionModel.id).label("cnt"))
+            .group_by(SessionModel.engineer_id)
+            .all()
+        )
+        power_users = sum(1 for _, cnt in per_eng if cnt > power_threshold)
+
+    roi_ratio = estimated_value / total_cost if total_cost > 0 and estimated_value else None
+
+    return ProductivityMetrics(
+        sessions_per_engineer_per_day=round(sessions_per_engineer_per_day, 3),
+        avg_cost_per_session=round(avg_cost_per_session, 4) if avg_cost_per_session else None,
+        cost_per_successful_outcome=round(cost_per_success, 4) if cost_per_success else None,
+        estimated_time_saved_hours=round(estimated_time_saved, 1) if estimated_time_saved else None,
+        estimated_value_created=round(estimated_value, 2) if estimated_value else None,
+        adoption_rate=round(adoption_rate, 1),
+        power_users=power_users,
+        total_engineers_in_scope=total_active_engineers,
+        total_cost=round(total_cost, 4),
+        roi_ratio=round(roi_ratio, 2) if roi_ratio else None,
+    )
+
+
+def get_engineer_benchmarks(
+    db: Session,
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> EngineerBenchmarkResponse:
+    """Compute per-engineer benchmarks with percentiles and vs-team-avg."""
+    # Grouped query by engineer
+    q = db.query(
+        SessionModel.engineer_id,
+        Engineer.name,
+        Engineer.display_name,
+        Engineer.avatar_url,
+        func.count(SessionModel.id).label("total_sessions"),
+        func.coalesce(
+            func.sum(SessionModel.input_tokens) + func.sum(SessionModel.output_tokens), 0
+        ).label("total_tokens"),
+        func.avg(SessionModel.duration_seconds).label("avg_duration"),
+    ).join(Engineer, Engineer.id == SessionModel.engineer_id)
+
+    if team_id:
+        q = q.filter(Engineer.team_id == team_id)
+    if start_date:
+        q = q.filter(SessionModel.started_at >= start_date)
+    if end_date:
+        q = q.filter(SessionModel.started_at <= end_date)
+
+    q = q.group_by(
+        SessionModel.engineer_id,
+        Engineer.name,
+        Engineer.display_name,
+        Engineer.avatar_url,
+    )
+    rows = q.all()
+
+    if not rows:
+        return EngineerBenchmarkResponse(
+            engineers=[],
+            benchmark=BenchmarkContext(
+                team_avg_sessions=0,
+                team_avg_tokens=0,
+                team_avg_cost=0,
+                team_avg_success_rate=0,
+                team_avg_duration=None,
+            ),
+        )
+
+    # Per-engineer cost and success rate
+    eng_data: list[dict] = []
+    for row in rows:
+        eid = row.engineer_id
+
+        # Cost
+        cost_q = (
+            db.query(
+                ModelUsage.model_name,
+                func.sum(ModelUsage.input_tokens),
+                func.sum(ModelUsage.output_tokens),
+                func.sum(ModelUsage.cache_read_tokens),
+                func.sum(ModelUsage.cache_creation_tokens),
+            )
+            .join(SessionModel)
+            .filter(SessionModel.engineer_id == eid)
+        )
+        if start_date:
+            cost_q = cost_q.filter(SessionModel.started_at >= start_date)
+        if end_date:
+            cost_q = cost_q.filter(SessionModel.started_at <= end_date)
+        cost_q = cost_q.group_by(ModelUsage.model_name)
+        eng_cost = sum(
+            estimate_cost(name, inp or 0, out or 0, cr or 0, cc or 0)
+            for name, inp, out, cr, cc in cost_q.all()
+        )
+
+        # Success rate
+        sr = _compute_success_rate(db, engineer_id=eid, start_date=start_date, end_date=end_date)
+
+        eng_data.append(
+            {
+                "engineer_id": eid,
+                "name": row.name,
+                "display_name": row.display_name,
+                "avatar_url": row.avatar_url,
+                "total_sessions": row.total_sessions,
+                "total_tokens": row.total_tokens,
+                "estimated_cost": eng_cost,
+                "success_rate": sr,
+                "avg_duration": float(row.avg_duration) if row.avg_duration else None,
+            }
+        )
+
+    count = len(eng_data)
+
+    # Team averages
+    avg_sessions = sum(e["total_sessions"] for e in eng_data) / count
+    avg_tokens = sum(e["total_tokens"] for e in eng_data) / count
+    avg_cost = sum(e["estimated_cost"] for e in eng_data) / count
+    sr_vals = [e["success_rate"] for e in eng_data if e["success_rate"] is not None]
+    avg_sr = sum(sr_vals) / len(sr_vals) if sr_vals else 0
+    dur_vals = [e["avg_duration"] for e in eng_data if e["avg_duration"] is not None]
+    avg_dur = sum(dur_vals) / len(dur_vals) if dur_vals else None
+
+    # Percentile computation: sort, then rank / count * 100
+    sessions_sorted = sorted(e["total_sessions"] for e in eng_data)
+    tokens_sorted = sorted(e["total_tokens"] for e in eng_data)
+    cost_sorted = sorted(e["estimated_cost"] for e in eng_data)
+
+    def _percentile(sorted_vals: list, value) -> int:
+        rank = 0
+        for v in sorted_vals:
+            if v <= value:
+                rank += 1
+            else:
+                break
+        return round((rank / len(sorted_vals)) * 100) if sorted_vals else 0
+
+    engineers: list[EngineerBenchmark] = []
+    for e in eng_data:
+        vs_team: dict[str, float] = {}
+        if avg_sessions > 0:
+            vs_team["sessions"] = round(
+                ((e["total_sessions"] - avg_sessions) / avg_sessions) * 100, 1
+            )
+        if avg_tokens > 0:
+            vs_team["tokens"] = round(((e["total_tokens"] - avg_tokens) / avg_tokens) * 100, 1)
+        if avg_cost > 0:
+            vs_team["cost"] = round(((e["estimated_cost"] - avg_cost) / avg_cost) * 100, 1)
+
+        engineers.append(
+            EngineerBenchmark(
+                engineer_id=e["engineer_id"],
+                name=e["name"],
+                display_name=e["display_name"],
+                avatar_url=e["avatar_url"],
+                total_sessions=e["total_sessions"],
+                total_tokens=e["total_tokens"],
+                estimated_cost=round(e["estimated_cost"], 4),
+                success_rate=round(e["success_rate"], 3) if e["success_rate"] is not None else None,
+                avg_duration=round(e["avg_duration"], 1) if e["avg_duration"] is not None else None,
+                percentile_sessions=_percentile(sessions_sorted, e["total_sessions"]),
+                percentile_tokens=_percentile(tokens_sorted, e["total_tokens"]),
+                percentile_cost=_percentile(cost_sorted, e["estimated_cost"]),
+                vs_team_avg=vs_team,
+            )
+        )
+
+    # Sort by sessions descending
+    engineers.sort(key=lambda e: e.total_sessions, reverse=True)
+
+    return EngineerBenchmarkResponse(
+        engineers=engineers,
+        benchmark=BenchmarkContext(
+            team_avg_sessions=round(avg_sessions, 1),
+            team_avg_tokens=round(avg_tokens, 0),
+            team_avg_cost=round(avg_cost, 4),
+            team_avg_success_rate=round(avg_sr, 3),
+            team_avg_duration=round(avg_dur, 1) if avg_dur is not None else None,
+        ),
+    )

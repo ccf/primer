@@ -47,14 +47,18 @@ def create_engineer(
 
 @router.get("", response_model=list[EngineerResponse])
 def list_engineers(
+    include_inactive: bool = False,
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(get_auth_context),
 ):
     if auth.role == "engineer":
         raise HTTPException(status_code=403, detail="Insufficient permissions")
+    q = db.query(Engineer)
+    if not include_inactive:
+        q = q.filter(Engineer.is_active == True)  # noqa: E712
     if auth.role == "team_lead":
-        return db.query(Engineer).filter(Engineer.team_id == auth.team_id).all()
-    return db.query(Engineer).all()
+        q = q.filter(Engineer.team_id == auth.team_id)
+    return q.all()
 
 
 @router.get("/{engineer_id}/sessions", response_model=list[SessionResponse])
@@ -93,7 +97,43 @@ def update_engineer(
         engineer.role = payload.role
     if payload.team_id is not None:
         engineer.team_id = payload.team_id
+    if payload.is_active is not None:
+        engineer.is_active = payload.is_active
 
     db.commit()
     db.refresh(engineer)
     return EngineerResponse.model_validate(engineer)
+
+
+@router.delete("/{engineer_id}", response_model=EngineerResponse)
+def deactivate_engineer(
+    engineer_id: str,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_role("admin")),
+):
+    engineer = db.query(Engineer).filter(Engineer.id == engineer_id).first()
+    if not engineer:
+        raise HTTPException(status_code=404, detail="Engineer not found")
+    engineer.is_active = False
+    db.commit()
+    db.refresh(engineer)
+    return EngineerResponse.model_validate(engineer)
+
+
+@router.post("/{engineer_id}/rotate-key", response_model=EngineerCreateResponse)
+def rotate_api_key(
+    engineer_id: str,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_role("admin")),
+):
+    engineer = db.query(Engineer).filter(Engineer.id == engineer_id).first()
+    if not engineer:
+        raise HTTPException(status_code=404, detail="Engineer not found")
+    raw_key = f"primer_{secrets.token_urlsafe(32)}"
+    hashed = bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt()).decode()
+    engineer.api_key_hash = hashed
+    db.commit()
+    db.refresh(engineer)
+    return EngineerCreateResponse(
+        engineer=EngineerResponse.model_validate(engineer), api_key=raw_key
+    )

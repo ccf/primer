@@ -33,6 +33,15 @@ def ingest_session(
     try:
         created = upsert_session(db, engineer.id, payload)
         log_ingest_event(db, engineer.id, "session", payload.session_id, None, "ok")
+
+        # Trigger anomaly detection (non-blocking)
+        try:
+            from primer.server.services.alerting_service import detect_anomalies
+
+            detect_anomalies(db, team_id=engineer.team_id, engineer_id=engineer.id)
+        except Exception:
+            logger.exception("Anomaly detection failed during ingest")
+
         db.commit()
         return IngestResponse(status="ok", session_id=payload.session_id, created=created)
     except Exception as e:

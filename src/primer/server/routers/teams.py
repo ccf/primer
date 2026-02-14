@@ -54,3 +54,22 @@ def get_team(
         raise HTTPException(status_code=403, detail="Not your team")
 
     return team
+
+
+@router.patch("/{team_id}", response_model=TeamResponse)
+def update_team(
+    team_id: str,
+    payload: TeamCreate,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_role("admin")),
+):
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    existing = db.query(Team).filter(Team.name == payload.name, Team.id != team_id).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Team name already taken")
+    team.name = payload.name
+    db.commit()
+    db.refresh(team)
+    return team

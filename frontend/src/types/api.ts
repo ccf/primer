@@ -14,6 +14,7 @@ export interface EngineerResponse {
   avatar_url: string | null
   github_username: string | null
   display_name: string | null
+  is_active: boolean
   created_at: string
 }
 
@@ -203,4 +204,83 @@ export interface SessionMessage {
   tool_results: { name: string; output_preview: string }[] | null
   token_count: number | null
   model: string | null
+}
+
+export interface ProductivityMetrics {
+  sessions_per_engineer_per_day: number
+  avg_cost_per_session: number | null
+  cost_per_successful_outcome: number | null
+  estimated_time_saved_hours: number | null
+  estimated_value_created: number | null
+  adoption_rate: number
+  power_users: number
+  total_engineers_in_scope: number
+  total_cost: number
+  roi_ratio: number | null
+}
+
+export interface BenchmarkContext {
+  team_avg_sessions: number
+  team_avg_tokens: number
+  team_avg_cost: number
+  team_avg_success_rate: number
+  team_avg_duration: number | null
+}
+
+export interface EngineerBenchmark {
+  engineer_id: string
+  name: string
+  display_name: string | null
+  avatar_url: string | null
+  total_sessions: number
+  total_tokens: number
+  estimated_cost: number
+  success_rate: number | null
+  avg_duration: number | null
+  percentile_sessions: number
+  percentile_tokens: number
+  percentile_cost: number
+  vs_team_avg: Record<string, number>
+}
+
+export interface EngineerBenchmarkResponse {
+  engineers: EngineerBenchmark[]
+  benchmark: BenchmarkContext
+}
+
+export interface AlertResponse {
+  id: string
+  team_id: string | null
+  engineer_id: string | null
+  alert_type: string
+  severity: string
+  title: string
+  message: string
+  metric_name: string
+  expected_value: number | null
+  actual_value: number | null
+  threshold: number | null
+  detected_at: string
+  acknowledged_at: string | null
+  dismissed: boolean
+}
+
+export interface SystemStats {
+  total_engineers: number
+  active_engineers: number
+  total_teams: number
+  total_sessions: number
+  total_ingest_events: number
+  database_type: string
+}
+
+export interface IngestEventResponse {
+  id: number
+  engineer_id: string
+  event_type: string
+  session_id: string | null
+  payload_size_bytes: number | null
+  status: string
+  error_message: string | null
+  created_at: string
 }

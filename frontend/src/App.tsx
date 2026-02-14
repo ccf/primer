@@ -14,6 +14,7 @@ import { EngineersPage } from "@/pages/engineers"
 import { ProjectsPage } from "@/pages/projects"
 import { TeamsPage } from "@/pages/teams"
 import { TeamDetailPage } from "@/pages/team-detail"
+import { AdminPage } from "@/pages/admin"
 import { NotFoundPage } from "@/pages/not-found"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
@@ -64,6 +65,7 @@ function AuthenticatedApp() {
         <Route path="/projects" element={<ProjectsPage teamId={teamId} dateRange={dateRange} />} />
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/teams/:teamId" element={<TeamDetailRoute dateRange={dateRange} />} />
+        <Route path="/admin" element={<AdminPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AppShell>

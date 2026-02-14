@@ -9,22 +9,26 @@ from primer.common.schemas import (
     CostAnalytics,
     DailyStatsResponse,
     EngineerAnalytics,
+    EngineerBenchmarkResponse,
     FrictionReport,
     ModelRanking,
     OverviewStats,
+    ProductivityMetrics,
     ProjectAnalytics,
     Recommendation,
     ToolRanking,
 )
-from primer.server.deps import AuthContext, get_auth_context
+from primer.server.deps import AuthContext, get_auth_context, require_role
 from primer.server.services.analytics_service import (
     get_activity_heatmap,
     get_cost_analytics,
     get_daily_stats,
     get_engineer_analytics,
+    get_engineer_benchmarks,
     get_friction_report,
     get_model_rankings,
     get_overview,
+    get_productivity_metrics,
     get_project_analytics,
     get_tool_rankings,
 )
@@ -186,6 +190,32 @@ def project_analytics(
         sort_by=sort_by,
         limit=limit,
     )
+
+
+@router.get("/productivity", response_model=ProductivityMetrics)
+def productivity(
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_productivity_metrics(
+        db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
+    )
+
+
+@router.get("/engineers/benchmarks", response_model=EngineerBenchmarkResponse)
+def engineer_benchmarks(
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_role("team_lead", "admin")),
+):
+    tid = team_id if auth.role == "admin" else auth.team_id
+    return get_engineer_benchmarks(db, team_id=tid, start_date=start_date, end_date=end_date)
 
 
 @router.get("/activity-heatmap", response_model=ActivityHeatmap)

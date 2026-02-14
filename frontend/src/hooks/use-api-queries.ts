@@ -2,18 +2,23 @@ import { useQuery } from "@tanstack/react-query"
 import { apiFetch } from "@/lib/api"
 import type {
   ActivityHeatmap,
+  AlertResponse,
   CostAnalytics,
   DailyStatsResponse,
   EngineerAnalytics,
+  EngineerBenchmarkResponse,
   EngineerResponse,
   FrictionReport,
+  IngestEventResponse,
   ModelRanking,
   OverviewStats,
+  ProductivityMetrics,
   ProjectAnalytics,
   Recommendation,
   SessionDetailResponse,
   SessionMessage,
   SessionResponse,
+  SystemStats,
   TeamResponse,
   ToolRanking,
 } from "@/types/api"
@@ -211,5 +216,60 @@ export function useTranscript(sessionId: string) {
     queryKey: ["transcript", sessionId],
     queryFn: () => apiFetch<SessionMessage[]>(`/api/v1/sessions/${sessionId}/transcript`),
     enabled: !!sessionId,
+  })
+}
+
+export function useProductivity(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["productivity", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<ProductivityMetrics>(
+        `/api/v1/analytics/productivity${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useEngineerBenchmarks(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["benchmarks", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<EngineerBenchmarkResponse>(
+        `/api/v1/analytics/engineers/benchmarks${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useAlerts(acknowledged?: boolean) {
+  return useQuery({
+    queryKey: ["alerts", acknowledged],
+    queryFn: () => {
+      const params = new URLSearchParams()
+      if (acknowledged !== undefined) params.set("acknowledged", String(acknowledged))
+      const qs = params.toString()
+      return apiFetch<AlertResponse[]>(`/api/v1/alerts${qs ? `?${qs}` : ""}`)
+    },
+    refetchInterval: 60_000,
+  })
+}
+
+export function useSystemStats() {
+  return useQuery({
+    queryKey: ["system-stats"],
+    queryFn: () => apiFetch<SystemStats>("/api/v1/admin/system-stats"),
+  })
+}
+
+export function useIngestEvents(params?: { engineerId?: string; status?: string; limit?: number; offset?: number }) {
+  return useQuery({
+    queryKey: ["ingest-events", params],
+    queryFn: () => {
+      const sp = new URLSearchParams()
+      if (params?.engineerId) sp.set("engineer_id", params.engineerId)
+      if (params?.status) sp.set("status", params.status)
+      if (params?.limit) sp.set("limit", String(params.limit))
+      if (params?.offset) sp.set("offset", String(params.offset))
+      const qs = sp.toString()
+      return apiFetch<IngestEventResponse[]>(`/api/v1/admin/ingest-events${qs ? `?${qs}` : ""}`)
+    },
   })
 }
