@@ -26,16 +26,17 @@
 - [x] Engineer activation/deactivation
 - [x] API key rotation
 
-## Tier 3 — Enterprise Features (Planned)
+## Tier 3 — Enterprise Features (In Progress)
 
-- [ ] GitHub OAuth SSO for dashboard access
-- [ ] Role-based access control (engineer, team_lead, admin)
-- [ ] Exportable reports (CSV/PDF)
+- [x] GitHub OAuth SSO for dashboard access
+- [x] Role-based access control (engineer, team_lead, admin)
+- [x] Exportable reports (CSV)
+- [x] Custom alert thresholds configuration
+- [x] Audit trail for admin actions
+- [x] API rate limiting
 - [ ] Scheduled alert digests (email/Slack)
-- [ ] Custom alert thresholds configuration
 - [ ] Multi-tenant workspace isolation
-- [ ] Audit trail for admin actions
-- [ ] API rate limiting and usage quotas
+- [ ] PDF export
 
 ## Tier 4 — Future Ideas
 
