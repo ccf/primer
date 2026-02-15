@@ -9,8 +9,9 @@ Aggregate Claude Code usage insights across an engineering organization.
 | `src/primer/common/` | Shared models, schemas, config, database setup |
 | `src/primer/common/pricing.py` | Model pricing config + cost estimation (longest-prefix match) |
 | `src/primer/server/` | FastAPI application, routers, services |
-| `src/primer/server/routers/` | API endpoint definitions (health, teams, engineers, sessions, ingest, analytics) |
-| `src/primer/server/services/` | Business logic (ingest, analytics, synthesis) |
+| `src/primer/server/routers/` | API endpoint definitions (health, teams, engineers, sessions, ingest, analytics, alert_configs, admin) |
+| `src/primer/server/services/` | Business logic (ingest, analytics, synthesis, alert_config, audit) |
+| `src/primer/server/middleware.py` | Rate limiting via slowapi (key function, limiter instance) |
 | `src/primer/hook/` | Claude Code SessionEnd hook (extractor, installer) |
 | `src/primer/mcp/` | MCP sidecar server (5 tools: sync, my_stats, team_overview, friction_report, recommendations) |
 | `tests/` | pytest test suite |
@@ -19,6 +20,8 @@ Aggregate Claude Code usage insights across an engineering organization.
 | `frontend/` | React + Tailwind CSS dashboard |
 | `frontend/src/lib/theme-context.tsx` | Dark mode ThemeProvider (light/dark/system, localStorage-backed) |
 | `frontend/src/components/layout/date-range-picker.tsx` | Time range picker (7d/30d/90d/1y presets) |
+| `frontend/src/components/admin/` | Admin UI tabs (alert thresholds, audit log) |
+| `frontend/src/hooks/use-api-mutations.ts` | TanStack Query mutations (alert config CRUD) |
 
 ## Commands
 
@@ -69,6 +72,9 @@ cd frontend && npx tsc -b --noEmit  # Type check
 - **MCP**: `FastMCP` server with `httpx` calls back to the REST API
 - **Pricing**: `src/primer/common/pricing.py` — longest-prefix match on model name, falls back to Sonnet 4 pricing
 - **Theming**: CSS custom properties in `index.css`, `.dark` class toggle, localStorage-persisted preference
+- **Rate Limiting**: slowapi middleware with per-route limits; key function uses API key prefix or client IP
+- **Alert Thresholds**: `AlertConfig` model with team > global > config defaults priority chain
+- **Audit Trail**: `AuditLog` model records admin mutations with actor, action, resource, details, IP
 
 ## Conventions
 

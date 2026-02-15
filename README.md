@@ -107,6 +107,12 @@ All management and analytics endpoints require authentication. Ingest endpoints 
 | GET | `/api/v1/auth/github/callback` | None | GitHub OAuth callback |
 | GET | `/api/v1/auth/me` | JWT | Get current user info |
 | POST | `/api/v1/auth/logout` | JWT | Logout (revoke refresh token) |
+| GET | `/api/v1/alert-configs` | Admin | List alert config overrides |
+| GET | `/api/v1/alert-configs/resolved` | Admin | Get effective alert thresholds |
+| POST | `/api/v1/alert-configs` | Admin | Create alert config override |
+| PATCH | `/api/v1/alert-configs/{id}` | Admin | Update alert config override |
+| DELETE | `/api/v1/alert-configs/{id}` | Admin | Delete alert config override |
+| GET | `/api/v1/admin/audit-logs` | Admin | List audit log entries (with filters) |
 
 See [docs/api.md](docs/api.md) for full request/response schemas and examples.
 
@@ -114,9 +120,11 @@ See [docs/api.md](docs/api.md) for full request/response schemas and examples.
 
 - **Cost Analysis** — Estimated spend per model with daily cost trend charts
 - **Date Range Picker** — Filter all analytics by 7d / 30d / 90d / 1y
+- **CSV Export** — Export data from Overview, Engineers, Projects, and Sessions pages
 - **Dark Mode** — Toggle between light, dark, and system themes (persisted in localStorage)
 - **Session Deep Links** — Copy-to-clipboard button on session detail pages
 - **Keyboard Navigation** — Arrow keys to navigate session tables, Enter to open
+- **Admin Panel** — Alert threshold management and audit log viewer (admin only)
 
 ## MCP Sidecar Setup
 
@@ -171,6 +179,15 @@ All settings use the `PRIMER_` environment variable prefix.
 | `PRIMER_GITHUB_CLIENT_ID` | — | GitHub OAuth app client ID |
 | `PRIMER_GITHUB_CLIENT_SECRET` | — | GitHub OAuth app client secret |
 | `PRIMER_JWT_SECRET_KEY` | — | Secret key for JWT token signing |
+| `PRIMER_RATE_LIMIT_ENABLED` | `true` | Enable/disable API rate limiting |
+| `PRIMER_RATE_LIMIT_DEFAULT` | `60/minute` | Default rate limit for all endpoints |
+| `PRIMER_RATE_LIMIT_INGEST` | `120/minute` | Rate limit for ingest endpoints |
+| `PRIMER_RATE_LIMIT_AUTH` | `10/minute` | Rate limit for auth endpoints |
+| `PRIMER_ALERT_FRICTION_SPIKE_MULTIPLIER` | `2.0` | Default friction spike threshold |
+| `PRIMER_ALERT_USAGE_DROP_RATIO` | `0.5` | Default usage drop threshold |
+| `PRIMER_ALERT_COST_SPIKE_WARNING` | `2.0` | Default cost spike warning threshold |
+| `PRIMER_ALERT_COST_SPIKE_CRITICAL` | `3.0` | Default cost spike critical threshold |
+| `PRIMER_ALERT_SUCCESS_RATE_DROP_PP` | `20.0` | Default success rate drop threshold (pp) |
 
 For the hook and MCP sidecar:
 
