@@ -7,6 +7,7 @@ from primer.common.database import get_db
 from primer.common.schemas import (
     ActivityHeatmap,
     BottleneckAnalytics,
+    ConfigOptimizationResponse,
     CostAnalytics,
     DailyStatsResponse,
     EngineerAnalytics,
@@ -14,9 +15,11 @@ from primer.common.schemas import (
     FrictionReport,
     ModelRanking,
     OverviewStats,
+    PersonalizedTipsResponse,
     ProductivityMetrics,
     ProjectAnalytics,
     Recommendation,
+    SkillInventoryResponse,
     ToolAdoptionAnalytics,
     ToolRanking,
 )
@@ -272,4 +275,52 @@ def tool_adoption(
         start_date=start_date,
         end_date=end_date,
         limit=limit,
+    )
+
+
+@router.get("/config-optimization", response_model=ConfigOptimizationResponse)
+def config_optimization(
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.insights_service import get_config_optimization
+
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_config_optimization(
+        db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
+    )
+
+
+@router.get("/personalized-tips", response_model=PersonalizedTipsResponse)
+def personalized_tips(
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.insights_service import get_personalized_tips
+
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_personalized_tips(
+        db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
+    )
+
+
+@router.get("/skill-inventory", response_model=SkillInventoryResponse)
+def skill_inventory(
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.insights_service import get_skill_inventory
+
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_skill_inventory(
+        db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
     )

@@ -382,3 +382,62 @@ export interface ToolAdoptionAnalytics {
   total_tools_discovered: number
   avg_tools_per_engineer: number
 }
+
+// --- Config Optimization ---
+
+export interface ConfigSuggestion {
+  category: string
+  title: string
+  description: string
+  severity: string
+  evidence: Record<string, unknown>
+  suggested_config?: string | null
+}
+
+export interface ConfigOptimizationResponse {
+  suggestions: ConfigSuggestion[]
+  sessions_analyzed: number
+}
+
+// --- Personalized Tips ---
+
+export interface PersonalizedTip {
+  category: string
+  title: string
+  description: string
+  severity: string
+  evidence: Record<string, unknown>
+}
+
+export interface PersonalizedTipsResponse {
+  tips: PersonalizedTip[]
+  sessions_analyzed: number
+  engineer_id?: string | null
+}
+
+// --- Skill Inventory ---
+
+export interface EngineerSkillProfile {
+  engineer_id: string
+  name: string
+  session_types: Record<string, number>
+  tool_proficiency: Record<string, string>
+  project_count: number
+  total_sessions: number
+  diversity_score: number
+}
+
+export interface TeamSkillGap {
+  skill: string
+  coverage_pct: number
+  total_engineers: number
+  engineers_with_skill: number
+}
+
+export interface SkillInventoryResponse {
+  engineer_profiles: EngineerSkillProfile[]
+  team_skill_gaps: TeamSkillGap[]
+  total_engineers: number
+  total_session_types: number
+  total_tools_used: number
+}
