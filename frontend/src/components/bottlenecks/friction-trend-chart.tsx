@@ -56,7 +56,7 @@ export function FrictionTrendChart({ data }: FrictionTrendChartProps) {
             />
             <Tooltip
               formatter={(value, name) =>
-                name === "frictionRate" ? `${value}%` : value
+                name === "Friction Rate %" ? `${value}%` : value
               }
             />
             <Legend />
