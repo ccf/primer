@@ -32,9 +32,12 @@ def detect_anomalies(
         except Exception:
             logger.exception("Anomaly detector %s failed", detector.__name__)
 
-    # Send Slack notifications in a background thread to avoid blocking ingest
+    # Snapshot alert data before the caller commits/closes the session.
+    # ORM objects become detached after commit (expire_on_commit=True),
+    # so the background thread needs plain dicts to avoid DetachedInstanceError.
     if alerts:
-        threading.Thread(target=_notify_slack_batch, args=(list(alerts),), daemon=True).start()
+        snapshots = [_snapshot_alert(a) for a in alerts]
+        threading.Thread(target=_notify_slack_batch, args=(snapshots,), daemon=True).start()
 
     return alerts
 
@@ -105,15 +108,36 @@ def _create_alert_if_new(
     return alert
 
 
-def _notify_slack_batch(alerts: list[Alert]) -> None:
+def _snapshot_alert(alert: Alert) -> dict:
+    """Capture alert attributes as a plain dict for use outside the DB session."""
+    return {
+        "id": alert.id,
+        "severity": alert.severity,
+        "title": alert.title,
+        "message": alert.message,
+        "alert_type": alert.alert_type,
+        "metric_name": alert.metric_name,
+        "expected_value": alert.expected_value,
+        "actual_value": alert.actual_value,
+    }
+
+
+class _AlertSnapshot:
+    """Lightweight stand-in for Alert that satisfies send_alert_to_slack's attribute access."""
+
+    def __init__(self, data: dict):
+        self.__dict__.update(data)
+
+
+def _notify_slack_batch(snapshots: list[dict]) -> None:
     """Send Slack notifications for a batch of alerts. Runs in a background thread."""
     from primer.server.services.slack_service import send_alert_to_slack
 
-    for alert in alerts:
+    for snap in snapshots:
         try:
-            send_alert_to_slack(alert)
+            send_alert_to_slack(_AlertSnapshot(snap))  # type: ignore[arg-type]
         except Exception:
-            logger.exception("Slack notification failed for alert %s", alert.id)
+            logger.exception("Slack notification failed for alert %s", snap.get("id"))
 
 
 def _detect_friction_spike(
