@@ -24,7 +24,8 @@ def system_stats(
 
     # Determine database type from the engine URL
     engine = db.get_bind()
-    db_type = engine.url.drivername if hasattr(engine, "url") else "unknown"
+    drivername = engine.url.drivername if hasattr(engine, "url") else "unknown"
+    db_type = drivername.split("+")[0].replace("postgresql", "PostgreSQL").replace("sqlite", "SQLite")
 
     return SystemStats(
         total_engineers=total_engineers,
