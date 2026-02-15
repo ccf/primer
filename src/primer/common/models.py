@@ -8,11 +8,13 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -191,7 +193,16 @@ class RefreshToken(Base):
 
 class AlertConfig(Base):
     __tablename__ = "alert_configs"
-    __table_args__ = (UniqueConstraint("team_id", "alert_type", name="uq_alert_config_team_type"),)
+    __table_args__ = (
+        UniqueConstraint("team_id", "alert_type", name="uq_alert_config_team_type"),
+        Index(
+            "uq_alert_config_global_type",
+            "alert_type",
+            unique=True,
+            sqlite_where=text("team_id IS NULL"),
+            postgresql_where=text("team_id IS NULL"),
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     team_id: Mapped[str | None] = mapped_column(ForeignKey("teams.id"), nullable=True)

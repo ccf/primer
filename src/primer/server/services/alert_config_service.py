@@ -25,12 +25,13 @@ def create_alert_config(db: Session, payload: AlertConfigCreate) -> AlertConfig:
     if payload.alert_type not in VALID_ALERT_TYPES:
         raise HTTPException(status_code=400, detail=f"Invalid alert type: {payload.alert_type}")
 
+    if payload.team_id is None:
+        team_filter = AlertConfig.team_id.is_(None)
+    else:
+        team_filter = AlertConfig.team_id == payload.team_id
     existing = (
         db.query(AlertConfig)
-        .filter(
-            AlertConfig.team_id == payload.team_id,
-            AlertConfig.alert_type == payload.alert_type,
-        )
+        .filter(team_filter, AlertConfig.alert_type == payload.alert_type)
         .first()
     )
     if existing:
