@@ -218,16 +218,19 @@ def get_personalized_tips(
     tips: list[PersonalizedTip] = []
 
     # Get engineer's sessions
-    eng_sessions = base_session_query(db, team_id, engineer_id, start_date, end_date).all()
+    eng_base_q = base_session_query(db, team_id, engineer_id, start_date, end_date)
+    eng_sessions = eng_base_q.all()
     if not eng_sessions:
         return PersonalizedTipsResponse(tips=[], sessions_analyzed=0, engineer_id=engineer_id)
 
-    eng_session_ids = [s.id for s in eng_sessions]
+    # Subquery for IN clauses to avoid SQLite's 999 variable limit
+    eng_ids_subq = eng_base_q.with_entities(SessionModel.id).subquery()
+    eng_session_ids_q = db.query(eng_ids_subq.c.id)
 
     # Get engineer's tools
     eng_tools_q = (
         db.query(ToolUsage.tool_name, func.sum(ToolUsage.call_count))
-        .filter(ToolUsage.session_id.in_(eng_session_ids))
+        .filter(ToolUsage.session_id.in_(eng_session_ids_q))
         .group_by(ToolUsage.tool_name)
         .all()
     )
@@ -253,16 +256,17 @@ def get_personalized_tips(
             team_session_ids_q = team_session_ids_q.filter(SessionModel.started_at >= start_date)
         if end_date:
             team_session_ids_q = team_session_ids_q.filter(SessionModel.started_at <= end_date)
-        team_session_ids = [r[0] for r in team_session_ids_q.all()]
+        team_ids_subq = team_session_ids_q.subquery()
+        team_session_ids_sq = db.query(team_ids_subq.c.id)
 
         team_engineer_count = (
             db.query(func.count(func.distinct(SessionModel.engineer_id)))
-            .filter(SessionModel.id.in_(team_session_ids))
+            .filter(SessionModel.id.in_(team_session_ids_sq))
             .scalar()
             or 0
         )
 
-        if team_engineer_count > 1 and team_session_ids:
+        if team_engineer_count > 1:
             # 1. Tool gap detection
             team_tool_engineers = (
                 db.query(
@@ -270,7 +274,7 @@ def get_personalized_tips(
                     func.count(func.distinct(SessionModel.engineer_id)),
                 )
                 .join(SessionModel, ToolUsage.session_id == SessionModel.id)
-                .filter(ToolUsage.session_id.in_(team_session_ids))
+                .filter(ToolUsage.session_id.in_(team_session_ids_sq))
                 .group_by(ToolUsage.tool_name)
                 .all()
             )
@@ -298,7 +302,7 @@ def get_personalized_tips(
             eng_facets = (
                 db.query(SessionFacets.friction_counts)
                 .filter(
-                    SessionFacets.session_id.in_(eng_session_ids),
+                    SessionFacets.session_id.in_(eng_session_ids_q),
                     SessionFacets.friction_counts.isnot(None),
                 )
                 .all()
@@ -311,7 +315,7 @@ def get_personalized_tips(
             team_facets = (
                 db.query(SessionFacets.friction_counts)
                 .filter(
-                    SessionFacets.session_id.in_(team_session_ids),
+                    SessionFacets.session_id.in_(team_session_ids_sq),
                     SessionFacets.friction_counts.isnot(None),
                 )
                 .all()
@@ -347,7 +351,7 @@ def get_personalized_tips(
                     db.query(func.count(func.distinct(SessionModel.engineer_id)))
                     .join(ToolUsage, ToolUsage.session_id == SessionModel.id)
                     .filter(
-                        ToolUsage.session_id.in_(team_session_ids),
+                        ToolUsage.session_id.in_(team_session_ids_sq),
                         ToolUsage.tool_name == "Task",
                     )
                     .scalar()
@@ -390,7 +394,7 @@ def get_personalized_tips(
     eng_facets_with_outcome = (
         db.query(SessionFacets.session_type, SessionFacets.outcome)
         .filter(
-            SessionFacets.session_id.in_(eng_session_ids),
+            SessionFacets.session_id.in_(eng_session_ids_q),
             SessionFacets.session_type.isnot(None),
             SessionFacets.outcome.isnot(None),
         )
