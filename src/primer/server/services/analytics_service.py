@@ -1130,7 +1130,6 @@ def get_bottleneck_analytics(
     type_outcomes_with: dict[str, list[str]] = {}
 
     sessions_with_friction: set[str] = set()
-    all_outcomes: list[str] = []
     outcomes_without_friction: list[str] = []
 
     # --- Project Friction ---
@@ -1146,8 +1145,6 @@ def get_bottleneck_analytics(
     for session, facets in rows:
         sid = session.id
         outcome = facets.outcome if facets else None
-        if outcome:
-            all_outcomes.append(outcome)
 
         date_key = session.started_at.strftime("%Y-%m-%d") if session.started_at else None
         project = session.project_name or "unknown"
@@ -1204,6 +1201,10 @@ def get_bottleneck_analytics(
                     if date_key not in daily_friction_sessions:
                         daily_friction_sessions[date_key] = set()
                     daily_friction_sessions[date_key].add(sid)
+            else:
+                # Dict existed but all counts were zero — treat as no friction
+                if outcome:
+                    outcomes_without_friction.append(outcome)
         else:
             if outcome:
                 outcomes_without_friction.append(outcome)
