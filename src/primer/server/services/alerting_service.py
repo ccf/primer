@@ -30,6 +30,11 @@ def detect_anomalies(
                 alerts.append(result)
         except Exception:
             logger.exception("Anomaly detector %s failed", detector.__name__)
+
+    # Send Slack notifications after all DB work is complete
+    for alert in alerts:
+        _notify_slack(alert)
+
     return alerts
 
 
@@ -96,14 +101,17 @@ def _create_alert_if_new(
     db.add(alert)
     db.flush()
 
+    return alert
+
+
+def _notify_slack(alert: Alert) -> None:
+    """Send Slack notification outside the DB transaction."""
     try:
         from primer.server.services.slack_service import send_alert_to_slack
 
         send_alert_to_slack(alert)
     except Exception:
         logger.exception("Slack notification failed for alert %s", alert.id)
-
-    return alert
 
 
 def _detect_friction_spike(

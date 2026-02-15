@@ -141,9 +141,7 @@ def get_config_optimization(
     simple_sessions_with_opus = [
         s
         for s in sessions
-        if s.tool_call_count < 5
-        and s.primary_model
-        and "opus" in s.primary_model.lower()
+        if s.tool_call_count < 5 and s.primary_model and "opus" in s.primary_model.lower()
     ]
     if len(simple_sessions_with_opus) >= 3:
         suggestions.append(
@@ -259,9 +257,7 @@ def get_personalized_tips(
     if resolved_team_id:
         # Team-wide tool usage
         team_session_ids_q = (
-            db.query(SessionModel.id)
-            .join(Engineer)
-            .filter(Engineer.team_id == resolved_team_id)
+            db.query(SessionModel.id).join(Engineer).filter(Engineer.team_id == resolved_team_id)
         )
         if start_date:
             team_session_ids_q = team_session_ids_q.filter(SessionModel.started_at >= start_date)
