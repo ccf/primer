@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session
 from primer.common.database import get_db
 from primer.common.models import Engineer, IngestEvent, Team
 from primer.common.models import Session as SessionModel
-from primer.common.schemas import IngestEventResponse, SystemStats
+from primer.common.schemas import AuditLogResponse, IngestEventResponse, SystemStats
 from primer.server.deps import AuthContext, require_role
+from primer.server.services import audit_service
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
@@ -51,3 +52,23 @@ def list_ingest_events(
         q = q.filter(IngestEvent.status == status)
     q = q.order_by(IngestEvent.created_at.desc())
     return q.offset(offset).limit(limit).all()
+
+
+@router.get("/audit-logs", response_model=list[AuditLogResponse])
+def list_audit_logs(
+    resource_type: str | None = None,
+    action: str | None = None,
+    actor_id: str | None = None,
+    limit: int = Query(default=100, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_role("admin")),
+):
+    return audit_service.get_audit_logs(
+        db,
+        resource_type=resource_type,
+        action=action,
+        actor_id=actor_id,
+        limit=limit,
+        offset=offset,
+    )

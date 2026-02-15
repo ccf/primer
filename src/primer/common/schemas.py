@@ -441,6 +441,41 @@ class DetectionResult(BaseModel):
     alert_ids: list[str]
 
 
+# --- Alert Config ---
+
+
+class AlertConfigCreate(BaseModel):
+    team_id: str | None = None
+    alert_type: str
+    enabled: bool = True
+    threshold: float
+
+
+class AlertConfigUpdate(BaseModel):
+    enabled: bool | None = None
+    threshold: float | None = None
+
+
+class AlertConfigResponse(BaseModel):
+    id: str
+    team_id: str | None
+    alert_type: str
+    enabled: bool
+    threshold: float
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AlertThresholds(BaseModel):
+    friction_spike_multiplier: float
+    usage_drop_ratio: float
+    cost_spike_warning: float
+    cost_spike_critical: float
+    success_rate_drop_pp: float
+
+
 # --- Admin ---
 
 
@@ -461,6 +496,23 @@ class IngestEventResponse(BaseModel):
     payload_size_bytes: int | None
     status: str
     error_message: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# --- Audit Log ---
+
+
+class AuditLogResponse(BaseModel):
+    id: int
+    actor_id: str | None
+    actor_role: str
+    action: str
+    resource_type: str
+    resource_id: str | None
+    details: dict | None
+    ip_address: str | None
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -6,6 +6,9 @@ import { EngineerLeaderboard } from "@/components/engineers/engineer-leaderboard
 import { BenchmarkTable } from "@/components/engineers/benchmark-table"
 import { TableSkeleton } from "@/components/shared/loading-skeleton"
 import { EmptyState } from "@/components/shared/empty-state"
+import { Button } from "@/components/ui/button"
+import { exportToCsv } from "@/lib/csv-export"
+import { formatCost } from "@/lib/utils"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
 interface EngineersPageProps {
@@ -29,6 +32,22 @@ export function EngineersPage({ teamId, dateRange }: EngineersPageProps) {
     endDate,
     canBenchmark,
   )
+
+  const handleExport = () => {
+    if (!data) return
+    exportToCsv(
+      "engineers.csv",
+      ["Name", "Sessions", "Tokens", "Estimated Cost", "Success Rate", "Avg Duration"],
+      data.engineers.map((e) => [
+        e.name,
+        e.total_sessions,
+        e.total_tokens,
+        formatCost(e.estimated_cost),
+        e.success_rate != null ? `${(e.success_rate * 100).toFixed(1)}%` : "",
+        e.avg_duration != null ? `${Math.round(e.avg_duration)}s` : "",
+      ]),
+    )
+  }
 
   if (isLoading) {
     return (

@@ -7,6 +7,8 @@ from alembic import context
 from primer.common.database import Base
 from primer.common.models import (  # noqa: F401 — ensure all models are registered
     Alert,
+    AlertConfig,
+    AuditLog,
     DailyStats,
     Engineer,
     IngestEvent,

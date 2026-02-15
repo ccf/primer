@@ -5,12 +5,14 @@ import { getApiKey } from "@/lib/api"
 import { EmptyState } from "@/components/shared/empty-state"
 import { AdminEngineersTab } from "@/components/admin/admin-engineers-tab"
 import { AdminTeamsTab } from "@/components/admin/admin-teams-tab"
+import { AdminAlertsTab } from "@/components/admin/admin-alerts-tab"
 import { AdminAuditTab } from "@/components/admin/admin-audit-tab"
 import { AdminSystemTab } from "@/components/admin/admin-system-tab"
 
 const tabs = [
   { id: "engineers", label: "Engineers" },
   { id: "teams", label: "Teams" },
+  { id: "alerts", label: "Alert Thresholds" },
   { id: "audit", label: "Audit Log" },
   { id: "system", label: "System" },
 ] as const
@@ -50,6 +52,7 @@ export function AdminPage() {
 
       {activeTab === "engineers" && <AdminEngineersTab />}
       {activeTab === "teams" && <AdminTeamsTab />}
+      {activeTab === "alerts" && <AdminAlertsTab />}
       {activeTab === "audit" && <AdminAuditTab />}
       {activeTab === "system" && <AdminSystemTab />}
     </div>

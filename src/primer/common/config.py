@@ -28,5 +28,18 @@ class PrimerSettings(BaseSettings):
     productivity_time_multiplier: float = 3.0
     productivity_hourly_rate: float = 75.0
 
+    # Rate limiting
+    rate_limit_enabled: bool = True
+    rate_limit_default: str = "60/minute"
+    rate_limit_ingest: str = "120/minute"
+    rate_limit_auth: str = "10/minute"
+
+    # Alert thresholds (defaults)
+    alert_friction_spike_multiplier: float = 2.0
+    alert_usage_drop_ratio: float = 0.5
+    alert_cost_spike_warning: float = 2.0
+    alert_cost_spike_critical: float = 3.0
+    alert_success_rate_drop_pp: float = 20.0
+
 
 settings = PrimerSettings()

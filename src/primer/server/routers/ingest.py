@@ -1,8 +1,9 @@
 import logging
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
+from primer.common.config import settings
 from primer.common.database import get_db
 from primer.common.models import Session as SessionModel
 from primer.common.schemas import (
@@ -13,6 +14,7 @@ from primer.common.schemas import (
     SessionIngestPayload,
 )
 from primer.server.deps import verify_api_key
+from primer.server.middleware import limiter
 from primer.server.services.ingest_service import (
     log_ingest_event,
     upsert_facets,
@@ -25,7 +27,9 @@ router = APIRouter(prefix="/api/v1/ingest", tags=["ingest"])
 
 
 @router.post("/session", response_model=IngestResponse)
+@limiter.limit(settings.rate_limit_ingest)
 def ingest_session(
+    request: Request,
     payload: SessionIngestPayload,
     db: Session = Depends(get_db),
 ):
@@ -52,7 +56,9 @@ def ingest_session(
 
 
 @router.post("/bulk", response_model=BulkIngestResponse)
+@limiter.limit(settings.rate_limit_ingest)
 def ingest_bulk(
+    request: Request,
     payload: BulkIngestPayload,
     db: Session = Depends(get_db),
 ):
@@ -78,7 +84,9 @@ def ingest_bulk(
 
 
 @router.post("/facets/{session_id}", response_model=IngestResponse)
+@limiter.limit(settings.rate_limit_ingest)
 def ingest_facets(
+    request: Request,
     session_id: str,
     payload: SessionFacetsPayload,
     x_api_key: str = Header(),
