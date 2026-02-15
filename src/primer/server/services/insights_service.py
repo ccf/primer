@@ -56,19 +56,22 @@ def get_config_optimization(
     start_date: datetime | None = None,
     end_date: datetime | None = None,
 ) -> ConfigOptimizationResponse:
-    sessions = base_session_query(db, team_id, engineer_id, start_date, end_date).all()
+    base_q = base_session_query(db, team_id, engineer_id, start_date, end_date)
+    sessions = base_q.all()
     suggestions: list[ConfigSuggestion] = []
 
     if not sessions:
         return ConfigOptimizationResponse(suggestions=[], sessions_analyzed=0)
 
-    session_ids = [s.id for s in sessions]
+    # Use a subquery for IN clauses to avoid SQLite's 999 variable limit
+    session_ids_subq = base_q.with_entities(SessionModel.id).subquery()
+    session_ids_q = db.query(session_ids_subq.c.id)
 
     # 1. Repeated session types → hook suggestion
     facets = (
         db.query(SessionFacets.session_type)
         .filter(
-            SessionFacets.session_id.in_(session_ids),
+            SessionFacets.session_id.in_(session_ids_q),
             SessionFacets.session_type.isnot(None),
         )
         .all()
@@ -146,7 +149,7 @@ def get_config_optimization(
     bash_usages = (
         db.query(ToolUsage.session_id, ToolUsage.call_count)
         .filter(
-            ToolUsage.session_id.in_(session_ids),
+            ToolUsage.session_id.in_(session_ids_q),
             ToolUsage.tool_name == "Bash",
         )
         .all()
@@ -175,7 +178,7 @@ def get_config_optimization(
         task_usage_count = (
             db.query(func.count(ToolUsage.id))
             .filter(
-                ToolUsage.session_id.in_(session_ids),
+                ToolUsage.session_id.in_(session_ids_q),
                 ToolUsage.tool_name == "Task",
             )
             .scalar()
@@ -451,7 +454,9 @@ def get_skill_inventory(
             total_tools_used=0,
         )
 
-    session_ids = [s.id for s in sessions]
+    # Use a subquery for IN clauses to avoid SQLite's 999 variable limit
+    session_ids_subq = base_q.with_entities(SessionModel.id).subquery()
+    session_ids_q = db.query(session_ids_subq.c.id)
 
     # Group sessions by engineer
     eng_sessions: dict[str, list] = defaultdict(list)
@@ -467,7 +472,7 @@ def get_skill_inventory(
     all_facets = (
         db.query(SessionFacets.session_id, SessionFacets.session_type)
         .filter(
-            SessionFacets.session_id.in_(session_ids),
+            SessionFacets.session_id.in_(session_ids_q),
             SessionFacets.session_type.isnot(None),
         )
         .all()
@@ -477,7 +482,7 @@ def get_skill_inventory(
     # Get all tool usages
     all_tools = (
         db.query(ToolUsage.session_id, ToolUsage.tool_name, ToolUsage.call_count)
-        .filter(ToolUsage.session_id.in_(session_ids))
+        .filter(ToolUsage.session_id.in_(session_ids_q))
         .all()
     )
 

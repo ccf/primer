@@ -1098,8 +1098,9 @@ def get_bottleneck_analytics(
     end_date: datetime | None = None,
 ) -> BottleneckAnalytics:
     """Analyse friction patterns across sessions for bottleneck detection."""
-    # Fetch sessions with their facets
-    q = db.query(SessionModel, SessionFacets).outerjoin(
+    # Fetch sessions with their facets (inner join so only sessions with
+    # facets data are included in friction rate denominators)
+    q = db.query(SessionModel, SessionFacets).join(
         SessionFacets, SessionFacets.session_id == SessionModel.id
     )
     if engineer_id:
