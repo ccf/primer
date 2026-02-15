@@ -34,9 +34,7 @@ def detect_anomalies(
 
     # Send Slack notifications in a background thread to avoid blocking ingest
     if alerts:
-        threading.Thread(
-            target=_notify_slack_batch, args=(list(alerts),), daemon=True
-        ).start()
+        threading.Thread(target=_notify_slack_batch, args=(list(alerts),), daemon=True).start()
 
     return alerts
 
