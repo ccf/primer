@@ -18,6 +18,7 @@ from primer.common.pricing import estimate_cost
 from primer.common.schemas import (
     ActivityHeatmap,
     BenchmarkContext,
+    BottleneckAnalytics,
     CostAnalytics,
     DailyCostEntry,
     DailyStatsResponse,
@@ -25,13 +26,16 @@ from primer.common.schemas import (
     EngineerBenchmark,
     EngineerBenchmarkResponse,
     EngineerStats,
+    FrictionImpact,
     FrictionReport,
+    FrictionTrend,
     HeatmapCell,
     ModelCostBreakdown,
     ModelRanking,
     OverviewStats,
     ProductivityMetrics,
     ProjectAnalytics,
+    ProjectFriction,
     ProjectStats,
     ToolRanking,
 )
@@ -1078,4 +1082,205 @@ def get_engineer_benchmarks(
             team_avg_success_rate=round(avg_sr, 3),
             team_avg_duration=round(avg_dur, 1) if avg_dur is not None else None,
         ),
+    )
+
+
+def get_bottleneck_analytics(
+    db: Session,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> BottleneckAnalytics:
+    """Analyse friction patterns across sessions for bottleneck detection."""
+    # Fetch sessions with their facets
+    q = db.query(SessionModel, SessionFacets).outerjoin(
+        SessionFacets, SessionFacets.session_id == SessionModel.id
+    )
+    if engineer_id:
+        q = q.filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
+        q = q.join(Engineer, Engineer.id == SessionModel.engineer_id).filter(
+            Engineer.team_id == team_id
+        )
+    if start_date:
+        q = q.filter(SessionModel.started_at >= start_date)
+    if end_date:
+        q = q.filter(SessionModel.started_at <= end_date)
+
+    rows = q.all()
+
+    total_sessions = len(rows)
+    if total_sessions == 0:
+        return BottleneckAnalytics(
+            friction_impacts=[],
+            project_friction=[],
+            friction_trends=[],
+            total_sessions_analyzed=0,
+            sessions_with_any_friction=0,
+            overall_friction_rate=0.0,
+        )
+
+    # --- Friction Impact Analysis ---
+    # Track per friction type: occurrences, sessions, outcomes, details
+    type_occurrences: Counter[str] = Counter()
+    type_sessions: dict[str, set[str]] = {}
+    type_details: dict[str, list[str]] = {}
+    # Track outcomes for sessions with/without each friction type
+    type_outcomes_with: dict[str, list[str]] = {}
+
+    sessions_with_friction: set[str] = set()
+    all_outcomes: list[str] = []
+    outcomes_without_friction: list[str] = []
+
+    # --- Project Friction ---
+    project_sessions: dict[str, int] = {}
+    project_friction_sessions: dict[str, set[str]] = {}
+    project_friction_counts: dict[str, Counter[str]] = {}
+
+    # --- Friction Trends ---
+    daily_friction: dict[str, int] = {}
+    daily_friction_sessions: dict[str, set[str]] = {}
+    daily_total_sessions: dict[str, set[str]] = {}
+
+    for session, facets in rows:
+        sid = session.id
+        outcome = facets.outcome if facets else None
+        if outcome:
+            all_outcomes.append(outcome)
+
+        date_key = session.started_at.strftime("%Y-%m-%d") if session.started_at else None
+        project = session.project_name or "unknown"
+
+        # Track project sessions
+        project_sessions[project] = project_sessions.get(project, 0) + 1
+
+        # Track daily total sessions
+        if date_key:
+            if date_key not in daily_total_sessions:
+                daily_total_sessions[date_key] = set()
+            daily_total_sessions[date_key].add(sid)
+
+        friction_counts = facets.friction_counts if facets else None
+        if friction_counts:
+            has_friction = False
+            for friction_type, count in friction_counts.items():
+                if count > 0:
+                    has_friction = True
+                    type_occurrences[friction_type] += count
+
+                    if friction_type not in type_sessions:
+                        type_sessions[friction_type] = set()
+                    type_sessions[friction_type].add(sid)
+
+                    if outcome:
+                        if friction_type not in type_outcomes_with:
+                            type_outcomes_with[friction_type] = []
+                        type_outcomes_with[friction_type].append(outcome)
+
+                    if facets.friction_detail:
+                        if friction_type not in type_details:
+                            type_details[friction_type] = []
+                        if len(type_details[friction_type]) < 10:
+                            type_details[friction_type].append(facets.friction_detail)
+
+                    # Project friction tracking
+                    if project not in project_friction_counts:
+                        project_friction_counts[project] = Counter()
+                    project_friction_counts[project][friction_type] += count
+
+                    # Daily friction tracking
+                    if date_key:
+                        daily_friction[date_key] = daily_friction.get(date_key, 0) + count
+
+            if has_friction:
+                sessions_with_friction.add(sid)
+
+                if project not in project_friction_sessions:
+                    project_friction_sessions[project] = set()
+                project_friction_sessions[project].add(sid)
+
+                if date_key:
+                    if date_key not in daily_friction_sessions:
+                        daily_friction_sessions[date_key] = set()
+                    daily_friction_sessions[date_key].add(sid)
+        else:
+            if outcome:
+                outcomes_without_friction.append(outcome)
+
+    # Build friction impacts
+    def _success_rate(outcomes: list[str]) -> float | None:
+        if not outcomes:
+            return None
+        return sum(1 for o in outcomes if o == "success") / len(outcomes)
+
+    sr_without_any = _success_rate(outcomes_without_friction)
+
+    friction_impacts: list[FrictionImpact] = []
+    for ft, occ_count in type_occurrences.most_common():
+        sr_with = _success_rate(type_outcomes_with.get(ft, []))
+        sr_without = sr_without_any
+        impact = None
+        if sr_with is not None and sr_without is not None:
+            impact = round(sr_without - sr_with, 3)
+
+        friction_impacts.append(
+            FrictionImpact(
+                friction_type=ft,
+                occurrence_count=occ_count,
+                sessions_affected=len(type_sessions.get(ft, set())),
+                success_rate_with=round(sr_with, 3) if sr_with is not None else None,
+                success_rate_without=round(sr_without, 3) if sr_without is not None else None,
+                impact_score=impact,
+                sample_details=type_details.get(ft, []),
+            )
+        )
+
+    # Build project friction
+    project_friction_list: list[ProjectFriction] = []
+    for proj, total in project_sessions.items():
+        friction_sids = project_friction_sessions.get(proj, set())
+        friction_count = len(friction_sids)
+        proj_counter = project_friction_counts.get(proj, Counter())
+        top_types = [ft for ft, _ in proj_counter.most_common(3)]
+        total_fc = sum(proj_counter.values())
+
+        project_friction_list.append(
+            ProjectFriction(
+                project_name=proj,
+                total_sessions=total,
+                sessions_with_friction=friction_count,
+                friction_rate=round(friction_count / total, 3) if total > 0 else 0.0,
+                top_friction_types=top_types,
+                total_friction_count=total_fc,
+            )
+        )
+    project_friction_list.sort(key=lambda p: p.total_friction_count, reverse=True)
+
+    # Build friction trends
+    all_dates = sorted(set(daily_total_sessions.keys()))
+    friction_trends: list[FrictionTrend] = []
+    for d in all_dates:
+        from datetime import date as date_type
+
+        parts = d.split("-")
+        friction_trends.append(
+            FrictionTrend(
+                date=date_type(int(parts[0]), int(parts[1]), int(parts[2])),
+                total_friction_count=daily_friction.get(d, 0),
+                sessions_with_friction=len(daily_friction_sessions.get(d, set())),
+                total_sessions=len(daily_total_sessions.get(d, set())),
+            )
+        )
+
+    sessions_with_count = len(sessions_with_friction)
+    return BottleneckAnalytics(
+        friction_impacts=friction_impacts,
+        project_friction=project_friction_list,
+        friction_trends=friction_trends,
+        total_sessions_analyzed=total_sessions,
+        sessions_with_any_friction=sessions_with_count,
+        overall_friction_rate=round(sessions_with_count / total_sessions, 3)
+        if total_sessions > 0
+        else 0.0,
     )

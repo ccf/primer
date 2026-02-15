@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from primer.common.database import get_db
 from primer.common.schemas import (
     ActivityHeatmap,
+    BottleneckAnalytics,
     CostAnalytics,
     DailyStatsResponse,
     EngineerAnalytics,
@@ -21,6 +22,7 @@ from primer.common.schemas import (
 from primer.server.deps import AuthContext, get_auth_context, require_role
 from primer.server.services.analytics_service import (
     get_activity_heatmap,
+    get_bottleneck_analytics,
     get_cost_analytics,
     get_daily_stats,
     get_engineer_analytics,
@@ -233,5 +235,19 @@ def activity_heatmap(
 ):
     tid, eid = _resolve_scope(auth, team_id)
     return get_activity_heatmap(
+        db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
+    )
+
+
+@router.get("/bottlenecks", response_model=BottleneckAnalytics)
+def bottlenecks(
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_bottleneck_analytics(
         db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
     )

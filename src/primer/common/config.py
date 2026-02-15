@@ -34,6 +34,10 @@ class PrimerSettings(BaseSettings):
     rate_limit_ingest: str = "120/minute"
     rate_limit_auth: str = "10/minute"
 
+    # Slack notifications
+    slack_webhook_url: str = ""
+    slack_alerts_enabled: bool = False
+
     # Alert thresholds (defaults)
     alert_friction_spike_multiplier: float = 2.0
     alert_usage_drop_ratio: float = 0.5

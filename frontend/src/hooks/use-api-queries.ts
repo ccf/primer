@@ -6,6 +6,7 @@ import type {
   AlertResponse,
   AlertThresholds,
   AuditLogResponse,
+  BottleneckAnalytics,
   CostAnalytics,
   DailyStatsResponse,
   EngineerAnalytics,
@@ -303,6 +304,27 @@ export function useResolvedThresholds(teamId?: string | null) {
       apiFetch<AlertThresholds>(
         `/api/v1/alert-configs/resolved${buildParams({ team_id: teamId })}`,
       ),
+  })
+}
+
+export function useBottleneckAnalytics(
+  teamId: string | null,
+  startDate?: string,
+  endDate?: string,
+) {
+  return useQuery({
+    queryKey: ["bottlenecks", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<BottleneckAnalytics>(
+        `/api/v1/analytics/bottlenecks${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useSlackConfig() {
+  return useQuery({
+    queryKey: ["slack-config"],
+    queryFn: () => apiFetch<{ webhook_url_set: boolean; enabled: boolean }>("/api/v1/notifications/slack"),
   })
 }
 
