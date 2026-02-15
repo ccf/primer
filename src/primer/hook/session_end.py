@@ -15,7 +15,7 @@ import sys
 
 import httpx
 
-from primer.hook.extractor import extract_from_jsonl, load_facets
+from primer.hook.extractor import capture_git_info, extract_from_jsonl, load_facets
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -57,6 +57,16 @@ def main() -> None:
         from primer.hook.extractor import SessionMetadata
 
         meta = SessionMetadata(session_id=session_id, project_path=cwd)
+
+    # Capture git info (branch, remote, commits during session)
+    if cwd:
+        git_info = capture_git_info(cwd, meta.started_at)
+        if git_info.get("branch"):
+            meta.git_branch = git_info["branch"]
+        if git_info.get("remote_url"):
+            meta.git_remote_url = git_info["remote_url"]
+        if git_info.get("commits"):
+            meta.commits = git_info["commits"]
 
     # Check for facets
     facets = load_facets(session_id)

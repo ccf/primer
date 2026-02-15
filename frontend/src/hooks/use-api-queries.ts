@@ -14,6 +14,7 @@ import type {
   EngineerBenchmarkResponse,
   EngineerResponse,
   FrictionReport,
+  GitHubStatusResponse,
   IngestEventResponse,
   LearningPathsResponse,
   ModelRanking,
@@ -23,6 +24,7 @@ import type {
   PersonalizedTipsResponse,
   ProductivityMetrics,
   ProjectAnalytics,
+  QualityMetricsResponse,
   Recommendation,
   SessionDetailResponse,
   SessionMessage,
@@ -418,5 +420,22 @@ export function useOnboardingAcceleration(teamId: string | null, startDate?: str
       apiFetch<OnboardingAccelerationResponse>(
         `/api/v1/analytics/onboarding-acceleration${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
       ),
+  })
+}
+
+export function useQualityMetrics(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["quality-metrics", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<QualityMetricsResponse>(
+        `/api/v1/analytics/quality-metrics${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useGitHubStatus() {
+  return useQuery({
+    queryKey: ["github-status"],
+    queryFn: () => apiFetch<GitHubStatusResponse>("/api/v1/analytics/github/status"),
   })
 }

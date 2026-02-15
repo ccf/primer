@@ -1,10 +1,13 @@
 import logging
+import re
 
 from sqlalchemy.orm import Session
 
 from primer.common.models import (
+    GitRepository,
     IngestEvent,
     ModelUsage,
+    SessionCommit,
     SessionFacets,
     SessionMessage,
     ToolUsage,
@@ -15,6 +18,28 @@ from primer.common.models import (
 from primer.common.schemas import SessionFacetsPayload, SessionIngestPayload
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_repo_full_name(url: str) -> str | None:
+    """Extract owner/repo from a git remote URL."""
+    m = re.match(r"git@[^:]+:(.+?)(?:\.git)?$", url)
+    if m:
+        return m.group(1)
+    m = re.match(r"https?://[^/]+/(.+?)(?:\.git)?$", url)
+    if m:
+        return m.group(1)
+    return None
+
+
+def _find_or_create_repository(db: Session, full_name: str) -> GitRepository:
+    """Find or create a GitRepository by full_name."""
+    repo = db.query(GitRepository).filter(GitRepository.full_name == full_name).first()
+    if repo:
+        return repo
+    repo = GitRepository(full_name=full_name)
+    db.add(repo)
+    db.flush()
+    return repo
 
 
 def upsert_session(db: Session, engineer_id: str, payload: SessionIngestPayload) -> bool:
@@ -58,6 +83,13 @@ def upsert_session(db: Session, engineer_id: str, payload: SessionIngestPayload)
     if payload.first_prompt:
         session.first_prompt = payload.first_prompt[:500]
 
+    # Repository linking
+    if payload.git_remote_url:
+        full_name = _parse_repo_full_name(payload.git_remote_url)
+        if full_name:
+            repo = _find_or_create_repository(db, full_name)
+            session.repository_id = repo.id
+
     # Tool usages — replace all
     if payload.tool_usages:
         db.query(ToolUsage).filter(ToolUsage.session_id == session.id).delete()
@@ -78,6 +110,25 @@ def upsert_session(db: Session, engineer_id: str, payload: SessionIngestPayload)
                     output_tokens=mu.output_tokens,
                     cache_read_tokens=mu.cache_read_tokens,
                     cache_creation_tokens=mu.cache_creation_tokens,
+                )
+            )
+
+    # Commits — replace all
+    if payload.commits:
+        db.query(SessionCommit).filter(SessionCommit.session_id == session.id).delete()
+        for c in payload.commits:
+            db.add(
+                SessionCommit(
+                    session_id=session.id,
+                    repository_id=session.repository_id,
+                    commit_sha=c.sha,
+                    commit_message=c.message,
+                    author_name=c.author_name,
+                    author_email=c.author_email,
+                    committed_at=c.committed_at,
+                    files_changed=c.files_changed,
+                    lines_added=c.lines_added,
+                    lines_deleted=c.lines_deleted,
                 )
             )
 

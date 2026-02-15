@@ -58,11 +58,30 @@ class Engineer(Base):
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="engineer")
 
 
+class GitRepository(Base):
+    __tablename__ = "git_repositories"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    full_name: Mapped[str] = mapped_column(String(255), unique=True)
+    github_id: Mapped[int | None] = mapped_column(Integer, unique=True)
+    default_branch: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    sessions: Mapped[list["Session"]] = relationship(back_populates="repository")
+    pull_requests: Mapped[list["PullRequest"]] = relationship(back_populates="repository")
+
+
 class Session(Base):
     __tablename__ = "sessions"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     engineer_id: Mapped[str] = mapped_column(ForeignKey("engineers.id"), nullable=False)
+    repository_id: Mapped[str | None] = mapped_column(
+        ForeignKey("git_repositories.id"), nullable=True
+    )
     project_path: Mapped[str | None] = mapped_column(String(1024))
     project_name: Mapped[str | None] = mapped_column(String(255))
     git_branch: Mapped[str | None] = mapped_column(String(255))
@@ -90,6 +109,7 @@ class Session(Base):
     )
 
     engineer: Mapped[Engineer] = relationship(back_populates="sessions")
+    repository: Mapped[GitRepository | None] = relationship(back_populates="sessions")
     facets: Mapped["SessionFacets | None"] = relationship(
         back_populates="session", uselist=False, cascade="all, delete-orphan"
     )
@@ -100,6 +120,9 @@ class Session(Base):
         back_populates="session", cascade="all, delete-orphan"
     )
     messages: Mapped[list["SessionMessage"]] = relationship(
+        back_populates="session", cascade="all, delete-orphan"
+    )
+    commits: Mapped[list["SessionCommit"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )
 
@@ -263,3 +286,57 @@ class Alert(Base):
     detected_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime)
     dismissed: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class PullRequest(Base):
+    __tablename__ = "pull_requests"
+    __table_args__ = (UniqueConstraint("repository_id", "github_pr_number"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    repository_id: Mapped[str] = mapped_column(ForeignKey("git_repositories.id"), nullable=False)
+    engineer_id: Mapped[str | None] = mapped_column(ForeignKey("engineers.id"), nullable=True)
+    github_pr_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str | None] = mapped_column(String(500))
+    state: Mapped[str] = mapped_column(String(20))
+    head_branch: Mapped[str | None] = mapped_column(String(255))
+    additions: Mapped[int] = mapped_column(Integer, default=0)
+    deletions: Mapped[int] = mapped_column(Integer, default=0)
+    changed_files: Mapped[int] = mapped_column(Integer, default=0)
+    review_comments_count: Mapped[int] = mapped_column(Integer, default=0)
+    commits_count: Mapped[int] = mapped_column(Integer, default=0)
+    merged_at: Mapped[datetime | None] = mapped_column(DateTime)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    pr_created_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    repository: Mapped[GitRepository] = relationship(back_populates="pull_requests")
+    commits: Mapped[list["SessionCommit"]] = relationship(back_populates="pull_request")
+
+
+class SessionCommit(Base):
+    __tablename__ = "session_commits"
+    __table_args__ = (UniqueConstraint("session_id", "commit_sha"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), nullable=False)
+    repository_id: Mapped[str | None] = mapped_column(
+        ForeignKey("git_repositories.id"), nullable=True
+    )
+    pull_request_id: Mapped[str | None] = mapped_column(
+        ForeignKey("pull_requests.id"), nullable=True
+    )
+    commit_sha: Mapped[str] = mapped_column(String(40), nullable=False)
+    commit_message: Mapped[str | None] = mapped_column(Text)
+    author_name: Mapped[str | None] = mapped_column(String(255))
+    author_email: Mapped[str | None] = mapped_column(String(255))
+    committed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    files_changed: Mapped[int] = mapped_column(Integer, default=0)
+    lines_added: Mapped[int] = mapped_column(Integer, default=0)
+    lines_deleted: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    session: Mapped["Session"] = relationship(back_populates="commits")
+    pull_request: Mapped[PullRequest | None] = relationship(back_populates="commits")

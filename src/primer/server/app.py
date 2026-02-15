@@ -20,6 +20,7 @@ from primer.server.routers import (
     notifications,
     sessions,
     teams,
+    webhooks,
 )
 
 FRONTEND_DIST = pathlib.Path(__file__).resolve().parent.parent.parent.parent / "frontend" / "dist"
@@ -52,6 +53,7 @@ def create_app() -> FastAPI:
     app.include_router(alert_configs.router)
     app.include_router(notifications.router)
     app.include_router(admin.router)
+    app.include_router(webhooks.router)
 
     if FRONTEND_DIST.is_dir():
         app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")

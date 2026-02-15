@@ -145,6 +145,17 @@ class SessionMessageResponse(BaseModel):
 # --- Session Ingest ---
 
 
+class CommitPayload(BaseModel):
+    sha: str
+    message: str | None = None
+    author_name: str | None = None
+    author_email: str | None = None
+    committed_at: datetime | None = None
+    files_changed: int = 0
+    lines_added: int = 0
+    lines_deleted: int = 0
+
+
 class SessionIngestPayload(BaseModel):
     session_id: str
     api_key: str
@@ -172,6 +183,8 @@ class SessionIngestPayload(BaseModel):
     tool_usages: list[ToolUsagePayload] = []
     model_usages: list[ModelUsagePayload] = []
     messages: list[SessionMessagePayload] = []
+    git_remote_url: str | None = None
+    commits: list[CommitPayload] = []
 
 
 class BulkIngestPayload(BaseModel):
@@ -756,3 +769,88 @@ class OnboardingAccelerationResponse(BaseModel):
     recommendations: list[OnboardingRecommendation]
     sessions_analyzed: int
     experienced_benchmark: CohortMetrics | None
+
+
+# --- Quality Metrics ---
+
+
+class QualityOverview(BaseModel):
+    sessions_with_commits: int
+    total_commits: int
+    total_lines_added: int
+    total_lines_deleted: int
+    total_prs: int
+    pr_merge_rate: float | None
+    avg_commits_per_session: float | None
+    avg_lines_per_session: float | None
+    avg_review_comments_per_pr: float | None
+    avg_time_to_merge_hours: float | None
+
+
+class DailyCodeVolume(BaseModel):
+    date: str
+    lines_added: int
+    lines_deleted: int
+    commits: int
+    sessions: int
+
+
+class QualityByType(BaseModel):
+    session_type: str
+    session_count: int
+    avg_commits: float
+    avg_lines_added: float
+    avg_lines_deleted: float
+    pr_count: int
+    merge_rate: float | None
+
+
+class EngineerQuality(BaseModel):
+    engineer_id: str
+    name: str
+    sessions_with_commits: int
+    total_commits: int
+    total_lines_added: int
+    total_lines_deleted: int
+    pr_count: int
+    merge_rate: float | None
+    avg_review_comments: float | None
+
+
+class PRSummary(BaseModel):
+    repository: str
+    pr_number: int
+    title: str | None
+    state: str
+    head_branch: str | None
+    additions: int
+    deletions: int
+    review_comments_count: int
+    author: str | None
+    linked_sessions: int
+    pr_created_at: str | None
+    merged_at: str | None
+
+
+class QualityMetricsResponse(BaseModel):
+    overview: QualityOverview
+    daily_volume: list[DailyCodeVolume]
+    by_session_type: list[QualityByType]
+    engineer_quality: list[EngineerQuality]
+    recent_prs: list[PRSummary]
+    sessions_analyzed: int
+    github_connected: bool
+
+
+class GitHubSyncResponse(BaseModel):
+    repos_synced: int
+    prs_found: int
+    commits_correlated: int
+
+
+class GitHubStatusResponse(BaseModel):
+    configured: bool
+    app_id: int | None
+    installation_id: int | None
+    repos_count: int
+    prs_count: int

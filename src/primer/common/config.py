@@ -38,6 +38,12 @@ class PrimerSettings(BaseSettings):
     slack_webhook_url: str = ""
     slack_alerts_enabled: bool = False
 
+    # GitHub App (for repo/PR access)
+    github_app_id: int | None = None
+    github_app_private_key: str = ""
+    github_installation_id: int | None = None
+    github_webhook_secret: str = ""
+
     # Alert thresholds (defaults)
     alert_friction_spike_multiplier: float = 2.0
     alert_usage_drop_ratio: float = 0.5
