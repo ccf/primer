@@ -101,7 +101,7 @@ def test_slack_failure_does_not_raise(db_session):
 def test_slack_config_requires_admin(client, engineer_with_key):
     _eng, api_key = engineer_with_key
     r = client.get("/api/v1/notifications/slack", headers={"x-api-key": api_key})
-    assert r.status_code == 422 or r.status_code == 403
+    assert r.status_code == 403
 
 
 def test_slack_config_returns_state(client, admin_headers):
