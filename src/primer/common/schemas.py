@@ -652,3 +652,107 @@ class SkillInventoryResponse(BaseModel):
     total_engineers: int
     total_session_types: int
     total_tools_used: int
+
+
+# --- Learning Paths ---
+
+
+class LearningRecommendation(BaseModel):
+    category: str  # "session_type_gap", "tool_gap", "complexity", "goal_gap"
+    skill_area: str
+    title: str
+    description: str
+    priority: str  # "high", "medium", "low"
+    evidence: dict
+
+
+class EngineerLearningPath(BaseModel):
+    engineer_id: str
+    name: str
+    total_sessions: int
+    recommendations: list[LearningRecommendation]
+    coverage_score: float
+    complexity_trend: str  # "increasing", "flat", "decreasing"
+
+
+class LearningPathsResponse(BaseModel):
+    engineer_paths: list[EngineerLearningPath]
+    team_skill_universe: dict[str, int]
+    sessions_analyzed: int
+
+
+# --- Pattern Sharing ---
+
+
+class EngineerApproach(BaseModel):
+    engineer_id: str
+    name: str
+    session_id: str
+    duration_seconds: float | None
+    tool_count: int
+    outcome: str | None
+    helpfulness: str | None
+    tools_used: list[str]
+
+
+class SharedPattern(BaseModel):
+    cluster_id: str
+    cluster_type: str  # "session_type", "goal_category", "project"
+    cluster_label: str
+    session_count: int
+    engineer_count: int
+    approaches: list[EngineerApproach]
+    best_approach: EngineerApproach | None
+    avg_duration: float | None
+    success_rate: float | None
+    insight: str
+
+
+class PatternSharingResponse(BaseModel):
+    patterns: list[SharedPattern]
+    total_clusters_found: int
+    sessions_analyzed: int
+
+
+# --- Onboarding Acceleration ---
+
+
+class CohortMetrics(BaseModel):
+    cohort_label: str  # "new_hire", "ramping", "experienced"
+    engineer_count: int
+    avg_sessions_per_engineer: float
+    avg_tool_diversity: float
+    avg_duration_seconds: float | None
+    success_rate: float | None
+    avg_friction_rate: float
+    top_tools: list[str]
+    top_session_types: list[str]
+
+
+class NewHireProgress(BaseModel):
+    engineer_id: str
+    name: str
+    days_since_first_session: int
+    total_sessions: int
+    tool_diversity: int
+    success_rate: float | None
+    avg_duration: float | None
+    friction_rate: float
+    velocity_score: float
+    lagging_areas: list[str]
+
+
+class OnboardingRecommendation(BaseModel):
+    category: str  # "tool_adoption", "complexity", "mentoring", "friction"
+    title: str
+    description: str
+    target_engineer_id: str | None
+    evidence: dict
+
+
+class OnboardingAccelerationResponse(BaseModel):
+    cohorts: list[CohortMetrics]
+    new_hire_progress: list[NewHireProgress]
+    recommendations: list[OnboardingRecommendation]
+    sessions_analyzed: int
+    experienced_benchmark: CohortMetrics | None
