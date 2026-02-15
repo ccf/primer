@@ -698,15 +698,14 @@ def get_learning_paths(
         for cat in eng_goal_cats.get(eid, set()):
             team_goal_universe[cat] += 1
 
-    # Skill universe for response: combine types + tools
+    # Skill universe for response: prefix keys to avoid name collisions
     team_skill_universe: dict[str, int] = {}
     for stype, cnt in team_type_universe.items():
-        team_skill_universe[stype] = cnt
+        team_skill_universe[f"type:{stype}"] = cnt
     for tool, cnt in team_tool_universe.items():
-        team_skill_universe[tool] = cnt
+        team_skill_universe[f"tool:{tool}"] = cnt
 
-    all_team_skills = set(team_type_universe.keys()) | set(team_tool_universe.keys())
-    team_skill_count = len(all_team_skills) if all_team_skills else 1
+    team_skill_count = len(team_skill_universe) if team_skill_universe else 1
 
     paths: list[EngineerLearningPath] = []
     for eid in engineer_ids:
@@ -808,9 +807,10 @@ def get_learning_paths(
                     )
                 )
 
-        # 5. Coverage score (use set union to match team denominator)
-        my_skill_count = len(my_types | my_tools)
+        # 5. Coverage score (prefixed keys match team denominator)
+        my_skill_count = len(my_types) + len(my_tools)
         coverage_score = round(my_skill_count / team_skill_count, 3) if team_skill_count else 0.0
+        coverage_score = min(coverage_score, 1.0)
 
         paths.append(
             EngineerLearningPath(
@@ -1080,15 +1080,20 @@ def get_onboarding_acceleration(
         if f.friction_counts and isinstance(f.friction_counts, dict):
             session_friction[f.session_id] = sum(f.friction_counts.values())
 
-    # Cohort segmentation by first session date
+    # Cohort segmentation by true first session date (ignoring date range filter)
     def _ensure_utc(dt: datetime) -> datetime:
         return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
 
+    first_session_rows = (
+        db.query(SessionModel.engineer_id, func.min(SessionModel.started_at))
+        .filter(SessionModel.engineer_id.in_(engineer_ids))
+        .group_by(SessionModel.engineer_id)
+        .all()
+    )
     eng_first_session: dict[str, datetime] = {}
-    for eid, sess_list in eng_sessions.items():
-        dates = [_ensure_utc(s.started_at) for s in sess_list if s.started_at]
-        if dates:
-            eng_first_session[eid] = min(dates)
+    for eid, first_dt in first_session_rows:
+        if first_dt:
+            eng_first_session[eid] = _ensure_utc(first_dt)
 
     def _cohort_label(eid: str) -> str:
         first = eng_first_session.get(eid)
