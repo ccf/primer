@@ -1,6 +1,8 @@
-import { Activity, CheckCircle2, MessageSquare, Users, Wrench, FileCode, DollarSign } from "lucide-react"
+import { Activity, CheckCircle2, MessageSquare, Users, Wrench, FileCode, DollarSign, Download } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useOverview, useDailyStats, useToolRankings, useModelRankings, useRecommendations, useCostAnalytics, useActivityHeatmap, useProductivity } from "@/hooks/use-api-queries"
+import { Button } from "@/components/ui/button"
+import { exportToCsv } from "@/lib/csv-export"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { OutcomeChart } from "@/components/dashboard/outcome-chart"
 import { SessionTypeChart } from "@/components/dashboard/session-type-chart"
@@ -56,11 +58,34 @@ export function OverviewPage({ teamId, dateRange }: OverviewPageProps) {
 
   const prev = overview.previous_period
 
+  const handleExport = () => {
+    if (!daily) return
+    exportToCsv(
+      "overview-report.csv",
+      ["Date", "Sessions", "Messages", "Tool Calls", "Success Rate"],
+      daily.map((d) => [
+        d.date,
+        d.session_count,
+        d.message_count,
+        d.tool_call_count,
+        d.success_rate != null ? `${(d.success_rate * 100).toFixed(1)}%` : "",
+      ]),
+    )
+  }
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">
-        {role === "engineer" ? "My Dashboard" : role === "team_lead" ? "Team Overview" : "Overview"}
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">
+          {role === "engineer" ? "My Dashboard" : role === "team_lead" ? "Team Overview" : "Overview"}
+        </h1>
+        {daily && daily.length > 0 && (
+          <Button variant="outline" size="sm" onClick={handleExport}>
+            <Download className="mr-1 h-4 w-4" />
+            Export CSV
+          </Button>
+        )}
+      </div>
 
       {/* KPI Cards — Row 1 */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

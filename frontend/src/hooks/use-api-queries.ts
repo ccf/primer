@@ -2,7 +2,10 @@ import { useQuery } from "@tanstack/react-query"
 import { apiFetch } from "@/lib/api"
 import type {
   ActivityHeatmap,
+  AlertConfigResponse,
   AlertResponse,
+  AlertThresholds,
+  AuditLogResponse,
   CostAnalytics,
   DailyStatsResponse,
   EngineerAnalytics,
@@ -280,5 +283,41 @@ export function useIngestEvents(params?: { engineerId?: string; status?: string;
       const qs = sp.toString()
       return apiFetch<IngestEventResponse[]>(`/api/v1/admin/ingest-events${qs ? `?${qs}` : ""}`)
     },
+  })
+}
+
+export function useAlertConfigs(teamId?: string | null) {
+  return useQuery({
+    queryKey: ["alert-configs", teamId],
+    queryFn: () =>
+      apiFetch<AlertConfigResponse[]>(
+        `/api/v1/alert-configs${buildParams({ team_id: teamId })}`,
+      ),
+  })
+}
+
+export function useResolvedThresholds(teamId?: string | null) {
+  return useQuery({
+    queryKey: ["alert-thresholds", teamId],
+    queryFn: () =>
+      apiFetch<AlertThresholds>(
+        `/api/v1/alert-configs/resolved${buildParams({ team_id: teamId })}`,
+      ),
+  })
+}
+
+export function useAuditLogs(params?: {
+  resource_type?: string
+  action?: string
+  actor_id?: string
+  limit?: number
+  offset?: number
+}) {
+  return useQuery({
+    queryKey: ["audit-logs", params],
+    queryFn: () =>
+      apiFetch<AuditLogResponse[]>(
+        `/api/v1/admin/audit-logs${buildParams(params ?? {})}`,
+      ),
   })
 }

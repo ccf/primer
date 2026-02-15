@@ -1,7 +1,7 @@
 import secrets
 
 import bcrypt
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from primer.common.database import get_db
@@ -14,6 +14,7 @@ from primer.common.schemas import (
     SessionResponse,
 )
 from primer.server.deps import AuthContext, get_auth_context, require_role
+from primer.server.services import audit_service
 
 router = APIRouter(prefix="/api/v1/engineers", tags=["engineers"])
 
@@ -21,6 +22,7 @@ router = APIRouter(prefix="/api/v1/engineers", tags=["engineers"])
 @router.post("", response_model=EngineerCreateResponse)
 def create_engineer(
     payload: EngineerCreate,
+    request: Request,
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(require_role("admin")),
 ):
@@ -38,6 +40,17 @@ def create_engineer(
         api_key_hash=hashed,
     )
     db.add(engineer)
+    db.flush()
+    ip = request.client.host if request.client else None
+    audit_service.log_action(
+        db,
+        auth,
+        "create",
+        "engineer",
+        engineer.id,
+        details={"name": engineer.name, "email": engineer.email},
+        ip_address=ip,
+    )
     db.commit()
     db.refresh(engineer)
     return EngineerCreateResponse(
@@ -84,6 +97,7 @@ def list_engineer_sessions(
 def update_engineer(
     engineer_id: str,
     payload: EngineerUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(require_role("admin")),
 ):
@@ -91,15 +105,28 @@ def update_engineer(
     if not engineer:
         raise HTTPException(status_code=404, detail="Engineer not found")
 
+    changes = {}
     if payload.role is not None:
         if payload.role not in ("engineer", "team_lead", "admin"):
             raise HTTPException(status_code=400, detail="Invalid role")
+        changes["role"] = {"old": engineer.role, "new": payload.role}
         engineer.role = payload.role
     if payload.team_id is not None:
+        changes["team_id"] = {"old": engineer.team_id, "new": payload.team_id}
         engineer.team_id = payload.team_id
     if payload.is_active is not None:
         engineer.is_active = payload.is_active
 
+    ip = request.client.host if request.client else None
+    audit_service.log_action(
+        db,
+        auth,
+        "update",
+        "engineer",
+        engineer_id,
+        details=changes if changes else None,
+        ip_address=ip,
+    )
     db.commit()
     db.refresh(engineer)
     return EngineerResponse.model_validate(engineer)

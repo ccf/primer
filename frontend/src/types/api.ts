@@ -284,3 +284,33 @@ export interface IngestEventResponse {
   error_message: string | null
   created_at: string
 }
+
+export interface AlertConfigResponse {
+  id: string
+  team_id: string | null
+  alert_type: string
+  enabled: boolean
+  threshold: number
+  created_at: string
+  updated_at: string
+}
+
+export interface AlertThresholds {
+  friction_spike_multiplier: number
+  usage_drop_ratio: number
+  cost_spike_warning: number
+  cost_spike_critical: number
+  success_rate_drop_pp: number
+}
+
+export interface AuditLogResponse {
+  id: number
+  actor_id: string | null
+  actor_role: string
+  action: string
+  resource_type: string
+  resource_id: string | null
+  details: Record<string, unknown> | null
+  ip_address: string | null
+  created_at: string
+}

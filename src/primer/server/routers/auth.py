@@ -1,12 +1,13 @@
 import secrets
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from primer.common.config import settings
 from primer.common.database import get_db
 from primer.common.schemas import EngineerResponse
+from primer.server.middleware import limiter
 from primer.server.services.auth_service import (
     create_access_token,
     create_refresh_token,
@@ -62,7 +63,8 @@ def _clear_auth_cookies(response: Response) -> None:
 
 
 @router.get("/github/login", response_model=GithubLoginResponse)
-def github_login():
+@limiter.limit(settings.rate_limit_auth)
+def github_login(request: Request):
     if not settings.github_client_id:
         raise HTTPException(status_code=501, detail="GitHub OAuth not configured")
     state = secrets.token_urlsafe(32)
@@ -71,7 +73,9 @@ def github_login():
 
 
 @router.post("/github/callback", response_model=EngineerResponse)
+@limiter.limit(settings.rate_limit_auth)
 async def github_callback(
+    request: Request,
     payload: GithubCallbackRequest,
     response: Response,
     db: Session = Depends(get_db),
@@ -91,7 +95,9 @@ async def github_callback(
 
 
 @router.post("/refresh", response_model=EngineerResponse)
+@limiter.limit(settings.rate_limit_auth)
 def refresh(
+    request: Request,
     response: Response,
     primer_refresh: str | None = Cookie(default=None),
     db: Session = Depends(get_db),
