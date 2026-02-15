@@ -17,6 +17,7 @@ from primer.common.schemas import (
     ProductivityMetrics,
     ProjectAnalytics,
     Recommendation,
+    ToolAdoptionAnalytics,
     ToolRanking,
 )
 from primer.server.deps import AuthContext, get_auth_context, require_role
@@ -32,6 +33,7 @@ from primer.server.services.analytics_service import (
     get_overview,
     get_productivity_metrics,
     get_project_analytics,
+    get_tool_adoption_analytics,
     get_tool_rankings,
 )
 
@@ -250,4 +252,24 @@ def bottlenecks(
     tid, eid = _resolve_scope(auth, team_id)
     return get_bottleneck_analytics(
         db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
+    )
+
+
+@router.get("/tool-adoption", response_model=ToolAdoptionAnalytics)
+def tool_adoption(
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    limit: int = Query(default=20, le=100),
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_tool_adoption_analytics(
+        db,
+        team_id=tid,
+        engineer_id=eid,
+        start_date=start_date,
+        end_date=end_date,
+        limit=limit,
     )

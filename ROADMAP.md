@@ -36,7 +36,7 @@
 - [x] API rate limiting
 - [x] Scheduled alert digests (email/Slack)
 - [ ] Multi-tenant workspace isolation
-- [ ] PDF export
+- [x] PDF export
 
 ## Tier 4 — Future Ideas
 
@@ -47,5 +47,5 @@
 - [x] **Bottleneck detection** — common friction points across team
 - **Onboarding acceleration** — compare new hire vs experienced patterns
 - **Skill inventory** — team capabilities from session topics
-- **Tool adoption tracking** — which Claude Code features are/aren't used
+- [x] **Tool adoption tracking** — which Claude Code features are/aren't used
 - **Quality metrics** — correlate session outcomes with code quality via git

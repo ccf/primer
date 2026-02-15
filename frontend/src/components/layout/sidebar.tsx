@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom"
-import { AlertTriangle, FolderKanban, Layout, MonitorDot, Settings, Users, Users2 } from "lucide-react"
+import { AlertTriangle, FolderKanban, Layout, MonitorDot, Settings, Users, Users2, Wrench } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import { getApiKey } from "@/lib/api"
@@ -9,6 +9,7 @@ const allLinks = [
   { to: "/sessions", label: "Sessions", icon: MonitorDot, minRole: "engineer" as const },
   { to: "/projects", label: "Projects", icon: FolderKanban, minRole: "engineer" as const },
   { to: "/bottlenecks", label: "Bottlenecks", icon: AlertTriangle, minRole: "engineer" as const },
+  { to: "/tool-adoption", label: "Tool Adoption", icon: Wrench, minRole: "engineer" as const },
   { to: "/teams", label: "Teams", icon: Users2, minRole: "team_lead" as const },
   { to: "/engineers", label: "Engineers", icon: Users, minRole: "team_lead" as const },
   { to: "/admin", label: "Admin", icon: Settings, minRole: "admin" as const },

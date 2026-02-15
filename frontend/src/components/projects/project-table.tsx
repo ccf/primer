@@ -1,11 +1,12 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowUpDown, Download } from "lucide-react"
+import { ArrowUpDown, Download, FileText } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { formatTokens, formatCost } from "@/lib/utils"
 import { exportToCsv } from "@/lib/csv-export"
+import { exportToPdf } from "@/lib/pdf-export"
 import type { ProjectStats } from "@/types/api"
 
 interface ProjectTableProps {
@@ -32,33 +33,43 @@ export function ProjectTable({ projects, onSortChange, sortBy }: ProjectTablePro
     { key: "total_tokens", label: "Tokens" },
   ] as const
 
+  const projExportHeaders = ["Project", "Sessions", "Engineers", "Tokens", "Cost", "Success", "Partial", "Failure", "Abandoned", "Top Tools"]
+  const projExportRows = () =>
+    projects.map((p) => [
+      p.project_name,
+      p.total_sessions,
+      p.unique_engineers,
+      p.total_tokens,
+      p.estimated_cost.toFixed(2),
+      p.outcome_distribution.success ?? 0,
+      p.outcome_distribution.partial ?? 0,
+      p.outcome_distribution.failure ?? 0,
+      p.outcome_distribution.abandoned ?? 0,
+      p.top_tools.join(", "),
+    ])
+
   const handleExport = () => {
-    exportToCsv(
-      "projects.csv",
-      ["Project", "Sessions", "Engineers", "Tokens", "Cost", "Success", "Partial", "Failure", "Abandoned", "Top Tools"],
-      projects.map((p) => [
-        p.project_name,
-        p.total_sessions,
-        p.unique_engineers,
-        p.total_tokens,
-        p.estimated_cost.toFixed(2),
-        p.outcome_distribution.success ?? 0,
-        p.outcome_distribution.partial ?? 0,
-        p.outcome_distribution.failure ?? 0,
-        p.outcome_distribution.abandoned ?? 0,
-        p.top_tools.join(", "),
-      ]),
-    )
+    exportToCsv("projects.csv", projExportHeaders, projExportRows())
+  }
+
+  const handleExportPdf = () => {
+    exportToPdf("projects.pdf", "Projects Report", projExportHeaders, projExportRows())
   }
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-sm font-medium">Projects</CardTitle>
-        <Button variant="outline" size="sm" onClick={handleExport}>
-          <Download className="mr-1 h-4 w-4" />
-          Export CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleExport}>
+            <Download className="mr-1 h-4 w-4" />
+            Export CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportPdf}>
+            <FileText className="mr-1 h-4 w-4" />
+            Export PDF
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">

@@ -1,8 +1,9 @@
-import { Activity, CheckCircle2, MessageSquare, Users, Wrench, FileCode, DollarSign, Download } from "lucide-react"
+import { Activity, CheckCircle2, MessageSquare, Users, Wrench, FileCode, DollarSign, Download, FileText } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useOverview, useDailyStats, useToolRankings, useModelRankings, useRecommendations, useCostAnalytics, useActivityHeatmap, useProductivity } from "@/hooks/use-api-queries"
 import { Button } from "@/components/ui/button"
 import { exportToCsv } from "@/lib/csv-export"
+import { exportToPdf } from "@/lib/pdf-export"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { OutcomeChart } from "@/components/dashboard/outcome-chart"
 import { SessionTypeChart } from "@/components/dashboard/session-type-chart"
@@ -58,19 +59,24 @@ export function OverviewPage({ teamId, dateRange }: OverviewPageProps) {
 
   const prev = overview.previous_period
 
+  const exportHeaders = ["Date", "Sessions", "Messages", "Tool Calls", "Success Rate"]
+  const exportRows = () =>
+    (daily ?? []).map((d) => [
+      d.date,
+      d.session_count,
+      d.message_count,
+      d.tool_call_count,
+      d.success_rate != null ? `${(d.success_rate * 100).toFixed(1)}%` : "",
+    ])
+
   const handleExport = () => {
     if (!daily) return
-    exportToCsv(
-      "overview-report.csv",
-      ["Date", "Sessions", "Messages", "Tool Calls", "Success Rate"],
-      daily.map((d) => [
-        d.date,
-        d.session_count,
-        d.message_count,
-        d.tool_call_count,
-        d.success_rate != null ? `${(d.success_rate * 100).toFixed(1)}%` : "",
-      ]),
-    )
+    exportToCsv("overview-report.csv", exportHeaders, exportRows())
+  }
+
+  const handleExportPdf = () => {
+    if (!daily) return
+    exportToPdf("overview-report.pdf", "Overview Report", exportHeaders, exportRows())
   }
 
   return (
@@ -80,10 +86,16 @@ export function OverviewPage({ teamId, dateRange }: OverviewPageProps) {
           {role === "engineer" ? "My Dashboard" : role === "team_lead" ? "Team Overview" : "Overview"}
         </h1>
         {daily && daily.length > 0 && (
-          <Button variant="outline" size="sm" onClick={handleExport}>
-            <Download className="mr-1 h-4 w-4" />
-            Export CSV
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              <Download className="mr-1 h-4 w-4" />
+              Export CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportPdf}>
+              <FileText className="mr-1 h-4 w-4" />
+              Export PDF
+            </Button>
+          </div>
         )}
       </div>
 

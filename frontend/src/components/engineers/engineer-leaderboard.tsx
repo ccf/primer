@@ -1,11 +1,12 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowUpDown, Download } from "lucide-react"
+import { ArrowUpDown, Download, FileText } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { formatTokens, formatCost, formatDuration, formatPercent } from "@/lib/utils"
 import { exportToCsv } from "@/lib/csv-export"
+import { exportToPdf } from "@/lib/pdf-export"
 import type { EngineerStats } from "@/types/api"
 
 interface EngineerLeaderboardProps {
@@ -27,31 +28,41 @@ export function EngineerLeaderboard({ engineers, onSortChange, sortBy }: Enginee
     { key: "avg_duration", label: "Avg Duration" },
   ] as const
 
+  const engExportHeaders = ["Name", "Email", "Sessions", "Tokens", "Cost", "Success Rate", "Avg Duration", "Top Tools"]
+  const engExportRows = () =>
+    engineers.map((e) => [
+      e.name,
+      e.email,
+      e.total_sessions,
+      e.total_tokens,
+      e.estimated_cost.toFixed(2),
+      e.success_rate != null ? (e.success_rate * 100).toFixed(1) + "%" : "",
+      e.avg_duration != null ? e.avg_duration.toFixed(0) : "",
+      e.top_tools.join(", "),
+    ])
+
   const handleExport = () => {
-    exportToCsv(
-      "engineers.csv",
-      ["Name", "Email", "Sessions", "Tokens", "Cost", "Success Rate", "Avg Duration", "Top Tools"],
-      engineers.map((e) => [
-        e.name,
-        e.email,
-        e.total_sessions,
-        e.total_tokens,
-        e.estimated_cost.toFixed(2),
-        e.success_rate != null ? (e.success_rate * 100).toFixed(1) + "%" : "",
-        e.avg_duration != null ? e.avg_duration.toFixed(0) : "",
-        e.top_tools.join(", "),
-      ]),
-    )
+    exportToCsv("engineers.csv", engExportHeaders, engExportRows())
+  }
+
+  const handleExportPdf = () => {
+    exportToPdf("engineers.pdf", "Engineer Leaderboard", engExportHeaders, engExportRows())
   }
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-sm font-medium">Engineer Leaderboard</CardTitle>
-        <Button variant="outline" size="sm" onClick={handleExport}>
-          <Download className="mr-1 h-4 w-4" />
-          Export CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleExport}>
+            <Download className="mr-1 h-4 w-4" />
+            Export CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportPdf}>
+            <FileText className="mr-1 h-4 w-4" />
+            Export PDF
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">

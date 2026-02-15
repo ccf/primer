@@ -9,9 +9,10 @@ import { FrictionList } from "@/components/analytics/friction-list"
 import { TableSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleton"
 import { EmptyState } from "@/components/shared/empty-state"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, Download, X } from "lucide-react"
+import { ChevronLeft, ChevronRight, Download, FileText, X } from "lucide-react"
 import { useKeyboardNavigation } from "@/hooks/use-keyboard-navigation"
 import { exportToCsv } from "@/lib/csv-export"
+import { exportToPdf } from "@/lib/pdf-export"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
 interface SessionsPageProps {
@@ -104,24 +105,29 @@ export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
     updateParam(paramKey, "")
   }
 
+  const sessionExportHeaders = ["ID", "Engineer", "Project", "Started", "Duration (s)", "Messages", "Tool Calls", "Model", "Tokens In", "Tokens Out"]
+  const sessionExportRows = () =>
+    (sessions ?? []).map((s) => [
+      s.id,
+      s.engineer_id,
+      s.project_name ?? "",
+      s.started_at ?? "",
+      s.duration_seconds ?? "",
+      s.message_count,
+      s.tool_call_count,
+      s.primary_model ?? "",
+      s.input_tokens,
+      s.output_tokens,
+    ])
+
   const handleExport = () => {
     if (!sessions) return
-    exportToCsv(
-      "sessions.csv",
-      ["ID", "Engineer", "Project", "Started", "Duration (s)", "Messages", "Tool Calls", "Model", "Tokens In", "Tokens Out"],
-      sessions.map((s) => [
-        s.id,
-        s.engineer_id,
-        s.project_name ?? "",
-        s.started_at ?? "",
-        s.duration_seconds ?? "",
-        s.message_count,
-        s.tool_call_count,
-        s.primary_model ?? "",
-        s.input_tokens,
-        s.output_tokens,
-      ]),
-    )
+    exportToCsv("sessions.csv", sessionExportHeaders, sessionExportRows())
+  }
+
+  const handleExportPdf = () => {
+    if (!sessions) return
+    exportToPdf("sessions.pdf", "Sessions Report", sessionExportHeaders, sessionExportRows())
   }
 
   const extraFilters = [
@@ -137,10 +143,16 @@ export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
         </h1>
         <div className="flex items-center gap-2">
           {sessions && sessions.length > 0 && (
-            <Button variant="outline" size="sm" onClick={handleExport}>
-              <Download className="mr-1 h-4 w-4" />
-              Export CSV
-            </Button>
+            <>
+              <Button variant="outline" size="sm" onClick={handleExport}>
+                <Download className="mr-1 h-4 w-4" />
+                Export CSV
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportPdf}>
+                <FileText className="mr-1 h-4 w-4" />
+                Export PDF
+              </Button>
+            </>
           )}
           {role === "admin" && (
             <SessionFilters
