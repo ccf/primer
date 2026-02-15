@@ -504,6 +504,44 @@ class IngestEventResponse(BaseModel):
 # --- Audit Log ---
 
 
+# --- Bottleneck Analytics ---
+
+
+class FrictionImpact(BaseModel):
+    friction_type: str
+    occurrence_count: int
+    sessions_affected: int
+    success_rate_with: float | None
+    success_rate_without: float | None
+    impact_score: float | None
+    sample_details: list[str]
+
+
+class ProjectFriction(BaseModel):
+    project_name: str
+    total_sessions: int
+    sessions_with_friction: int
+    friction_rate: float
+    top_friction_types: list[str]
+    total_friction_count: int
+
+
+class FrictionTrend(BaseModel):
+    date: date
+    total_friction_count: int
+    sessions_with_friction: int
+    total_sessions: int
+
+
+class BottleneckAnalytics(BaseModel):
+    friction_impacts: list[FrictionImpact]
+    project_friction: list[ProjectFriction]
+    friction_trends: list[FrictionTrend]
+    total_sessions_analyzed: int
+    sessions_with_any_friction: int
+    overall_friction_rate: float
+
+
 class AuditLogResponse(BaseModel):
     id: int
     actor_id: str | None

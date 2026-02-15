@@ -95,6 +95,14 @@ def _create_alert_if_new(
     )
     db.add(alert)
     db.flush()
+
+    try:
+        from primer.server.services.slack_service import send_alert_to_slack
+
+        send_alert_to_slack(alert)
+    except Exception:
+        logger.exception("Slack notification failed for alert %s", alert.id)
+
     return alert
 
 

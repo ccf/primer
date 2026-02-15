@@ -17,6 +17,7 @@ from primer.server.routers import (
     engineers,
     health,
     ingest,
+    notifications,
     sessions,
     teams,
 )
@@ -49,6 +50,7 @@ def create_app() -> FastAPI:
     app.include_router(analytics.router)
     app.include_router(alerts.router)
     app.include_router(alert_configs.router)
+    app.include_router(notifications.router)
     app.include_router(admin.router)
 
     if FRONTEND_DIST.is_dir():

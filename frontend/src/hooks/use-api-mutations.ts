@@ -77,6 +77,15 @@ export function useCreateEngineer() {
   })
 }
 
+export function useTestSlack() {
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<{ success: boolean; error?: string }>("/api/v1/notifications/slack/test", {
+        method: "POST",
+      }),
+  })
+}
+
 export function useCreateAlertConfig() {
   const qc = useQueryClient()
   return useMutation({

@@ -34,7 +34,7 @@
 - [x] Custom alert thresholds configuration
 - [x] Audit trail for admin actions
 - [x] API rate limiting
-- [ ] Scheduled alert digests (email/Slack)
+- [x] Scheduled alert digests (email/Slack)
 - [ ] Multi-tenant workspace isolation
 - [ ] PDF export
 
@@ -44,7 +44,7 @@
 - **Personalized tips** — "You use X but rarely Y; here's when Y helps"
 - **Learning paths** — identify knowledge gaps from session patterns
 - **Pattern sharing** — "3 engineers solved similar problems; best approach"
-- **Bottleneck detection** — common friction points across team
+- [x] **Bottleneck detection** — common friction points across team
 - **Onboarding acceleration** — compare new hire vs experienced patterns
 - **Skill inventory** — team capabilities from session topics
 - **Tool adoption tracking** — which Claude Code features are/aren't used

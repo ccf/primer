@@ -303,6 +303,41 @@ export interface AlertThresholds {
   success_rate_drop_pp: number
 }
 
+export interface FrictionImpact {
+  friction_type: string
+  occurrence_count: number
+  sessions_affected: number
+  success_rate_with: number | null
+  success_rate_without: number | null
+  impact_score: number | null
+  sample_details: string[]
+}
+
+export interface ProjectFriction {
+  project_name: string
+  total_sessions: number
+  sessions_with_friction: number
+  friction_rate: number
+  top_friction_types: string[]
+  total_friction_count: number
+}
+
+export interface FrictionTrend {
+  date: string
+  total_friction_count: number
+  sessions_with_friction: number
+  total_sessions: number
+}
+
+export interface BottleneckAnalytics {
+  friction_impacts: FrictionImpact[]
+  project_friction: ProjectFriction[]
+  friction_trends: FrictionTrend[]
+  total_sessions_analyzed: number
+  sessions_with_any_friction: number
+  overall_friction_rate: number
+}
+
 export interface AuditLogResponse {
   id: number
   actor_id: string | null
