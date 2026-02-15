@@ -16,25 +16,9 @@ from primer.common.schemas import (
     SkillInventoryResponse,
     TeamSkillGap,
 )
-
-
-def _base_session_query(
-    db: Session,
-    team_id: str | None = None,
-    engineer_id: str | None = None,
-    start_date: datetime | None = None,
-    end_date: datetime | None = None,
-):
-    q = db.query(SessionModel)
-    if engineer_id:
-        q = q.filter(SessionModel.engineer_id == engineer_id)
-    elif team_id:
-        q = q.join(Engineer).filter(Engineer.team_id == team_id)
-    if start_date:
-        q = q.filter(SessionModel.started_at >= start_date)
-    if end_date:
-        q = q.filter(SessionModel.started_at <= end_date)
-    return q
+from primer.server.services.analytics_service import (
+    _base_session_query,
+)
 
 
 def _shannon_entropy(counts: dict[str, int]) -> float:
@@ -494,14 +478,18 @@ def get_skill_inventory(
         .all()
     )
 
+    # Build session_id → engineer_id lookup for O(1) mapping
+    session_to_engineer: dict[str, str] = {}
+    for eid, sess_list in eng_sessions.items():
+        for s in sess_list:
+            session_to_engineer[s.id] = eid
+
     # Group tool usage by engineer
     eng_tool_calls: dict[str, Counter] = defaultdict(Counter)
     for tu in all_tools:
-        # find engineer for this session
-        for eid, sess_list in eng_sessions.items():
-            if any(s.id == tu.session_id for s in sess_list):
-                eng_tool_calls[eid][tu.tool_name] += tu.call_count
-                break
+        eid = session_to_engineer.get(tu.session_id)
+        if eid:
+            eng_tool_calls[eid][tu.tool_name] += tu.call_count
 
     # Build profiles
     all_session_types: set[str] = set()
