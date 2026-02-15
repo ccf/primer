@@ -1182,7 +1182,7 @@ def get_onboarding_acceleration(
         all_types_counter: Counter[str] = Counter()
         for m in metrics:
             all_tools_counter.update(m["tools"])
-            all_types_counter.update(m["session_types"])
+            all_types_counter.update(m["session_types"].keys())
 
         return CohortMetrics(
             cohort_label=label,
