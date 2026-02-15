@@ -46,7 +46,7 @@ from primer.common.schemas import (
 )
 
 
-def _base_session_query(
+def base_session_query(
     db: Session,
     team_id: str | None = None,
     engineer_id: str | None = None,
@@ -97,7 +97,7 @@ def _build_overview(
     end_date: datetime | None = None,
 ) -> OverviewStats:
     """Internal helper that builds an OverviewStats without previous_period."""
-    q = _base_session_query(db, team_id, engineer_id, start_date, end_date)
+    q = base_session_query(db, team_id, engineer_id, start_date, end_date)
 
     total_sessions = q.count()
 
@@ -753,7 +753,7 @@ def get_activity_heatmap(
     end_date: datetime | None = None,
 ) -> ActivityHeatmap:
     """Build a 7x24 heatmap of session activity by day-of-week and hour."""
-    q = _base_session_query(db, team_id, engineer_id, start_date, end_date)
+    q = base_session_query(db, team_id, engineer_id, start_date, end_date)
     q = q.filter(SessionModel.started_at.isnot(None))
 
     sessions = q.with_entities(SessionModel.started_at).all()
@@ -782,7 +782,7 @@ def get_productivity_metrics(
     end_date: datetime | None = None,
 ) -> ProductivityMetrics:
     """Compute ROI / productivity metrics."""
-    q = _base_session_query(db, team_id, engineer_id, start_date, end_date)
+    q = base_session_query(db, team_id, engineer_id, start_date, end_date)
 
     # Session counts and total duration
     agg = q.with_entities(
