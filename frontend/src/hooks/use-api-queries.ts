@@ -7,6 +7,7 @@ import type {
   AlertThresholds,
   AuditLogResponse,
   BottleneckAnalytics,
+  ConfigOptimizationResponse,
   CostAnalytics,
   DailyStatsResponse,
   EngineerAnalytics,
@@ -16,12 +17,14 @@ import type {
   IngestEventResponse,
   ModelRanking,
   OverviewStats,
+  PersonalizedTipsResponse,
   ProductivityMetrics,
   ProjectAnalytics,
   Recommendation,
   SessionDetailResponse,
   SessionMessage,
   SessionResponse,
+  SkillInventoryResponse,
   SystemStats,
   TeamResponse,
   ToolAdoptionAnalytics,
@@ -351,6 +354,36 @@ export function useAuditLogs(params?: {
     queryFn: () =>
       apiFetch<AuditLogResponse[]>(
         `/api/v1/admin/audit-logs${buildParams(params ?? {})}`,
+      ),
+  })
+}
+
+export function useConfigOptimization(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["config-optimization", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<ConfigOptimizationResponse>(
+        `/api/v1/analytics/config-optimization${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function usePersonalizedTips(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["personalized-tips", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<PersonalizedTipsResponse>(
+        `/api/v1/analytics/personalized-tips${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useSkillInventory(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["skill-inventory", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<SkillInventoryResponse>(
+        `/api/v1/analytics/skill-inventory${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
       ),
   })
 }

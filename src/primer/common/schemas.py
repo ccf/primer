@@ -590,3 +590,65 @@ class ToolAdoptionAnalytics(BaseModel):
     total_engineers: int
     total_tools_discovered: int
     avg_tools_per_engineer: float
+
+
+# --- Config Optimization ---
+
+
+class ConfigSuggestion(BaseModel):
+    category: str  # "hook", "permission", "model", "mcp", "workflow"
+    title: str
+    description: str
+    severity: str  # "info", "warning"
+    evidence: dict
+    suggested_config: str | None = None
+
+
+class ConfigOptimizationResponse(BaseModel):
+    suggestions: list[ConfigSuggestion]
+    sessions_analyzed: int
+
+
+# --- Personalized Tips ---
+
+
+class PersonalizedTip(BaseModel):
+    category: str  # "tool_gap", "diversity", "friction", "success", "workflow"
+    title: str
+    description: str
+    severity: str
+    evidence: dict
+
+
+class PersonalizedTipsResponse(BaseModel):
+    tips: list[PersonalizedTip]
+    sessions_analyzed: int
+    engineer_id: str | None = None
+
+
+# --- Skill Inventory ---
+
+
+class EngineerSkillProfile(BaseModel):
+    engineer_id: str
+    name: str
+    session_types: dict[str, int]
+    tool_proficiency: dict[str, str]
+    project_count: int
+    total_sessions: int
+    diversity_score: float
+
+
+class TeamSkillGap(BaseModel):
+    skill: str
+    coverage_pct: float
+    total_engineers: int
+    engineers_with_skill: int
+
+
+class SkillInventoryResponse(BaseModel):
+    engineer_profiles: list[EngineerSkillProfile]
+    team_skill_gaps: list[TeamSkillGap]
+    total_engineers: int
+    total_session_types: int
+    total_tools_used: int
