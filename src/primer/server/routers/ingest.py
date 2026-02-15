@@ -39,14 +39,24 @@ def ingest_session(
         log_ingest_event(db, engineer.id, "session", payload.session_id, None, "ok")
 
         # Trigger anomaly detection (non-blocking)
+        alert_snapshots: list[dict] = []
         try:
-            from primer.server.services.alerting_service import detect_anomalies
+            from primer.server.services.alerting_service import (
+                detect_anomalies,
+                send_alert_notifications,
+            )
 
-            detect_anomalies(db, team_id=engineer.team_id, engineer_id=engineer.id)
+            _alerts, alert_snapshots = detect_anomalies(
+                db, team_id=engineer.team_id, engineer_id=engineer.id
+            )
         except Exception:
             logger.exception("Anomaly detection failed during ingest")
 
         db.commit()
+
+        # Send Slack notifications only after a successful commit
+        if alert_snapshots:
+            send_alert_notifications(alert_snapshots)
         return IngestResponse(status="ok", session_id=payload.session_id, created=created)
     except Exception as e:
         db.rollback()

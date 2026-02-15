@@ -16,8 +16,13 @@ def detect_anomalies(
     db: Session,
     team_id: str | None = None,
     engineer_id: str | None = None,
-) -> list[Alert]:
-    """Run all anomaly detectors and return newly created alerts."""
+) -> tuple[list[Alert], list[dict]]:
+    """Run all anomaly detectors and return newly created alerts + notification snapshots.
+
+    Returns (alerts, snapshots).  Callers should commit the transaction first,
+    then call ``send_alert_notifications(snapshots)`` so that Slack messages
+    are only sent for alerts that were actually persisted.
+    """
     alerts: list[Alert] = []
     for detector in [
         _detect_friction_spike,
@@ -32,14 +37,22 @@ def detect_anomalies(
         except Exception:
             logger.exception("Anomaly detector %s failed", detector.__name__)
 
-    # Snapshot alert data before the caller commits/closes the session.
-    # ORM objects become detached after commit (expire_on_commit=True),
-    # so the background thread needs plain dicts to avoid DetachedInstanceError.
-    if alerts:
-        snapshots = [_snapshot_alert(a) for a in alerts]
-        threading.Thread(target=_notify_slack_batch, args=(snapshots,), daemon=True).start()
+    # Snapshot alert data while the session is still open.  ORM objects become
+    # detached after commit (expire_on_commit=True), so we capture plain dicts
+    # now and let the caller dispatch notifications post-commit.
+    snapshots = [_snapshot_alert(a) for a in alerts]
 
-    return alerts
+    return alerts, snapshots
+
+
+def send_alert_notifications(snapshots: list[dict]) -> None:
+    """Dispatch Slack notifications in a background thread.
+
+    Call this *after* the DB transaction has been committed so that phantom
+    notifications are never sent for rolled-back alerts.
+    """
+    if snapshots:
+        threading.Thread(target=_notify_slack_batch, args=(snapshots,), daemon=True).start()
 
 
 def _recent_window(

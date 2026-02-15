@@ -1135,7 +1135,8 @@ def get_bottleneck_analytics(
     type_outcomes_with: dict[str, list[str]] = {}
 
     sessions_with_friction: set[str] = set()
-    outcomes_without_friction: list[str] = []
+    # Map session_id → outcome for computing per-type baselines
+    session_outcomes: dict[str, str] = {}
 
     # --- Project Friction ---
     project_sessions: dict[str, int] = {}
@@ -1210,13 +1211,9 @@ def get_bottleneck_analytics(
                     if date_key not in daily_friction_sessions:
                         daily_friction_sessions[date_key] = set()
                     daily_friction_sessions[date_key].add(sid)
-            else:
-                # Dict existed but all counts were zero — treat as no friction
-                if outcome:
-                    outcomes_without_friction.append(outcome)
-        else:
-            if outcome:
-                outcomes_without_friction.append(outcome)
+        # Track all session outcomes for per-type baseline calculation
+        if outcome:
+            session_outcomes[sid] = outcome
 
     # Build friction impacts
     def _success_rate(outcomes: list[str]) -> float | None:
@@ -1224,12 +1221,15 @@ def get_bottleneck_analytics(
             return None
         return sum(1 for o in outcomes if o == "success") / len(outcomes)
 
-    sr_without_any = _success_rate(outcomes_without_friction)
+    all_session_ids = set(session_outcomes.keys())
 
     friction_impacts: list[FrictionImpact] = []
     for ft, occ_count in type_occurrences.most_common():
         sr_with = _success_rate(type_outcomes_with.get(ft, []))
-        sr_without = sr_without_any
+        # Per-type baseline: success rate of sessions WITHOUT this specific type
+        sessions_without_ft = all_session_ids - type_sessions.get(ft, set())
+        outcomes_without_ft = [session_outcomes[s] for s in sessions_without_ft]
+        sr_without = _success_rate(outcomes_without_ft)
         impact = None
         if sr_with is not None and sr_without is not None:
             impact = round(sr_without - sr_with, 3)

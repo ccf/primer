@@ -11,6 +11,7 @@ from primer.server.services.alerting_service import (
     detect_anomalies,
     dismiss_alert,
     get_alerts,
+    send_alert_notifications,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,8 +54,9 @@ def trigger_detection(
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(require_role("admin")),
 ):
-    alerts = detect_anomalies(db, team_id=team_id)
+    alerts, snapshots = detect_anomalies(db, team_id=team_id)
     db.commit()
+    send_alert_notifications(snapshots)
     return DetectionResult(
         alerts_created=len(alerts),
         alert_ids=[a.id for a in alerts],
