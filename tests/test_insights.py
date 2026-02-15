@@ -222,9 +222,7 @@ class TestSkillInventory:
 
         # Session with debugging type
         s1 = _create_session(db_session, eng, started_at=now - timedelta(hours=3))
-        db_session.add(
-            SessionFacets(session_id=s1.id, session_type="debugging", outcome="success")
-        )
+        db_session.add(SessionFacets(session_id=s1.id, session_type="debugging", outcome="success"))
         db_session.add(ToolUsage(session_id=s1.id, tool_name="Read", call_count=30))
         db_session.add(ToolUsage(session_id=s1.id, tool_name="Bash", call_count=25))
 
@@ -232,9 +230,7 @@ class TestSkillInventory:
         s2 = _create_session(
             db_session, eng, started_at=now - timedelta(hours=2), project_name="project-a"
         )
-        db_session.add(
-            SessionFacets(session_id=s2.id, session_type="feature", outcome="success")
-        )
+        db_session.add(SessionFacets(session_id=s2.id, session_type="feature", outcome="success"))
         db_session.add(ToolUsage(session_id=s2.id, tool_name="Read", call_count=25))
         db_session.add(ToolUsage(session_id=s2.id, tool_name="Write", call_count=3))
 
@@ -287,9 +283,7 @@ class TestSkillInventory:
             db_session.add(ToolUsage(session_id=s.id, tool_name="Read", call_count=10))
 
         # Only 1 engineer uses RareTool (20% coverage -> gap)
-        s_rare = _create_session(
-            db_session, engineers[0], started_at=now - timedelta(hours=2)
-        )
+        s_rare = _create_session(db_session, engineers[0], started_at=now - timedelta(hours=2))
         db_session.add(ToolUsage(session_id=s_rare.id, tool_name="RareTool", call_count=5))
         db_session.flush()
 
@@ -304,9 +298,7 @@ class TestSkillInventory:
         assert "RareTool" in gap_skills
         assert "Read" not in gap_skills
 
-    def test_tool_proficiency_levels(
-        self, client, db_session, engineer_with_key, admin_headers
-    ):
+    def test_tool_proficiency_levels(self, client, db_session, engineer_with_key, admin_headers):
         eng, _key = engineer_with_key
         now = datetime.now(UTC)
 

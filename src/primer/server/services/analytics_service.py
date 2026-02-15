@@ -1,5 +1,6 @@
 from collections import Counter
 from datetime import UTC, datetime
+from datetime import date as date_type
 
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
@@ -1266,8 +1267,6 @@ def get_bottleneck_analytics(
     all_dates = sorted(set(daily_total_sessions.keys()))
     friction_trends: list[FrictionTrend] = []
     for d in all_dates:
-        from datetime import date as date_type
-
         parts = d.split("-")
         friction_trends.append(
             FrictionTrend(
@@ -1430,9 +1429,33 @@ def get_tool_adoption_analytics(
         )
 
     # --- Aggregate stats ---
-    total_tools_discovered = len(tool_adoption)
-    tools_per_eng = [p.tools_used for p in engineer_profiles]
-    avg_tools = sum(tools_per_eng) / len(tools_per_eng) if tools_per_eng else 0.0
+    # Separate count query so total_tools_discovered isn't bounded by `limit`
+    total_tools_q = db.query(func.count(func.distinct(ToolUsage.tool_name))).join(SessionModel)
+    if engineer_id:
+        total_tools_q = total_tools_q.filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
+        total_tools_q = total_tools_q.join(Engineer).filter(Engineer.team_id == team_id)
+    if start_date:
+        total_tools_q = total_tools_q.filter(SessionModel.started_at >= start_date)
+    if end_date:
+        total_tools_q = total_tools_q.filter(SessionModel.started_at <= end_date)
+    total_tools_discovered = total_tools_q.scalar() or 0
+
+    # Avg tools per engineer from all engineers (not just top-50 profiles)
+    tools_per_eng_q = db.query(
+        func.count(func.distinct(ToolUsage.tool_name)).label("tool_count"),
+    ).join(SessionModel)
+    if engineer_id:
+        tools_per_eng_q = tools_per_eng_q.filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
+        tools_per_eng_q = tools_per_eng_q.join(Engineer).filter(Engineer.team_id == team_id)
+    if start_date:
+        tools_per_eng_q = tools_per_eng_q.filter(SessionModel.started_at >= start_date)
+    if end_date:
+        tools_per_eng_q = tools_per_eng_q.filter(SessionModel.started_at <= end_date)
+    tools_per_eng_sub = tools_per_eng_q.group_by(SessionModel.engineer_id).subquery()
+    avg_tools_val = db.query(func.avg(tools_per_eng_sub.c.tool_count)).scalar()
+    avg_tools = float(avg_tools_val) if avg_tools_val else 0.0
 
     return ToolAdoptionAnalytics(
         tool_adoption=tool_adoption,
