@@ -349,3 +349,36 @@ export interface AuditLogResponse {
   ip_address: string | null
   created_at: string
 }
+
+export interface ToolAdoptionEntry {
+  tool_name: string
+  total_calls: number
+  session_count: number
+  engineer_count: number
+  adoption_rate: number
+  avg_calls_per_session: number
+}
+
+export interface ToolTrendEntry {
+  date: string
+  tool_name: string
+  call_count: number
+  session_count: number
+}
+
+export interface EngineerToolProfile {
+  engineer_id: string
+  name: string
+  tools_used: number
+  total_tool_calls: number
+  top_tools: string[]
+}
+
+export interface ToolAdoptionAnalytics {
+  tool_adoption: ToolAdoptionEntry[]
+  tool_trends: ToolTrendEntry[]
+  engineer_profiles: EngineerToolProfile[]
+  total_engineers: number
+  total_tools_discovered: number
+  avg_tools_per_engineer: number
+}

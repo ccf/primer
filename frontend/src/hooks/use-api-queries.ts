@@ -24,6 +24,7 @@ import type {
   SessionResponse,
   SystemStats,
   TeamResponse,
+  ToolAdoptionAnalytics,
   ToolRanking,
 } from "@/types/api"
 
@@ -317,6 +318,16 @@ export function useBottleneckAnalytics(
     queryFn: () =>
       apiFetch<BottleneckAnalytics>(
         `/api/v1/analytics/bottlenecks${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useToolAdoption(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["tool-adoption", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<ToolAdoptionAnalytics>(
+        `/api/v1/analytics/tool-adoption${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
       ),
   })
 }

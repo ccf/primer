@@ -554,3 +554,39 @@ class AuditLogResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# --- Tool Adoption Analytics ---
+
+
+class ToolAdoptionEntry(BaseModel):
+    tool_name: str
+    total_calls: int
+    session_count: int
+    engineer_count: int
+    adoption_rate: float
+    avg_calls_per_session: float
+
+
+class ToolTrendEntry(BaseModel):
+    date: date
+    tool_name: str
+    call_count: int
+    session_count: int
+
+
+class EngineerToolProfile(BaseModel):
+    engineer_id: str
+    name: str
+    tools_used: int
+    total_tool_calls: int
+    top_tools: list[str]
+
+
+class ToolAdoptionAnalytics(BaseModel):
+    tool_adoption: list[ToolAdoptionEntry]
+    tool_trends: list[ToolTrendEntry]
+    engineer_profiles: list[EngineerToolProfile]
+    total_engineers: int
+    total_tools_discovered: int
+    avg_tools_per_engineer: float

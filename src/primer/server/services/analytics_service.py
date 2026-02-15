@@ -26,6 +26,7 @@ from primer.common.schemas import (
     EngineerBenchmark,
     EngineerBenchmarkResponse,
     EngineerStats,
+    EngineerToolProfile,
     FrictionImpact,
     FrictionReport,
     FrictionTrend,
@@ -37,7 +38,10 @@ from primer.common.schemas import (
     ProjectAnalytics,
     ProjectFriction,
     ProjectStats,
+    ToolAdoptionAnalytics,
+    ToolAdoptionEntry,
     ToolRanking,
+    ToolTrendEntry,
 )
 
 
@@ -1284,4 +1288,157 @@ def get_bottleneck_analytics(
         overall_friction_rate=round(sessions_with_count / total_sessions, 3)
         if total_sessions > 0
         else 0.0,
+    )
+
+
+def get_tool_adoption_analytics(
+    db: Session,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    limit: int = 20,
+) -> ToolAdoptionAnalytics:
+    """Compute tool adoption analytics: per-tool adoption, trends, engineer profiles."""
+
+    # --- Total engineers in scope ---
+    eng_q = db.query(func.count(func.distinct(SessionModel.engineer_id)))
+    if engineer_id:
+        eng_q = eng_q.filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
+        eng_q = eng_q.join(Engineer).filter(Engineer.team_id == team_id)
+    if start_date:
+        eng_q = eng_q.filter(SessionModel.started_at >= start_date)
+    if end_date:
+        eng_q = eng_q.filter(SessionModel.started_at <= end_date)
+    total_engineers = eng_q.scalar() or 0
+
+    # --- 1. Tool Adoption ---
+    tool_q = db.query(
+        ToolUsage.tool_name,
+        func.sum(ToolUsage.call_count).label("total_calls"),
+        func.count(func.distinct(ToolUsage.session_id)).label("session_count"),
+        func.count(func.distinct(SessionModel.engineer_id)).label("engineer_count"),
+    ).join(SessionModel)
+    if engineer_id:
+        tool_q = tool_q.filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
+        tool_q = tool_q.join(Engineer).filter(Engineer.team_id == team_id)
+    if start_date:
+        tool_q = tool_q.filter(SessionModel.started_at >= start_date)
+    if end_date:
+        tool_q = tool_q.filter(SessionModel.started_at <= end_date)
+    tool_q = tool_q.group_by(ToolUsage.tool_name).order_by(func.sum(ToolUsage.call_count).desc())
+    tool_rows = tool_q.limit(limit).all()
+
+    tool_adoption: list[ToolAdoptionEntry] = []
+    for name, total_calls, session_count, eng_count in tool_rows:
+        adoption_rate = (eng_count / total_engineers * 100) if total_engineers > 0 else 0.0
+        avg_per_session = total_calls / session_count if session_count > 0 else 0.0
+        tool_adoption.append(
+            ToolAdoptionEntry(
+                tool_name=name,
+                total_calls=total_calls,
+                session_count=session_count,
+                engineer_count=eng_count,
+                adoption_rate=round(adoption_rate, 1),
+                avg_calls_per_session=round(avg_per_session, 1),
+            )
+        )
+
+    # --- 2. Tool Trends (top 5 tools, daily) ---
+    top_5_names = [t.tool_name for t in tool_adoption[:5]]
+    tool_trends: list[ToolTrendEntry] = []
+    if top_5_names:
+        trend_q = (
+            db.query(
+                func.date(SessionModel.started_at).label("date"),
+                ToolUsage.tool_name,
+                func.sum(ToolUsage.call_count).label("call_count"),
+                func.count(func.distinct(ToolUsage.session_id)).label("session_count"),
+            )
+            .join(SessionModel)
+            .filter(
+                ToolUsage.tool_name.in_(top_5_names),
+                SessionModel.started_at.isnot(None),
+            )
+        )
+        if engineer_id:
+            trend_q = trend_q.filter(SessionModel.engineer_id == engineer_id)
+        elif team_id:
+            trend_q = trend_q.join(Engineer).filter(Engineer.team_id == team_id)
+        if start_date:
+            trend_q = trend_q.filter(SessionModel.started_at >= start_date)
+        if end_date:
+            trend_q = trend_q.filter(SessionModel.started_at <= end_date)
+        trend_q = trend_q.group_by(
+            func.date(SessionModel.started_at), ToolUsage.tool_name
+        ).order_by(func.date(SessionModel.started_at))
+
+        for d, name, calls, sc in trend_q.all():
+            tool_trends.append(
+                ToolTrendEntry(date=d, tool_name=name, call_count=calls, session_count=sc)
+            )
+
+    # --- 3. Engineer Profiles ---
+    prof_q = (
+        db.query(
+            SessionModel.engineer_id,
+            Engineer.name,
+            func.count(func.distinct(ToolUsage.tool_name)).label("tools_used"),
+            func.sum(ToolUsage.call_count).label("total_tool_calls"),
+        )
+        .join(ToolUsage, ToolUsage.session_id == SessionModel.id)
+        .join(Engineer, Engineer.id == SessionModel.engineer_id)
+    )
+    if engineer_id:
+        prof_q = prof_q.filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
+        prof_q = prof_q.filter(Engineer.team_id == team_id)
+    if start_date:
+        prof_q = prof_q.filter(SessionModel.started_at >= start_date)
+    if end_date:
+        prof_q = prof_q.filter(SessionModel.started_at <= end_date)
+    prof_q = prof_q.group_by(SessionModel.engineer_id, Engineer.name).order_by(
+        func.count(func.distinct(ToolUsage.tool_name)).desc()
+    )
+    prof_rows = prof_q.limit(50).all()
+
+    engineer_profiles: list[EngineerToolProfile] = []
+    for eid, ename, tools_used, total_calls in prof_rows:
+        # Top 5 tools for this engineer
+        top_q = (
+            db.query(ToolUsage.tool_name, func.sum(ToolUsage.call_count).label("tc"))
+            .join(SessionModel)
+            .filter(SessionModel.engineer_id == eid)
+        )
+        if start_date:
+            top_q = top_q.filter(SessionModel.started_at >= start_date)
+        if end_date:
+            top_q = top_q.filter(SessionModel.started_at <= end_date)
+        top_q = top_q.group_by(ToolUsage.tool_name).order_by(func.sum(ToolUsage.call_count).desc())
+        top_tools = [t[0] for t in top_q.limit(5).all()]
+
+        engineer_profiles.append(
+            EngineerToolProfile(
+                engineer_id=eid,
+                name=ename,
+                tools_used=tools_used,
+                total_tool_calls=total_calls,
+                top_tools=top_tools,
+            )
+        )
+
+    # --- Aggregate stats ---
+    total_tools_discovered = len(tool_adoption)
+    tools_per_eng = [p.tools_used for p in engineer_profiles]
+    avg_tools = sum(tools_per_eng) / len(tools_per_eng) if tools_per_eng else 0.0
+
+    return ToolAdoptionAnalytics(
+        tool_adoption=tool_adoption,
+        tool_trends=tool_trends,
+        engineer_profiles=engineer_profiles,
+        total_engineers=total_engineers,
+        total_tools_discovered=total_tools_discovered,
+        avg_tools_per_engineer=round(avg_tools, 1),
     )
