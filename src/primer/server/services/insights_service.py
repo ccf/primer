@@ -808,10 +808,9 @@ def get_learning_paths(
                     )
                 )
 
-        # 5. Coverage score
-        my_skill_count = len(my_types) + len(my_tools)
+        # 5. Coverage score (use set union to match team denominator)
+        my_skill_count = len(my_types | my_tools)
         coverage_score = round(my_skill_count / team_skill_count, 3) if team_skill_count else 0.0
-        coverage_score = min(coverage_score, 1.0)
 
         paths.append(
             EngineerLearningPath(
@@ -990,13 +989,16 @@ def get_pattern_sharing(
         if s.project_name:
             project_groups[s.project_name].append(s.id)
 
+    # Track projects already covered by type+project clusters
+    covered_projects: set[str] = set()
+    for (_, proj), sids_tp in type_project_groups.items():
+        if len({session_to_engineer[sid] for sid in sids_tp}) >= 2:
+            covered_projects.add(proj)
+
     for proj, sids in project_groups.items():
         eng_set = {session_to_engineer[sid] for sid in sids}
-        if len(eng_set) >= 2:
-            # Don't duplicate if already covered by type+project
-            existing_labels = {p.cluster_label for p in patterns}
-            if proj not in existing_labels:
-                patterns.append(_build_pattern(f"project:{proj}", "project", proj, sids))
+        if len(eng_set) >= 2 and proj not in covered_projects:
+            patterns.append(_build_pattern(f"project:{proj}", "project", proj, sids))
 
     # Sort by engineer_count desc
     patterns.sort(key=lambda p: p.engineer_count, reverse=True)
@@ -1195,10 +1197,7 @@ def get_onboarding_acceleration(
         if eids:
             cohorts.append(_build_cohort(label, eids))
 
-    experienced_eids = cohort_engineers.get("experienced", [])
-    experienced_benchmark = (
-        _build_cohort("experienced", experienced_eids) if experienced_eids else None
-    )
+    experienced_benchmark = next((c for c in cohorts if c.cohort_label == "experienced"), None)
 
     # New hire progress
     new_hire_eids = cohort_engineers.get("new_hire", [])
