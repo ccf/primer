@@ -441,3 +441,104 @@ export interface SkillInventoryResponse {
   total_session_types: number
   total_tools_used: number
 }
+
+// --- Learning Paths ---
+
+export interface LearningRecommendation {
+  category: string
+  skill_area: string
+  title: string
+  description: string
+  priority: string
+  evidence: Record<string, unknown>
+}
+
+export interface EngineerLearningPath {
+  engineer_id: string
+  name: string
+  total_sessions: number
+  recommendations: LearningRecommendation[]
+  coverage_score: number
+  complexity_trend: string
+}
+
+export interface LearningPathsResponse {
+  engineer_paths: EngineerLearningPath[]
+  team_skill_universe: Record<string, number>
+  sessions_analyzed: number
+}
+
+// --- Pattern Sharing ---
+
+export interface EngineerApproach {
+  engineer_id: string
+  name: string
+  session_id: string
+  duration_seconds: number | null
+  tool_count: number
+  outcome: string | null
+  helpfulness: string | null
+  tools_used: string[]
+}
+
+export interface SharedPattern {
+  cluster_id: string
+  cluster_type: string
+  cluster_label: string
+  session_count: number
+  engineer_count: number
+  approaches: EngineerApproach[]
+  best_approach: EngineerApproach | null
+  avg_duration: number | null
+  success_rate: number | null
+  insight: string
+}
+
+export interface PatternSharingResponse {
+  patterns: SharedPattern[]
+  total_clusters_found: number
+  sessions_analyzed: number
+}
+
+// --- Onboarding Acceleration ---
+
+export interface CohortMetrics {
+  cohort_label: string
+  engineer_count: number
+  avg_sessions_per_engineer: number
+  avg_tool_diversity: number
+  avg_duration_seconds: number | null
+  success_rate: number | null
+  avg_friction_rate: number
+  top_tools: string[]
+  top_session_types: string[]
+}
+
+export interface NewHireProgress {
+  engineer_id: string
+  name: string
+  days_since_first_session: number
+  total_sessions: number
+  tool_diversity: number
+  success_rate: number | null
+  avg_duration: number | null
+  friction_rate: number
+  velocity_score: number
+  lagging_areas: string[]
+}
+
+export interface OnboardingRecommendation {
+  category: string
+  title: string
+  description: string
+  target_engineer_id: string | null
+  evidence: Record<string, unknown>
+}
+
+export interface OnboardingAccelerationResponse {
+  cohorts: CohortMetrics[]
+  new_hire_progress: NewHireProgress[]
+  recommendations: OnboardingRecommendation[]
+  sessions_analyzed: number
+  experienced_benchmark: CohortMetrics | null
+}

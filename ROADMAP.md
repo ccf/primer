@@ -42,10 +42,10 @@
 
 - [x] **Config optimization** — auto-suggest hooks/skills from repeated patterns
 - [x] **Personalized tips** — "You use X but rarely Y; here's when Y helps"
-- **Learning paths** — identify knowledge gaps from session patterns
-- **Pattern sharing** — "3 engineers solved similar problems; best approach"
+- [x] **Learning paths** — identify knowledge gaps from session patterns
+- [x] **Pattern sharing** — "3 engineers solved similar problems; best approach"
 - [x] **Bottleneck detection** — common friction points across team
-- **Onboarding acceleration** — compare new hire vs experienced patterns
+- [x] **Onboarding acceleration** — compare new hire vs experienced patterns
 - [x] **Skill inventory** — team capabilities from session topics
 - [x] **Tool adoption tracking** — which Claude Code features are/aren't used
 - **Quality metrics** — correlate session outcomes with code quality via git

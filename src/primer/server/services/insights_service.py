@@ -1,6 +1,8 @@
+import hashlib
+import json
 import math
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -8,11 +10,21 @@ from sqlalchemy.orm import Session
 from primer.common.models import Engineer, SessionFacets, ToolUsage
 from primer.common.models import Session as SessionModel
 from primer.common.schemas import (
+    CohortMetrics,
     ConfigOptimizationResponse,
     ConfigSuggestion,
+    EngineerApproach,
+    EngineerLearningPath,
     EngineerSkillProfile,
+    LearningPathsResponse,
+    LearningRecommendation,
+    NewHireProgress,
+    OnboardingAccelerationResponse,
+    OnboardingRecommendation,
+    PatternSharingResponse,
     PersonalizedTip,
     PersonalizedTipsResponse,
+    SharedPattern,
     SkillInventoryResponse,
     TeamSkillGap,
 )
@@ -576,4 +588,783 @@ def get_skill_inventory(
         total_engineers=total_engineers,
         total_session_types=len(all_session_types),
         total_tools_used=len(all_tool_names),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Learning Paths
+# ---------------------------------------------------------------------------
+
+
+def get_learning_paths(
+    db: Session,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> LearningPathsResponse:
+    base_q = base_session_query(db, team_id, engineer_id, start_date, end_date)
+    sessions = base_q.all()
+
+    if not sessions:
+        return LearningPathsResponse(engineer_paths=[], team_skill_universe={}, sessions_analyzed=0)
+
+    session_ids_subq = base_q.with_entities(SessionModel.id).subquery()
+    session_ids_q = db.query(session_ids_subq.c.id)
+
+    # Group sessions by engineer
+    eng_sessions: dict[str, list] = defaultdict(list)
+    for s in sessions:
+        eng_sessions[s.engineer_id].append(s)
+
+    # Engineer names
+    engineer_ids = list(eng_sessions.keys())
+    engineers = db.query(Engineer.id, Engineer.name).filter(Engineer.id.in_(engineer_ids)).all()
+    eng_names = {eid: name for eid, name in engineers}
+
+    # Session types per session
+    all_facets = (
+        db.query(
+            SessionFacets.session_id,
+            SessionFacets.session_type,
+            SessionFacets.goal_categories,
+        )
+        .filter(SessionFacets.session_id.in_(session_ids_q))
+        .all()
+    )
+    session_to_type: dict[str, str] = {}
+    session_to_goals: dict[str, list[str]] = {}
+    for f in all_facets:
+        if f.session_type:
+            session_to_type[f.session_id] = f.session_type
+        if f.goal_categories:
+            cats = f.goal_categories
+            if isinstance(cats, str):
+                try:
+                    cats = json.loads(cats)
+                except (json.JSONDecodeError, TypeError):
+                    cats = []
+            if isinstance(cats, list):
+                session_to_goals[f.session_id] = cats
+
+    # Build session_id → engineer_id
+    session_to_engineer: dict[str, str] = {}
+    for eid, sess_list in eng_sessions.items():
+        for s in sess_list:
+            session_to_engineer[s.id] = eid
+
+    # Tool usages
+    all_tools = (
+        db.query(ToolUsage.session_id, ToolUsage.tool_name, ToolUsage.call_count)
+        .filter(ToolUsage.session_id.in_(session_ids_q))
+        .all()
+    )
+    eng_tool_names: dict[str, set[str]] = defaultdict(set)
+    for tu in all_tools:
+        eid = session_to_engineer.get(tu.session_id)
+        if eid:
+            eng_tool_names[eid].add(tu.tool_name)
+
+    total_engineers = len(engineer_ids)
+
+    # Build team skill universe
+    # Session types: skill → count of engineers using it
+    eng_session_types: dict[str, set[str]] = defaultdict(set)
+    for sid, stype in session_to_type.items():
+        eid = session_to_engineer.get(sid)
+        if eid:
+            eng_session_types[eid].add(stype)
+
+    team_type_universe: Counter[str] = Counter()
+    for eid in engineer_ids:
+        for stype in eng_session_types.get(eid, set()):
+            team_type_universe[stype] += 1
+
+    team_tool_universe: Counter[str] = Counter()
+    for eid in engineer_ids:
+        for tool in eng_tool_names.get(eid, set()):
+            team_tool_universe[tool] += 1
+
+    # Goal categories per engineer
+    eng_goal_cats: dict[str, set[str]] = defaultdict(set)
+    for sid, cats in session_to_goals.items():
+        eid = session_to_engineer.get(sid)
+        if eid:
+            for c in cats:
+                eng_goal_cats[eid].add(c)
+
+    team_goal_universe: Counter[str] = Counter()
+    for eid in engineer_ids:
+        for cat in eng_goal_cats.get(eid, set()):
+            team_goal_universe[cat] += 1
+
+    # Skill universe for response: combine types + tools
+    team_skill_universe: dict[str, int] = {}
+    for stype, cnt in team_type_universe.items():
+        team_skill_universe[stype] = cnt
+    for tool, cnt in team_tool_universe.items():
+        team_skill_universe[tool] = cnt
+
+    all_team_skills = set(team_type_universe.keys()) | set(team_tool_universe.keys())
+    team_skill_count = len(all_team_skills) if all_team_skills else 1
+
+    paths: list[EngineerLearningPath] = []
+    for eid in engineer_ids:
+        recs: list[LearningRecommendation] = []
+        sess_list = eng_sessions[eid]
+        my_types = eng_session_types.get(eid, set())
+        my_tools = eng_tool_names.get(eid, set())
+        my_goals = eng_goal_cats.get(eid, set())
+
+        # 1. Session type gaps
+        for stype, cnt in team_type_universe.items():
+            adoption = cnt / total_engineers
+            if adoption >= 0.5 and stype not in my_types:
+                recs.append(
+                    LearningRecommendation(
+                        category="session_type_gap",
+                        skill_area=stype,
+                        title=f"Try '{stype}' sessions",
+                        description=(
+                            f"{cnt}/{total_engineers} teammates work on '{stype}' "
+                            "sessions, but you haven't yet."
+                        ),
+                        priority="high",
+                        evidence={"team_adoption": round(adoption, 2), "team_count": cnt},
+                    )
+                )
+
+        # 2. Tool gaps
+        for tool, cnt in team_tool_universe.items():
+            adoption = cnt / total_engineers
+            if adoption >= 0.4 and tool not in my_tools:
+                priority = "high" if adoption >= 0.7 else "medium"
+                recs.append(
+                    LearningRecommendation(
+                        category="tool_gap",
+                        skill_area=tool,
+                        title=f"Learn the {tool} tool",
+                        description=(
+                            f"{cnt}/{total_engineers} teammates use {tool}, "
+                            "but you haven't used it yet."
+                        ),
+                        priority=priority,
+                        evidence={"team_adoption": round(adoption, 2), "team_count": cnt},
+                    )
+                )
+
+        # 3. Goal category gaps
+        for cat, cnt in team_goal_universe.items():
+            adoption = cnt / total_engineers
+            if adoption >= 0.3 and cat not in my_goals:
+                recs.append(
+                    LearningRecommendation(
+                        category="goal_gap",
+                        skill_area=cat,
+                        title=f"Explore '{cat}' goals",
+                        description=(
+                            f"{cnt}/{total_engineers} teammates work on '{cat}' "
+                            "goals, but you haven't yet."
+                        ),
+                        priority="medium",
+                        evidence={"team_adoption": round(adoption, 2), "team_count": cnt},
+                    )
+                )
+
+        # 4. Complexity progression
+        sorted_sessions = sorted(sess_list, key=lambda s: s.started_at or datetime.min)
+        complexity_trend = "flat"
+        if len(sorted_sessions) >= 5:
+            first_chunk = sorted_sessions[: min(10, len(sorted_sessions) // 2)]
+            recent_chunk = sorted_sessions[-min(10, len(sorted_sessions) // 2) :]
+            first_avg = sum(s.tool_call_count + s.message_count for s in first_chunk) / len(
+                first_chunk
+            )
+            recent_avg = sum(s.tool_call_count + s.message_count for s in recent_chunk) / len(
+                recent_chunk
+            )
+            if first_avg > 0:
+                change = (recent_avg - first_avg) / first_avg
+                if change > 0.1:
+                    complexity_trend = "increasing"
+                elif change < -0.1:
+                    complexity_trend = "decreasing"
+
+            if complexity_trend == "decreasing" and len(sorted_sessions) >= 20:
+                recs.append(
+                    LearningRecommendation(
+                        category="complexity",
+                        skill_area="task complexity",
+                        title="Complexity trend is declining",
+                        description=(
+                            "Your recent sessions show lower complexity than earlier ones. "
+                            "Consider tackling more challenging tasks."
+                        ),
+                        priority="low",
+                        evidence={
+                            "first_avg": round(first_avg, 1),
+                            "recent_avg": round(recent_avg, 1),
+                        },
+                    )
+                )
+
+        # 5. Coverage score
+        my_skill_count = len(my_types) + len(my_tools)
+        coverage_score = round(my_skill_count / team_skill_count, 3) if team_skill_count else 0.0
+        coverage_score = min(coverage_score, 1.0)
+
+        paths.append(
+            EngineerLearningPath(
+                engineer_id=eid,
+                name=eng_names.get(eid, "Unknown"),
+                total_sessions=len(sess_list),
+                recommendations=recs,
+                coverage_score=coverage_score,
+                complexity_trend=complexity_trend,
+            )
+        )
+
+    return LearningPathsResponse(
+        engineer_paths=paths,
+        team_skill_universe=team_skill_universe,
+        sessions_analyzed=len(sessions),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Pattern Sharing
+# ---------------------------------------------------------------------------
+
+
+def get_pattern_sharing(
+    db: Session,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> PatternSharingResponse:
+    base_q = base_session_query(db, team_id, engineer_id, start_date, end_date)
+    sessions = base_q.all()
+
+    if not sessions:
+        return PatternSharingResponse(patterns=[], total_clusters_found=0, sessions_analyzed=0)
+
+    session_ids_subq = base_q.with_entities(SessionModel.id).subquery()
+    session_ids_q = db.query(session_ids_subq.c.id)
+
+    # Build lookups
+    session_map: dict[str, object] = {s.id: s for s in sessions}
+    session_to_engineer: dict[str, str] = {s.id: s.engineer_id for s in sessions}
+
+    engineer_ids = list({s.engineer_id for s in sessions})
+    engineers = db.query(Engineer.id, Engineer.name).filter(Engineer.id.in_(engineer_ids)).all()
+    eng_names = {eid: name for eid, name in engineers}
+
+    # Facets
+    all_facets = (
+        db.query(
+            SessionFacets.session_id,
+            SessionFacets.session_type,
+            SessionFacets.outcome,
+            SessionFacets.claude_helpfulness,
+            SessionFacets.goal_categories,
+        )
+        .filter(SessionFacets.session_id.in_(session_ids_q))
+        .all()
+    )
+    session_facets: dict[str, object] = {}
+    for f in all_facets:
+        session_facets[f.session_id] = f
+
+    # Tool usages per session
+    all_tools = (
+        db.query(ToolUsage.session_id, ToolUsage.tool_name, ToolUsage.call_count)
+        .filter(ToolUsage.session_id.in_(session_ids_q))
+        .all()
+    )
+    session_tools: dict[str, list[str]] = defaultdict(list)
+    session_tool_count: dict[str, int] = defaultdict(int)
+    for tu in all_tools:
+        session_tools[tu.session_id].append(tu.tool_name)
+        session_tool_count[tu.session_id] += tu.call_count
+
+    def _make_approach(sid: str) -> EngineerApproach:
+        s = session_map[sid]
+        eid = session_to_engineer[sid]
+        facet = session_facets.get(sid)
+        return EngineerApproach(
+            engineer_id=eid,
+            name=eng_names.get(eid, "Unknown"),
+            session_id=sid,
+            duration_seconds=s.duration_seconds,
+            tool_count=session_tool_count.get(sid, 0),
+            outcome=facet.outcome if facet else None,
+            helpfulness=facet.claude_helpfulness if facet else None,
+            tools_used=sorted(set(session_tools.get(sid, []))),
+        )
+
+    def _build_pattern(
+        cluster_key: str,
+        cluster_type: str,
+        cluster_label: str,
+        sids: list[str],
+    ) -> SharedPattern:
+        approaches = [_make_approach(sid) for sid in sids]
+        eng_set = {a.engineer_id for a in approaches}
+
+        # Best approach: successful + shortest duration
+        successful = [a for a in approaches if a.outcome == "success" and a.duration_seconds]
+        best = min(successful, key=lambda a: a.duration_seconds) if successful else None
+
+        durations = [a.duration_seconds for a in approaches if a.duration_seconds is not None]
+        avg_dur = sum(durations) / len(durations) if durations else None
+
+        outcomes = [a.outcome for a in approaches if a.outcome]
+        successes = sum(1 for o in outcomes if o == "success")
+        sr = round(successes / len(outcomes), 3) if outcomes else None
+
+        # Insight
+        insight_parts = [f"{len(eng_set)} engineers worked on {cluster_label}"]
+        if best and avg_dur and avg_dur > 0:
+            pct = round((1 - best.duration_seconds / avg_dur) * 100)
+            if pct > 0:
+                insight_parts.append(f"{best.name}'s approach was {pct}% faster")
+        insight = "; ".join(insight_parts)
+
+        cid = hashlib.md5(
+            f"{cluster_type}:{cluster_key}".encode(), usedforsecurity=False
+        ).hexdigest()[:12]
+
+        return SharedPattern(
+            cluster_id=cid,
+            cluster_type=cluster_type,
+            cluster_label=cluster_label,
+            session_count=len(sids),
+            engineer_count=len(eng_set),
+            approaches=approaches,
+            best_approach=best,
+            avg_duration=round(avg_dur, 1) if avg_dur else None,
+            success_rate=sr,
+            insight=insight,
+        )
+
+    patterns: list[SharedPattern] = []
+
+    # 1. Session type + project clusters
+    type_project_groups: dict[tuple[str, str], list[str]] = defaultdict(list)
+    for s in sessions:
+        facet = session_facets.get(s.id)
+        if facet and facet.session_type and s.project_name:
+            type_project_groups[(facet.session_type, s.project_name)].append(s.id)
+
+    for (stype, proj), sids in type_project_groups.items():
+        eng_set = {session_to_engineer[sid] for sid in sids}
+        if len(eng_set) >= 2:
+            label = f"{stype} on {proj}"
+            patterns.append(_build_pattern(f"{stype}:{proj}", "session_type", label, sids))
+
+    # 2. Goal category clusters
+    goal_groups: dict[str, list[str]] = defaultdict(list)
+    for f in all_facets:
+        cats = f.goal_categories
+        if cats:
+            if isinstance(cats, str):
+                try:
+                    cats = json.loads(cats)
+                except (json.JSONDecodeError, TypeError):
+                    cats = []
+            if isinstance(cats, list):
+                for cat in cats:
+                    goal_groups[cat].append(f.session_id)
+
+    for cat, sids in goal_groups.items():
+        # Filter to valid session ids
+        valid_sids = [sid for sid in sids if sid in session_map]
+        eng_set = {session_to_engineer[sid] for sid in valid_sids}
+        if len(eng_set) >= 2 and len(valid_sids) >= 3:
+            patterns.append(_build_pattern(f"goal:{cat}", "goal_category", cat, valid_sids))
+
+    # 3. Project-only clusters
+    project_groups: dict[str, list[str]] = defaultdict(list)
+    for s in sessions:
+        if s.project_name:
+            project_groups[s.project_name].append(s.id)
+
+    for proj, sids in project_groups.items():
+        eng_set = {session_to_engineer[sid] for sid in sids}
+        if len(eng_set) >= 2:
+            # Don't duplicate if already covered by type+project
+            existing_labels = {p.cluster_label for p in patterns}
+            if proj not in existing_labels:
+                patterns.append(_build_pattern(f"project:{proj}", "project", proj, sids))
+
+    # Sort by engineer_count desc
+    patterns.sort(key=lambda p: p.engineer_count, reverse=True)
+
+    return PatternSharingResponse(
+        patterns=patterns,
+        total_clusters_found=len(patterns),
+        sessions_analyzed=len(sessions),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Onboarding Acceleration
+# ---------------------------------------------------------------------------
+
+
+def get_onboarding_acceleration(
+    db: Session,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> OnboardingAccelerationResponse:
+    base_q = base_session_query(db, team_id, engineer_id, start_date, end_date)
+    sessions = base_q.all()
+
+    if not sessions:
+        return OnboardingAccelerationResponse(
+            cohorts=[],
+            new_hire_progress=[],
+            recommendations=[],
+            sessions_analyzed=0,
+            experienced_benchmark=None,
+        )
+
+    session_ids_subq = base_q.with_entities(SessionModel.id).subquery()
+    session_ids_q = db.query(session_ids_subq.c.id)
+
+    now = datetime.now(UTC)
+
+    # Group sessions by engineer
+    eng_sessions: dict[str, list] = defaultdict(list)
+    for s in sessions:
+        eng_sessions[s.engineer_id].append(s)
+
+    engineer_ids = list(eng_sessions.keys())
+    engineers = db.query(Engineer.id, Engineer.name).filter(Engineer.id.in_(engineer_ids)).all()
+    eng_names = {eid: name for eid, name in engineers}
+
+    # Tool usages per session
+    all_tools = (
+        db.query(ToolUsage.session_id, ToolUsage.tool_name)
+        .filter(ToolUsage.session_id.in_(session_ids_q))
+        .all()
+    )
+    session_tools: dict[str, set[str]] = defaultdict(set)
+    for tu in all_tools:
+        session_tools[tu.session_id].add(tu.tool_name)
+
+    # Facets
+    all_facets = (
+        db.query(
+            SessionFacets.session_id,
+            SessionFacets.session_type,
+            SessionFacets.outcome,
+            SessionFacets.friction_counts,
+        )
+        .filter(SessionFacets.session_id.in_(session_ids_q))
+        .all()
+    )
+    session_outcome: dict[str, str] = {}
+    session_friction: dict[str, int] = {}
+    session_type_map: dict[str, str] = {}
+    for f in all_facets:
+        if f.outcome:
+            session_outcome[f.session_id] = f.outcome
+        if f.session_type:
+            session_type_map[f.session_id] = f.session_type
+        if f.friction_counts and isinstance(f.friction_counts, dict):
+            session_friction[f.session_id] = sum(f.friction_counts.values())
+
+    # Cohort segmentation by first session date
+    def _ensure_utc(dt: datetime) -> datetime:
+        return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
+
+    eng_first_session: dict[str, datetime] = {}
+    for eid, sess_list in eng_sessions.items():
+        dates = [_ensure_utc(s.started_at) for s in sess_list if s.started_at]
+        if dates:
+            eng_first_session[eid] = min(dates)
+
+    def _cohort_label(eid: str) -> str:
+        first = eng_first_session.get(eid)
+        if not first:
+            return "experienced"
+        # Make first timezone-aware if needed
+        if first.tzinfo is None:
+            first = first.replace(tzinfo=UTC)
+        days = (now - first).days
+        if days <= 30:
+            return "new_hire"
+        if days <= 90:
+            return "ramping"
+        return "experienced"
+
+    cohort_engineers: dict[str, list[str]] = defaultdict(list)
+    for eid in engineer_ids:
+        cohort_engineers[_cohort_label(eid)].append(eid)
+
+    # Per-engineer metrics
+    def _eng_metrics(eid: str) -> dict:
+        sess_list = eng_sessions[eid]
+        tools_used: set[str] = set()
+        for s in sess_list:
+            tools_used.update(session_tools.get(s.id, set()))
+
+        outcomes = [session_outcome.get(s.id) for s in sess_list]
+        outcomes = [o for o in outcomes if o]
+        successes = sum(1 for o in outcomes if o == "success")
+        sr = round(successes / len(outcomes), 3) if outcomes else None
+
+        durations = [s.duration_seconds for s in sess_list if s.duration_seconds is not None]
+        avg_dur = sum(durations) / len(durations) if durations else None
+
+        frictions = [session_friction.get(s.id, 0) for s in sess_list]
+        total_friction = sum(frictions)
+        friction_rate = round(total_friction / len(sess_list), 3) if sess_list else 0.0
+
+        types_used: Counter[str] = Counter()
+        for s in sess_list:
+            st = session_type_map.get(s.id)
+            if st:
+                types_used[st] += 1
+
+        return {
+            "total_sessions": len(sess_list),
+            "tool_diversity": len(tools_used),
+            "tools": tools_used,
+            "success_rate": sr,
+            "avg_duration": round(avg_dur, 1) if avg_dur else None,
+            "friction_rate": friction_rate,
+            "session_types": types_used,
+        }
+
+    eng_metrics = {eid: _eng_metrics(eid) for eid in engineer_ids}
+
+    # Build cohort metrics
+    def _build_cohort(label: str, eids: list[str]) -> CohortMetrics:
+        if not eids:
+            return CohortMetrics(
+                cohort_label=label,
+                engineer_count=0,
+                avg_sessions_per_engineer=0,
+                avg_tool_diversity=0,
+                avg_duration_seconds=None,
+                success_rate=None,
+                avg_friction_rate=0,
+                top_tools=[],
+                top_session_types=[],
+            )
+
+        metrics = [eng_metrics[eid] for eid in eids]
+        total_sess = sum(m["total_sessions"] for m in metrics)
+        avg_sess = total_sess / len(eids)
+        avg_div = sum(m["tool_diversity"] for m in metrics) / len(eids)
+
+        durations = [m["avg_duration"] for m in metrics if m["avg_duration"] is not None]
+        avg_dur = sum(durations) / len(durations) if durations else None
+
+        srs = [m["success_rate"] for m in metrics if m["success_rate"] is not None]
+        sr = round(sum(srs) / len(srs), 3) if srs else None
+
+        avg_fr = sum(m["friction_rate"] for m in metrics) / len(eids)
+
+        all_tools_counter: Counter[str] = Counter()
+        all_types_counter: Counter[str] = Counter()
+        for m in metrics:
+            all_tools_counter.update(m["tools"])
+            all_types_counter.update(m["session_types"])
+
+        return CohortMetrics(
+            cohort_label=label,
+            engineer_count=len(eids),
+            avg_sessions_per_engineer=round(avg_sess, 1),
+            avg_tool_diversity=round(avg_div, 1),
+            avg_duration_seconds=round(avg_dur, 1) if avg_dur else None,
+            success_rate=sr,
+            avg_friction_rate=round(avg_fr, 3),
+            top_tools=[t for t, _ in all_tools_counter.most_common(5)],
+            top_session_types=[t for t, _ in all_types_counter.most_common(5)],
+        )
+
+    cohorts: list[CohortMetrics] = []
+    for label in ["new_hire", "ramping", "experienced"]:
+        eids = cohort_engineers.get(label, [])
+        if eids:
+            cohorts.append(_build_cohort(label, eids))
+
+    experienced_eids = cohort_engineers.get("experienced", [])
+    experienced_benchmark = (
+        _build_cohort("experienced", experienced_eids) if experienced_eids else None
+    )
+
+    # New hire progress
+    new_hire_eids = cohort_engineers.get("new_hire", [])
+    new_hire_progress: list[NewHireProgress] = []
+
+    for eid in new_hire_eids:
+        m = eng_metrics[eid]
+        first = eng_first_session.get(eid)
+        if first:
+            if first.tzinfo is None:
+                first = first.replace(tzinfo=UTC)
+            days = (now - first).days
+        else:
+            days = 0
+
+        # Velocity score (0-100)
+        # 30% tool diversity, 30% success rate, 20% sessions/day, 20% inv friction
+        velocity = 0.0
+
+        if experienced_benchmark and experienced_benchmark.avg_tool_diversity > 0:
+            tool_ratio = min(m["tool_diversity"] / experienced_benchmark.avg_tool_diversity, 1.0)
+            velocity += 30 * tool_ratio
+
+        sr = m["success_rate"]
+        if sr is not None:
+            velocity += 30 * sr
+
+        if days > 0:
+            sess_per_day = m["total_sessions"] / days
+            # Cap at 2 sessions/day as "good"
+            velocity += 20 * min(sess_per_day / 2, 1.0)
+
+        # Inverse friction (lower = better)
+        fr = m["friction_rate"]
+        velocity += 20 * max(0, 1 - fr)
+
+        velocity = round(min(velocity, 100), 1)
+
+        # Lagging areas
+        lagging: list[str] = []
+        if experienced_benchmark:
+            if (
+                experienced_benchmark.avg_tool_diversity > 0
+                and m["tool_diversity"] < 0.6 * experienced_benchmark.avg_tool_diversity
+            ):
+                lagging.append("tool diversity")
+            if (
+                experienced_benchmark.success_rate is not None
+                and sr is not None
+                and experienced_benchmark.success_rate > 0
+                and sr < 0.6 * experienced_benchmark.success_rate
+            ):
+                lagging.append("success rate")
+            if (
+                experienced_benchmark.avg_friction_rate > 0
+                and fr > 1.5 * experienced_benchmark.avg_friction_rate
+            ):
+                lagging.append("friction rate")
+            if (
+                experienced_benchmark.avg_sessions_per_engineer > 0
+                and m["total_sessions"] < 0.6 * experienced_benchmark.avg_sessions_per_engineer
+            ):
+                lagging.append("session volume")
+
+        new_hire_progress.append(
+            NewHireProgress(
+                engineer_id=eid,
+                name=eng_names.get(eid, "Unknown"),
+                days_since_first_session=days,
+                total_sessions=m["total_sessions"],
+                tool_diversity=m["tool_diversity"],
+                success_rate=sr,
+                avg_duration=m["avg_duration"],
+                friction_rate=fr,
+                velocity_score=velocity,
+                lagging_areas=lagging,
+            )
+        )
+
+    # Recommendations
+    recommendations: list[OnboardingRecommendation] = []
+
+    if experienced_benchmark and new_hire_eids:
+        new_hire_cohort = next((c for c in cohorts if c.cohort_label == "new_hire"), None)
+        if new_hire_cohort:
+            # Team-wide recs
+            if (
+                experienced_benchmark.avg_friction_rate > 0
+                and new_hire_cohort.avg_friction_rate > 2 * experienced_benchmark.avg_friction_rate
+            ):
+                recommendations.append(
+                    OnboardingRecommendation(
+                        category="friction",
+                        title="New hires experiencing high friction",
+                        description=(
+                            f"New hire friction rate ({new_hire_cohort.avg_friction_rate:.2f}) "
+                            f"is over 2x the experienced rate "
+                            f"({experienced_benchmark.avg_friction_rate:.2f})."
+                        ),
+                        target_engineer_id=None,
+                        evidence={
+                            "new_hire_friction": new_hire_cohort.avg_friction_rate,
+                            "experienced_friction": experienced_benchmark.avg_friction_rate,
+                        },
+                    )
+                )
+
+            if (
+                experienced_benchmark.avg_tool_diversity > 0
+                and new_hire_cohort.avg_tool_diversity
+                < 0.5 * experienced_benchmark.avg_tool_diversity
+            ):
+                recommendations.append(
+                    OnboardingRecommendation(
+                        category="tool_adoption",
+                        title="New hires underusing available tools",
+                        description=(
+                            f"New hire tool diversity ({new_hire_cohort.avg_tool_diversity:.1f}) "
+                            f"is less than 50% of experienced engineers "
+                            f"({experienced_benchmark.avg_tool_diversity:.1f})."
+                        ),
+                        target_engineer_id=None,
+                        evidence={
+                            "new_hire_diversity": new_hire_cohort.avg_tool_diversity,
+                            "experienced_diversity": experienced_benchmark.avg_tool_diversity,
+                        },
+                    )
+                )
+
+            if new_hire_cohort.success_rate is not None and new_hire_cohort.success_rate < 0.7:
+                recommendations.append(
+                    OnboardingRecommendation(
+                        category="mentoring",
+                        title="New hire success rate below 70%",
+                        description=(
+                            f"New hires have a {new_hire_cohort.success_rate:.0%} success rate. "
+                            "Consider pairing them with experienced engineers."
+                        ),
+                        target_engineer_id=None,
+                        evidence={"success_rate": new_hire_cohort.success_rate},
+                    )
+                )
+
+        # Individual recs for low velocity
+        for nhp in new_hire_progress:
+            if nhp.velocity_score < 50:
+                recommendations.append(
+                    OnboardingRecommendation(
+                        category="mentoring",
+                        title=f"Pair {nhp.name} with an experienced engineer",
+                        description=(
+                            f"{nhp.name}'s velocity score ({nhp.velocity_score}) is below 50. "
+                            f"Lagging areas: {', '.join(nhp.lagging_areas) or 'general'}."
+                        ),
+                        target_engineer_id=nhp.engineer_id,
+                        evidence={
+                            "velocity_score": nhp.velocity_score,
+                            "lagging_areas": nhp.lagging_areas,
+                        },
+                    )
+                )
+
+    return OnboardingAccelerationResponse(
+        cohorts=cohorts,
+        new_hire_progress=new_hire_progress,
+        recommendations=recommendations,
+        sessions_analyzed=len(sessions),
+        experienced_benchmark=experienced_benchmark,
     )

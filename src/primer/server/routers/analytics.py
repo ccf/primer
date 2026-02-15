@@ -13,8 +13,11 @@ from primer.common.schemas import (
     EngineerAnalytics,
     EngineerBenchmarkResponse,
     FrictionReport,
+    LearningPathsResponse,
     ModelRanking,
+    OnboardingAccelerationResponse,
     OverviewStats,
+    PatternSharingResponse,
     PersonalizedTipsResponse,
     ProductivityMetrics,
     ProjectAnalytics,
@@ -322,5 +325,53 @@ def skill_inventory(
 
     tid, eid = _resolve_scope(auth, team_id)
     return get_skill_inventory(
+        db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
+    )
+
+
+@router.get("/learning-paths", response_model=LearningPathsResponse)
+def learning_paths(
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.insights_service import get_learning_paths
+
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_learning_paths(
+        db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
+    )
+
+
+@router.get("/pattern-sharing", response_model=PatternSharingResponse)
+def pattern_sharing(
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.insights_service import get_pattern_sharing
+
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_pattern_sharing(
+        db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
+    )
+
+
+@router.get("/onboarding-acceleration", response_model=OnboardingAccelerationResponse)
+def onboarding_acceleration(
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.insights_service import get_onboarding_acceleration
+
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_onboarding_acceleration(
         db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
     )

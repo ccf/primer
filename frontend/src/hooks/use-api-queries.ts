@@ -15,8 +15,11 @@ import type {
   EngineerResponse,
   FrictionReport,
   IngestEventResponse,
+  LearningPathsResponse,
   ModelRanking,
+  OnboardingAccelerationResponse,
   OverviewStats,
+  PatternSharingResponse,
   PersonalizedTipsResponse,
   ProductivityMetrics,
   ProjectAnalytics,
@@ -384,6 +387,36 @@ export function useSkillInventory(teamId: string | null, startDate?: string, end
     queryFn: () =>
       apiFetch<SkillInventoryResponse>(
         `/api/v1/analytics/skill-inventory${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useLearningPaths(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["learning-paths", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<LearningPathsResponse>(
+        `/api/v1/analytics/learning-paths${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function usePatternSharing(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["pattern-sharing", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<PatternSharingResponse>(
+        `/api/v1/analytics/pattern-sharing${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useOnboardingAcceleration(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["onboarding-acceleration", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<OnboardingAccelerationResponse>(
+        `/api/v1/analytics/onboarding-acceleration${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
       ),
   })
 }
