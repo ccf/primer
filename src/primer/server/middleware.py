@@ -7,11 +7,12 @@ from primer.common.config import settings
 
 
 def _key_func(request: Request) -> str:
-    """Rate-limit key: API key prefix if present, else client IP."""
+    """Rate-limit key: client IP combined with API key prefix when present."""
+    ip = request.client.host if request.client else "unknown"
     api_key = request.headers.get("x-api-key") or ""
     if api_key:
-        return api_key[:16]
-    return request.client.host if request.client else "unknown"
+        return f"{ip}:{api_key[:16]}"
+    return ip
 
 
 limiter = Limiter(
