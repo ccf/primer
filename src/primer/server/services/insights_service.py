@@ -231,12 +231,15 @@ def get_personalized_tips(
     eng_tool_map = {name: count for name, count in eng_tools_q}
     eng_tool_names = set(eng_tool_map.keys())
 
-    # Get team context for comparison (only if we can identify a team)
-    resolved_team_id = team_id
-    if not resolved_team_id and engineer_id:
-        eng = db.query(Engineer.team_id).filter(Engineer.id == engineer_id).first()
-        if eng:
-            resolved_team_id = eng.team_id
+    # Get team context for comparison (only meaningful with a specific engineer)
+    resolved_team_id = None
+    if engineer_id:
+        if team_id:
+            resolved_team_id = team_id
+        else:
+            eng = db.query(Engineer.team_id).filter(Engineer.id == engineer_id).first()
+            if eng:
+                resolved_team_id = eng.team_id
 
     if resolved_team_id:
         # Team-wide tool usage
