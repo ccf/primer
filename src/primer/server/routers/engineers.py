@@ -115,6 +115,7 @@ def update_engineer(
         changes["team_id"] = {"old": engineer.team_id, "new": payload.team_id}
         engineer.team_id = payload.team_id
     if payload.is_active is not None:
+        changes["is_active"] = {"old": engineer.is_active, "new": payload.is_active}
         engineer.is_active = payload.is_active
 
     ip = request.client.host if request.client else None
@@ -135,6 +136,7 @@ def update_engineer(
 @router.delete("/{engineer_id}", response_model=EngineerResponse)
 def deactivate_engineer(
     engineer_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(require_role("admin")),
 ):
@@ -142,6 +144,8 @@ def deactivate_engineer(
     if not engineer:
         raise HTTPException(status_code=404, detail="Engineer not found")
     engineer.is_active = False
+    ip = request.client.host if request.client else None
+    audit_service.log_action(db, auth, "deactivate", "engineer", engineer_id, ip_address=ip)
     db.commit()
     db.refresh(engineer)
     return EngineerResponse.model_validate(engineer)
@@ -150,6 +154,7 @@ def deactivate_engineer(
 @router.post("/{engineer_id}/rotate-key", response_model=EngineerCreateResponse)
 def rotate_api_key(
     engineer_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(require_role("admin")),
 ):
@@ -159,6 +164,8 @@ def rotate_api_key(
     raw_key = f"primer_{secrets.token_urlsafe(32)}"
     hashed = bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt()).decode()
     engineer.api_key_hash = hashed
+    ip = request.client.host if request.client else None
+    audit_service.log_action(db, auth, "rotate_key", "engineer", engineer_id, ip_address=ip)
     db.commit()
     db.refresh(engineer)
     return EngineerCreateResponse(
