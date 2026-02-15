@@ -3,6 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from primer.common.config import settings
 from primer.common.database import get_db
 from primer.common.schemas import (
     ActivityHeatmap,
@@ -13,6 +14,8 @@ from primer.common.schemas import (
     EngineerAnalytics,
     EngineerBenchmarkResponse,
     FrictionReport,
+    GitHubStatusResponse,
+    GitHubSyncResponse,
     LearningPathsResponse,
     ModelRanking,
     OnboardingAccelerationResponse,
@@ -21,6 +24,7 @@ from primer.common.schemas import (
     PersonalizedTipsResponse,
     ProductivityMetrics,
     ProjectAnalytics,
+    QualityMetricsResponse,
     Recommendation,
     SkillInventoryResponse,
     ToolAdoptionAnalytics,
@@ -374,4 +378,61 @@ def onboarding_acceleration(
     tid, eid = _resolve_scope(auth, team_id)
     return get_onboarding_acceleration(
         db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
+    )
+
+
+@router.get("/quality-metrics", response_model=QualityMetricsResponse)
+def quality_metrics(
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.quality_service import get_quality_metrics
+
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_quality_metrics(
+        db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
+    )
+
+
+@router.post("/github/sync", response_model=GitHubSyncResponse)
+def sync_github_data(
+    repository: str | None = None,
+    since_days: int = Query(default=30, le=365),
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_role("admin")),
+):
+    from primer.common.models import GitRepository
+    from primer.server.services.github_service import sync_repository
+
+    totals = {"repos_synced": 0, "prs_found": 0, "commits_correlated": 0}
+
+    repos = [repository] if repository else [r.full_name for r in db.query(GitRepository).all()]
+
+    for full_name in repos:
+        stats = sync_repository(db, full_name, since_days=since_days)
+        totals["repos_synced"] += 1
+        totals["prs_found"] += stats["prs_found"]
+        totals["commits_correlated"] += stats["commits_correlated"]
+
+    db.commit()
+    return GitHubSyncResponse(**totals)
+
+
+@router.get("/github/status", response_model=GitHubStatusResponse)
+def github_status(
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_role("admin")),
+):
+    from primer.common.models import GitRepository, PullRequest
+    from primer.server.services.github_service import is_configured
+
+    return GitHubStatusResponse(
+        configured=is_configured(),
+        app_id=settings.github_app_id,
+        installation_id=settings.github_installation_id,
+        repos_count=db.query(GitRepository).count(),
+        prs_count=db.query(PullRequest).count(),
     )

@@ -542,3 +542,81 @@ export interface OnboardingAccelerationResponse {
   sessions_analyzed: number
   experienced_benchmark: CohortMetrics | null
 }
+
+// --- Quality Metrics ---
+
+export interface QualityOverview {
+  sessions_with_commits: number
+  total_commits: number
+  total_lines_added: number
+  total_lines_deleted: number
+  total_prs: number
+  pr_merge_rate: number | null
+  avg_commits_per_session: number | null
+  avg_lines_per_session: number | null
+  avg_review_comments_per_pr: number | null
+  avg_time_to_merge_hours: number | null
+}
+
+export interface DailyCodeVolume {
+  date: string
+  lines_added: number
+  lines_deleted: number
+  commits: number
+  sessions: number
+}
+
+export interface QualityByType {
+  session_type: string
+  session_count: number
+  avg_commits: number
+  avg_lines_added: number
+  avg_lines_deleted: number
+  pr_count: number
+  merge_rate: number | null
+}
+
+export interface EngineerQuality {
+  engineer_id: string
+  name: string
+  sessions_with_commits: number
+  total_commits: number
+  total_lines_added: number
+  total_lines_deleted: number
+  pr_count: number
+  merge_rate: number | null
+  avg_review_comments: number | null
+}
+
+export interface PRSummary {
+  repository: string
+  pr_number: number
+  title: string | null
+  state: string
+  head_branch: string | null
+  additions: number
+  deletions: number
+  review_comments_count: number
+  author: string | null
+  linked_sessions: number
+  pr_created_at: string | null
+  merged_at: string | null
+}
+
+export interface QualityMetricsResponse {
+  overview: QualityOverview
+  daily_volume: DailyCodeVolume[]
+  by_session_type: QualityByType[]
+  engineer_quality: EngineerQuality[]
+  recent_prs: PRSummary[]
+  sessions_analyzed: number
+  github_connected: boolean
+}
+
+export interface GitHubStatusResponse {
+  configured: boolean
+  app_id: number | null
+  installation_id: number | null
+  repos_count: number
+  prs_count: number
+}

@@ -1,10 +1,15 @@
 """Extract structured metadata from Claude Code JSONL session transcripts."""
 
 import json
+import logging
+import re
+import subprocess
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -13,6 +18,7 @@ class SessionMetadata:
     project_path: str = ""
     project_name: str = ""
     git_branch: str = ""
+    git_remote_url: str = ""
     claude_version: str = ""
     permission_mode: str = ""
     end_reason: str = ""
@@ -33,6 +39,7 @@ class SessionMetadata:
     tool_counts: dict[str, int] = field(default_factory=dict)
     model_tokens: dict[str, dict[str, int]] = field(default_factory=dict)
     messages: list[dict] = field(default_factory=list)
+    commits: list[dict] = field(default_factory=list)
 
     def to_ingest_payload(self, api_key: str, facets: dict | None = None) -> dict:
         payload: dict = {
@@ -74,9 +81,107 @@ class SessionMetadata:
         }
         if self.messages:
             payload["messages"] = self.messages
+        if self.git_remote_url:
+            payload["git_remote_url"] = self.git_remote_url
+        if self.commits:
+            payload["commits"] = self.commits
         if facets:
             payload["facets"] = facets
         return payload
+
+
+def _run_git(args: list[str], cwd: str) -> str | None:
+    """Run a git command and return stdout, or None on failure."""
+    try:
+        result = subprocess.run(  # noqa: S603
+            ["git", *args],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+    return None
+
+
+def _parse_repo_full_name(url: str) -> str | None:
+    """Extract owner/repo from a git remote URL."""
+    # SSH: git@github.com:owner/repo.git
+    m = re.match(r"git@[^:]+:(.+?)(?:\.git)?$", url)
+    if m:
+        return m.group(1)
+    # HTTPS: https://github.com/owner/repo.git
+    m = re.match(r"https?://[^/]+/(.+?)(?:\.git)?$", url)
+    if m:
+        return m.group(1)
+    return None
+
+
+def capture_git_info(cwd: str, started_at: datetime | None) -> dict:
+    """Capture git branch, remote, and commits made during the session."""
+    info: dict = {"branch": "", "remote_url": "", "commits": []}
+
+    branch = _run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd)
+    if branch:
+        info["branch"] = branch
+
+    remote_url = _run_git(["remote", "get-url", "origin"], cwd)
+    if remote_url:
+        info["remote_url"] = remote_url
+
+    if not started_at:
+        return info
+
+    since = started_at.strftime("%Y-%m-%dT%H:%M:%S")
+    log_output = _run_git(
+        ["log", f"--since={since}", "--format=%H|%s|%an|%ae|%aI", "--numstat"],
+        cwd,
+    )
+    if not log_output:
+        return info
+
+    commits: list[dict] = []
+    current: dict | None = None
+
+    for line in log_output.split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+        if "|" in line and len(line.split("|")) >= 5:
+            parts = line.split("|", 4)
+            if current:
+                commits.append(current)
+            current = {
+                "sha": parts[0],
+                "message": parts[1],
+                "author_name": parts[2],
+                "author_email": parts[3],
+                "committed_at": parts[4],
+                "files_changed": 0,
+                "lines_added": 0,
+                "lines_deleted": 0,
+            }
+        elif current and "\t" in line:
+            # numstat line: added\tdeleted\tfilename
+            numparts = line.split("\t")
+            if len(numparts) >= 2:
+                try:
+                    added = int(numparts[0]) if numparts[0] != "-" else 0
+                    deleted = int(numparts[1]) if numparts[1] != "-" else 0
+                    current["files_changed"] += 1
+                    current["lines_added"] += added
+                    current["lines_deleted"] += deleted
+                except ValueError:
+                    pass
+
+    if current:
+        commits.append(current)
+
+    info["commits"] = commits
+    return info
 
 
 def extract_from_jsonl(transcript_path: str) -> SessionMetadata:
