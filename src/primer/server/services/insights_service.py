@@ -17,7 +17,7 @@ from primer.common.schemas import (
     TeamSkillGap,
 )
 from primer.server.services.analytics_service import (
-    _base_session_query,
+    base_session_query,
 )
 
 
@@ -56,7 +56,7 @@ def get_config_optimization(
     start_date: datetime | None = None,
     end_date: datetime | None = None,
 ) -> ConfigOptimizationResponse:
-    sessions = _base_session_query(db, team_id, engineer_id, start_date, end_date).all()
+    sessions = base_session_query(db, team_id, engineer_id, start_date, end_date).all()
     suggestions: list[ConfigSuggestion] = []
 
     if not sessions:
@@ -215,7 +215,7 @@ def get_personalized_tips(
     tips: list[PersonalizedTip] = []
 
     # Get engineer's sessions
-    eng_sessions = _base_session_query(db, team_id, engineer_id, start_date, end_date).all()
+    eng_sessions = base_session_query(db, team_id, engineer_id, start_date, end_date).all()
     if not eng_sessions:
         return PersonalizedTipsResponse(tips=[], sessions_analyzed=0, engineer_id=engineer_id)
 
@@ -439,7 +439,7 @@ def get_skill_inventory(
     end_date: datetime | None = None,
 ) -> SkillInventoryResponse:
     # Build base query for sessions in scope
-    base_q = _base_session_query(db, team_id, engineer_id, start_date, end_date)
+    base_q = base_session_query(db, team_id, engineer_id, start_date, end_date)
     sessions = base_q.all()
 
     if not sessions:
