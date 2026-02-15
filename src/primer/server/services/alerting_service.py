@@ -1,4 +1,5 @@
 import logging
+import threading
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func
@@ -31,9 +32,11 @@ def detect_anomalies(
         except Exception:
             logger.exception("Anomaly detector %s failed", detector.__name__)
 
-    # Send Slack notifications after all DB work is complete
-    for alert in alerts:
-        _notify_slack(alert)
+    # Send Slack notifications in a background thread to avoid blocking ingest
+    if alerts:
+        threading.Thread(
+            target=_notify_slack_batch, args=(list(alerts),), daemon=True
+        ).start()
 
     return alerts
 
@@ -104,14 +107,15 @@ def _create_alert_if_new(
     return alert
 
 
-def _notify_slack(alert: Alert) -> None:
-    """Send Slack notification outside the DB transaction."""
-    try:
-        from primer.server.services.slack_service import send_alert_to_slack
+def _notify_slack_batch(alerts: list[Alert]) -> None:
+    """Send Slack notifications for a batch of alerts. Runs in a background thread."""
+    from primer.server.services.slack_service import send_alert_to_slack
 
-        send_alert_to_slack(alert)
-    except Exception:
-        logger.exception("Slack notification failed for alert %s", alert.id)
+    for alert in alerts:
+        try:
+            send_alert_to_slack(alert)
+        except Exception:
+            logger.exception("Slack notification failed for alert %s", alert.id)
 
 
 def _detect_friction_spike(

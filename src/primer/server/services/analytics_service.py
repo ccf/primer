@@ -1166,6 +1166,7 @@ def get_bottleneck_analytics(
         friction_counts = facets.friction_counts if facets else None
         if friction_counts:
             has_friction = False
+            detail_assigned = False
             for friction_type, count in friction_counts.items():
                 if count > 0:
                     has_friction = True
@@ -1180,11 +1181,14 @@ def get_bottleneck_analytics(
                             type_outcomes_with[friction_type] = []
                         type_outcomes_with[friction_type].append(outcome)
 
-                    if facets.friction_detail:
+                    # Only attribute friction_detail to one type per session
+                    # since the detail is session-level, not type-specific
+                    if facets.friction_detail and not detail_assigned:
                         if friction_type not in type_details:
                             type_details[friction_type] = []
                         if len(type_details[friction_type]) < 10:
                             type_details[friction_type].append(facets.friction_detail)
+                            detail_assigned = True
 
                     # Project friction tracking
                     if project not in project_friction_counts:
