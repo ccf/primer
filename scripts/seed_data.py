@@ -362,6 +362,91 @@ BRANCH_SLUGS = [
     "refactor-services",
 ]
 
+# ── Git repositories for commit generation ────────────────────────
+GIT_REPOS = {
+    "api-service": "https://github.com/acme-corp/api-service.git",
+    "web-app": "https://github.com/acme-corp/web-app.git",
+    "cli-tool": "https://github.com/acme-corp/cli-tool.git",
+    "shared-lib": "https://github.com/acme-corp/shared-lib.git",
+    "data-pipeline": "https://github.com/acme-corp/data-pipeline.git",
+    "mobile-app": "https://github.com/acme-corp/mobile-app.git",
+}
+
+COMMIT_MESSAGES = {
+    "feature": [
+        "Add {slug} endpoint",
+        "Implement {slug} handler",
+        "Create {slug} model and migration",
+        "Add tests for {slug}",
+        "Wire up {slug} to router",
+        "Add validation for {slug} input",
+    ],
+    "debugging": [
+        "Fix null check in {slug} handler",
+        "Correct query filter for {slug}",
+        "Handle edge case in {slug}",
+        "Fix off-by-one error in {slug}",
+        "Add missing error handling for {slug}",
+    ],
+    "refactoring": [
+        "Extract {slug} into separate module",
+        "Simplify {slug} logic",
+        "Rename variables in {slug} for clarity",
+        "Move {slug} to service layer",
+        "Clean up {slug} imports",
+    ],
+}
+
+COMMIT_AUTHORS = {
+    "Alice Chen": "alice@example.com",
+    "Bob Smith": "bob@example.com",
+    "Carol Davis": "carol@example.com",
+    "Dan Wilson": "dan@example.com",
+    "Eve Martinez": "eve@example.com",
+    "Frank Lee": "frank@example.com",
+    "Grace Kim": "grace@example.com",
+    "Hiro Tanaka": "hiro@example.com",
+}
+
+
+def _generate_commits(
+    session_type: str, started_at: datetime, ended_at: datetime, eng_name: str, branch_slug: str
+) -> list[dict]:
+    """Generate synthetic commits for a session."""
+    if session_type not in ("feature", "debugging", "refactoring"):
+        return []
+    if random.random() < 0.3:  # 30% of coding sessions have no commits
+        return []
+
+    n_commits = random.randint(1, 5)
+    commits = []
+    duration = (ended_at - started_at).total_seconds()
+
+    for _i in range(n_commits):
+        offset_secs = random.uniform(duration * 0.2, duration * 0.95)
+        committed_at = started_at + timedelta(seconds=offset_secs)
+        slug = branch_slug.split("/")[-1] if "/" in branch_slug else branch_slug
+        msg = random.choice(COMMIT_MESSAGES[session_type]).format(slug=slug)
+        files_changed = random.randint(1, 12)
+        lines_added = random.randint(5, 300)
+        lines_deleted = random.randint(0, 150)
+
+        commits.append(
+            {
+                "sha": uuid.uuid4().hex[:40],
+                "message": msg,
+                "author_name": eng_name,
+                "author_email": COMMIT_AUTHORS.get(eng_name, "dev@example.com"),
+                "committed_at": committed_at.isoformat(),
+                "files_changed": files_changed,
+                "lines_added": lines_added,
+                "lines_deleted": lines_deleted,
+            }
+        )
+
+    return commits
+
+
 FRICTION_TYPES = ["tool_error", "permission_denied", "timeout", "context_limit", "edit_conflict"]
 FRICTION_DETAILS = {
     "tool_error": [
@@ -780,11 +865,21 @@ def main():
                 # Generate transcript messages
                 session_messages = _generate_messages(session_type, msg_count, model)
 
+                # Git data
+                git_branch = _generate_branch(session_type)
+                git_remote_url = GIT_REPOS.get(project_name)
+                eng_name = eng_data["engineer"]["name"]
+                commits = _generate_commits(
+                    session_type, started_at, ended_at, eng_name, git_branch
+                )
+
                 payload = {
                     "session_id": session_id,
                     "api_key": api_key,
                     "project_name": project_name,
-                    "git_branch": _generate_branch(session_type),
+                    "git_branch": git_branch,
+                    "git_remote_url": git_remote_url,
+                    "commits": commits,
                     "claude_version": random.choice(CLAUDE_VERSIONS),
                     "permission_mode": random.choice(PERMISSION_MODES),
                     "end_reason": (

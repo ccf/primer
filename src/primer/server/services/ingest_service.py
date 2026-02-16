@@ -1,5 +1,4 @@
 import logging
-import re
 
 from sqlalchemy.orm import Session
 
@@ -22,13 +21,9 @@ logger = logging.getLogger(__name__)
 
 def _parse_repo_full_name(url: str) -> str | None:
     """Extract owner/repo from a git remote URL."""
-    m = re.match(r"git@[^:]+:(.+?)(?:\.git)?$", url)
-    if m:
-        return m.group(1)
-    m = re.match(r"https?://[^/]+/(.+?)(?:\.git)?$", url)
-    if m:
-        return m.group(1)
-    return None
+    from primer.common.utils import parse_repo_full_name
+
+    return parse_repo_full_name(url)
 
 
 def _find_or_create_repository(db: Session, full_name: str) -> GitRepository:

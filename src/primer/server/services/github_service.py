@@ -21,11 +21,15 @@ logger = logging.getLogger(__name__)
 GITHUB_API = "https://api.github.com"
 
 # Module-level token cache
-_token_cache: dict[str, object] = {"token": None, "expires_at": 0.0}
+_token_cache: dict[str, object] = {"access_token": None, "expires_at": 0.0}
 
 
 def is_configured() -> bool:
-    return bool(settings.github_app_id and settings.github_app_private_key)
+    return bool(
+        settings.github_app_id
+        and settings.github_app_private_key
+        and settings.github_installation_id
+    )
 
 
 def _generate_app_jwt() -> str:
@@ -42,8 +46,8 @@ def _generate_app_jwt() -> str:
 def _get_installation_token() -> str:
     """Get or refresh the GitHub App installation token (cached for 50 min)."""
     now = time.time()
-    if _token_cache["token"] and _token_cache["expires_at"] > now:  # type: ignore[operator]
-        return _token_cache["token"]  # type: ignore[return-value]
+    if _token_cache["access_token"] and _token_cache["expires_at"] > now:  # type: ignore[operator]
+        return _token_cache["access_token"]  # type: ignore[return-value]
 
     app_jwt = _generate_app_jwt()
     installation_id = settings.github_installation_id
@@ -57,7 +61,7 @@ def _get_installation_token() -> str:
     )
     resp.raise_for_status()
     token = resp.json()["token"]
-    _token_cache["token"] = token
+    _token_cache["access_token"] = token
     _token_cache["expires_at"] = now + 3000  # 50 minutes
     return token
 
@@ -123,6 +127,23 @@ def list_pull_requests(full_name: str, state: str = "all", since: str | None = N
     return prs
 
 
+def get_pull_request(full_name: str, pr_number: int) -> dict | None:
+    """Fetch full pull request details (includes additions, deletions, review_comments)."""
+    if not is_configured():
+        return None
+    try:
+        resp = httpx.get(
+            f"{GITHUB_API}/repos/{full_name}/pulls/{pr_number}",
+            headers=_github_headers(),
+            timeout=10.0,
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except httpx.HTTPError:
+        logger.exception("Failed to fetch PR %s#%d", full_name, pr_number)
+        return None
+
+
 def get_pull_request_commits(full_name: str, pr_number: int) -> list[str]:
     """Get commit SHAs for a pull request."""
     if not is_configured():
@@ -179,8 +200,8 @@ def sync_repository(db: Session, full_name: str, since_days: int = 30) -> dict:
     prs = list_pull_requests(full_name, state="all", since=since)
     stats["prs_found"] = len(prs)
 
-    for pr_data in prs:
-        pr_number = pr_data["number"]
+    for pr_list_item in prs:
+        pr_number = pr_list_item["number"]
         existing = (
             db.query(PullRequest)
             .filter(
@@ -189,6 +210,9 @@ def sync_repository(db: Session, full_name: str, since_days: int = 30) -> dict:
             )
             .first()
         )
+
+        # Fetch full PR details (list endpoint omits additions/deletions/review_comments)
+        pr_data = get_pull_request(full_name, pr_number) or pr_list_item
 
         state = "merged" if pr_data.get("merged_at") else pr_data.get("state", "open")
 

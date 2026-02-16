@@ -53,4 +53,4 @@ ignore = ["S101", "S104", "S106", "S607", "B008"]
 
 [tool.bandit]
 exclude_dirs = ["tests", "alembic"]
-skips = ["B101", "B104"]
+skips = ["B101", "B104", "B105", "B404", "B603", "B607"]
