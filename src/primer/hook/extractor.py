@@ -106,13 +106,6 @@ def _run_git(args: list[str], cwd: str) -> str | None:
     return None
 
 
-def _parse_repo_full_name(url: str) -> str | None:
-    """Extract owner/repo from a git remote URL."""
-    from primer.common.utils import parse_repo_full_name
-
-    return parse_repo_full_name(url)
-
-
 def capture_git_info(cwd: str, started_at: datetime | None) -> dict:
     """Capture git branch, remote, and commits made during the session."""
     info: dict = {"branch": "", "remote_url": "", "commits": []}
@@ -128,7 +121,7 @@ def capture_git_info(cwd: str, started_at: datetime | None) -> dict:
     if not started_at:
         return info
 
-    since = started_at.strftime("%Y-%m-%dT%H:%M:%S")
+    since = started_at.isoformat()
     # Use record separator (%x1e) + unit separator (%x1f) to avoid pipe-in-message issues
     log_output = _run_git(
         ["log", f"--since={since}", "--format=%x1e%H%x1f%s%x1f%an%x1f%ae%x1f%aI", "--numstat"],

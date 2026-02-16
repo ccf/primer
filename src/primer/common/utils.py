@@ -1,6 +1,7 @@
 """Shared utility functions."""
 
 import re
+from datetime import datetime
 
 
 def parse_repo_full_name(url: str) -> str | None:
@@ -18,3 +19,13 @@ def parse_repo_full_name(url: str) -> str | None:
     if m:
         return m.group(1)
     return None
+
+
+def parse_github_datetime(val: str | None) -> datetime | None:
+    """Parse an ISO datetime string from GitHub (handles trailing Z)."""
+    if not val:
+        return None
+    try:
+        return datetime.fromisoformat(val.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return None
