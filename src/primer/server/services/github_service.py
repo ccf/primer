@@ -103,11 +103,10 @@ def upsert_pull_request(
         pr = existing
     else:
         try:
-            pr = PullRequest(repository_id=repo.id, github_pr_number=pr_number, state=state)
-            db.add(pr)
-            db.flush()
+            with db.begin_nested():
+                pr = PullRequest(repository_id=repo.id, github_pr_number=pr_number, state=state)
+                db.add(pr)
         except IntegrityError:
-            db.rollback()
             pr = (
                 db.query(PullRequest)
                 .filter(

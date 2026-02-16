@@ -27,12 +27,11 @@ def find_or_create_repository(db: Session, full_name: str) -> GitRepository:
     if repo:
         return repo
     try:
-        repo = GitRepository(full_name=full_name)
-        db.add(repo)
-        db.flush()
+        with db.begin_nested():
+            repo = GitRepository(full_name=full_name)
+            db.add(repo)
         return repo
     except IntegrityError:
-        db.rollback()
         return db.query(GitRepository).filter(GitRepository.full_name == full_name).one()
 
 
