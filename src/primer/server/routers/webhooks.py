@@ -67,6 +67,7 @@ async def github_webhook(request: Request, db: Session = Depends(get_db)):
     elif event == "pull_request":
         _handle_pull_request(db, payload)
 
+    db.commit()
     return {"status": "ok"}
 
 

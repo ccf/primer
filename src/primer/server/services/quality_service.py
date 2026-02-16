@@ -137,12 +137,13 @@ def _compute_overview(db: Session, session_ids: list[str]) -> QualityOverview:
             pr_merge_rate = merged / denominator
         avg_review_comments = float(pr_stats[3]) if pr_stats[3] is not None else None
 
-        # Average time to merge
+        # Average time to merge (seconds → hours)
+        # Use strftime('%s') for epoch seconds — works on both SQLite and PostgreSQL
         merge_times = (
             db.query(
                 func.avg(
-                    func.julianday(PullRequest.merged_at)
-                    - func.julianday(PullRequest.pr_created_at)
+                    func.strftime("%s", PullRequest.merged_at)
+                    - func.strftime("%s", PullRequest.pr_created_at)
                 )
             )
             .filter(
@@ -153,7 +154,7 @@ def _compute_overview(db: Session, session_ids: list[str]) -> QualityOverview:
             .scalar()
         )
         if merge_times is not None:
-            avg_time_to_merge_hours = float(merge_times) * 24
+            avg_time_to_merge_hours = float(merge_times) / 3600
 
     avg_commits_per_session = (
         total_commits / sessions_with_commits if sessions_with_commits else None

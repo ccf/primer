@@ -2,7 +2,6 @@
 
 import json
 import logging
-import re
 import subprocess
 from collections import Counter
 from dataclasses import dataclass, field
@@ -109,15 +108,9 @@ def _run_git(args: list[str], cwd: str) -> str | None:
 
 def _parse_repo_full_name(url: str) -> str | None:
     """Extract owner/repo from a git remote URL."""
-    # SSH: git@github.com:owner/repo.git
-    m = re.match(r"git@[^:]+:(.+?)(?:\.git)?$", url)
-    if m:
-        return m.group(1)
-    # HTTPS: https://github.com/owner/repo.git
-    m = re.match(r"https?://[^/]+/(.+?)(?:\.git)?$", url)
-    if m:
-        return m.group(1)
-    return None
+    from primer.common.utils import parse_repo_full_name
+
+    return parse_repo_full_name(url)
 
 
 def capture_git_info(cwd: str, started_at: datetime | None) -> dict:
@@ -136,8 +129,9 @@ def capture_git_info(cwd: str, started_at: datetime | None) -> dict:
         return info
 
     since = started_at.strftime("%Y-%m-%dT%H:%M:%S")
+    # Use record separator (%x1e) + unit separator (%x1f) to avoid pipe-in-message issues
     log_output = _run_git(
-        ["log", f"--since={since}", "--format=%H|%s|%an|%ae|%aI", "--numstat"],
+        ["log", f"--since={since}", "--format=%x1e%H%x1f%s%x1f%an%x1f%ae%x1f%aI", "--numstat"],
         cwd,
     )
     if not log_output:
@@ -150,20 +144,21 @@ def capture_git_info(cwd: str, started_at: datetime | None) -> dict:
         line = line.strip()
         if not line:
             continue
-        if "|" in line and len(line.split("|")) >= 5:
-            parts = line.split("|", 4)
-            if current:
+        if line.startswith("\x1e"):
+            parts = line[1:].split("\x1f")
+            if len(parts) >= 5 and current:
                 commits.append(current)
-            current = {
-                "sha": parts[0],
-                "message": parts[1],
-                "author_name": parts[2],
-                "author_email": parts[3],
-                "committed_at": parts[4],
-                "files_changed": 0,
-                "lines_added": 0,
-                "lines_deleted": 0,
-            }
+            if len(parts) >= 5:
+                current = {
+                    "sha": parts[0],
+                    "message": parts[1],
+                    "author_name": parts[2],
+                    "author_email": parts[3],
+                    "committed_at": parts[4],
+                    "files_changed": 0,
+                    "lines_added": 0,
+                    "lines_deleted": 0,
+                }
         elif current and "\t" in line:
             # numstat line: added\tdeleted\tfilename
             numparts = line.split("\t")
