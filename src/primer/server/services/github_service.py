@@ -1,6 +1,7 @@
 """GitHub App integration: token management, API client, PR sync."""
 
 import logging
+import threading
 import time
 from datetime import UTC
 
@@ -11,18 +12,19 @@ from sqlalchemy.orm import Session
 from primer.common.config import settings
 from primer.common.models import (
     Engineer,
-    GitRepository,
     PullRequest,
     SessionCommit,
 )
 from primer.common.utils import parse_github_datetime
+from primer.server.services.ingest_service import find_or_create_repository
 
 logger = logging.getLogger(__name__)
 
 GITHUB_API = "https://api.github.com"
 
-# Module-level token cache
+# Module-level token cache (protected by lock for thread safety)
 _token_cache: dict[str, object] = {"access_token": None, "expires_at": 0.0}
+_token_lock = threading.Lock()
 
 
 def is_configured() -> bool:
@@ -46,25 +48,26 @@ def _generate_app_jwt() -> str:
 
 def _get_installation_token() -> str:
     """Get or refresh the GitHub App installation token (cached for 50 min)."""
-    now = time.time()
-    if _token_cache["access_token"] and _token_cache["expires_at"] > now:  # type: ignore[operator]
-        return _token_cache["access_token"]  # type: ignore[return-value]
+    with _token_lock:
+        now = time.time()
+        if _token_cache["access_token"] and _token_cache["expires_at"] > now:  # type: ignore[operator]
+            return _token_cache["access_token"]  # type: ignore[return-value]
 
-    app_jwt = _generate_app_jwt()
-    installation_id = settings.github_installation_id
-    resp = httpx.post(
-        f"{GITHUB_API}/app/installations/{installation_id}/access_tokens",
-        headers={
-            "Authorization": f"Bearer {app_jwt}",
-            "Accept": "application/vnd.github+json",
-        },
-        timeout=10.0,
-    )
-    resp.raise_for_status()
-    token = resp.json()["token"]
-    _token_cache["access_token"] = token
-    _token_cache["expires_at"] = now + 3000  # 50 minutes
-    return token
+        app_jwt = _generate_app_jwt()
+        installation_id = settings.github_installation_id
+        resp = httpx.post(
+            f"{GITHUB_API}/app/installations/{installation_id}/access_tokens",
+            headers={
+                "Authorization": f"Bearer {app_jwt}",
+                "Accept": "application/vnd.github+json",
+            },
+            timeout=10.0,
+        )
+        resp.raise_for_status()
+        token = resp.json()["token"]
+        _token_cache["access_token"] = token
+        _token_cache["expires_at"] = now + 3000  # 50 minutes
+        return token
 
 
 def _github_headers() -> dict[str, str]:
@@ -173,11 +176,7 @@ def sync_repository(db: Session, full_name: str, since_days: int = 30) -> dict:
         return stats
 
     # Ensure repo exists locally
-    repo = db.query(GitRepository).filter(GitRepository.full_name == full_name).first()
-    if not repo:
-        repo = GitRepository(full_name=full_name)
-        db.add(repo)
-        db.flush()
+    repo = find_or_create_repository(db, full_name)
 
     # Fetch repo metadata
     gh_repo = get_repository(full_name)

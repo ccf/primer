@@ -211,9 +211,10 @@ def _compute_daily_volume(db: Session, session_ids: list[str]) -> list[DailyCode
 
 def _compute_by_session_type(db: Session, session_ids: list[str]) -> list[QualityByType]:
     """Quality metrics grouped by session type."""
+    session_type_expr = func.coalesce(SessionFacets.session_type, "unknown")
     rows = (
         db.query(
-            func.coalesce(SessionFacets.session_type, "unknown").label("session_type"),
+            session_type_expr.label("session_type"),
             func.count(distinct(SessionModel.id)).label("session_count"),
             func.count(SessionCommit.id).label("total_commits"),
             func.coalesce(func.sum(SessionCommit.lines_added), 0).label("total_lines_added"),
@@ -223,26 +224,31 @@ def _compute_by_session_type(db: Session, session_ids: list[str]) -> list[Qualit
         .outerjoin(SessionFacets, SessionFacets.session_id == SessionModel.id)
         .join(SessionCommit, SessionCommit.session_id == SessionModel.id)
         .filter(SessionModel.id.in_(session_ids))
-        .group_by(func.coalesce(SessionFacets.session_type, "unknown"))
+        .group_by(session_type_expr)
         .all()
     )
+
+    # Batch PR counts by session type (avoids N+1)
+    pr_count_rows = (
+        db.query(
+            session_type_expr.label("session_type"),
+            func.count(distinct(SessionCommit.pull_request_id)).label("pr_count"),
+        )
+        .select_from(SessionCommit)
+        .join(SessionModel, SessionModel.id == SessionCommit.session_id)
+        .outerjoin(SessionFacets, SessionFacets.session_id == SessionModel.id)
+        .filter(
+            SessionModel.id.in_(session_ids),
+            SessionCommit.pull_request_id.isnot(None),
+        )
+        .group_by(session_type_expr)
+        .all()
+    )
+    pr_count_map = {row.session_type: row.pr_count for row in pr_count_rows}
 
     results = []
     for row in rows:
         session_count = row.session_count or 1
-        # Count PRs for this session type
-        pr_count_q = (
-            db.query(func.count(distinct(SessionCommit.pull_request_id)))
-            .join(SessionModel, SessionModel.id == SessionCommit.session_id)
-            .outerjoin(SessionFacets, SessionFacets.session_id == SessionModel.id)
-            .filter(
-                SessionModel.id.in_(session_ids),
-                func.coalesce(SessionFacets.session_type, "unknown") == row.session_type,
-                SessionCommit.pull_request_id.isnot(None),
-            )
-            .scalar()
-        ) or 0
-
         results.append(
             QualityByType(
                 session_type=row.session_type,
@@ -250,7 +256,7 @@ def _compute_by_session_type(db: Session, session_ids: list[str]) -> list[Qualit
                 avg_commits=row.total_commits / session_count,
                 avg_lines_added=row.total_lines_added / session_count,
                 avg_lines_deleted=row.total_lines_deleted / session_count,
-                pr_count=pr_count_q,
+                pr_count=pr_count_map.get(row.session_type, 0),
                 merge_rate=None,
             )
         )
@@ -276,39 +282,49 @@ def _compute_engineer_quality(db: Session, session_ids: list[str]) -> list[Engin
         .all()
     )
 
-    results = []
-    for row in rows:
-        # Count PRs linked to this engineer's commits
-        pr_ids = (
-            db.query(distinct(SessionCommit.pull_request_id))
-            .join(SessionModel, SessionModel.id == SessionCommit.session_id)
-            .filter(
-                SessionModel.id.in_(session_ids),
-                SessionModel.engineer_id == row.engineer_id,
-                SessionCommit.pull_request_id.isnot(None),
-            )
+    # Batch: get distinct PR IDs per engineer (avoids N+1)
+    engineer_pr_rows = (
+        db.query(SessionModel.engineer_id, SessionCommit.pull_request_id)
+        .join(SessionCommit, SessionCommit.session_id == SessionModel.id)
+        .filter(
+            SessionModel.id.in_(session_ids),
+            SessionCommit.pull_request_id.isnot(None),
+        )
+        .distinct()
+        .all()
+    )
+    engineer_prs: dict[str, set[str]] = {}
+    all_pr_ids: set[str] = set()
+    for eng_id, pr_id in engineer_pr_rows:
+        engineer_prs.setdefault(eng_id, set()).add(pr_id)
+        all_pr_ids.add(pr_id)
+
+    # Batch: get PR stats for all relevant PRs at once
+    pr_stats_map: dict[str, tuple[str, int]] = {}
+    if all_pr_ids:
+        pr_detail_rows = (
+            db.query(PullRequest.id, PullRequest.state, PullRequest.review_comments_count)
+            .filter(PullRequest.id.in_(list(all_pr_ids)))
             .all()
         )
-        pr_id_list = [p[0] for p in pr_ids]
-        pr_count = len(pr_id_list)
+        for pr in pr_detail_rows:
+            pr_stats_map[pr.id] = (pr.state, pr.review_comments_count)
+
+    results = []
+    for row in rows:
+        pr_id_set = engineer_prs.get(row.engineer_id, set())
+        pr_count = len(pr_id_set)
         merge_rate = None
         avg_review_comments = None
 
-        if pr_id_list:
-            stats = (
-                db.query(
-                    func.sum(case((PullRequest.state == "merged", 1), else_=0)).label("merged"),
-                    func.sum(case((PullRequest.state == "closed", 1), else_=0)).label("closed"),
-                    func.avg(PullRequest.review_comments_count),
-                )
-                .filter(PullRequest.id.in_(pr_id_list))
-                .first()
-            )
-            merged = stats[0] or 0
-            closed = stats[1] or 0
+        if pr_id_set:
+            merged = sum(1 for pid in pr_id_set if pr_stats_map.get(pid, ("",))[0] == "merged")
+            closed = sum(1 for pid in pr_id_set if pr_stats_map.get(pid, ("",))[0] == "closed")
             if merged + closed > 0:
                 merge_rate = merged / (merged + closed)
-            avg_review_comments = float(stats[2]) if stats[2] is not None else None
+            comment_counts = [pr_stats_map[pid][1] for pid in pr_id_set if pid in pr_stats_map]
+            if comment_counts:
+                avg_review_comments = sum(comment_counts) / len(comment_counts)
 
         results.append(
             EngineerQuality(
@@ -353,17 +369,24 @@ def _compute_recent_prs(db: Session, session_ids: list[str]) -> list[PRSummary]:
         .all()
     )
 
+    # Batch: count linked sessions per PR (avoids N+1)
+    fetched_pr_ids = [pr.id for pr, _, _ in prs]
+    linked_rows = (
+        db.query(
+            SessionCommit.pull_request_id,
+            func.count(distinct(SessionCommit.session_id)).label("linked"),
+        )
+        .filter(
+            SessionCommit.pull_request_id.in_(fetched_pr_ids),
+            SessionCommit.session_id.in_(session_ids),
+        )
+        .group_by(SessionCommit.pull_request_id)
+        .all()
+    )
+    linked_map = {row.pull_request_id: row.linked for row in linked_rows}
+
     results = []
     for pr, repo_name, author_name in prs:
-        linked = (
-            db.query(func.count(distinct(SessionCommit.session_id)))
-            .filter(
-                SessionCommit.pull_request_id == pr.id,
-                SessionCommit.session_id.in_(session_ids),
-            )
-            .scalar()
-        ) or 0
-
         results.append(
             PRSummary(
                 repository=repo_name,
@@ -375,7 +398,7 @@ def _compute_recent_prs(db: Session, session_ids: list[str]) -> list[PRSummary]:
                 deletions=pr.deletions,
                 review_comments_count=pr.review_comments_count,
                 author=author_name,
-                linked_sessions=linked,
+                linked_sessions=linked_map.get(pr.id, 0),
                 pr_created_at=pr.pr_created_at.isoformat() if pr.pr_created_at else None,
                 merged_at=pr.merged_at.isoformat() if pr.merged_at else None,
             )

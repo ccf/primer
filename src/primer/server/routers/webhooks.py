@@ -16,6 +16,7 @@ from primer.common.models import (
     SessionCommit,
 )
 from primer.common.utils import parse_github_datetime
+from primer.server.services.ingest_service import find_or_create_repository
 
 logger = logging.getLogger(__name__)
 
@@ -74,10 +75,11 @@ def _handle_push(db: Session, payload: dict) -> None:
         sha = commit.get("id", "")
         if not sha:
             continue
-        # Check if already linked to a session
-        existing = db.query(SessionCommit).filter(SessionCommit.commit_sha == sha).first()
-        if existing and not existing.repository_id:
-            existing.repository_id = repo.id
+        # Update all session commits with matching SHA (same SHA can exist in multiple sessions)
+        matches = db.query(SessionCommit).filter(SessionCommit.commit_sha == sha).all()
+        for sc in matches:
+            if not sc.repository_id:
+                sc.repository_id = repo.id
 
     db.flush()
 
@@ -93,11 +95,7 @@ def _handle_pull_request(db: Session, payload: dict) -> None:
     if not repo_full_name or not pr_data:
         return
 
-    repo = db.query(GitRepository).filter(GitRepository.full_name == repo_full_name).first()
-    if not repo:
-        repo = GitRepository(full_name=repo_full_name)
-        db.add(repo)
-        db.flush()
+    repo = find_or_create_repository(db, repo_full_name)
 
     pr_number = pr_data.get("number")
     if not pr_number:
