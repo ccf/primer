@@ -10,12 +10,10 @@ from sqlalchemy.orm import Session
 from primer.common.config import settings
 from primer.common.database import get_db
 from primer.common.models import (
-    Engineer,
     GitRepository,
-    PullRequest,
     SessionCommit,
 )
-from primer.common.utils import parse_github_datetime
+from primer.server.services.github_service import upsert_pull_request
 from primer.server.services.ingest_service import find_or_create_repository
 
 logger = logging.getLogger(__name__)
@@ -101,40 +99,4 @@ def _handle_pull_request(db: Session, payload: dict) -> None:
     if not pr_number:
         return
 
-    existing = (
-        db.query(PullRequest)
-        .filter(
-            PullRequest.repository_id == repo.id,
-            PullRequest.github_pr_number == pr_number,
-        )
-        .first()
-    )
-
-    state = "merged" if pr_data.get("merged_at") else pr_data.get("state", "open")
-
-    if existing:
-        pr = existing
-    else:
-        pr = PullRequest(repository_id=repo.id, github_pr_number=pr_number, state=state)
-        db.add(pr)
-
-    pr.title = (pr_data.get("title") or "")[:500]
-    pr.state = state
-    pr.head_branch = (pr_data.get("head") or {}).get("ref")
-    pr.additions = pr_data.get("additions") or 0
-    pr.deletions = pr_data.get("deletions") or 0
-    pr.changed_files = pr_data.get("changed_files") or 0
-    pr.review_comments_count = pr_data.get("review_comments") or 0
-    pr.commits_count = pr_data.get("commits") or 0
-    pr.merged_at = parse_github_datetime(pr_data.get("merged_at"))
-    pr.closed_at = parse_github_datetime(pr_data.get("closed_at"))
-    pr.pr_created_at = parse_github_datetime(pr_data.get("created_at"))
-
-    # Link to engineer
-    pr_author = (pr_data.get("user") or {}).get("login")
-    if pr_author:
-        eng = db.query(Engineer).filter(Engineer.github_username == pr_author).first()
-        if eng:
-            pr.engineer_id = eng.id
-
-    db.flush()
+    upsert_pull_request(db, repo, pr_number, pr_data)
