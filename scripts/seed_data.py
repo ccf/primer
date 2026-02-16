@@ -447,6 +447,15 @@ def _generate_commits(
     return commits
 
 
+GOAL_CATEGORIES_BY_TYPE = {
+    "feature": ["new_feature", "api_endpoint", "integration", "ui_component"],
+    "debugging": ["bug_fix", "performance", "error_handling", "regression"],
+    "refactoring": ["code_quality", "architecture", "testing", "cleanup"],
+    "exploration": ["code_review", "learning", "investigation", "planning"],
+    "documentation": ["api_docs", "guides", "comments", "changelog"],
+}
+
+
 FRICTION_TYPES = ["tool_error", "permission_denied", "timeout", "context_limit", "edit_conflict"]
 FRICTION_DETAILS = {
     "tool_error": [
@@ -585,18 +594,6 @@ CLAUDE_VERSIONS = ["1.0.17", "1.0.16", "1.0.15", "1.0.14", "1.0.13"]
 PERMISSION_MODES = ["default", "plan", "bypassPermissions"]
 END_REASONS = ["user_exit", "conversation_end", "timeout", "error"]
 PRIMARY_SUCCESS_VALUES = ["full", "partial", "none"]
-GOAL_CATEGORIES = [
-    "bug_fix",
-    "new_feature",
-    "refactor",
-    "testing",
-    "documentation",
-    "devops",
-    "code_review",
-    "exploration",
-    "performance",
-    "security",
-]
 
 # ── Hourly weights (24 hours, peaks at working hours) ──────────────
 HOUR_WEIGHTS = [
@@ -874,9 +871,10 @@ def main():
                     else:
                         ps = random.choices(PRIMARY_SUCCESS_VALUES, weights=[5, 25, 70], k=1)[0]
 
-                    # Goal categories (1-3 per session)
-                    n_cats = random.randint(1, 3)
-                    goal_cats = random.sample(GOAL_CATEGORIES, k=n_cats)
+                    # Goal categories (1-2 per session, type-specific)
+                    cats = GOAL_CATEGORIES_BY_TYPE[session_type]
+                    n_cats = random.randint(1, min(2, len(cats)))
+                    goal_cats = random.sample(cats, k=n_cats)
 
                     # User satisfaction (60% of sessions with facets)
                     satisfaction = None
@@ -905,11 +903,11 @@ def main():
                         "underlying_goal": f"Working on {session_type} task for {project_name}",
                         "outcome": outcome,
                         "session_type": session_type,
+                        "goal_categories": goal_cats,
                         "brief_summary": summary or f"Session for {project_name}",
                         "friction_counts": friction_counts,
                         "friction_detail": friction_detail,
                         "primary_success": ps,
-                        "goal_categories": goal_cats,
                         "user_satisfaction_counts": satisfaction,
                     }
 
