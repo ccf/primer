@@ -210,14 +210,14 @@ def sync_repository(db: Session, full_name: str, since_days: int = 30) -> dict:
             pr = PullRequest(repository_id=repo.id, github_pr_number=pr_number, state=state)
             db.add(pr)
 
-        pr.title = pr_data.get("title", "")[:500]
+        pr.title = (pr_data.get("title") or "")[:500]
         pr.state = state
         pr.head_branch = (pr_data.get("head") or {}).get("ref")
-        pr.additions = pr_data.get("additions", 0)
-        pr.deletions = pr_data.get("deletions", 0)
-        pr.changed_files = pr_data.get("changed_files", 0)
-        pr.review_comments_count = pr_data.get("review_comments", 0)
-        pr.commits_count = pr_data.get("commits", 0)
+        pr.additions = pr_data.get("additions") or 0
+        pr.deletions = pr_data.get("deletions") or 0
+        pr.changed_files = pr_data.get("changed_files") or 0
+        pr.review_comments_count = pr_data.get("review_comments") or 0
+        pr.commits_count = pr_data.get("commits") or 0
         pr.merged_at = parse_github_datetime(pr_data.get("merged_at"))
         pr.closed_at = parse_github_datetime(pr_data.get("closed_at"))
         pr.pr_created_at = parse_github_datetime(pr_data.get("created_at"))

@@ -40,10 +40,11 @@ def get_quality_metrics(
     base_q = base_session_query(
         db, team_id=team_id, engineer_id=engineer_id, start_date=start_date, end_date=end_date
     )
-    session_ids = [s.id for s in base_q.all()]
-    total_sessions = len(session_ids)
+    # Use subquery instead of materializing IDs to avoid SQLite 999-variable limit
+    session_id_q = base_q.with_entities(SessionModel.id)
+    total_sessions = session_id_q.count()
 
-    if not session_ids:
+    if total_sessions == 0:
         return QualityMetricsResponse(
             overview=QualityOverview(
                 sessions_with_commits=0,
@@ -65,11 +66,11 @@ def get_quality_metrics(
             github_connected=bool(settings.github_app_id),
         )
 
-    overview = _compute_overview(db, session_ids)
-    daily_volume = _compute_daily_volume(db, session_ids)
-    by_session_type = _compute_by_session_type(db, session_ids)
-    engineer_quality = _compute_engineer_quality(db, session_ids)
-    recent_prs = _compute_recent_prs(db, session_ids)
+    overview = _compute_overview(db, session_id_q)
+    daily_volume = _compute_daily_volume(db, session_id_q)
+    by_session_type = _compute_by_session_type(db, session_id_q)
+    engineer_quality = _compute_engineer_quality(db, session_id_q)
+    recent_prs = _compute_recent_prs(db, session_id_q)
 
     return QualityMetricsResponse(
         overview=overview,
@@ -82,7 +83,7 @@ def get_quality_metrics(
     )
 
 
-def _compute_overview(db: Session, session_ids: list[str]) -> QualityOverview:
+def _compute_overview(db: Session, session_id_q) -> QualityOverview:
     """Compute overview quality metrics."""
     commit_stats = (
         db.query(
@@ -91,7 +92,7 @@ def _compute_overview(db: Session, session_ids: list[str]) -> QualityOverview:
             func.coalesce(func.sum(SessionCommit.lines_added), 0).label("total_lines_added"),
             func.coalesce(func.sum(SessionCommit.lines_deleted), 0).label("total_lines_deleted"),
         )
-        .filter(SessionCommit.session_id.in_(session_ids))
+        .filter(SessionCommit.session_id.in_(session_id_q))
         .first()
     )
 
@@ -104,7 +105,7 @@ def _compute_overview(db: Session, session_ids: list[str]) -> QualityOverview:
     pr_ids = (
         db.query(distinct(SessionCommit.pull_request_id))
         .filter(
-            SessionCommit.session_id.in_(session_ids),
+            SessionCommit.session_id.in_(session_id_q),
             SessionCommit.pull_request_id.isnot(None),
         )
         .all()
@@ -176,7 +177,7 @@ def _compute_overview(db: Session, session_ids: list[str]) -> QualityOverview:
     )
 
 
-def _compute_daily_volume(db: Session, session_ids: list[str]) -> list[DailyCodeVolume]:
+def _compute_daily_volume(db: Session, session_id_q) -> list[DailyCodeVolume]:
     """Aggregate code volume by day."""
     date_expr = func.date(SessionCommit.committed_at)
     rows = (
@@ -188,7 +189,7 @@ def _compute_daily_volume(db: Session, session_ids: list[str]) -> list[DailyCode
             func.count(distinct(SessionCommit.session_id)).label("sessions"),
         )
         .filter(
-            SessionCommit.session_id.in_(session_ids),
+            SessionCommit.session_id.in_(session_id_q),
             SessionCommit.committed_at.isnot(None),
         )
         .group_by(date_expr)
@@ -209,7 +210,7 @@ def _compute_daily_volume(db: Session, session_ids: list[str]) -> list[DailyCode
     ]
 
 
-def _compute_by_session_type(db: Session, session_ids: list[str]) -> list[QualityByType]:
+def _compute_by_session_type(db: Session, session_id_q) -> list[QualityByType]:
     """Quality metrics grouped by session type."""
     session_type_expr = func.coalesce(SessionFacets.session_type, "unknown")
     rows = (
@@ -223,7 +224,7 @@ def _compute_by_session_type(db: Session, session_ids: list[str]) -> list[Qualit
         .select_from(SessionModel)
         .outerjoin(SessionFacets, SessionFacets.session_id == SessionModel.id)
         .join(SessionCommit, SessionCommit.session_id == SessionModel.id)
-        .filter(SessionModel.id.in_(session_ids))
+        .filter(SessionModel.id.in_(session_id_q))
         .group_by(session_type_expr)
         .all()
     )
@@ -238,7 +239,7 @@ def _compute_by_session_type(db: Session, session_ids: list[str]) -> list[Qualit
         .join(SessionModel, SessionModel.id == SessionCommit.session_id)
         .outerjoin(SessionFacets, SessionFacets.session_id == SessionModel.id)
         .filter(
-            SessionModel.id.in_(session_ids),
+            SessionModel.id.in_(session_id_q),
             SessionCommit.pull_request_id.isnot(None),
         )
         .group_by(session_type_expr)
@@ -264,7 +265,7 @@ def _compute_by_session_type(db: Session, session_ids: list[str]) -> list[Qualit
     return results
 
 
-def _compute_engineer_quality(db: Session, session_ids: list[str]) -> list[EngineerQuality]:
+def _compute_engineer_quality(db: Session, session_id_q) -> list[EngineerQuality]:
     """Per-engineer quality metrics."""
     rows = (
         db.query(
@@ -277,7 +278,7 @@ def _compute_engineer_quality(db: Session, session_ids: list[str]) -> list[Engin
         )
         .join(SessionCommit, SessionCommit.session_id == SessionModel.id)
         .join(Engineer, Engineer.id == SessionModel.engineer_id)
-        .filter(SessionModel.id.in_(session_ids))
+        .filter(SessionModel.id.in_(session_id_q))
         .group_by(SessionModel.engineer_id, Engineer.name)
         .all()
     )
@@ -287,7 +288,7 @@ def _compute_engineer_quality(db: Session, session_ids: list[str]) -> list[Engin
         db.query(SessionModel.engineer_id, SessionCommit.pull_request_id)
         .join(SessionCommit, SessionCommit.session_id == SessionModel.id)
         .filter(
-            SessionModel.id.in_(session_ids),
+            SessionModel.id.in_(session_id_q),
             SessionCommit.pull_request_id.isnot(None),
         )
         .distinct()
@@ -343,13 +344,13 @@ def _compute_engineer_quality(db: Session, session_ids: list[str]) -> list[Engin
     return results
 
 
-def _compute_recent_prs(db: Session, session_ids: list[str]) -> list[PRSummary]:
+def _compute_recent_prs(db: Session, session_id_q) -> list[PRSummary]:
     """Recent pull requests linked to sessions."""
     # Get PRs linked to sessions via commits
     pr_ids = (
         db.query(distinct(SessionCommit.pull_request_id))
         .filter(
-            SessionCommit.session_id.in_(session_ids),
+            SessionCommit.session_id.in_(session_id_q),
             SessionCommit.pull_request_id.isnot(None),
         )
         .all()
@@ -378,7 +379,7 @@ def _compute_recent_prs(db: Session, session_ids: list[str]) -> list[PRSummary]:
         )
         .filter(
             SessionCommit.pull_request_id.in_(fetched_pr_ids),
-            SessionCommit.session_id.in_(session_ids),
+            SessionCommit.session_id.in_(session_id_q),
         )
         .group_by(SessionCommit.pull_request_id)
         .all()

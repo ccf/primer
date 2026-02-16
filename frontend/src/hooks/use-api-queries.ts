@@ -14,7 +14,6 @@ import type {
   EngineerBenchmarkResponse,
   EngineerResponse,
   FrictionReport,
-  GitHubStatusResponse,
   IngestEventResponse,
   LearningPathsResponse,
   ModelRanking,
@@ -430,12 +429,5 @@ export function useQualityMetrics(teamId: string | null, startDate?: string, end
       apiFetch<QualityMetricsResponse>(
         `/api/v1/analytics/quality-metrics${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
       ),
-  })
-}
-
-export function useGitHubStatus() {
-  return useQuery({
-    queryKey: ["github-status"],
-    queryFn: () => apiFetch<GitHubStatusResponse>("/api/v1/analytics/github/status"),
   })
 }
