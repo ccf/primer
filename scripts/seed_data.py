@@ -433,7 +433,7 @@ def _generate_commits(
 
         commits.append(
             {
-                "sha": uuid.uuid4().hex[:40],
+                "sha": uuid.uuid4().hex + uuid.uuid4().hex[:8],
                 "message": msg,
                 "author_name": eng_name,
                 "author_email": COMMIT_AUTHORS.get(eng_name, "dev@example.com"),

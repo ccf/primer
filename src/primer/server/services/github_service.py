@@ -15,6 +15,7 @@ from primer.common.models import (
     PullRequest,
     SessionCommit,
 )
+from primer.common.utils import parse_github_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -162,18 +163,6 @@ def get_pull_request_commits(full_name: str, pr_number: int) -> list[str]:
         return []
 
 
-def _parse_datetime(val: str | None):
-    """Parse an ISO datetime string from GitHub."""
-    if not val:
-        return None
-    from datetime import datetime
-
-    try:
-        return datetime.fromisoformat(val.replace("Z", "+00:00"))
-    except (ValueError, AttributeError):
-        return None
-
-
 def sync_repository(db: Session, full_name: str, since_days: int = 30) -> dict:
     """Sync PRs from GitHub for a repository and correlate commits."""
     from datetime import datetime, timedelta
@@ -230,9 +219,9 @@ def sync_repository(db: Session, full_name: str, since_days: int = 30) -> dict:
         pr.changed_files = pr_data.get("changed_files", 0)
         pr.review_comments_count = pr_data.get("review_comments", 0)
         pr.commits_count = pr_data.get("commits", 0)
-        pr.merged_at = _parse_datetime(pr_data.get("merged_at"))
-        pr.closed_at = _parse_datetime(pr_data.get("closed_at"))
-        pr.pr_created_at = _parse_datetime(pr_data.get("created_at"))
+        pr.merged_at = parse_github_datetime(pr_data.get("merged_at"))
+        pr.closed_at = parse_github_datetime(pr_data.get("closed_at"))
+        pr.pr_created_at = parse_github_datetime(pr_data.get("created_at"))
 
         # Link to engineer via GitHub username
         pr_author = (pr_data.get("user") or {}).get("login")

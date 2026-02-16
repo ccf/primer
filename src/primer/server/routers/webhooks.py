@@ -15,6 +15,7 @@ from primer.common.models import (
     PullRequest,
     SessionCommit,
 )
+from primer.common.utils import parse_github_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -33,18 +34,6 @@ def _verify_signature(body: bytes, signature: str | None) -> bool:
         hashlib.sha256,
     ).hexdigest()
     return hmac.compare_digest(f"sha256={expected}", signature)
-
-
-def _parse_datetime(val: str | None):
-    """Parse ISO datetime from GitHub."""
-    if not val:
-        return None
-    from datetime import datetime
-
-    try:
-        return datetime.fromisoformat(val.replace("Z", "+00:00"))
-    except (ValueError, AttributeError):
-        return None
 
 
 @router.post("/github")
@@ -139,9 +128,9 @@ def _handle_pull_request(db: Session, payload: dict) -> None:
     pr.changed_files = pr_data.get("changed_files", 0)
     pr.review_comments_count = pr_data.get("review_comments", 0)
     pr.commits_count = pr_data.get("commits", 0)
-    pr.merged_at = _parse_datetime(pr_data.get("merged_at"))
-    pr.closed_at = _parse_datetime(pr_data.get("closed_at"))
-    pr.pr_created_at = _parse_datetime(pr_data.get("created_at"))
+    pr.merged_at = parse_github_datetime(pr_data.get("merged_at"))
+    pr.closed_at = parse_github_datetime(pr_data.get("closed_at"))
+    pr.pr_created_at = parse_github_datetime(pr_data.get("created_at"))
 
     # Link to engineer
     pr_author = (pr_data.get("user") or {}).get("login")
