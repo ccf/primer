@@ -7,11 +7,13 @@ from datetime import UTC
 
 import httpx
 import jwt
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from primer.common.config import settings
 from primer.common.models import (
     Engineer,
+    GitRepository,
     PullRequest,
     SessionCommit,
 )
@@ -76,6 +78,66 @@ def _github_headers() -> dict[str, str]:
         "Authorization": f"Bearer {token}",
         "Accept": "application/vnd.github+json",
     }
+
+
+def upsert_pull_request(
+    db: Session, repo: GitRepository, pr_number: int, pr_data: dict
+) -> PullRequest:
+    """Find or create a PullRequest and update its fields from GitHub API data.
+
+    Handles concurrent inserts via IntegrityError catch-and-retry.
+    Only sets engineer_id if not already linked (avoids overwriting manual links).
+    """
+    state = "merged" if pr_data.get("merged_at") else pr_data.get("state", "open")
+
+    existing = (
+        db.query(PullRequest)
+        .filter(
+            PullRequest.repository_id == repo.id,
+            PullRequest.github_pr_number == pr_number,
+        )
+        .first()
+    )
+
+    if existing:
+        pr = existing
+    else:
+        try:
+            pr = PullRequest(repository_id=repo.id, github_pr_number=pr_number, state=state)
+            db.add(pr)
+            db.flush()
+        except IntegrityError:
+            db.rollback()
+            pr = (
+                db.query(PullRequest)
+                .filter(
+                    PullRequest.repository_id == repo.id,
+                    PullRequest.github_pr_number == pr_number,
+                )
+                .one()
+            )
+
+    pr.title = (pr_data.get("title") or "")[:500]
+    pr.state = state
+    pr.head_branch = (pr_data.get("head") or {}).get("ref")
+    pr.additions = pr_data.get("additions") or 0
+    pr.deletions = pr_data.get("deletions") or 0
+    pr.changed_files = pr_data.get("changed_files") or 0
+    pr.review_comments_count = pr_data.get("review_comments") or 0
+    pr.commits_count = pr_data.get("commits") or 0
+    pr.merged_at = parse_github_datetime(pr_data.get("merged_at"))
+    pr.closed_at = parse_github_datetime(pr_data.get("closed_at"))
+    pr.pr_created_at = parse_github_datetime(pr_data.get("created_at"))
+
+    # Only set engineer if not already linked (avoids overwriting manual links)
+    pr_author = (pr_data.get("user") or {}).get("login")
+    if pr_author and not pr.engineer_id:
+        eng = db.query(Engineer).filter(Engineer.github_username == pr_author).first()
+        if eng:
+            pr.engineer_id = eng.id
+
+    db.flush()
+    return pr
 
 
 def get_repository(full_name: str) -> dict | None:
@@ -190,46 +252,11 @@ def sync_repository(db: Session, full_name: str, since_days: int = 30) -> dict:
 
     for pr_list_item in prs:
         pr_number = pr_list_item["number"]
-        existing = (
-            db.query(PullRequest)
-            .filter(
-                PullRequest.repository_id == repo.id,
-                PullRequest.github_pr_number == pr_number,
-            )
-            .first()
-        )
 
         # Fetch full PR details (list endpoint omits additions/deletions/review_comments)
         pr_data = get_pull_request(full_name, pr_number) or pr_list_item
 
-        state = "merged" if pr_data.get("merged_at") else pr_data.get("state", "open")
-
-        if existing:
-            pr = existing
-        else:
-            pr = PullRequest(repository_id=repo.id, github_pr_number=pr_number, state=state)
-            db.add(pr)
-
-        pr.title = (pr_data.get("title") or "")[:500]
-        pr.state = state
-        pr.head_branch = (pr_data.get("head") or {}).get("ref")
-        pr.additions = pr_data.get("additions") or 0
-        pr.deletions = pr_data.get("deletions") or 0
-        pr.changed_files = pr_data.get("changed_files") or 0
-        pr.review_comments_count = pr_data.get("review_comments") or 0
-        pr.commits_count = pr_data.get("commits") or 0
-        pr.merged_at = parse_github_datetime(pr_data.get("merged_at"))
-        pr.closed_at = parse_github_datetime(pr_data.get("closed_at"))
-        pr.pr_created_at = parse_github_datetime(pr_data.get("created_at"))
-
-        # Link to engineer via GitHub username
-        pr_author = (pr_data.get("user") or {}).get("login")
-        if pr_author and not pr.engineer_id:
-            eng = db.query(Engineer).filter(Engineer.github_username == pr_author).first()
-            if eng:
-                pr.engineer_id = eng.id
-
-        db.flush()
+        pr = upsert_pull_request(db, repo, pr_number, pr_data)
 
         # Correlate commits
         commit_shas = get_pull_request_commits(full_name, pr_number)

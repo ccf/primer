@@ -1,5 +1,6 @@
 import logging
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from primer.common.models import (
@@ -21,14 +22,18 @@ logger = logging.getLogger(__name__)
 
 
 def find_or_create_repository(db: Session, full_name: str) -> GitRepository:
-    """Find or create a GitRepository by full_name."""
+    """Find or create a GitRepository by full_name (handles concurrent inserts)."""
     repo = db.query(GitRepository).filter(GitRepository.full_name == full_name).first()
     if repo:
         return repo
-    repo = GitRepository(full_name=full_name)
-    db.add(repo)
-    db.flush()
-    return repo
+    try:
+        repo = GitRepository(full_name=full_name)
+        db.add(repo)
+        db.flush()
+        return repo
+    except IntegrityError:
+        db.rollback()
+        return db.query(GitRepository).filter(GitRepository.full_name == full_name).one()
 
 
 def upsert_session(db: Session, engineer_id: str, payload: SessionIngestPayload) -> bool:
