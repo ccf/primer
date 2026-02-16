@@ -26,6 +26,7 @@ from primer.common.schemas import (
     ProjectAnalytics,
     QualityMetricsResponse,
     Recommendation,
+    SessionInsightsResponse,
     SkillInventoryResponse,
     ToolAdoptionAnalytics,
     ToolRanking,
@@ -393,6 +394,22 @@ def quality_metrics(
 
     tid, eid = _resolve_scope(auth, team_id)
     return get_quality_metrics(
+        db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
+    )
+
+
+@router.get("/session-insights", response_model=SessionInsightsResponse)
+def session_insights(
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.session_insights_service import get_session_insights
+
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_session_insights(
         db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
     )
 

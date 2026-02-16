@@ -19,6 +19,7 @@ import { ToolAdoptionPage } from "@/pages/tool-adoption"
 import { InsightsPage } from "@/pages/insights"
 import { GrowthPage } from "@/pages/growth"
 import { QualityPage } from "@/pages/quality"
+import { SessionInsightsPage } from "@/pages/session-insights"
 import { AdminPage } from "@/pages/admin"
 import { NotFoundPage } from "@/pages/not-found"
 import type { DateRange } from "@/components/layout/date-range-picker"
@@ -73,6 +74,7 @@ function AuthenticatedApp() {
         <Route path="/insights" element={<InsightsPage teamId={teamId} dateRange={dateRange} />} />
         <Route path="/growth" element={<GrowthPage teamId={teamId} dateRange={dateRange} />} />
         <Route path="/quality" element={<QualityPage teamId={teamId} dateRange={dateRange} />} />
+        <Route path="/session-insights" element={<SessionInsightsPage teamId={teamId} dateRange={dateRange} />} />
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/teams/:teamId" element={<TeamDetailRoute dateRange={dateRange} />} />
         <Route path="/admin" element={<AdminPage />} />

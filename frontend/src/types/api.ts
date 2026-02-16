@@ -92,6 +92,9 @@ export interface OverviewStats {
   session_type_counts: Record<string, number>
   success_rate: number | null
   previous_period: OverviewStats | null
+  end_reason_counts: Record<string, number>
+  cache_hit_rate: number | null
+  avg_health_score: number | null
 }
 
 export interface FrictionReport {
@@ -619,4 +622,114 @@ export interface GitHubStatusResponse {
   installation_id: number | null
   repos_count: number
   prs_count: number
+}
+
+// --- Session Insights ---
+
+export interface EndReasonBreakdown {
+  end_reason: string
+  count: number
+  avg_duration: number | null
+  success_rate: number | null
+}
+
+export interface DailySatisfaction {
+  date: string
+  satisfied: number
+  neutral: number
+  dissatisfied: number
+}
+
+export interface SatisfactionSummary {
+  total_sessions_with_data: number
+  satisfied_count: number
+  neutral_count: number
+  dissatisfied_count: number
+  satisfaction_rate: number | null
+  trend: DailySatisfaction[]
+}
+
+export interface FrictionCluster {
+  cluster_label: string
+  occurrence_count: number
+  sample_details: string[]
+}
+
+export interface DailyCacheEntry {
+  date: string
+  cache_read_tokens: number
+  cache_creation_tokens: number
+  input_tokens: number
+  cache_hit_rate: number | null
+}
+
+export interface CacheEfficiencyMetrics {
+  total_cache_read_tokens: number
+  total_cache_creation_tokens: number
+  total_input_tokens: number
+  cache_hit_rate: number | null
+  cache_savings_estimate: number | null
+  daily_cache_trend: DailyCacheEntry[]
+}
+
+export interface PermissionModeAnalysis {
+  mode: string
+  session_count: number
+  success_rate: number | null
+  avg_duration: number | null
+  avg_friction_count: number | null
+}
+
+export interface DailyHealthEntry {
+  date: string
+  avg_score: number
+  session_count: number
+}
+
+export interface SessionHealthDistribution {
+  avg_score: number
+  median_score: number
+  buckets: Record<string, number>
+  daily_trend: DailyHealthEntry[]
+}
+
+export interface GoalTypeBreakdown {
+  session_type: string
+  count: number
+  avg_cost: number | null
+  success_rate: number | null
+  avg_duration: number | null
+}
+
+export interface GoalCategoryBreakdown {
+  category: string
+  count: number
+  avg_cost: number | null
+  success_rate: number | null
+}
+
+export interface GoalAnalytics {
+  session_type_breakdown: GoalTypeBreakdown[]
+  goal_category_breakdown: GoalCategoryBreakdown[]
+}
+
+export interface PrimarySuccessAnalysis {
+  full_count: number
+  partial_count: number
+  none_count: number
+  unknown_count: number
+  full_rate: number | null
+  by_session_type: Record<string, Record<string, number>>
+}
+
+export interface SessionInsightsResponse {
+  end_reasons: EndReasonBreakdown[]
+  satisfaction: SatisfactionSummary
+  friction_clusters: FrictionCluster[]
+  cache_efficiency: CacheEfficiencyMetrics
+  permission_modes: PermissionModeAnalysis[]
+  health_distribution: SessionHealthDistribution
+  goals: GoalAnalytics
+  primary_success: PrimarySuccessAnalysis
+  sessions_analyzed: number
 }

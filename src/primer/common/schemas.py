@@ -258,6 +258,9 @@ class OverviewStats(BaseModel):
     session_type_counts: dict[str, int]
     success_rate: float | None = None
     previous_period: "OverviewStats | None" = None
+    end_reason_counts: dict[str, int] = {}
+    cache_hit_rate: float | None = None
+    avg_health_score: float | None = None
 
 
 class FrictionReport(BaseModel):
@@ -854,3 +857,114 @@ class GitHubStatusResponse(BaseModel):
     installation_id: int | None
     repos_count: int
     prs_count: int
+
+
+# --- Session Insights ---
+
+
+class EndReasonBreakdown(BaseModel):
+    end_reason: str
+    count: int
+    avg_duration: float | None
+    success_rate: float | None
+
+
+class DailySatisfaction(BaseModel):
+    date: date
+    satisfied: int
+    neutral: int
+    dissatisfied: int
+
+
+class SatisfactionSummary(BaseModel):
+    total_sessions_with_data: int
+    satisfied_count: int
+    neutral_count: int
+    dissatisfied_count: int
+    satisfaction_rate: float | None
+    trend: list[DailySatisfaction] = []
+
+
+class FrictionCluster(BaseModel):
+    cluster_label: str
+    occurrence_count: int
+    sample_details: list[str]
+
+
+class DailyCacheEntry(BaseModel):
+    date: date
+    cache_read_tokens: int
+    cache_creation_tokens: int
+    input_tokens: int
+    cache_hit_rate: float | None
+
+
+class CacheEfficiencyMetrics(BaseModel):
+    total_cache_read_tokens: int
+    total_cache_creation_tokens: int
+    total_input_tokens: int
+    cache_hit_rate: float | None
+    cache_savings_estimate: float | None
+    daily_cache_trend: list[DailyCacheEntry] = []
+
+
+class PermissionModeAnalysis(BaseModel):
+    mode: str
+    session_count: int
+    success_rate: float | None
+    avg_duration: float | None
+    avg_friction_count: float | None
+
+
+class DailyHealthEntry(BaseModel):
+    date: date
+    avg_score: float
+    session_count: int
+
+
+class SessionHealthDistribution(BaseModel):
+    avg_score: float
+    median_score: float
+    buckets: dict[str, int]
+    daily_trend: list[DailyHealthEntry] = []
+
+
+class GoalTypeBreakdown(BaseModel):
+    session_type: str
+    count: int
+    avg_cost: float | None
+    success_rate: float | None
+    avg_duration: float | None
+
+
+class GoalCategoryBreakdown(BaseModel):
+    category: str
+    count: int
+    avg_cost: float | None
+    success_rate: float | None
+
+
+class GoalAnalytics(BaseModel):
+    session_type_breakdown: list[GoalTypeBreakdown]
+    goal_category_breakdown: list[GoalCategoryBreakdown]
+
+
+class PrimarySuccessAnalysis(BaseModel):
+    full_count: int
+    partial_count: int
+    none_count: int
+    unknown_count: int
+    full_rate: float | None
+    by_session_type: dict[str, dict[str, int]]
+
+
+class SessionInsightsResponse(BaseModel):
+    end_reasons: list[EndReasonBreakdown]
+    satisfaction: SatisfactionSummary
+    friction_clusters: list[FrictionCluster]
+    cache_efficiency: CacheEfficiencyMetrics
+    permission_modes: list[PermissionModeAnalysis]
+    health_distribution: SessionHealthDistribution
+    goals: GoalAnalytics
+    primary_success: PrimarySuccessAnalysis
+    sessions_analyzed: int

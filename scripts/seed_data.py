@@ -584,6 +584,19 @@ def _generate_messages(session_type: str, msg_count: int, model: str) -> list[di
 CLAUDE_VERSIONS = ["1.0.17", "1.0.16", "1.0.15", "1.0.14", "1.0.13"]
 PERMISSION_MODES = ["default", "plan", "bypassPermissions"]
 END_REASONS = ["user_exit", "conversation_end", "timeout", "error"]
+PRIMARY_SUCCESS_VALUES = ["full", "partial", "none"]
+GOAL_CATEGORIES = [
+    "bug_fix",
+    "new_feature",
+    "refactor",
+    "testing",
+    "documentation",
+    "devops",
+    "code_review",
+    "exploration",
+    "performance",
+    "security",
+]
 
 # ── Hourly weights (24 hours, peaks at working hours) ──────────────
 HOUR_WEIGHTS = [
@@ -853,6 +866,41 @@ def main():
                 # Facets (85% of sessions)
                 facets = None
                 if random.random() < 0.85:
+                    # Primary success — correlate with outcome
+                    if outcome == "success":
+                        ps = random.choices(PRIMARY_SUCCESS_VALUES, weights=[75, 20, 5], k=1)[0]
+                    elif outcome == "partial":
+                        ps = random.choices(PRIMARY_SUCCESS_VALUES, weights=[15, 60, 25], k=1)[0]
+                    else:
+                        ps = random.choices(PRIMARY_SUCCESS_VALUES, weights=[5, 25, 70], k=1)[0]
+
+                    # Goal categories (1-3 per session)
+                    n_cats = random.randint(1, 3)
+                    goal_cats = random.sample(GOAL_CATEGORIES, k=n_cats)
+
+                    # User satisfaction (60% of sessions with facets)
+                    satisfaction = None
+                    if random.random() < 0.6:
+                        if outcome == "success":
+                            sat = random.choices(
+                                ["satisfied", "neutral", "dissatisfied"],
+                                weights=[70, 22, 8],
+                                k=1,
+                            )[0]
+                        elif outcome == "partial":
+                            sat = random.choices(
+                                ["satisfied", "neutral", "dissatisfied"],
+                                weights=[25, 45, 30],
+                                k=1,
+                            )[0]
+                        else:
+                            sat = random.choices(
+                                ["satisfied", "neutral", "dissatisfied"],
+                                weights=[5, 25, 70],
+                                k=1,
+                            )[0]
+                        satisfaction = {sat: 1}
+
                     facets = {
                         "underlying_goal": f"Working on {session_type} task for {project_name}",
                         "outcome": outcome,
@@ -860,6 +908,9 @@ def main():
                         "brief_summary": summary or f"Session for {project_name}",
                         "friction_counts": friction_counts,
                         "friction_detail": friction_detail,
+                        "primary_success": ps,
+                        "goal_categories": goal_cats,
+                        "user_satisfaction_counts": satisfaction,
                     }
 
                 # Generate transcript messages
