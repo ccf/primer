@@ -49,3 +49,10 @@
 - [x] **Skill inventory** — team capabilities from session topics
 - [x] **Tool adoption tracking** — which Claude Code features are/aren't used
 - [x] **Quality metrics** — correlate session outcomes with code quality via git
+
+## Tier 5 — Personal Engineer Experience (Complete)
+
+- [x] **Engineer profile page** — personal trajectory dashboard with weekly sparklines, friction breakdown, strengths/skills, and quality tabs (`/engineers/:id`)
+- [x] **Similar sessions** — contextual pattern sharing panel on session detail with 3-tier relevance matching
+- [x] **Claude vs non-Claude PR comparison** — side-by-side metrics for Claude-assisted vs other PRs (stub awaiting PR models)
+- [x] **Time-to-team-average** — ramp-up tracking for new hires with rolling success rates vs team average
