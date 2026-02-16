@@ -507,9 +507,19 @@ def time_to_team_average(
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(get_auth_context),
 ):
+    from primer.common.models import Engineer
     from primer.server.services.insights_service import get_time_to_team_average
 
-    tid, eid = _resolve_scope(auth, team_id)
+    # Time-to-team-average needs team-wide data, not single-engineer scope.
+    # For engineers, resolve their team_id so the team avg is meaningful.
+    if auth.role == "admin":
+        tid = team_id
+    elif auth.role == "team_lead":
+        tid = auth.team_id
+    else:
+        eng = db.query(Engineer.team_id).filter(Engineer.id == auth.engineer_id).first()
+        tid = eng.team_id if eng else None
+
     return get_time_to_team_average(
-        db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
+        db, team_id=tid, engineer_id=None, start_date=start_date, end_date=end_date
     )

@@ -125,7 +125,7 @@ def get_transcript(
 @router.get("/{session_id}/similar", response_model=SimilarSessionsResponse)
 def get_similar(
     session_id: str,
-    limit: int = 10,
+    limit: int = Query(default=10, ge=1, le=50),
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(get_auth_context),
 ):

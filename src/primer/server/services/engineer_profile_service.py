@@ -166,9 +166,9 @@ def get_engineer_profile(
         db, engineer_id=engineer_id, start_date=start_date, end_date=end_date
     )
 
-    # Learning paths
+    # Learning paths — use team scope so adoption baselines are team-wide
     learning = get_learning_paths(
-        db, engineer_id=engineer_id, start_date=start_date, end_date=end_date
+        db, team_id=engineer.team_id, start_date=start_date, end_date=end_date
     )
     # Extract this engineer's learning path
     eng_paths = [p for p in learning.engineer_paths if p.engineer_id == engineer_id]

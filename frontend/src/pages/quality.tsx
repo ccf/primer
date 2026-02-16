@@ -7,6 +7,7 @@ import { QualityByTypeChart } from "@/components/quality/quality-by-type"
 import { PRTable } from "@/components/quality/pr-table"
 import { EngineerQualityTable } from "@/components/quality/engineer-quality-table"
 import { GitHubStatusBanner } from "@/components/quality/github-status-banner"
+import { ClaudePRComparison } from "@/components/quality/claude-pr-comparison"
 import { CardSkeleton } from "@/components/shared/loading-skeleton"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
@@ -14,6 +15,7 @@ const tabs = [
   { id: "code", label: "Code Output" },
   { id: "prs", label: "Pull Requests" },
   { id: "engineers", label: "Engineers" },
+  { id: "claude", label: "Claude Impact" },
 ] as const
 
 type TabId = (typeof tabs)[number]["id"]
@@ -77,6 +79,14 @@ export function QualityPage({ teamId, dateRange }: QualityPageProps) {
 
           {activeTab === "engineers" && (
             <EngineerQualityTable engineers={data.engineer_quality} />
+          )}
+
+          {activeTab === "claude" && (
+            <ClaudePRComparison
+              teamId={teamId}
+              startDate={startDate}
+              endDate={endDate}
+            />
           )}
 
           {data.sessions_analyzed === 0 && (

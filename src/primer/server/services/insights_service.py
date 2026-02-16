@@ -1500,7 +1500,7 @@ def get_similar_sessions(
 
         c_outcome = f.outcome if f else None
         is_success = c_outcome == "success"
-        dur = c.duration_seconds if c.duration_seconds else float("inf")
+        dur = c.duration_seconds if c.duration_seconds is not None else float("inf")
 
         scored.append((relevance, is_success, dur, c, reason))
 
