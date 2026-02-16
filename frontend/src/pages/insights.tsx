@@ -10,6 +10,7 @@ import { PersonalizedTipsList } from "@/components/insights/personalized-tips-li
 import { SkillInventorySummary } from "@/components/insights/skill-inventory-summary"
 import { EngineerSkillTable } from "@/components/insights/engineer-skill-table"
 import { TeamSkillGaps } from "@/components/insights/team-skill-gaps"
+import { ClaudePRComparison } from "@/components/quality/claude-pr-comparison"
 import { CardSkeleton } from "@/components/shared/loading-skeleton"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
@@ -17,6 +18,7 @@ const tabs = [
   { id: "config", label: "Config Optimization" },
   { id: "tips", label: "Personalized Tips" },
   { id: "skills", label: "Skill Inventory" },
+  { id: "claude-impact", label: "Claude Impact" },
 ] as const
 
 type TabId = (typeof tabs)[number]["id"]
@@ -60,6 +62,9 @@ export function InsightsPage({ teamId, dateRange }: InsightsPageProps) {
       )}
       {activeTab === "skills" && (
         <SkillsTab teamId={teamId} startDate={startDate} endDate={endDate} />
+      )}
+      {activeTab === "claude-impact" && (
+        <ClaudePRComparison teamId={teamId} startDate={startDate} endDate={endDate} />
       )}
     </div>
   )

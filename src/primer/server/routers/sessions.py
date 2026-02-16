@@ -143,4 +143,6 @@ def get_similar(
 
     from primer.server.services.insights_service import get_similar_sessions
 
-    return get_similar_sessions(db, session_id, limit=limit)
+    # Engineers only see their own similar sessions (data isolation)
+    req_eid = auth.engineer_id if auth.role == "engineer" else None
+    return get_similar_sessions(db, session_id, limit=limit, requesting_engineer_id=req_eid)

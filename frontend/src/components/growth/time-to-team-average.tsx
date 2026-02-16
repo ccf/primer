@@ -64,11 +64,16 @@ export function TimeToTeamAverage({ teamId, startDate, endDate }: TimeToTeamAver
   }
   const sortedWeeks = [...weekNumbers].sort((a, b) => a - b)
 
+  // Use engineer_id as chart key to avoid duplicate name collisions
+  const engKeyToName = Object.fromEntries(
+    data.engineers.map((eng) => [eng.engineer_id, eng.name]),
+  )
+
   const chartData = sortedWeeks.map((week) => {
     const point: Record<string, number | null> = { week }
     for (const eng of data.engineers) {
       const match = eng.weekly_success_rates.find((pt) => pt.week_number === week)
-      point[eng.name] = match?.success_rate != null ? match.success_rate * 100 : null
+      point[eng.engineer_id] = match?.success_rate != null ? match.success_rate * 100 : null
     }
     return point
   })
@@ -153,7 +158,11 @@ export function TimeToTeamAverage({ teamId, startDate, endDate }: TimeToTeamAver
                     borderRadius: "8px",
                     fontSize: "12px",
                   }}
-                  formatter={(value) => [`${(value as number).toFixed(0)}%`]}
+                  formatter={(value, name) => {
+                    const v = value as number | null
+                    const label = typeof name === "string" ? (engKeyToName[name] ?? name) : name
+                    return v != null ? [`${v.toFixed(0)}%`, label] : ["-", label]
+                  }}
                   labelFormatter={(label) => `Week ${label}`}
                 />
                 <Legend />
@@ -172,7 +181,8 @@ export function TimeToTeamAverage({ teamId, startDate, endDate }: TimeToTeamAver
                   <Line
                     key={eng.engineer_id}
                     type="monotone"
-                    dataKey={eng.name}
+                    dataKey={eng.engineer_id}
+                    name={eng.name}
                     stroke={CHART_COLORS[i % CHART_COLORS.length]}
                     strokeWidth={2}
                     dot={{ r: 3 }}

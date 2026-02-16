@@ -1388,6 +1388,7 @@ def get_similar_sessions(
     db: Session,
     session_id: str,
     limit: int = 10,
+    requesting_engineer_id: str | None = None,
 ) -> SimilarSessionsResponse:
     """Find sessions similar to the target, within the same team."""
     # Load target session and its facets
@@ -1419,8 +1420,12 @@ def get_similar_sessions(
     target_team_id = target_engineer.team_id if target_engineer else None
 
     # Build candidate query: same team, exclude self
+    # If requesting_engineer_id is set, restrict to that engineer's sessions only
+    # (enforces data isolation for the engineer role)
     q = db.query(SessionModel).filter(SessionModel.id != session_id)
-    if target_team_id:
+    if requesting_engineer_id:
+        q = q.filter(SessionModel.engineer_id == requesting_engineer_id)
+    elif target_team_id:
         q = q.join(Engineer).filter(Engineer.team_id == target_team_id)
     else:
         # No team — scope to same engineer only
@@ -1592,17 +1597,12 @@ def get_time_to_team_average(
     eng_rows = db.query(Engineer.id, Engineer.name).filter(Engineer.id.in_(engineer_ids)).all()
     eng_names = {eid: name for eid, name in eng_rows}
 
-    # True first session date per engineer (across all time, not just date range)
-    first_session_rows = (
-        db.query(SessionModel.engineer_id, func.min(SessionModel.started_at))
-        .filter(SessionModel.engineer_id.in_(engineer_ids))
-        .group_by(SessionModel.engineer_id)
-        .all()
-    )
+    # First session date per engineer within the filtered range
     eng_first: dict[str, datetime] = {}
-    for eid, first_dt in first_session_rows:
-        if first_dt:
-            eng_first[eid] = first_dt
+    for eid, sess_list_raw in eng_sessions.items():
+        dates = [s.started_at for s in sess_list_raw if s.started_at]
+        if dates:
+            eng_first[eid] = min(dates)
 
     engineers: list[EngineerRampup] = []
     matched_count = 0
