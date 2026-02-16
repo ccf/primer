@@ -10,6 +10,7 @@ import { LearningPathCards } from "@/components/growth/learning-path-cards"
 import { SkillUniverseChart } from "@/components/growth/skill-universe-chart"
 import { PatternSummary } from "@/components/growth/pattern-summary"
 import { SharedPatternCards } from "@/components/growth/shared-pattern-card"
+import { TimeToTeamAverage } from "@/components/growth/time-to-team-average"
 import { CohortComparison } from "@/components/growth/cohort-comparison"
 import { NewHireTable } from "@/components/growth/new-hire-table"
 import { OnboardingRecommendations } from "@/components/growth/onboarding-recommendations"
@@ -160,6 +161,7 @@ function OnboardingTab({ teamId, startDate, endDate }: { teamId: string | null; 
 
   return (
     <div className="space-y-6">
+      <TimeToTeamAverage teamId={teamId} startDate={startDate} endDate={endDate} />
       <CohortComparison cohorts={data.cohorts} />
       <NewHireTable progress={data.new_hire_progress} />
       <VelocityChart progress={data.new_hire_progress} />

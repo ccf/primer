@@ -8,11 +8,13 @@ from primer.common.database import get_db
 from primer.common.schemas import (
     ActivityHeatmap,
     BottleneckAnalytics,
+    ClaudePRComparisonResponse,
     ConfigOptimizationResponse,
     CostAnalytics,
     DailyStatsResponse,
     EngineerAnalytics,
     EngineerBenchmarkResponse,
+    EngineerProfileResponse,
     FrictionReport,
     GitHubStatusResponse,
     GitHubSyncResponse,
@@ -28,6 +30,7 @@ from primer.common.schemas import (
     Recommendation,
     SessionInsightsResponse,
     SkillInventoryResponse,
+    TimeToTeamAverageResponse,
     ToolAdoptionAnalytics,
     ToolRanking,
 )
@@ -452,4 +455,61 @@ def github_status(
         installation_id=settings.github_installation_id,
         repos_count=db.query(GitRepository).count(),
         prs_count=db.query(PullRequest).count(),
+    )
+
+
+@router.get("/engineers/{engineer_id}/profile", response_model=EngineerProfileResponse)
+def engineer_profile(
+    engineer_id: str,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.common.models import Engineer
+    from primer.server.services.engineer_profile_service import get_engineer_profile
+
+    # Auth: engineer can view own; team_lead can view team members; admin any
+    if auth.role == "engineer" and auth.engineer_id != engineer_id:
+        raise HTTPException(status_code=403, detail="Cannot view another engineer's profile")
+    if auth.role == "team_lead":
+        eng = db.query(Engineer).filter(Engineer.id == engineer_id).first()
+        if not eng or eng.team_id != auth.team_id:
+            raise HTTPException(status_code=403, detail="Not your team's engineer")
+
+    result = get_engineer_profile(db, engineer_id, start_date, end_date)
+    if not result:
+        raise HTTPException(status_code=404, detail="Engineer not found")
+    return result
+
+
+@router.get("/claude-pr-comparison", response_model=ClaudePRComparisonResponse)
+def claude_pr_comparison(
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.quality_service import get_claude_pr_comparison
+
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_claude_pr_comparison(
+        db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
+    )
+
+
+@router.get("/time-to-team-average", response_model=TimeToTeamAverageResponse)
+def time_to_team_average(
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.insights_service import get_time_to_team_average
+
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_time_to_team_average(
+        db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
     )

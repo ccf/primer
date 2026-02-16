@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom"
 import { useSessionDetail } from "@/hooks/use-api-queries"
 import { SessionDetailPanel } from "@/components/sessions/session-detail-panel"
 import { TranscriptViewer } from "@/components/sessions/transcript-viewer"
+import { SimilarSessionsPanel } from "@/components/sessions/similar-sessions-panel"
 import { CardSkeleton } from "@/components/shared/loading-skeleton"
 import { ArrowLeft, Link2, Check } from "lucide-react"
 
@@ -63,6 +64,7 @@ export function SessionDetailPage() {
       </div>
       <SessionDetailPanel session={session} />
       <TranscriptViewer sessionId={session.id} />
+      <SimilarSessionsPanel sessionId={session.id} />
     </div>
   )
 }

@@ -733,3 +733,101 @@ export interface SessionInsightsResponse {
   primary_success: PrimarySuccessAnalysis
   sessions_analyzed: number
 }
+
+// --- Engineer Profile ---
+
+export interface WeeklyMetricPoint {
+  week: string
+  success_rate: number | null
+  avg_duration: number | null
+  tool_diversity: number
+  estimated_cost: number
+  session_count: number
+}
+
+export interface EngineerProfileResponse {
+  engineer_id: string
+  name: string
+  email: string
+  display_name: string | null
+  team_id: string | null
+  team_name: string | null
+  avatar_url: string | null
+  github_username: string | null
+  created_at: string
+  overview: OverviewStats
+  weekly_trajectory: WeeklyMetricPoint[]
+  friction: FrictionReport[]
+  config_suggestions: ConfigSuggestion[]
+  strengths: SkillInventoryResponse
+  learning_paths: EngineerLearningPath[]
+  quality: Record<string, unknown>
+}
+
+// --- Similar Sessions ---
+
+export interface SimilarSession {
+  session_id: string
+  engineer_id: string
+  engineer_name: string
+  engineer_avatar_url: string | null
+  project_name: string | null
+  session_type: string | null
+  outcome: string | null
+  duration_seconds: number | null
+  tools_used: string[]
+  similarity_reason: string
+  started_at: string | null
+}
+
+export interface SimilarSessionsResponse {
+  similar_sessions: SimilarSession[]
+  target_session_type: string | null
+  target_project: string | null
+  total_found: number
+}
+
+// --- Claude PR Comparison ---
+
+export interface PRGroupMetrics {
+  pr_count: number
+  merge_rate: number | null
+  avg_review_comments: number | null
+  avg_time_to_merge_hours: number | null
+  avg_additions: number | null
+  avg_deletions: number | null
+}
+
+export interface ClaudePRComparisonResponse {
+  claude_assisted: PRGroupMetrics
+  non_claude: PRGroupMetrics
+  delta_review_comments: number | null
+  delta_merge_time_hours: number | null
+  delta_merge_rate: number | null
+  total_prs_analyzed: number
+}
+
+// --- Time to Team Average ---
+
+export interface WeeklySuccessPoint {
+  week_number: number
+  success_rate: number | null
+  session_count: number
+}
+
+export interface EngineerRampup {
+  engineer_id: string
+  name: string
+  first_session_date: string
+  weeks_to_team_average: number | null
+  current_success_rate: number | null
+  weekly_success_rates: WeeklySuccessPoint[]
+}
+
+export interface TimeToTeamAverageResponse {
+  engineers: EngineerRampup[]
+  team_avg_success_rate: number
+  avg_weeks_to_match: number | null
+  engineers_who_matched: number
+  total_engineers: number
+}

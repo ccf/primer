@@ -7,7 +7,12 @@ from sqlalchemy.orm import Session
 from primer.common.database import get_db
 from primer.common.models import Engineer, SessionFacets, SessionMessage
 from primer.common.models import Session as SessionModel
-from primer.common.schemas import SessionDetailResponse, SessionMessageResponse, SessionResponse
+from primer.common.schemas import (
+    SessionDetailResponse,
+    SessionMessageResponse,
+    SessionResponse,
+    SimilarSessionsResponse,
+)
 from primer.server.deps import AuthContext, get_auth_context
 
 router = APIRouter(prefix="/api/v1/sessions", tags=["sessions"])
@@ -115,3 +120,27 @@ def get_transcript(
         .order_by(SessionMessage.ordinal)
         .all()
     )
+
+
+@router.get("/{session_id}/similar", response_model=SimilarSessionsResponse)
+def get_similar(
+    session_id: str,
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    # Same ownership check as GET /{session_id}
+    session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if auth.role == "engineer" and session.engineer_id != auth.engineer_id:
+        raise HTTPException(status_code=403, detail="Not your session")
+    if auth.role == "team_lead":
+        eng = db.query(Engineer).filter(Engineer.id == session.engineer_id).first()
+        if not eng or eng.team_id != auth.team_id:
+            raise HTTPException(status_code=403, detail="Not your team's session")
+
+    from primer.server.services.insights_service import get_similar_sessions
+
+    return get_similar_sessions(db, session_id, limit=limit)
