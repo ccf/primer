@@ -15,18 +15,12 @@ from primer.common.models import (
     Session as SessionModel,
 )
 from primer.common.schemas import SessionFacetsPayload, SessionIngestPayload
+from primer.common.utils import parse_repo_full_name
 
 logger = logging.getLogger(__name__)
 
 
-def _parse_repo_full_name(url: str) -> str | None:
-    """Extract owner/repo from a git remote URL."""
-    from primer.common.utils import parse_repo_full_name
-
-    return parse_repo_full_name(url)
-
-
-def _find_or_create_repository(db: Session, full_name: str) -> GitRepository:
+def find_or_create_repository(db: Session, full_name: str) -> GitRepository:
     """Find or create a GitRepository by full_name."""
     repo = db.query(GitRepository).filter(GitRepository.full_name == full_name).first()
     if repo:
@@ -80,9 +74,9 @@ def upsert_session(db: Session, engineer_id: str, payload: SessionIngestPayload)
 
     # Repository linking
     if payload.git_remote_url:
-        full_name = _parse_repo_full_name(payload.git_remote_url)
+        full_name = parse_repo_full_name(payload.git_remote_url)
         if full_name:
-            repo = _find_or_create_repository(db, full_name)
+            repo = find_or_create_repository(db, full_name)
             session.repository_id = repo.id
 
     # Tool usages — replace all
