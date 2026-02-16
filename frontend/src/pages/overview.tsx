@@ -1,4 +1,4 @@
-import { Activity, CheckCircle2, MessageSquare, Users, Wrench, FileCode, DollarSign, Download, FileText } from "lucide-react"
+import { Activity, CheckCircle2, HeartPulse, LogOut, MessageSquare, Users, Wrench, FileCode, DollarSign, Download, FileText, Zap } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useOverview, useDailyStats, useToolRankings, useModelRankings, useRecommendations, useCostAnalytics, useActivityHeatmap, useProductivity } from "@/hooks/use-api-queries"
 import { Button } from "@/components/ui/button"
@@ -155,6 +155,29 @@ export function OverviewPage({ teamId, dateRange }: OverviewPageProps) {
           value={formatNumber(overview.total_tool_calls)}
           icon={Wrench}
           delta={computeDelta(overview.total_tool_calls, prev?.total_tool_calls)}
+        />
+      </div>
+
+      {/* KPI Cards — Row 3 (Session Insights) */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard
+          label="Health Score"
+          value={overview.avg_health_score != null ? overview.avg_health_score.toFixed(1) : "-"}
+          icon={HeartPulse}
+        />
+        <StatCard
+          label="Cache Hit Rate"
+          value={overview.cache_hit_rate != null ? `${(overview.cache_hit_rate * 100).toFixed(1)}%` : "-"}
+          icon={Zap}
+        />
+        <StatCard
+          label="Top End Reason"
+          value={
+            overview.end_reason_counts && Object.keys(overview.end_reason_counts).length > 0
+              ? Object.entries(overview.end_reason_counts).sort((a, b) => b[1] - a[1])[0][0]
+              : "-"
+          }
+          icon={LogOut}
         />
       </div>
 

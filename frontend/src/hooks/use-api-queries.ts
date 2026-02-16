@@ -32,6 +32,7 @@ import type {
   SystemStats,
   TeamResponse,
   ToolAdoptionAnalytics,
+  SessionInsightsResponse,
   ToolRanking,
 } from "@/types/api"
 
@@ -428,6 +429,16 @@ export function useQualityMetrics(teamId: string | null, startDate?: string, end
     queryFn: () =>
       apiFetch<QualityMetricsResponse>(
         `/api/v1/analytics/quality-metrics${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useSessionInsights(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["session-insights", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<SessionInsightsResponse>(
+        `/api/v1/analytics/session-insights${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
       ),
   })
 }

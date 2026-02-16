@@ -181,6 +181,68 @@ def _build_overview(
     # Success rate
     success_rate = _compute_success_rate(db, team_id, engineer_id, start_date, end_date)
 
+    # End reason counts
+    er_q = q.filter(SessionModel.end_reason.isnot(None)).with_entities(SessionModel.end_reason)
+    end_reason_counts: dict[str, int] = {}
+    for (er,) in er_q.all():
+        end_reason_counts[er] = end_reason_counts.get(er, 0) + 1
+
+    # Cache hit rate from aggregated token sums
+    cache_agg = q.with_entities(
+        func.sum(SessionModel.cache_read_tokens),
+        func.sum(SessionModel.input_tokens),
+    ).first()
+    total_cache_read = cache_agg[0] or 0 if cache_agg else 0
+    total_input_for_cache = cache_agg[1] or 0 if cache_agg else 0
+    cache_denom = total_cache_read + total_input_for_cache
+    cache_hit_rate = round(total_cache_read / cache_denom, 3) if cache_denom > 0 else None
+
+    # Avg health score
+    from primer.server.services.session_insights_service import compute_session_health_score
+
+    health_rows = db.query(
+        SessionModel.duration_seconds,
+        SessionFacets.outcome,
+        SessionFacets.friction_counts,
+        SessionFacets.user_satisfaction_counts,
+        SessionFacets.primary_success,
+    ).outerjoin(SessionFacets, SessionFacets.session_id == SessionModel.id)
+    if engineer_id:
+        health_rows = health_rows.filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
+        health_rows = health_rows.join(Engineer).filter(Engineer.team_id == team_id)
+    if start_date:
+        health_rows = health_rows.filter(SessionModel.started_at >= start_date)
+    if end_date:
+        health_rows = health_rows.filter(SessionModel.started_at <= end_date)
+    health_data = health_rows.all()
+
+    avg_health_score = None
+    if health_data:
+        durations = [r.duration_seconds for r in health_data if r.duration_seconds is not None]
+        if durations:
+            sorted_dur = sorted(durations)
+            mid = len(sorted_dur) // 2
+            median_dur = (
+                sorted_dur[mid]
+                if len(sorted_dur) % 2 == 1
+                else (sorted_dur[mid - 1] + sorted_dur[mid]) / 2
+            )
+        else:
+            median_dur = None
+        scores = [
+            compute_session_health_score(
+                outcome=r.outcome,
+                friction_counts=r.friction_counts,
+                duration_seconds=r.duration_seconds,
+                median_duration=median_dur,
+                satisfaction_counts=r.user_satisfaction_counts,
+                primary_success=r.primary_success,
+            )
+            for r in health_data
+        ]
+        avg_health_score = round(sum(scores) / len(scores), 1) if scores else None
+
     return OverviewStats(
         total_sessions=total_sessions,
         total_engineers=total_engineers,
@@ -194,6 +256,9 @@ def _build_overview(
         outcome_counts=outcome_counts,
         session_type_counts=session_type_counts,
         success_rate=success_rate,
+        end_reason_counts=end_reason_counts,
+        cache_hit_rate=cache_hit_rate,
+        avg_health_score=avg_health_score,
     )
 
 
