@@ -117,6 +117,9 @@ def update_engineer(
     if payload.is_active is not None:
         changes["is_active"] = {"old": engineer.is_active, "new": payload.is_active}
         engineer.is_active = payload.is_active
+    if payload.github_id is not None:
+        changes["github_id"] = {"old": engineer.github_id, "new": payload.github_id}
+        engineer.github_id = payload.github_id
     if payload.github_username is not None:
         changes["github_username"] = {
             "old": engineer.github_username,

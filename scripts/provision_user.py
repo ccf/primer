@@ -136,6 +136,7 @@ def main():
             eng_id,
             {
                 "role": args.role,
+                "github_id": github_id,
                 "github_username": username,
                 "avatar_url": avatar_url,
                 "display_name": name,
@@ -156,6 +157,7 @@ def main():
             eng_id,
             {
                 "role": args.role,
+                "github_id": github_id,
                 "github_username": username,
                 "avatar_url": avatar_url,
                 "display_name": name,
