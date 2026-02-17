@@ -1,51 +1,53 @@
 import { NavLink } from "react-router-dom"
-import { AlertTriangle, FolderKanban, GitPullRequest, GraduationCap, Layout, Lightbulb, Microscope, MonitorDot, Settings, Sparkles, Users, Users2, Wrench } from "lucide-react"
+import { LayoutDashboard, MonitorDot, Settings, Sparkles, Users, Users2, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import { getApiKey } from "@/lib/api"
+import { getEffectiveRole } from "@/lib/role-utils"
+import type { LucideIcon } from "lucide-react"
 
-const allLinks = [
-  { to: "/", label: "Overview", icon: Layout, minRole: "engineer" as const },
-  { to: "/sessions", label: "Sessions", icon: MonitorDot, minRole: "engineer" as const },
-  { to: "/projects", label: "Projects", icon: FolderKanban, minRole: "engineer" as const },
-  { to: "/bottlenecks", label: "Bottlenecks", icon: AlertTriangle, minRole: "engineer" as const },
-  { to: "/tool-adoption", label: "Tool Adoption", icon: Wrench, minRole: "engineer" as const },
-  { to: "/insights", label: "Insights", icon: Lightbulb, minRole: "engineer" as const },
-  { to: "/growth", label: "Growth", icon: GraduationCap, minRole: "engineer" as const },
-  { to: "/quality", label: "Quality", icon: GitPullRequest, minRole: "engineer" as const },
-  { to: "/session-insights", label: "Session Insights", icon: Microscope, minRole: "engineer" as const },
-  { to: "/maturity", label: "AI Maturity", icon: Sparkles, minRole: "engineer" as const },
-  { to: "/teams", label: "Teams", icon: Users2, minRole: "team_lead" as const },
-  { to: "/engineers", label: "Engineers", icon: Users, minRole: "team_lead" as const },
-  { to: "/admin", label: "Admin", icon: Settings, minRole: "admin" as const },
+interface NavItem {
+  to: string
+  label: string
+  icon: LucideIcon
+}
+
+const engineerLinks: NavItem[] = [
+  { to: "/profile", label: "Home", icon: User },
+  { to: "/sessions", label: "Sessions", icon: MonitorDot },
 ]
 
-const roleLevel: Record<string, number> = {
-  engineer: 0,
-  team_lead: 1,
-  admin: 2,
-}
+const leadershipLinks: NavItem[] = [
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/engineers", label: "Engineers", icon: Users },
+  { to: "/teams", label: "Teams", icon: Users2 },
+  { to: "/sessions", label: "Sessions", icon: MonitorDot },
+  { to: "/maturity", label: "AI Maturity", icon: Sparkles },
+]
+
+const adminLink: NavItem = { to: "/admin", label: "Admin", icon: Settings }
 
 export function Sidebar() {
   const { user } = useAuth()
   const isApiKeyUser = !user && !!getApiKey()
   const role = user?.role ?? (isApiKeyUser ? "admin" : "admin")
-  const level = roleLevel[role] ?? 0
+  const effectiveRole = getEffectiveRole(role)
+  const isAdmin = role === "admin" || isApiKeyUser
 
-  const visibleLinks = allLinks.filter((link) => level >= (roleLevel[link.minRole] ?? 0))
+  const links = effectiveRole === "leadership" ? leadershipLinks : engineerLinks
+  const allLinks = isAdmin ? [...links, adminLink] : links
 
   return (
-    <aside className="flex h-full w-56 flex-col border-r border-border bg-card">
-      <div className="flex h-14 items-center gap-2 border-b border-border px-4">
-        <img src="/logo-mark.svg" alt="Primer" className="h-6 w-6" />
-        <span className="text-lg font-semibold">Primer</span>
+    <aside className="flex h-full w-48 flex-col border-r border-border bg-card">
+      <div className="flex h-12 items-center gap-2 border-b border-border px-4">
+        <img src="/logo-mark.svg" alt="Primer" className="h-5 w-5" />
+        <span className="text-base font-semibold">Primer</span>
       </div>
       <nav className="flex-1 space-y-1 p-3">
-        {visibleLinks.map((link) => (
+        {allLinks.map((link) => (
           <NavLink
             key={link.to}
             to={link.to}
-            end={link.to === "/"}
             className={({ isActive }) =>
               cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",

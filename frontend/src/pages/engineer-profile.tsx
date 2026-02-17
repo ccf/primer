@@ -1,9 +1,10 @@
 import { useState } from "react"
 import { Link, useParams } from "react-router-dom"
-import { ArrowLeft, Activity, CheckCircle2, DollarSign, Clock } from "lucide-react"
-import { cn, formatNumber, formatCost, formatPercent, formatDuration } from "@/lib/utils"
+import { ArrowLeft } from "lucide-react"
+import { formatNumber, formatCost, formatPercent, formatDuration } from "@/lib/utils"
 import { useEngineerProfile } from "@/hooks/use-api-queries"
-import { StatCard } from "@/components/dashboard/stat-card"
+import { InlineStat } from "@/components/ui/inline-stat"
+import { PageTabs } from "@/components/ui/page-tabs"
 import { TrajectorySparklines } from "@/components/engineer-profile/trajectory-sparklines"
 import { FrictionTab } from "@/components/engineer-profile/friction-tab"
 import { StrengthsTab } from "@/components/engineer-profile/strengths-tab"
@@ -76,91 +77,74 @@ export function EngineerProfilePage({ dateRange }: EngineerProfilePageProps) {
         Back to engineers
       </Link>
 
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        {profile.avatar_url ? (
-          <img
-            src={profile.avatar_url}
-            alt={profile.name}
-            className="h-14 w-14 rounded-full"
-          />
-        ) : (
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted text-lg font-medium">
-            {profile.name.charAt(0)}
+      <div className="flex gap-8">
+        {/* Left sidebar */}
+        <div className="w-72 shrink-0">
+          {profile.avatar_url ? (
+            <img
+              src={profile.avatar_url}
+              alt={profile.display_name ?? profile.name}
+              className="h-48 w-48 rounded-full"
+            />
+          ) : (
+            <div className="flex h-48 w-48 items-center justify-center rounded-full bg-muted text-4xl font-medium">
+              {(profile.display_name ?? profile.name).charAt(0).toUpperCase()}
+            </div>
+          )}
+
+          <div className="mt-4">
+            <h1 className="text-xl font-semibold">{profile.display_name ?? profile.name}</h1>
+            {profile.github_username && (
+              <p className="text-sm text-muted-foreground">@{profile.github_username}</p>
+            )}
+            <p className="mt-1 text-sm text-muted-foreground">{profile.email}</p>
           </div>
-        )}
-        <div>
-          <h1 className="text-2xl font-bold">
-            {profile.display_name ?? profile.name}
-          </h1>
-          <p className="text-sm text-muted-foreground">{profile.email}</p>
+
+          <div className="mt-6 grid grid-cols-2 gap-4">
+            <InlineStat label="Sessions" value={formatNumber(overview.total_sessions)} />
+            <InlineStat label="Success Rate" value={formatPercent(overview.success_rate)} />
+            <InlineStat
+              label="Est. Cost"
+              value={overview.estimated_cost != null ? formatCost(overview.estimated_cost) : "-"}
+            />
+            <InlineStat label="Avg Duration" value={formatDuration(overview.avg_session_duration)} />
+          </div>
+
           {profile.team_name && (
-            <p className="text-xs text-muted-foreground">Team: {profile.team_name}</p>
+            <div className="mt-6">
+              <span className="inline-flex items-center rounded-full border border-border px-3 py-1 text-xs font-medium">
+                {profile.team_name}
+              </span>
+            </div>
           )}
         </div>
-      </div>
 
-      {/* Overview stat cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Sessions"
-          value={formatNumber(overview.total_sessions)}
-          icon={Activity}
-        />
-        <StatCard
-          label="Success Rate"
-          value={formatPercent(overview.success_rate)}
-          icon={CheckCircle2}
-        />
-        <StatCard
-          label="Estimated Cost"
-          value={overview.estimated_cost != null ? formatCost(overview.estimated_cost) : "-"}
-          icon={DollarSign}
-        />
-        <StatCard
-          label="Avg Duration"
-          value={formatDuration(overview.avg_session_duration)}
-          icon={Clock}
-        />
-      </div>
+        {/* Right content */}
+        <div className="min-w-0 flex-1">
+          <PageTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-border">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              "px-4 py-2 text-sm font-medium transition-colors",
-              activeTab === tab.id
-                ? "border-b-2 border-primary text-primary"
-                : "text-muted-foreground hover:text-foreground",
+          <div className="mt-6">
+            {activeTab === "trajectory" && (
+              <TrajectorySparklines data={profile.weekly_trajectory} />
             )}
-          >
-            {tab.label}
-          </button>
-        ))}
+            {activeTab === "friction" && (
+              <FrictionTab
+                friction={profile.friction}
+                configSuggestions={profile.config_suggestions}
+              />
+            )}
+            {activeTab === "strengths" && (
+              <StrengthsTab
+                strengths={profile.strengths}
+                learningPaths={profile.learning_paths}
+              />
+            )}
+            {activeTab === "quality" && (
+              <QualityTab quality={profile.quality} />
+            )}
+          </div>
+        </div>
       </div>
-
-      {/* Tab content */}
-      {activeTab === "trajectory" && (
-        <TrajectorySparklines data={profile.weekly_trajectory} />
-      )}
-      {activeTab === "friction" && (
-        <FrictionTab
-          friction={profile.friction}
-          configSuggestions={profile.config_suggestions}
-        />
-      )}
-      {activeTab === "strengths" && (
-        <StrengthsTab
-          strengths={profile.strengths}
-          learningPaths={profile.learning_paths}
-        />
-      )}
-      {activeTab === "quality" && (
-        <QualityTab quality={profile.quality} />
-      )}
     </div>
   )
 }
