@@ -313,9 +313,7 @@ class TestGitHubSync:
         assert resp.status_code == 403
 
     def test_status_returns_not_configured(self, client, admin_headers, db_session, monkeypatch):
-        monkeypatch.setattr(
-            "primer.server.services.github_service.settings.github_app_id", None
-        )
+        monkeypatch.setattr("primer.server.services.github_service.settings.github_app_id", None)
         resp = client.get("/api/v1/analytics/github/status", headers=admin_headers)
         assert resp.status_code == 200
         data = resp.json()

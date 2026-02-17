@@ -70,8 +70,10 @@ def get_quality_metrics(
     engineer_quality = _compute_engineer_quality(db, session_id_q)
     session_prs = _compute_recent_prs(db, session_id_q)
 
-    # Enrich overview with GitHub-synced PR stats if session-linked PRs are empty
-    if overview.total_prs == 0 and github_prs:
+    # Always use GitHub-synced PR stats for the overview so counts match the
+    # merged PR list.  This avoids the inconsistency where overview.total_prs
+    # only reflects session-linked PRs while recent_prs shows the full set.
+    if github_prs:
         gh_overview = _compute_pr_overview_from_github(
             db, team_id, engineer_id, start_date, end_date
         )
@@ -79,8 +81,6 @@ def get_quality_metrics(
         overview.pr_merge_rate = gh_overview.pr_merge_rate
         overview.avg_review_comments_per_pr = gh_overview.avg_review_comments_per_pr
         overview.avg_time_to_merge_hours = gh_overview.avg_time_to_merge_hours
-        overview.total_lines_added += gh_overview.total_lines_added
-        overview.total_lines_deleted += gh_overview.total_lines_deleted
 
     # Merge session-linked PRs with GitHub-synced PRs (dedupe by repo+number)
     seen = {(pr.repository, pr.pr_number) for pr in session_prs}
@@ -492,15 +492,10 @@ def _compute_pr_overview_from_github(
     end_date: datetime | None,
 ) -> QualityOverview:
     """Compute PR overview stats directly from GitHub-synced PRs."""
-    q = db.query(PullRequest).outerjoin(Engineer, Engineer.id == PullRequest.engineer_id)
-    if engineer_id:
-        q = q.filter(PullRequest.engineer_id == engineer_id)
-    elif team_id:
-        q = q.filter(Engineer.team_id == team_id)
-    if start_date:
-        q = q.filter(PullRequest.pr_created_at >= start_date)
-    if end_date:
-        q = q.filter(PullRequest.pr_created_at <= end_date)
+    # Reuse _build_pr_scope_query for consistent scope filtering
+    base = _build_pr_scope_query(db, team_id, engineer_id, start_date, end_date)
+    # Replace selected columns — base selects (PullRequest, repo_name, author_name)
+    q = base.with_entities(PullRequest)
 
     stats = q.with_entities(
         func.count(PullRequest.id).label("total"),
@@ -525,9 +520,7 @@ def _compute_pr_overview_from_github(
         .all()
     )
     if merge_rows:
-        total_secs = sum(
-            (row.merged_at - row.pr_created_at).total_seconds() for row in merge_rows
-        )
+        total_secs = sum((row.merged_at - row.pr_created_at).total_seconds() for row in merge_rows)
         avg_time_to_merge_hours = total_secs / len(merge_rows) / 3600
 
     return QualityOverview(
