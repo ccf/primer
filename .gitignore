@@ -17,6 +17,8 @@ coverage.xml
 .env
 .env.*
 !.env.example
+*.pem
+.github-app-key.pem
 .DS_Store
 uv.lock
 frontend/node_modules/

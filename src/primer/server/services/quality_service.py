@@ -46,24 +46,20 @@ def get_quality_metrics(
     session_id_q = base_q.with_entities(SessionModel.id)
     total_sessions = session_id_q.count()
 
+    # Always fetch GitHub-synced PRs (not dependent on sessions)
+    github_prs = _compute_github_prs(db, team_id, engineer_id, start_date, end_date)
+
     if total_sessions == 0:
+        # Still compute PR overview from GitHub-synced data
+        pr_overview = _compute_pr_overview_from_github(
+            db, team_id, engineer_id, start_date, end_date
+        )
         return QualityMetricsResponse(
-            overview=QualityOverview(
-                sessions_with_commits=0,
-                total_commits=0,
-                total_lines_added=0,
-                total_lines_deleted=0,
-                total_prs=0,
-                pr_merge_rate=None,
-                avg_commits_per_session=None,
-                avg_lines_per_session=None,
-                avg_review_comments_per_pr=None,
-                avg_time_to_merge_hours=None,
-            ),
+            overview=pr_overview,
             daily_volume=[],
             by_session_type=[],
             engineer_quality=[],
-            recent_prs=[],
+            recent_prs=github_prs,
             sessions_analyzed=0,
             github_connected=bool(settings.github_app_id),
         )
@@ -72,14 +68,34 @@ def get_quality_metrics(
     daily_volume = _compute_daily_volume(db, session_id_q)
     by_session_type = _compute_by_session_type(db, session_id_q)
     engineer_quality = _compute_engineer_quality(db, session_id_q)
-    recent_prs = _compute_recent_prs(db, session_id_q)
+    session_prs = _compute_recent_prs(db, session_id_q)
+
+    # Enrich overview with GitHub-synced PR stats if session-linked PRs are empty
+    if overview.total_prs == 0 and github_prs:
+        gh_overview = _compute_pr_overview_from_github(
+            db, team_id, engineer_id, start_date, end_date
+        )
+        overview.total_prs = gh_overview.total_prs
+        overview.pr_merge_rate = gh_overview.pr_merge_rate
+        overview.avg_review_comments_per_pr = gh_overview.avg_review_comments_per_pr
+        overview.avg_time_to_merge_hours = gh_overview.avg_time_to_merge_hours
+        overview.total_lines_added += gh_overview.total_lines_added
+        overview.total_lines_deleted += gh_overview.total_lines_deleted
+
+    # Merge session-linked PRs with GitHub-synced PRs (dedupe by repo+number)
+    seen = {(pr.repository, pr.pr_number) for pr in session_prs}
+    merged_prs = list(session_prs)
+    for pr in github_prs:
+        if (pr.repository, pr.pr_number) not in seen:
+            merged_prs.append(pr)
+    merged_prs.sort(key=lambda p: p.pr_created_at or "", reverse=True)
 
     return QualityMetricsResponse(
         overview=overview,
         daily_volume=daily_volume,
         by_session_type=by_session_type,
         engineer_quality=engineer_quality,
-        recent_prs=recent_prs,
+        recent_prs=merged_prs[:30],
         sessions_analyzed=total_sessions,
         github_connected=bool(settings.github_app_id),
     )
@@ -408,6 +424,124 @@ def _compute_recent_prs(db: Session, session_id_q) -> list[PRSummary]:
         )
 
     return results
+
+
+def _build_pr_scope_query(
+    db: Session,
+    team_id: str | None,
+    engineer_id: str | None,
+    start_date: datetime | None,
+    end_date: datetime | None,
+):
+    """Build a query for GitHub-synced PRs scoped by team/engineer/date."""
+    q = (
+        db.query(PullRequest, GitRepository.full_name, Engineer.name.label("author_name"))
+        .join(GitRepository, GitRepository.id == PullRequest.repository_id)
+        .outerjoin(Engineer, Engineer.id == PullRequest.engineer_id)
+    )
+    if engineer_id:
+        q = q.filter(PullRequest.engineer_id == engineer_id)
+    elif team_id:
+        q = q.filter(Engineer.team_id == team_id)
+    if start_date:
+        q = q.filter(PullRequest.pr_created_at >= start_date)
+    if end_date:
+        q = q.filter(PullRequest.pr_created_at <= end_date)
+    return q
+
+
+def _compute_github_prs(
+    db: Session,
+    team_id: str | None,
+    engineer_id: str | None,
+    start_date: datetime | None,
+    end_date: datetime | None,
+) -> list[PRSummary]:
+    """Fetch recent PRs directly from GitHub sync data (not session-linked)."""
+    rows = (
+        _build_pr_scope_query(db, team_id, engineer_id, start_date, end_date)
+        .order_by(PullRequest.pr_created_at.desc())
+        .limit(30)
+        .all()
+    )
+
+    return [
+        PRSummary(
+            repository=repo_name,
+            pr_number=pr.github_pr_number,
+            title=pr.title,
+            state=pr.state,
+            head_branch=pr.head_branch,
+            additions=pr.additions,
+            deletions=pr.deletions,
+            review_comments_count=pr.review_comments_count,
+            author=author_name,
+            linked_sessions=0,
+            pr_created_at=pr.pr_created_at.isoformat() if pr.pr_created_at else None,
+            merged_at=pr.merged_at.isoformat() if pr.merged_at else None,
+        )
+        for pr, repo_name, author_name in rows
+    ]
+
+
+def _compute_pr_overview_from_github(
+    db: Session,
+    team_id: str | None,
+    engineer_id: str | None,
+    start_date: datetime | None,
+    end_date: datetime | None,
+) -> QualityOverview:
+    """Compute PR overview stats directly from GitHub-synced PRs."""
+    q = db.query(PullRequest).outerjoin(Engineer, Engineer.id == PullRequest.engineer_id)
+    if engineer_id:
+        q = q.filter(PullRequest.engineer_id == engineer_id)
+    elif team_id:
+        q = q.filter(Engineer.team_id == team_id)
+    if start_date:
+        q = q.filter(PullRequest.pr_created_at >= start_date)
+    if end_date:
+        q = q.filter(PullRequest.pr_created_at <= end_date)
+
+    stats = q.with_entities(
+        func.count(PullRequest.id).label("total"),
+        func.sum(case((PullRequest.state == "merged", 1), else_=0)).label("merged"),
+        func.sum(case((PullRequest.state == "closed", 1), else_=0)).label("closed"),
+        func.coalesce(func.sum(PullRequest.additions), 0).label("additions"),
+        func.coalesce(func.sum(PullRequest.deletions), 0).label("deletions"),
+        func.avg(PullRequest.review_comments_count).label("avg_comments"),
+    ).first()
+
+    total_prs = stats[0] or 0
+    merged = stats[1] or 0
+    closed = stats[2] or 0
+    pr_merge_rate = merged / (merged + closed) if (merged + closed) > 0 else None
+    avg_review_comments = float(stats[5]) if stats[5] is not None else None
+
+    # Average time to merge
+    avg_time_to_merge_hours = None
+    merge_rows = (
+        q.with_entities(PullRequest.merged_at, PullRequest.pr_created_at)
+        .filter(PullRequest.merged_at.isnot(None), PullRequest.pr_created_at.isnot(None))
+        .all()
+    )
+    if merge_rows:
+        total_secs = sum(
+            (row.merged_at - row.pr_created_at).total_seconds() for row in merge_rows
+        )
+        avg_time_to_merge_hours = total_secs / len(merge_rows) / 3600
+
+    return QualityOverview(
+        sessions_with_commits=0,
+        total_commits=0,
+        total_lines_added=stats[3] or 0,
+        total_lines_deleted=stats[4] or 0,
+        total_prs=total_prs,
+        pr_merge_rate=pr_merge_rate,
+        avg_commits_per_session=None,
+        avg_lines_per_session=None,
+        avg_review_comments_per_pr=avg_review_comments,
+        avg_time_to_merge_hours=avg_time_to_merge_hours,
+    )
 
 
 def get_claude_pr_comparison(

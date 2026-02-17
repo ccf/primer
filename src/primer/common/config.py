@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
@@ -6,10 +8,16 @@ class PrimerSettings(BaseSettings):
     model_config = {"env_prefix": "PRIMER_", "env_file": ".env", "env_file_encoding": "utf-8"}
 
     @model_validator(mode="after")
-    def _fix_pem_newlines(self) -> "PrimerSettings":
-        """Replace literal \\n with actual newlines in PEM keys from env vars."""
-        if self.github_app_private_key and "\\n" in self.github_app_private_key:
-            self.github_app_private_key = self.github_app_private_key.replace("\\n", "\n")
+    def _resolve_private_key(self) -> "PrimerSettings":
+        """Load PEM from file path, or fix literal \\n in inline PEM strings."""
+        key = self.github_app_private_key
+        if key:
+            # If the value is a file path, read the file
+            path = Path(key)
+            if path.exists() and path.is_file():
+                self.github_app_private_key = path.read_text().strip()
+            elif "\\n" in key:
+                self.github_app_private_key = key.replace("\\n", "\n")
         return self
 
     database_url: str = "sqlite:///./primer.db"
