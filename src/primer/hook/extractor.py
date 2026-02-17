@@ -282,6 +282,16 @@ def _process_entry(
             for block in content:
                 if isinstance(block, dict) and block.get("type") == "tool_use":
                     tool_name = block.get("name", "unknown")
+                    tool_input = block.get("input", {})
+                    if isinstance(tool_input, dict):
+                        if tool_name == "Task":
+                            sub_type = tool_input.get("subagent_type") or ""
+                            if sub_type:
+                                tool_name = f"Task:{sub_type}"
+                        elif tool_name == "Skill":
+                            skill_name = tool_input.get("skill") or ""
+                            if skill_name:
+                                tool_name = f"Skill:{skill_name}"
                     tool_counter[tool_name] += 1
                     meta.tool_call_count += 1
 

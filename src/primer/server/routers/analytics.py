@@ -19,6 +19,7 @@ from primer.common.schemas import (
     GitHubStatusResponse,
     GitHubSyncResponse,
     LearningPathsResponse,
+    MaturityAnalyticsResponse,
     ModelRanking,
     OnboardingAccelerationResponse,
     OverviewStats,
@@ -413,6 +414,22 @@ def session_insights(
 
     tid, eid = _resolve_scope(auth, team_id)
     return get_session_insights(
+        db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
+    )
+
+
+@router.get("/maturity", response_model=MaturityAnalyticsResponse)
+def maturity_analytics(
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.maturity_service import get_maturity_analytics
+
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_maturity_analytics(
         db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
     )
 

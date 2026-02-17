@@ -20,6 +20,7 @@ import { InsightsPage } from "@/pages/insights"
 import { GrowthPage } from "@/pages/growth"
 import { QualityPage } from "@/pages/quality"
 import { SessionInsightsPage } from "@/pages/session-insights"
+import { MaturityPage } from "@/pages/maturity"
 import { AdminPage } from "@/pages/admin"
 import { EngineerProfilePage } from "@/pages/engineer-profile"
 import { NotFoundPage } from "@/pages/not-found"
@@ -81,6 +82,7 @@ function AuthenticatedApp() {
         <Route path="/growth" element={<GrowthPage teamId={teamId} dateRange={dateRange} />} />
         <Route path="/quality" element={<QualityPage teamId={teamId} dateRange={dateRange} />} />
         <Route path="/session-insights" element={<SessionInsightsPage teamId={teamId} dateRange={dateRange} />} />
+        <Route path="/maturity" element={<MaturityPage teamId={teamId} dateRange={dateRange} />} />
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/teams/:teamId" element={<TeamDetailRoute dateRange={dateRange} />} />
         <Route path="/admin" element={<AdminPage />} />

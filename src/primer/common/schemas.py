@@ -1070,3 +1070,61 @@ class TimeToTeamAverageResponse(BaseModel):
     avg_weeks_to_match: float | None
     engineers_who_matched: int
     total_engineers: int
+
+
+# --- AI DevEx Maturity ---
+
+
+class ToolCategoryBreakdown(BaseModel):
+    core: dict[str, int]
+    search: dict[str, int]
+    orchestration: dict[str, int]
+    skill: dict[str, int]
+    mcp: dict[str, int]
+
+
+class EngineerLeverageProfile(BaseModel):
+    engineer_id: str
+    name: str
+    leverage_score: float
+    total_tool_calls: int
+    orchestration_calls: int
+    skill_calls: int
+    mcp_calls: int
+    top_agents: list[str]
+    top_skills: list[str]
+    category_distribution: dict[str, int]
+
+
+class DailyLeverageEntry(BaseModel):
+    date: str
+    leverage_score: float
+    total_calls: int
+
+
+class AgentSkillUsage(BaseModel):
+    name: str
+    category: str
+    total_calls: int
+    session_count: int
+    engineer_count: int
+
+
+class ProjectReadinessEntry(BaseModel):
+    repository: str
+    has_claude_md: bool
+    has_agents_md: bool
+    has_claude_dir: bool
+    ai_readiness_score: float
+    session_count: int
+
+
+class MaturityAnalyticsResponse(BaseModel):
+    tool_categories: ToolCategoryBreakdown
+    engineer_profiles: list[EngineerLeverageProfile]
+    daily_leverage: list[DailyLeverageEntry]
+    agent_skill_breakdown: list[AgentSkillUsage]
+    project_readiness: list[ProjectReadinessEntry]
+    sessions_analyzed: int
+    avg_leverage_score: float
+    orchestration_adoption_rate: float

@@ -831,3 +831,60 @@ export interface TimeToTeamAverageResponse {
   engineers_who_matched: number
   total_engineers: number
 }
+
+// --- AI DevEx Maturity ---
+
+export interface ToolCategoryBreakdown {
+  core: Record<string, number>
+  search: Record<string, number>
+  orchestration: Record<string, number>
+  skill: Record<string, number>
+  mcp: Record<string, number>
+}
+
+export interface EngineerLeverageProfile {
+  engineer_id: string
+  name: string
+  leverage_score: number
+  total_tool_calls: number
+  orchestration_calls: number
+  skill_calls: number
+  mcp_calls: number
+  top_agents: string[]
+  top_skills: string[]
+  category_distribution: Record<string, number>
+}
+
+export interface DailyLeverageEntry {
+  date: string
+  leverage_score: number
+  total_calls: number
+}
+
+export interface AgentSkillUsage {
+  name: string
+  category: string
+  total_calls: number
+  session_count: number
+  engineer_count: number
+}
+
+export interface ProjectReadinessEntry {
+  repository: string
+  has_claude_md: boolean
+  has_agents_md: boolean
+  has_claude_dir: boolean
+  ai_readiness_score: number
+  session_count: number
+}
+
+export interface MaturityAnalyticsResponse {
+  tool_categories: ToolCategoryBreakdown
+  engineer_profiles: EngineerLeverageProfile[]
+  daily_leverage: DailyLeverageEntry[]
+  agent_skill_breakdown: AgentSkillUsage[]
+  project_readiness: ProjectReadinessEntry[]
+  sessions_analyzed: number
+  avg_leverage_score: number
+  orchestration_adoption_rate: number
+}

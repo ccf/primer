@@ -18,6 +18,7 @@ import type {
   FrictionReport,
   IngestEventResponse,
   LearningPathsResponse,
+  MaturityAnalyticsResponse,
   ModelRanking,
   OnboardingAccelerationResponse,
   OverviewStats,
@@ -483,6 +484,16 @@ export function useTimeToTeamAverage(teamId: string | null, startDate?: string, 
     queryFn: () =>
       apiFetch<TimeToTeamAverageResponse>(
         `/api/v1/analytics/time-to-team-average${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useMaturityAnalytics(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["maturity-analytics", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<MaturityAnalyticsResponse>(
+        `/api/v1/analytics/maturity${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
       ),
   })
 }
