@@ -25,6 +25,7 @@ def test_classify_orchestration():
 
 
 def test_classify_skills():
+    assert classify_tool("Skill") == "skill"
     assert classify_tool("Skill:commit") == "skill"
     assert classify_tool("Skill:review-pr") == "skill"
 
