@@ -228,7 +228,10 @@ def get_pull_request_commits(full_name: str, pr_number: int) -> list[str]:
 
 
 def check_file_exists(
-    full_name: str, path: str, ref: str | None = None, expected_type: str | None = None,
+    full_name: str,
+    path: str,
+    ref: str | None = None,
+    expected_type: str | None = None,
 ) -> bool | None:
     """Check if a file or directory exists in a GitHub repository.
 
