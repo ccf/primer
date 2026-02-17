@@ -15,6 +15,7 @@ from primer.common.schemas import (
     ConfigSuggestion,
     EngineerApproach,
     EngineerLearningPath,
+    EngineerRampup,
     EngineerSkillProfile,
     LearningPathsResponse,
     LearningRecommendation,
@@ -25,8 +26,12 @@ from primer.common.schemas import (
     PersonalizedTip,
     PersonalizedTipsResponse,
     SharedPattern,
+    SimilarSession,
+    SimilarSessionsResponse,
     SkillInventoryResponse,
     TeamSkillGap,
+    TimeToTeamAverageResponse,
+    WeeklySuccessPoint,
 )
 from primer.server.services.analytics_service import (
     base_session_query,
@@ -1371,4 +1376,334 @@ def get_onboarding_acceleration(
         recommendations=recommendations,
         sessions_analyzed=len(sessions),
         experienced_benchmark=experienced_benchmark,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Similar Sessions (Contextual Pattern Sharing)
+# ---------------------------------------------------------------------------
+
+
+def get_similar_sessions(
+    db: Session,
+    session_id: str,
+    limit: int = 10,
+    requesting_engineer_id: str | None = None,
+) -> SimilarSessionsResponse:
+    """Find sessions similar to the target, within the same team."""
+    # Load target session and its facets
+    target = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+    if not target:
+        return SimilarSessionsResponse(
+            similar_sessions=[],
+            target_session_type=None,
+            target_project=None,
+            total_found=0,
+        )
+
+    target_facets = db.query(SessionFacets).filter(SessionFacets.session_id == session_id).first()
+    target_type = target_facets.session_type if target_facets else None
+    target_project = target.project_name
+    target_goals: list[str] = []
+    if target_facets and target_facets.goal_categories:
+        cats = target_facets.goal_categories
+        if isinstance(cats, str):
+            try:
+                cats = json.loads(cats)
+            except (json.JSONDecodeError, TypeError):
+                cats = []
+        if isinstance(cats, list):
+            target_goals = cats
+
+    # Find the target's team
+    target_engineer = db.query(Engineer).filter(Engineer.id == target.engineer_id).first()
+    target_team_id = target_engineer.team_id if target_engineer else None
+
+    # Build candidate query: same team, exclude self
+    # If requesting_engineer_id is set, restrict to that engineer's sessions only
+    # (enforces data isolation for the engineer role)
+    q = db.query(SessionModel).filter(SessionModel.id != session_id)
+    if requesting_engineer_id:
+        q = q.filter(SessionModel.engineer_id == requesting_engineer_id)
+    elif target_team_id:
+        q = q.join(Engineer).filter(Engineer.team_id == target_team_id)
+    else:
+        # No team — scope to same engineer only
+        q = q.filter(SessionModel.engineer_id == target.engineer_id)
+
+    candidates = q.all()
+    if not candidates:
+        return SimilarSessionsResponse(
+            similar_sessions=[],
+            target_session_type=target_type,
+            target_project=target_project,
+            total_found=0,
+        )
+
+    # Gather candidate facets and tools
+    # Use subquery to avoid SQLite 999-variable limit
+    cand_subq = q.with_entities(SessionModel.id).subquery()
+    cand_ids_q = db.query(cand_subq.c.id)
+
+    cand_facets = db.query(SessionFacets).filter(SessionFacets.session_id.in_(cand_ids_q)).all()
+    facets_map: dict[str, SessionFacets] = {f.session_id: f for f in cand_facets}
+
+    cand_tools = (
+        db.query(ToolUsage.session_id, ToolUsage.tool_name)
+        .filter(ToolUsage.session_id.in_(cand_ids_q))
+        .all()
+    )
+    tools_map: dict[str, list[str]] = defaultdict(list)
+    for tu in cand_tools:
+        tools_map[tu.session_id].append(tu.tool_name)
+
+    # Engineer names/avatars
+    eng_ids = list({c.engineer_id for c in candidates})
+    eng_rows = (
+        db.query(Engineer.id, Engineer.name, Engineer.avatar_url)
+        .filter(Engineer.id.in_(eng_ids))
+        .all()
+    )
+    eng_info = {e.id: (e.name, e.avatar_url) for e in eng_rows}
+
+    # Score candidates
+    scored: list[tuple[int, bool, float | None, SessionModel]] = []
+    for c in candidates:
+        f = facets_map.get(c.id)
+        c_type = f.session_type if f else None
+        c_project = c.project_name
+        c_goals: list[str] = []
+        if f and f.goal_categories:
+            cats = f.goal_categories
+            if isinstance(cats, str):
+                try:
+                    cats = json.loads(cats)
+                except (json.JSONDecodeError, TypeError):
+                    cats = []
+            if isinstance(cats, list):
+                c_goals = cats
+
+        # Relevance: 3 = type+project, 2 = type only, 1 = goal overlap, 0 = no match
+        relevance = 0
+        reason = "same_goal"
+        if target_type and c_type == target_type and target_project and c_project == target_project:
+            relevance = 3
+            reason = "same_type_and_project"
+        elif target_type and c_type == target_type:
+            relevance = 2
+            reason = "same_type"
+        elif target_goals and c_goals and set(target_goals) & set(c_goals):
+            relevance = 1
+            reason = "same_goal"
+        else:
+            continue  # skip non-matching
+
+        c_outcome = f.outcome if f else None
+        is_success = c_outcome == "success"
+        dur = c.duration_seconds if c.duration_seconds is not None else float("inf")
+
+        scored.append((relevance, is_success, dur, c, reason))
+
+    # Sort: highest relevance, success first, shortest duration
+    scored.sort(key=lambda x: (-x[0], not x[1], x[2] if x[2] is not None else float("inf")))
+
+    results: list[SimilarSession] = []
+    for _relevance, _is_success, _dur, c, reason in scored[:limit]:
+        f = facets_map.get(c.id)
+        ename, eavatar = eng_info.get(c.engineer_id, ("Unknown", None))
+        results.append(
+            SimilarSession(
+                session_id=c.id,
+                engineer_id=c.engineer_id,
+                engineer_name=ename,
+                engineer_avatar_url=eavatar,
+                project_name=c.project_name,
+                session_type=f.session_type if f else None,
+                outcome=f.outcome if f else None,
+                duration_seconds=c.duration_seconds,
+                tools_used=sorted(set(tools_map.get(c.id, []))),
+                similarity_reason=reason,
+                started_at=c.started_at.isoformat() if c.started_at else None,
+            )
+        )
+
+    return SimilarSessionsResponse(
+        similar_sessions=results,
+        target_session_type=target_type,
+        target_project=target_project,
+        total_found=len(scored),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Time to Team Average
+# ---------------------------------------------------------------------------
+
+
+def get_time_to_team_average(
+    db: Session,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> TimeToTeamAverageResponse:
+    """For each engineer, compute how many weeks until their rolling success
+    rate reached the team average."""
+    base_q = base_session_query(db, team_id, engineer_id, start_date, end_date)
+    sessions = base_q.all()
+
+    if not sessions:
+        return TimeToTeamAverageResponse(
+            engineers=[],
+            team_avg_success_rate=0.0,
+            avg_weeks_to_match=None,
+            engineers_who_matched=0,
+            total_engineers=0,
+        )
+
+    session_ids_subq = base_q.with_entities(SessionModel.id).subquery()
+    session_ids_q = db.query(session_ids_subq.c.id)
+
+    # Get facets for outcomes
+    all_facets = (
+        db.query(SessionFacets.session_id, SessionFacets.outcome)
+        .filter(
+            SessionFacets.session_id.in_(session_ids_q),
+            SessionFacets.outcome.isnot(None),
+        )
+        .all()
+    )
+    outcome_map: dict[str, str] = {f.session_id: f.outcome for f in all_facets}
+
+    # Compute team average success rate
+    outcomes_all = list(outcome_map.values())
+    if not outcomes_all:
+        return TimeToTeamAverageResponse(
+            engineers=[],
+            team_avg_success_rate=0.0,
+            avg_weeks_to_match=None,
+            engineers_who_matched=0,
+            total_engineers=0,
+        )
+    team_avg_sr = sum(1 for o in outcomes_all if o == "success") / len(outcomes_all)
+
+    # Group sessions by engineer
+    eng_sessions: dict[str, list] = defaultdict(list)
+    for s in sessions:
+        eng_sessions[s.engineer_id].append(s)
+
+    # Engineer names + first session dates
+    engineer_ids = list(eng_sessions.keys())
+    eng_rows = db.query(Engineer.id, Engineer.name).filter(Engineer.id.in_(engineer_ids)).all()
+    eng_names = {eid: name for eid, name in eng_rows}
+
+    # Use all-time first session date for accurate ramp-up timing
+    first_session_rows = (
+        db.query(SessionModel.engineer_id, func.min(SessionModel.started_at))
+        .filter(SessionModel.engineer_id.in_(engineer_ids))
+        .group_by(SessionModel.engineer_id)
+        .all()
+    )
+    eng_first: dict[str, datetime] = {}
+    for eid, first_dt in first_session_rows:
+        if first_dt:
+            eng_first[eid] = first_dt
+
+    engineers: list[EngineerRampup] = []
+    matched_count = 0
+    weeks_list: list[int] = []
+
+    for eid in engineer_ids:
+        sess_list = eng_sessions[eid]
+        first_dt = eng_first.get(eid)
+        if not first_dt:
+            continue
+
+        # Sort by started_at
+        sess_list.sort(key=lambda s: s.started_at or datetime.min)
+
+        # Group into weekly buckets by offset from first session
+        weekly_buckets: dict[int, list[str]] = defaultdict(list)
+        for s in sess_list:
+            if not s.started_at:
+                continue
+            delta = s.started_at - first_dt
+            if hasattr(delta, "total_seconds"):
+                week_num = int(delta.total_seconds() / (7 * 86400))
+            else:
+                week_num = 0
+            outcome = outcome_map.get(s.id)
+            if outcome:
+                weekly_buckets[week_num].append(outcome)
+
+        if not weekly_buckets:
+            engineers.append(
+                EngineerRampup(
+                    engineer_id=eid,
+                    name=eng_names.get(eid, "Unknown"),
+                    first_session_date=first_dt.isoformat(),
+                    weeks_to_team_average=None,
+                    current_success_rate=None,
+                    weekly_success_rates=[],
+                )
+            )
+            continue
+
+        # Compute weekly success rates
+        max_week = max(weekly_buckets.keys())
+        weekly_points: list[WeeklySuccessPoint] = []
+        weeks_to_match: int | None = None
+        rolling_outcomes: list[str] = []
+
+        for wk in range(max_week + 1):
+            bucket = weekly_buckets.get(wk, [])
+            rolling_outcomes.extend(bucket)
+            count = len(bucket)
+            if rolling_outcomes:
+                sr = sum(1 for o in rolling_outcomes if o == "success") / len(rolling_outcomes)
+            else:
+                sr = None
+
+            weekly_points.append(
+                WeeklySuccessPoint(
+                    week_number=wk,
+                    success_rate=round(sr, 3) if sr is not None else None,
+                    session_count=count,
+                )
+            )
+
+            if weeks_to_match is None and sr is not None and sr >= team_avg_sr:
+                weeks_to_match = wk
+
+        # Current success rate
+        current_outcomes = [outcome_map.get(s.id) for s in sess_list if outcome_map.get(s.id)]
+        current_sr = (
+            sum(1 for o in current_outcomes if o == "success") / len(current_outcomes)
+            if current_outcomes
+            else None
+        )
+
+        if weeks_to_match is not None:
+            matched_count += 1
+            weeks_list.append(weeks_to_match)
+
+        engineers.append(
+            EngineerRampup(
+                engineer_id=eid,
+                name=eng_names.get(eid, "Unknown"),
+                first_session_date=first_dt.isoformat(),
+                weeks_to_team_average=weeks_to_match,
+                current_success_rate=round(current_sr, 3) if current_sr is not None else None,
+                weekly_success_rates=weekly_points,
+            )
+        )
+
+    avg_weeks = round(sum(weeks_list) / len(weeks_list), 1) if weeks_list else None
+
+    return TimeToTeamAverageResponse(
+        engineers=engineers,
+        team_avg_success_rate=round(team_avg_sr, 3),
+        avg_weeks_to_match=avg_weeks,
+        engineers_who_matched=matched_count,
+        total_engineers=len(engineers),
     )

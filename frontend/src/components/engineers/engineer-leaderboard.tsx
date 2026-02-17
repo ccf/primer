@@ -91,7 +91,7 @@ export function EngineerLeaderboard({ engineers, onSortChange, sortBy }: Enginee
                   className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/50"
                   onMouseEnter={() => setHoveredId(eng.engineer_id)}
                   onMouseLeave={() => setHoveredId(null)}
-                  onClick={() => navigate(`/sessions?engineer_id=${eng.engineer_id}`)}
+                  onClick={() => navigate(`/engineers/${eng.engineer_id}`)}
                 >
                   <td className="py-2.5">
                     <div className="flex items-center gap-2">

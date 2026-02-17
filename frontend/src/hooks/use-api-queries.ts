@@ -7,11 +7,13 @@ import type {
   AlertThresholds,
   AuditLogResponse,
   BottleneckAnalytics,
+  ClaudePRComparisonResponse,
   ConfigOptimizationResponse,
   CostAnalytics,
   DailyStatsResponse,
   EngineerAnalytics,
   EngineerBenchmarkResponse,
+  EngineerProfileResponse,
   EngineerResponse,
   FrictionReport,
   IngestEventResponse,
@@ -28,9 +30,11 @@ import type {
   SessionDetailResponse,
   SessionMessage,
   SessionResponse,
+  SimilarSessionsResponse,
   SkillInventoryResponse,
   SystemStats,
   TeamResponse,
+  TimeToTeamAverageResponse,
   ToolAdoptionAnalytics,
   SessionInsightsResponse,
   ToolRanking,
@@ -439,6 +443,46 @@ export function useSessionInsights(teamId: string | null, startDate?: string, en
     queryFn: () =>
       apiFetch<SessionInsightsResponse>(
         `/api/v1/analytics/session-insights${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useEngineerProfile(engineerId: string, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["engineer-profile", engineerId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<EngineerProfileResponse>(
+        `/api/v1/analytics/engineers/${engineerId}/profile${buildParams({ start_date: startDate, end_date: endDate })}`,
+      ),
+    enabled: !!engineerId,
+  })
+}
+
+export function useSimilarSessions(sessionId: string) {
+  return useQuery({
+    queryKey: ["similar-sessions", sessionId],
+    queryFn: () =>
+      apiFetch<SimilarSessionsResponse>(`/api/v1/sessions/${sessionId}/similar`),
+    enabled: !!sessionId,
+  })
+}
+
+export function useClaudePRComparison(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["claude-pr-comparison", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<ClaudePRComparisonResponse>(
+        `/api/v1/analytics/claude-pr-comparison${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useTimeToTeamAverage(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["time-to-team-average", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<TimeToTeamAverageResponse>(
+        `/api/v1/analytics/time-to-team-average${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
       ),
   })
 }

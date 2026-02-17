@@ -16,8 +16,10 @@ from primer.common.models import (
 )
 from primer.common.models import Session as SessionModel
 from primer.common.schemas import (
+    ClaudePRComparisonResponse,
     DailyCodeVolume,
     EngineerQuality,
+    PRGroupMetrics,
     PRSummary,
     QualityByType,
     QualityMetricsResponse,
@@ -406,3 +408,35 @@ def _compute_recent_prs(db: Session, session_id_q) -> list[PRSummary]:
         )
 
     return results
+
+
+def get_claude_pr_comparison(
+    db: Session,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> ClaudePRComparisonResponse:
+    """Compare Claude-assisted PRs vs non-Claude PRs.
+
+    NOTE: This feature requires PR tracking models (PullRequest, SessionCommit)
+    which are not yet implemented.  Until those tables exist this function
+    returns empty metrics so the API contract is honoured and the frontend
+    can render a "no data" state.
+    """
+    empty = PRGroupMetrics(
+        pr_count=0,
+        merge_rate=None,
+        avg_review_comments=None,
+        avg_time_to_merge_hours=None,
+        avg_additions=None,
+        avg_deletions=None,
+    )
+    return ClaudePRComparisonResponse(
+        claude_assisted=empty,
+        non_claude=empty,
+        delta_review_comments=None,
+        delta_merge_time_hours=None,
+        delta_merge_rate=None,
+        total_prs_analyzed=0,
+    )

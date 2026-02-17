@@ -968,3 +968,105 @@ class SessionInsightsResponse(BaseModel):
     goals: GoalAnalytics
     primary_success: PrimarySuccessAnalysis
     sessions_analyzed: int
+
+
+# --- Engineer Profile ---
+
+
+class WeeklyMetricPoint(BaseModel):
+    week: str  # "2026-W07"
+    success_rate: float | None
+    avg_duration: float | None
+    tool_diversity: int
+    estimated_cost: float
+    session_count: int
+
+
+class EngineerProfileResponse(BaseModel):
+    engineer_id: str
+    name: str
+    email: str
+    display_name: str | None = None
+    team_id: str | None
+    team_name: str | None = None
+    avatar_url: str | None = None
+    github_username: str | None = None
+    created_at: str
+    overview: OverviewStats
+    weekly_trajectory: list[WeeklyMetricPoint]
+    friction: list[FrictionReport]
+    config_suggestions: list[ConfigSuggestion]
+    strengths: SkillInventoryResponse
+    learning_paths: list[EngineerLearningPath]
+    quality: dict  # flexible dict for quality metrics
+
+
+# --- Similar Sessions ---
+
+
+class SimilarSession(BaseModel):
+    session_id: str
+    engineer_id: str
+    engineer_name: str
+    engineer_avatar_url: str | None = None
+    project_name: str | None
+    session_type: str | None
+    outcome: str | None
+    duration_seconds: float | None
+    tools_used: list[str]
+    similarity_reason: str  # "same_type_and_project" | "same_type" | "same_goal"
+    started_at: str | None
+
+
+class SimilarSessionsResponse(BaseModel):
+    similar_sessions: list[SimilarSession]
+    target_session_type: str | None
+    target_project: str | None
+    total_found: int
+
+
+# --- Claude PR Comparison ---
+
+
+class PRGroupMetrics(BaseModel):
+    pr_count: int
+    merge_rate: float | None
+    avg_review_comments: float | None
+    avg_time_to_merge_hours: float | None
+    avg_additions: float | None
+    avg_deletions: float | None
+
+
+class ClaudePRComparisonResponse(BaseModel):
+    claude_assisted: PRGroupMetrics
+    non_claude: PRGroupMetrics
+    delta_review_comments: float | None
+    delta_merge_time_hours: float | None
+    delta_merge_rate: float | None
+    total_prs_analyzed: int
+
+
+# --- Time to Team Average ---
+
+
+class WeeklySuccessPoint(BaseModel):
+    week_number: int  # weeks since first session
+    success_rate: float | None
+    session_count: int
+
+
+class EngineerRampup(BaseModel):
+    engineer_id: str
+    name: str
+    first_session_date: str
+    weeks_to_team_average: int | None
+    current_success_rate: float | None
+    weekly_success_rates: list[WeeklySuccessPoint]
+
+
+class TimeToTeamAverageResponse(BaseModel):
+    engineers: list[EngineerRampup]
+    team_avg_success_rate: float
+    avg_weeks_to_match: float | None
+    engineers_who_matched: int
+    total_engineers: int

@@ -21,6 +21,7 @@ import { GrowthPage } from "@/pages/growth"
 import { QualityPage } from "@/pages/quality"
 import { SessionInsightsPage } from "@/pages/session-insights"
 import { AdminPage } from "@/pages/admin"
+import { EngineerProfilePage } from "@/pages/engineer-profile"
 import { NotFoundPage } from "@/pages/not-found"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
@@ -36,6 +37,10 @@ const queryClient = new QueryClient({
 function TeamDetailRoute({ dateRange }: { dateRange: DateRange | null }) {
   const { teamId } = useParams<{ teamId: string }>()
   return <TeamDetailPage teamId={teamId ?? ""} dateRange={dateRange} />
+}
+
+function EngineerProfileRoute({ dateRange }: { dateRange: DateRange | null }) {
+  return <EngineerProfilePage dateRange={dateRange} />
 }
 
 function AuthenticatedApp() {
@@ -67,6 +72,7 @@ function AuthenticatedApp() {
         <Route path="/" element={<OverviewPage teamId={teamId} dateRange={dateRange} />} />
         <Route path="/sessions" element={<SessionsPage teamId={teamId} dateRange={dateRange} />} />
         <Route path="/sessions/:id" element={<SessionDetailPage />} />
+        <Route path="/engineers/:id" element={<EngineerProfileRoute dateRange={dateRange} />} />
         <Route path="/engineers" element={<EngineersPage teamId={teamId} dateRange={dateRange} />} />
         <Route path="/projects" element={<ProjectsPage teamId={teamId} dateRange={dateRange} />} />
         <Route path="/bottlenecks" element={<BottlenecksPage teamId={teamId} dateRange={dateRange} />} />
