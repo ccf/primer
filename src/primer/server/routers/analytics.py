@@ -518,7 +518,9 @@ def time_to_team_average(
         tid = auth.team_id
     else:
         eng = db.query(Engineer.team_id).filter(Engineer.id == auth.engineer_id).first()
-        tid = eng.team_id if eng else None
+        if not eng or not eng.team_id:
+            raise HTTPException(status_code=403, detail="No team assigned")
+        tid = eng.team_id
 
     return get_time_to_team_average(
         db, team_id=tid, engineer_id=None, start_date=start_date, end_date=end_date
