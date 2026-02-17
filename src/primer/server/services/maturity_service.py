@@ -72,11 +72,12 @@ def get_maturity_analytics(
     )
 
     # 2. Per-engineer leverage profiles
-    # Map session_id -> engineer info
+    # Map session_id -> engineer info (query directly to avoid duplicate Engineer join)
     if session_ids:
         eng_rows = (
-            sessions_q.join(Engineer)
-            .with_entities(SessionModel.id, Engineer.id, Engineer.name)
+            db.query(SessionModel.id, Engineer.id, Engineer.name)
+            .join(Engineer, SessionModel.engineer_id == Engineer.id)
+            .filter(SessionModel.id.in_(session_ids))
             .all()
         )
     else:
@@ -130,7 +131,7 @@ def get_maturity_analytics(
         score = compute_leverage_score(dict(tools), cache_rate)
         all_scores.append(score)
 
-        if orch_calls > 0:
+        if orch_calls > 0 or skill_calls > 0:
             engineers_using_orchestration += 1
 
         # Top agents = orchestration tools sorted by count
@@ -214,26 +215,39 @@ def get_maturity_analytics(
         for d in sorted(agent_skill_data.values(), key=lambda x: x["total_calls"], reverse=True)
     ]
 
-    # 5. Project readiness
+    # 5. Project readiness (scoped to repos with sessions in current filter)
     project_readiness: list[ProjectReadinessEntry] = []
-    repos = db.query(GitRepository).filter(GitRepository.ai_readiness_score.isnot(None)).all()
-    for repo in repos:
-        session_count = (
-            db.query(func.count(SessionModel.id))
-            .filter(SessionModel.repository_id == repo.id)
-            .scalar()
-            or 0
-        )
-        project_readiness.append(
-            ProjectReadinessEntry(
-                repository=repo.full_name,
-                has_claude_md=repo.has_claude_md or False,
-                has_agents_md=repo.has_agents_md or False,
-                has_claude_dir=repo.has_claude_dir or False,
-                ai_readiness_score=repo.ai_readiness_score or 0.0,
-                session_count=session_count,
+    if session_ids:
+        repo_session_counts = (
+            db.query(SessionModel.repository_id, func.count(SessionModel.id))
+            .filter(
+                SessionModel.id.in_(session_ids),
+                SessionModel.repository_id.isnot(None),
             )
+            .group_by(SessionModel.repository_id)
+            .all()
         )
+        repo_counts = dict(repo_session_counts)
+        if repo_counts:
+            repos = (
+                db.query(GitRepository)
+                .filter(
+                    GitRepository.id.in_(list(repo_counts.keys())),
+                    GitRepository.ai_readiness_score.isnot(None),
+                )
+                .all()
+            )
+            for repo in repos:
+                project_readiness.append(
+                    ProjectReadinessEntry(
+                        repository=repo.full_name,
+                        has_claude_md=repo.has_claude_md or False,
+                        has_agents_md=repo.has_agents_md or False,
+                        has_claude_dir=repo.has_claude_dir or False,
+                        ai_readiness_score=repo.ai_readiness_score or 0.0,
+                        session_count=repo_counts.get(repo.id, 0),
+                    )
+                )
     project_readiness.sort(key=lambda p: p.ai_readiness_score, reverse=True)
 
     # Aggregate metrics
