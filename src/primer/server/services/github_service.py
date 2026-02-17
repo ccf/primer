@@ -227,11 +227,19 @@ def get_pull_request_commits(full_name: str, pr_number: int) -> list[str]:
         return []
 
 
-def check_file_exists(full_name: str, path: str, ref: str | None = None) -> bool | None:
+def check_file_exists(
+    full_name: str, path: str, ref: str | None = None, expected_type: str | None = None,
+) -> bool | None:
     """Check if a file or directory exists in a GitHub repository.
 
-    Returns True if exists, False if confirmed not found (404),
+    Returns True if exists (and matches expected_type if specified),
+    False if confirmed not found (404) or wrong type,
     None on transient errors (rate limit, server error, network).
+
+    Args:
+        expected_type: If set, validate the GitHub Contents API "type" field
+            (e.g. "dir" or "file"). Returns False if the resource exists but
+            has a different type.
     """
     if not is_configured():
         return False
@@ -246,6 +254,11 @@ def check_file_exists(full_name: str, path: str, ref: str | None = None) -> bool
             timeout=10.0,
         )
         if resp.status_code == 200:
+            if expected_type is not None:
+                data = resp.json()
+                # Directory listings return a list; single items return a dict
+                actual_type = "dir" if isinstance(data, list) else data.get("type", "file")
+                return actual_type == expected_type
             return True
         if resp.status_code == 404:
             return False
@@ -267,7 +280,7 @@ def check_ai_readiness(full_name: str, default_branch: str | None = None) -> dic
     ref = default_branch or None  # let GitHub API use repo's actual default branch
     has_claude_md = check_file_exists(full_name, "CLAUDE.md", ref=ref)
     has_agents_md = check_file_exists(full_name, "AGENTS.md", ref=ref)
-    has_claude_dir = check_file_exists(full_name, ".claude", ref=ref)
+    has_claude_dir = check_file_exists(full_name, ".claude", ref=ref, expected_type="dir")
 
     # If any check had a transient error, don't return results to avoid caching bad data
     if has_claude_md is None or has_agents_md is None or has_claude_dir is None:
