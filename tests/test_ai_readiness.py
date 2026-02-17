@@ -14,7 +14,7 @@ def test_readiness_all_files():
 
 
 def test_readiness_claude_md_only():
-    def fake_check(full_name, path, ref=None):
+    def fake_check(full_name, path, ref=None, expected_type=None):
         return path == "CLAUDE.md"
 
     with patch("primer.server.services.github_service.check_file_exists", side_effect=fake_check):
@@ -34,7 +34,7 @@ def test_readiness_none():
 def test_readiness_transient_error():
     """Transient errors (None) should cause check_ai_readiness to return None."""
 
-    def fake_check(full_name, path, ref=None):
+    def fake_check(full_name, path, ref=None, expected_type=None):
         if path == "CLAUDE.md":
             return True
         return None  # Transient error for other checks
