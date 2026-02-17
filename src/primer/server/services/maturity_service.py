@@ -37,22 +37,20 @@ def get_maturity_analytics(
 ) -> MaturityAnalyticsResponse:
     """Compute full maturity analytics response."""
     sessions_q = base_session_query(db, team_id, engineer_id, start_date, end_date)
-    session_ids = [s.id for s in sessions_q.with_entities(SessionModel.id).all()]
-    sessions_analyzed = len(session_ids)
+    # Use a subquery for session IDs to avoid SQLite bound-parameter limits
+    session_id_subq = sessions_q.with_entities(SessionModel.id).subquery()
+    sessions_analyzed = db.query(func.count()).select_from(session_id_subq).scalar() or 0
 
     # Gather all tool usage rows for scoped sessions
-    if session_ids:
-        tool_rows = (
-            db.query(
-                ToolUsage.session_id,
-                ToolUsage.tool_name,
-                ToolUsage.call_count,
-            )
-            .filter(ToolUsage.session_id.in_(session_ids))
-            .all()
+    tool_rows = (
+        db.query(
+            ToolUsage.session_id,
+            ToolUsage.tool_name,
+            ToolUsage.call_count,
         )
-    else:
-        tool_rows = []
+        .filter(ToolUsage.session_id.in_(db.query(session_id_subq.c.id)))
+        .all()
+    )
 
     # Build per-session and aggregate tool counts
     aggregate_tools: Counter[str] = Counter()
@@ -73,15 +71,12 @@ def get_maturity_analytics(
 
     # 2. Per-engineer leverage profiles
     # Map session_id -> engineer info (query directly to avoid duplicate Engineer join)
-    if session_ids:
-        eng_rows = (
-            db.query(SessionModel.id, Engineer.id, Engineer.name)
-            .join(Engineer, SessionModel.engineer_id == Engineer.id)
-            .filter(SessionModel.id.in_(session_ids))
-            .all()
-        )
-    else:
-        eng_rows = []
+    eng_rows = (
+        db.query(SessionModel.id, Engineer.id, Engineer.name)
+        .join(Engineer, SessionModel.engineer_id == Engineer.id)
+        .filter(SessionModel.id.in_(db.query(session_id_subq.c.id)))
+        .all()
+    )
     session_engineer: dict[str, tuple[str, str]] = {}
     for sid, eid, ename in eng_rows:
         session_engineer[sid] = (eid, ename)
@@ -99,18 +94,15 @@ def get_maturity_analytics(
         engineer_names[eid] = ename
 
     # Get cache hit rates per engineer for leverage scoring
-    if session_ids:
-        eng_cache = (
-            sessions_q.with_entities(
-                SessionModel.engineer_id,
-                func.sum(SessionModel.cache_read_tokens),
-                func.sum(SessionModel.input_tokens),
-            )
-            .group_by(SessionModel.engineer_id)
-            .all()
+    eng_cache = (
+        sessions_q.with_entities(
+            SessionModel.engineer_id,
+            func.sum(SessionModel.cache_read_tokens),
+            func.sum(SessionModel.input_tokens),
         )
-    else:
-        eng_cache = []
+        .group_by(SessionModel.engineer_id)
+        .all()
+    )
     eng_cache_rates: dict[str, float] = {}
     for eid, cache_read, input_tok in eng_cache:
         total = (input_tok or 0) + (cache_read or 0)
@@ -164,7 +156,7 @@ def get_maturity_analytics(
 
     # 3. Daily leverage trend
     daily_leverage: list[DailyLeverageEntry] = []
-    if session_ids:
+    if sessions_analyzed > 0:
         # Get session dates
         session_dates = sessions_q.with_entities(SessionModel.id, SessionModel.started_at).all()
         date_tools: dict[str, Counter[str]] = defaultdict(Counter)
@@ -223,11 +215,11 @@ def get_maturity_analytics(
 
     # 5. Project readiness (scoped to repos with sessions in current filter)
     project_readiness: list[ProjectReadinessEntry] = []
-    if session_ids:
+    if sessions_analyzed > 0:
         repo_session_counts = (
             db.query(SessionModel.repository_id, func.count(SessionModel.id))
             .filter(
-                SessionModel.id.in_(session_ids),
+                SessionModel.id.in_(db.query(session_id_subq.c.id)),
                 SessionModel.repository_id.isnot(None),
             )
             .group_by(SessionModel.repository_id)
