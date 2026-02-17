@@ -1,8 +1,16 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
 
 class PrimerSettings(BaseSettings):
-    model_config = {"env_prefix": "PRIMER_"}
+    model_config = {"env_prefix": "PRIMER_", "env_file": ".env", "env_file_encoding": "utf-8"}
+
+    @model_validator(mode="after")
+    def _fix_pem_newlines(self) -> "PrimerSettings":
+        """Replace literal \\n with actual newlines in PEM keys from env vars."""
+        if self.github_app_private_key and "\\n" in self.github_app_private_key:
+            self.github_app_private_key = self.github_app_private_key.replace("\\n", "\n")
+        return self
 
     database_url: str = "sqlite:///./primer.db"
     admin_api_key: str = "primer-admin-dev-key"

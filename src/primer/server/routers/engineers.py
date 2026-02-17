@@ -117,6 +117,18 @@ def update_engineer(
     if payload.is_active is not None:
         changes["is_active"] = {"old": engineer.is_active, "new": payload.is_active}
         engineer.is_active = payload.is_active
+    if payload.github_username is not None:
+        changes["github_username"] = {
+            "old": engineer.github_username,
+            "new": payload.github_username,
+        }
+        engineer.github_username = payload.github_username
+    if payload.avatar_url is not None:
+        changes["avatar_url"] = {"old": engineer.avatar_url, "new": payload.avatar_url}
+        engineer.avatar_url = payload.avatar_url
+    if payload.display_name is not None:
+        changes["display_name"] = {"old": engineer.display_name, "new": payload.display_name}
+        engineer.display_name = payload.display_name
 
     ip = request.client.host if request.client else None
     audit_service.log_action(

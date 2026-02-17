@@ -741,7 +741,7 @@ def main():
 
     # Create engineers
     engineers = []
-    for name, email, team_idx, role, _github_user, _github_id, persona_type in ENGINEERS:
+    for name, email, team_idx, role, github_user, github_id, persona_type in ENGINEERS:
         team_id = teams[team_idx]["id"] if teams else None
         r = httpx.post(
             f"{SERVER_URL}/api/v1/engineers",
@@ -754,9 +754,15 @@ def main():
             key_preview = data["api_key"][:20]
             print(f"Created engineer: {name} (persona: {persona_type}, key: {key_preview}...)")
             eng_id = data["engineer"]["id"]
+            avatar = f"https://avatars.githubusercontent.com/u/{github_id}"
             httpx.patch(
                 f"{SERVER_URL}/api/v1/engineers/{eng_id}",
-                json={"role": role},
+                json={
+                    "role": role,
+                    "github_username": github_user,
+                    "avatar_url": avatar,
+                    "display_name": name,
+                },
                 headers=ADMIN_HEADERS,
             )
         elif r.status_code == 409:
