@@ -7,220 +7,128 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ccf/primer/actions/workflows/ci.yml"><img src="https://github.com/ccf/primer/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
-  <img src="https://img.shields.io/badge/coverage-92%25-brightgreen.svg" alt="Coverage: 92%">
-  <img src="https://img.shields.io/badge/security-bandit-brightgreen.svg" alt="Security: Bandit">
-  <img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python 3.12+">
-  <img src="https://img.shields.io/badge/node-20+-green.svg" alt="Node 20+">
+  <b>AI engineering analytics for Claude Code teams.</b>
 </p>
 
-<p align="center">Aggregate Claude Code usage insights across an engineering organization.</p>
+<p align="center">
+  <a href="docs/getting-started.md">Get Started</a> &middot;
+  <a href="docs/api.md">API Docs</a> &middot;
+  <a href="ROADMAP.md">Roadmap</a> &middot;
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/ccf/primer/actions/workflows/ci.yml"><img src="https://github.com/ccf/primer/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <img src="https://img.shields.io/badge/coverage-92%25-brightgreen.svg" alt="Coverage: 92%">
+  <img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python 3.12+">
+  <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT">
+</p>
 
 ---
 
-Primer is a self-hosted analytics platform with four components:
+<!-- TODO: Replace with an actual dashboard screenshot or animated GIF (1280x720+) -->
 
-1. **REST API Server** — FastAPI service that stores and analyzes session data
-2. **Frontend Dashboard** — React + Tailwind CSS dashboard with cost analysis, dark mode, and date filtering
-3. **Claude Code Hook** — SessionEnd hook that automatically uploads transcripts after each session
-4. **MCP Sidecar** — Model Context Protocol server that lets Claude query your team's usage patterns
+<p align="center">
+  <img src="docs/images/hero.svg" alt="Primer dashboard showing team analytics, cost tracking, and engineer profiles" width="100%">
+</p>
+
+---
+
+Primer is a self-hosted analytics platform that turns [Claude Code](https://docs.anthropic.com/en/docs/claude-code) session data into actionable insights for engineering teams. It shows where AI assistance accelerates work, where engineers hit friction, and what it costs — so teams can make informed decisions about AI adoption, training, and tooling.
+
+## Features
+
+- **Team Dashboard** — Session volume, token usage, cost trends, and activity heatmaps across your org with previous-period comparisons
+- **Cost Analysis** — Per-model spend tracking with daily cost charts, model breakdowns, and budget visibility
+- **Engineer Profiles** — Personal trajectory dashboards with weekly sparklines, strengths, friction breakdown, and peer benchmarking
+- **Friction Detection** — Surface where engineers struggle: tool errors, permission blocks, timeouts, and context limits
+- **Anomaly Alerts** — Automatic detection of cost spikes, usage drops, and success rate degradation with configurable thresholds
+- **AI Maturity Scoring** — Tool leverage scores, category usage, project AI-readiness checks, and agent/skill analytics
+- **Session Browser** — Full-text search with outcome, type, and model filters plus transcript viewer with message-level detail
+- **GitHub Integration** — OAuth SSO, pull request sync, commit correlation, and repository AI-readiness scoring
+- **MCP Sidecar** — Claude queries your team's own usage patterns mid-session: stats, friction reports, recommendations
+- **Role-Based Access** — Engineers see their profile; leadership sees the org dashboard; admins manage teams and thresholds
+- **Dark Mode** — Light, dark, and system-preference themes
+- **Export** — CSV and PDF export from any view
 
 ## Quickstart
 
-### Local Development
-
 ```bash
-# Clone and install
-git clone <repo-url> && cd insights
-pip install -e ".[dev]"
-
-# Initialize the database
-alembic upgrade head
-
-# Start the API server
-uvicorn primer.server.app:app --reload
-
-# (Optional) Seed sample data
-python scripts/seed_data.py
+pip install -e ".[dev]"       # Install dependencies
+alembic upgrade head           # Initialize database
+uvicorn primer.server.app:app --reload  # Start API server
 ```
 
-### Frontend Development
-
 ```bash
-cd frontend
-npm install
-npm run dev        # Vite dev server on :5173
-npm run build      # Production build
-npm run lint       # ESLint
-npx tsc -b --noEmit  # Type check
+cd frontend && npm install && npm run dev  # Start dashboard
 ```
 
-### Docker Compose
+Visit `http://localhost:5173`. Run `python scripts/seed_data.py` to populate sample data.
 
-```yaml
-services:
-  db:
-    image: postgres:16
-    environment:
-      POSTGRES_DB: primer
-      POSTGRES_USER: primer
-      POSTGRES_PASSWORD: primer
-    ports:
-      - "5432:5432"
+See the [Getting Started](docs/getting-started.md) guide for GitHub integration, hook setup, and production deployment.
 
-  api:
-    build: .
-    environment:
-      PRIMER_DATABASE_URL: postgresql://primer:primer@db:5432/primer
-      PRIMER_ADMIN_API_KEY: your-admin-key-here
-    ports:
-      - "8000:8000"
-    depends_on:
-      - db
+## How It Works
+
+Primer has four components that work together:
+
+```
+Claude Code ──SessionEnd Hook──▶ Primer API ◀──MCP Sidecar
+                                     │
+                                     ▼
+                              PostgreSQL / SQLite
+                                     │
+                                     ▼
+                              React Dashboard
 ```
 
-## API Reference
+1. **SessionEnd Hook** — Automatically uploads session transcripts after each Claude Code session
+2. **REST API** — FastAPI service that stores sessions, computes analytics, and serves the dashboard
+3. **Dashboard** — React + Tailwind CSS frontend with role-based views and real-time filtering
+4. **MCP Sidecar** — Lets Claude query your team's data during conversations
 
-All management and analytics endpoints require authentication. Ingest endpoints authenticate via engineer API keys. Analytics endpoints support optional `start_date` and `end_date` query parameters for date range filtering.
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/health` | None | Health check |
-| POST | `/api/v1/teams` | Admin | Create a team |
-| GET | `/api/v1/teams` | Admin | List all teams |
-| POST | `/api/v1/engineers` | Admin | Create an engineer (returns API key) |
-| GET | `/api/v1/engineers` | Admin | List all engineers |
-| GET | `/api/v1/engineers/{id}/sessions` | Admin | List sessions for an engineer |
-| POST | `/api/v1/ingest/session` | API Key | Ingest a single session |
-| POST | `/api/v1/ingest/bulk` | API Key | Ingest multiple sessions |
-| POST | `/api/v1/ingest/facets/{session_id}` | API Key | Upsert session facets |
-| GET | `/api/v1/sessions` | Admin | List sessions (with filters) |
-| GET | `/api/v1/sessions/{session_id}` | Admin | Get session details |
-| GET | `/api/v1/analytics/overview` | JWT/Admin | Aggregate usage stats (includes estimated cost) |
-| GET | `/api/v1/analytics/daily` | JWT/Admin | Daily session/message/tool activity |
-| GET | `/api/v1/analytics/friction` | JWT/Admin | Friction point report |
-| GET | `/api/v1/analytics/tools` | JWT/Admin | Tool usage rankings |
-| GET | `/api/v1/analytics/models` | JWT/Admin | Model usage rankings |
-| GET | `/api/v1/analytics/costs` | JWT/Admin | Cost breakdown by model + daily cost trend |
-| GET | `/api/v1/analytics/recommendations` | JWT/Admin | Actionable recommendations |
-| GET | `/api/v1/auth/github/login` | None | Initiate GitHub OAuth login |
-| GET | `/api/v1/auth/github/callback` | None | GitHub OAuth callback |
-| GET | `/api/v1/auth/me` | JWT | Get current user info |
-| POST | `/api/v1/auth/logout` | JWT | Logout (revoke refresh token) |
-| GET | `/api/v1/alert-configs` | Admin | List alert config overrides |
-| GET | `/api/v1/alert-configs/resolved` | Admin | Get effective alert thresholds |
-| POST | `/api/v1/alert-configs` | Admin | Create alert config override |
-| PATCH | `/api/v1/alert-configs/{id}` | Admin | Update alert config override |
-| DELETE | `/api/v1/alert-configs/{id}` | Admin | Delete alert config override |
-| GET | `/api/v1/admin/audit-logs` | Admin | List audit log entries (with filters) |
-
-See [docs/api.md](docs/api.md) for full request/response schemas and examples.
-
-## Frontend Features
-
-- **Cost Analysis** — Estimated spend per model with daily cost trend charts
-- **Date Range Picker** — Filter all analytics by 7d / 30d / 90d / 1y
-- **CSV Export** — Export data from Overview, Engineers, Projects, and Sessions pages
-- **Dark Mode** — Toggle between light, dark, and system themes (persisted in localStorage)
-- **Session Deep Links** — Copy-to-clipboard button on session detail pages
-- **Keyboard Navigation** — Arrow keys to navigate session tables, Enter to open
-- **Admin Panel** — Alert threshold management and audit log viewer (admin only)
-
-## MCP Sidecar Setup
-
-The MCP server lets Claude access your team's usage data during conversations.
+## Install the Hook
 
 ```bash
-# Required environment variables
 export PRIMER_SERVER_URL=http://localhost:8000
-export PRIMER_API_KEY=primer_...        # Engineer API key
-export PRIMER_ADMIN_API_KEY=your-admin-key
-
-# Run the MCP server
-python -m primer.mcp.server
-```
-
-### Available Tools
-
-| Tool | Description |
-|------|-------------|
-| `sync` | Upload local session history to the Primer server |
-| `my_stats` | Get your personal usage stats (sessions, tokens, tools, outcomes) |
-| `team_overview` | Get team-level analytics overview |
-| `friction_report` | Get friction points your team encounters |
-| `recommendations` | Get actionable recommendations based on usage patterns |
-
-## Hook Installation
-
-The SessionEnd hook automatically uploads session data after each Claude Code session.
-
-```bash
-# Set required environment variables
-export PRIMER_SERVER_URL=http://localhost:8000
-export PRIMER_API_KEY=primer_...
-
-# Install the hook into Claude Code settings
+export PRIMER_API_KEY=primer_...       # Your engineer API key
 python scripts/install_hook.py
 ```
 
-This adds a `SessionEnd` hook to `~/.claude/settings.json` that runs `python -m primer.hook.session_end` after every session.
+This adds a `SessionEnd` hook to `~/.claude/settings.json`. Sessions are uploaded automatically after every Claude Code conversation.
 
-## Configuration
+## Add the MCP Server
 
-All settings use the `PRIMER_` environment variable prefix.
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PRIMER_DATABASE_URL` | `sqlite:///./primer.db` | Database connection string |
-| `PRIMER_ADMIN_API_KEY` | `primer-admin-dev-key` | Admin API key for management endpoints |
-| `PRIMER_SERVER_HOST` | `0.0.0.0` | Server bind host |
-| `PRIMER_SERVER_PORT` | `8000` | Server bind port |
-| `PRIMER_LOG_LEVEL` | `info` | Logging level |
-| `PRIMER_GITHUB_CLIENT_ID` | — | GitHub OAuth app client ID |
-| `PRIMER_GITHUB_CLIENT_SECRET` | — | GitHub OAuth app client secret |
-| `PRIMER_JWT_SECRET_KEY` | — | Secret key for JWT token signing |
-| `PRIMER_RATE_LIMIT_ENABLED` | `true` | Enable/disable API rate limiting |
-| `PRIMER_RATE_LIMIT_DEFAULT` | `60/minute` | Default rate limit for all endpoints |
-| `PRIMER_RATE_LIMIT_INGEST` | `120/minute` | Rate limit for ingest endpoints |
-| `PRIMER_RATE_LIMIT_AUTH` | `10/minute` | Rate limit for auth endpoints |
-| `PRIMER_ALERT_FRICTION_SPIKE_MULTIPLIER` | `2.0` | Default friction spike threshold |
-| `PRIMER_ALERT_USAGE_DROP_RATIO` | `0.5` | Default usage drop threshold |
-| `PRIMER_ALERT_COST_SPIKE_WARNING` | `2.0` | Default cost spike warning threshold |
-| `PRIMER_ALERT_COST_SPIKE_CRITICAL` | `3.0` | Default cost spike critical threshold |
-| `PRIMER_ALERT_SUCCESS_RATE_DROP_PP` | `20.0` | Default success rate drop threshold (pp) |
-
-For the hook and MCP sidecar:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PRIMER_SERVER_URL` | `http://localhost:8000` | URL of the Primer API server |
-| `PRIMER_API_KEY` | — | Engineer API key for authentication |
-
-## Development
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development guide.
+Register Primer as an MCP server so Claude can query your team's patterns mid-session:
 
 ```bash
-# Install with dev dependencies
-pip install -e ".[dev]"
-
-# Run tests
-pytest -v
-
-# Lint and format
-ruff check .
-ruff format .
-
-# Security scan
-bandit -r src/ -c pyproject.toml
-
-# Pre-commit hooks
-pre-commit install
+export PRIMER_SERVER_URL=http://localhost:8000
+export PRIMER_ADMIN_API_KEY=your-admin-key
+python -m primer.mcp.server
 ```
+
+Tools: `sync` &middot; `my_stats` &middot; `team_overview` &middot; `friction_report` &middot; `recommendations`
+
+## Documentation
+
+| Guide | Description |
+|-------|-------------|
+| **[Getting Started](docs/getting-started.md)** | Installation, setup, first dashboard |
+| **[GitHub Integration](docs/github-integration.md)** | OAuth login, GitHub App for PR sync |
+| **[Configuration](docs/configuration.md)** | All environment variables and options |
+| **[API Reference](docs/api.md)** | Endpoints, authentication, request/response schemas |
+| **[Architecture](docs/architecture.md)** | System design, data model, request flows |
+| **[Deployment](docs/deployment.md)** | Docker Compose, PostgreSQL, scaling |
 
 ## About the Name
 
-The name comes from Neal Stephenson's *The Diamond Age*, where the Young Lady's Illustrated Primer is an adaptive, AI-driven book that observes its reader, understands her context, and transforms complexity into personalized guidance. Primer brings that same principle to engineering organizations — turning raw AI usage data into the understanding teams need to work effectively.
+Named after the Young Lady's Illustrated Primer in Neal Stephenson's *The Diamond Age* — an adaptive, AI-driven book that observes its reader, understands context, and transforms complexity into personalized guidance. Primer brings that same principle to engineering organizations.
+
+## Contributing
+
+We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+- [Open issues](https://github.com/ccf/primer/issues) — bugs and feature requests
+- [Roadmap](ROADMAP.md) — what's planned and complete
 
 ## License
 
