@@ -93,7 +93,6 @@ function AuthenticatedApp() {
         <Route path="/quality" element={<Navigate to="/" replace />} />
         <Route path="/session-insights" element={<Navigate to="/" replace />} />
         <Route path="/projects" element={<Navigate to="/" replace />} />
-        <Route path="/maturity" element={<Navigate to="/" replace />} />
 
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
