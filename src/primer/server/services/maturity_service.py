@@ -120,7 +120,10 @@ def get_maturity_analytics(
     engineers_using_orchestration = 0
     all_scores: list[float] = []
 
-    for eid, tools in eng_tools.items():
+    # Include all engineers with scoped sessions, not just those with tool rows
+    all_engineer_ids = set(eid for eid, _ in session_engineer.values())
+    for eid in all_engineer_ids:
+        tools = eng_tools.get(eid, Counter())
         classified_eng = classify_tools(dict(tools))
         orch_calls = sum(classified_eng["orchestration"].values())
         skill_calls = sum(classified_eng["skill"].values())
@@ -165,13 +168,16 @@ def get_maturity_analytics(
         # Get session dates
         session_dates = sessions_q.with_entities(SessionModel.id, SessionModel.started_at).all()
         date_tools: dict[str, Counter[str]] = defaultdict(Counter)
+        all_days: set[str] = set()
         for sid, started_at in session_dates:
-            if started_at and sid in per_session:
+            if started_at:
                 day = started_at.strftime("%Y-%m-%d")
-                for tool_name, count in per_session[sid].items():
-                    date_tools[day][tool_name] += count
+                all_days.add(day)
+                if sid in per_session:
+                    for tool_name, count in per_session[sid].items():
+                        date_tools[day][tool_name] += count
 
-        for day in sorted(date_tools):
+        for day in sorted(all_days):
             tools = dict(date_tools[day])
             score = compute_leverage_score(tools)
             daily_leverage.append(
