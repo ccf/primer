@@ -157,21 +157,33 @@ def get_maturity_analytics(
     # 3. Daily leverage trend
     daily_leverage: list[DailyLeverageEntry] = []
     if sessions_analyzed > 0:
-        # Get session dates
-        session_dates = sessions_q.with_entities(SessionModel.id, SessionModel.started_at).all()
+        # Get session dates and cache tokens for daily cache rate
+        session_dates = sessions_q.with_entities(
+            SessionModel.id,
+            SessionModel.started_at,
+            SessionModel.cache_read_tokens,
+            SessionModel.input_tokens,
+        ).all()
         date_tools: dict[str, Counter[str]] = defaultdict(Counter)
+        date_cache: dict[str, list[tuple[int, int]]] = defaultdict(list)
         all_days: set[str] = set()
-        for sid, started_at in session_dates:
+        for sid, started_at, cache_read, input_tok in session_dates:
             if started_at:
                 day = started_at.strftime("%Y-%m-%d")
                 all_days.add(day)
+                date_cache[day].append((cache_read or 0, input_tok or 0))
                 if sid in per_session:
                     for tool_name, count in per_session[sid].items():
                         date_tools[day][tool_name] += count
 
         for day in sorted(all_days):
             tools = dict(date_tools[day])
-            score = compute_leverage_score(tools)
+            # Compute daily cache hit rate
+            total_cache = sum(c for c, _ in date_cache[day])
+            total_input = sum(i for _, i in date_cache[day])
+            total_tokens = total_cache + total_input
+            daily_cache_rate = total_cache / total_tokens if total_tokens > 0 else 0.0
+            score = compute_leverage_score(tools, daily_cache_rate)
             daily_leverage.append(
                 DailyLeverageEntry(
                     date=day,
