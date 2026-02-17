@@ -27,6 +27,8 @@ const tabs = [
 
 type TabId = (typeof tabs)[number]["id"]
 
+const validTabIds = new Set<string>(tabs.map((t) => t.id))
+
 interface DashboardPageProps {
   teamId: string | null
   dateRange: DateRange | null
@@ -34,7 +36,8 @@ interface DashboardPageProps {
 
 export function DashboardPage({ teamId, dateRange }: DashboardPageProps) {
   const [searchParams, setSearchParams] = useSearchParams()
-  const activeTab = (searchParams.get("tab") as TabId) || "overview"
+  const rawTab = searchParams.get("tab")
+  const activeTab: TabId = rawTab && validTabIds.has(rawTab) ? (rawTab as TabId) : "overview"
   const startDate = dateRange?.startDate
   const endDate = dateRange?.endDate
 
