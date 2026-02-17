@@ -1,5 +1,6 @@
 import { render, screen, fireEvent } from "@testing-library/react"
 import { vi, describe, it, expect, beforeEach } from "vitest"
+import { MemoryRouter } from "react-router-dom"
 import { Header } from "../header"
 
 const mockUseTeams = vi.fn()
@@ -49,12 +50,14 @@ describe("Header", () => {
 
   const renderHeader = (props?: { teamId?: string | null }) =>
     render(
-      <Header
-        teamId={props?.teamId ?? null}
-        onTeamChange={onTeamChange}
-        dateRange={null}
-        onDateRangeChange={onDateRangeChange}
-      />,
+      <MemoryRouter>
+        <Header
+          teamId={props?.teamId ?? null}
+          onTeamChange={onTeamChange}
+          dateRange={null}
+          onDateRangeChange={onDateRangeChange}
+        />
+      </MemoryRouter>,
     )
 
   it("renders the 'All teams' default option", () => {
@@ -107,16 +110,47 @@ describe("Header", () => {
     expect(onTeamChange).toHaveBeenCalledWith(null)
   })
 
-  it("calls clearApiKey and reload when clicking sign out button", () => {
+  it("renders avatar button for user menu", () => {
+    renderHeader()
+
+    const avatarButton = screen.getByLabelText("User menu")
+    expect(avatarButton).toBeInTheDocument()
+  })
+
+  it("opens dropdown with sign out and theme toggle on avatar click", () => {
+    renderHeader()
+
+    const avatarButton = screen.getByLabelText("User menu")
+    fireEvent.click(avatarButton)
+
+    expect(screen.getByText("Sign out")).toBeInTheDocument()
+    expect(screen.getByText("Dark mode")).toBeInTheDocument()
+  })
+
+  it("calls clearApiKey and reload when clicking sign out", () => {
     const reloadMock = vi.fn()
     Object.defineProperty(window, "location", { value: { reload: reloadMock }, writable: true })
 
     renderHeader()
 
-    const signOutButton = screen.getByTitle("Sign out")
+    const avatarButton = screen.getByLabelText("User menu")
+    fireEvent.click(avatarButton)
+
+    const signOutButton = screen.getByText("Sign out")
     fireEvent.click(signOutButton)
 
     expect(mockClearApiKey).toHaveBeenCalled()
     expect(reloadMock).toHaveBeenCalled()
+  })
+
+  it("closes dropdown on outside click", () => {
+    renderHeader()
+
+    const avatarButton = screen.getByLabelText("User menu")
+    fireEvent.click(avatarButton)
+    expect(screen.getByText("Sign out")).toBeInTheDocument()
+
+    fireEvent.mouseDown(document.body)
+    expect(screen.queryByText("Sign out")).not.toBeInTheDocument()
   })
 })

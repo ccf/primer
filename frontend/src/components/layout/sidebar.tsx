@@ -62,35 +62,6 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
-
-      {/* User profile section */}
-      {user && (
-        <div className="border-t border-border p-3">
-          <div className="flex items-center gap-2">
-            {user.avatar_url ? (
-              <img
-                src={user.avatar_url}
-                alt={user.display_name ?? user.name}
-                className="h-8 w-8 rounded-full"
-              />
-            ) : (
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                {(user.display_name ?? user.name).charAt(0).toUpperCase()}
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">
-                {user.display_name ?? user.name}
-              </p>
-              {user.github_username && (
-                <p className="truncate text-xs text-muted-foreground">
-                  @{user.github_username}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </aside>
   )
 }
