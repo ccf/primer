@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom"
-import { AlertTriangle, FolderKanban, GitPullRequest, GraduationCap, Layout, Lightbulb, Microscope, MonitorDot, Settings, Users, Users2, Wrench } from "lucide-react"
+import { AlertTriangle, FolderKanban, GitPullRequest, GraduationCap, Layout, Lightbulb, Microscope, MonitorDot, Settings, Sparkles, Users, Users2, Wrench } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import { getApiKey } from "@/lib/api"
@@ -14,6 +14,7 @@ const allLinks = [
   { to: "/growth", label: "Growth", icon: GraduationCap, minRole: "engineer" as const },
   { to: "/quality", label: "Quality", icon: GitPullRequest, minRole: "engineer" as const },
   { to: "/session-insights", label: "Session Insights", icon: Microscope, minRole: "engineer" as const },
+  { to: "/maturity", label: "AI Maturity", icon: Sparkles, minRole: "engineer" as const },
   { to: "/teams", label: "Teams", icon: Users2, minRole: "team_lead" as const },
   { to: "/engineers", label: "Engineers", icon: Users, minRole: "team_lead" as const },
   { to: "/admin", label: "Admin", icon: Settings, minRole: "admin" as const },

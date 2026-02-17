@@ -70,6 +70,12 @@ class GitRepository(Base):
         DateTime, server_default=func.now(), onupdate=func.now()
     )
 
+    has_claude_md: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    has_agents_md: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    has_claude_dir: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    ai_readiness_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ai_readiness_checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     sessions: Mapped[list["Session"]] = relationship(back_populates="repository")
     pull_requests: Mapped[list["PullRequest"]] = relationship(back_populates="repository")
 

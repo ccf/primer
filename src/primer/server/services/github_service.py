@@ -227,6 +227,52 @@ def get_pull_request_commits(full_name: str, pr_number: int) -> list[str]:
         return []
 
 
+def check_file_exists(full_name: str, path: str, ref: str | None = None) -> bool:
+    """Check if a file or directory exists in a GitHub repository."""
+    if not is_configured():
+        return False
+    try:
+        params: dict[str, str] = {}
+        if ref:
+            params["ref"] = ref
+        resp = httpx.get(
+            f"{GITHUB_API}/repos/{full_name}/contents/{path}",
+            params=params,
+            headers=_github_headers(),
+            timeout=10.0,
+        )
+        return resp.status_code == 200
+    except httpx.HTTPError:
+        return False
+
+
+def check_ai_readiness(full_name: str, default_branch: str | None = None) -> dict:
+    """Check a repo for CLAUDE.md, AGENTS.md, and .claude/ directory.
+
+    Returns dict with has_claude_md, has_agents_md, has_claude_dir, ai_readiness_score.
+    Scoring: CLAUDE.md = 50pts, .claude/ = 30pts, AGENTS.md = 20pts.
+    """
+    ref = default_branch or "main"
+    has_claude_md = check_file_exists(full_name, "CLAUDE.md", ref=ref)
+    has_agents_md = check_file_exists(full_name, "AGENTS.md", ref=ref)
+    has_claude_dir = check_file_exists(full_name, ".claude", ref=ref)
+
+    score = 0.0
+    if has_claude_md:
+        score += 50.0
+    if has_claude_dir:
+        score += 30.0
+    if has_agents_md:
+        score += 20.0
+
+    return {
+        "has_claude_md": has_claude_md,
+        "has_agents_md": has_agents_md,
+        "has_claude_dir": has_claude_dir,
+        "ai_readiness_score": score,
+    }
+
+
 def sync_repository(db: Session, full_name: str, since_days: int = 30) -> dict:
     """Sync PRs from GitHub for a repository and correlate commits."""
     from datetime import datetime, timedelta
@@ -245,7 +291,21 @@ def sync_repository(db: Session, full_name: str, since_days: int = 30) -> dict:
         repo.github_id = gh_repo.get("id")
         repo.default_branch = gh_repo.get("default_branch")
 
-    since = (datetime.now(tz=UTC) - timedelta(days=since_days)).isoformat()
+    # AI readiness check with 24h cooldown
+    now = datetime.now(tz=UTC)
+    should_check_readiness = (
+        repo.ai_readiness_checked_at is None
+        or (now - repo.ai_readiness_checked_at).total_seconds() > 86400
+    )
+    if should_check_readiness:
+        readiness = check_ai_readiness(full_name, repo.default_branch)
+        repo.has_claude_md = readiness["has_claude_md"]
+        repo.has_agents_md = readiness["has_agents_md"]
+        repo.has_claude_dir = readiness["has_claude_dir"]
+        repo.ai_readiness_score = readiness["ai_readiness_score"]
+        repo.ai_readiness_checked_at = now
+
+    since = (now - timedelta(days=since_days)).isoformat()
     prs = list_pull_requests(full_name, state="all", since=since)
     stats["prs_found"] = len(prs)
 
