@@ -96,7 +96,7 @@ def main():
 
     # Check server
     try:
-        httpx.get(f"{SERVER_URL}/api/v1/health", timeout=5)
+        httpx.get(f"{SERVER_URL}/health", timeout=5)
     except httpx.ConnectError:
         print(f"Cannot connect to {SERVER_URL}. Start the server first.")
         sys.exit(1)
