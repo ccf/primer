@@ -21,6 +21,7 @@ coverage.xml
 .github-app-key.pem
 .DS_Store
 uv.lock
+site/
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/
