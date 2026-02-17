@@ -56,3 +56,11 @@
 - [x] **Similar sessions** — contextual pattern sharing panel on session detail with 3-tier relevance matching
 - [x] **Claude vs non-Claude PR comparison** — side-by-side metrics for Claude-assisted vs other PRs (stub awaiting PR models)
 - [x] **Time-to-team-average** — ramp-up tracking for new hires with rolling success rates vs team average
+
+## Tier 6 — AI DevEx Maturity
+
+- [ ] **Tool classification & leverage scoring** — categorize tool usage into tiers (core, extended, orchestration, MCP) and score engineers on a leverage spectrum from basic to advanced
+- [ ] **Enhanced tool metadata extraction** — capture subagent types from Task calls, skill names from Skill calls, and MCP tool origins from transcripts
+- [ ] **Project AI-readiness scoring** — detect CLAUDE.md, AGENTS.md, .claude/ config presence in repos; score project-level AI alignment
+- [ ] **Agent & skill usage analytics** — track built-in vs custom/marketplace agent usage, skill invocation patterns, and delegation depth
+- [ ] **Cache efficiency dashboard** — surface cache hit ratios, cost savings from caching, and model-specific cache strategies from existing token data

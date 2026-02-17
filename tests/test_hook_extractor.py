@@ -227,3 +227,70 @@ def test_load_facets(tmp_path):
         assert result["friction_counts"] == {"tool_error": 2}
     finally:
         Path.home = original_home
+
+
+def test_extract_task_with_subagent_type():
+    """Task tool_use with subagent_type gets enriched to 'Task:explore'."""
+    lines = [
+        {
+            "type": "assistant",
+            "message": {
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "name": "Task",
+                        "input": {"subagent_type": "explore", "prompt": "find files"},
+                    }
+                ],
+            },
+        },
+    ]
+    path = _write_jsonl(lines)
+    meta = extract_from_jsonl(path)
+    assert "Task:explore" in meta.tool_counts
+    assert meta.tool_counts["Task:explore"] == 1
+    assert meta.tool_call_count == 1
+
+
+def test_extract_skill_with_name():
+    """Skill tool_use with skill name gets enriched to 'Skill:commit'."""
+    lines = [
+        {
+            "type": "assistant",
+            "message": {
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "name": "Skill",
+                        "input": {"skill": "commit"},
+                    }
+                ],
+            },
+        },
+    ]
+    path = _write_jsonl(lines)
+    meta = extract_from_jsonl(path)
+    assert "Skill:commit" in meta.tool_counts
+    assert meta.tool_counts["Skill:commit"] == 1
+
+
+def test_extract_task_without_subagent_type():
+    """Task tool_use without subagent_type stays as plain 'Task'."""
+    lines = [
+        {
+            "type": "assistant",
+            "message": {
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "name": "Task",
+                        "input": {"prompt": "do something"},
+                    }
+                ],
+            },
+        },
+    ]
+    path = _write_jsonl(lines)
+    meta = extract_from_jsonl(path)
+    assert "Task" in meta.tool_counts
+    assert meta.tool_counts["Task"] == 1

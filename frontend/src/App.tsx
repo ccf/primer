@@ -15,6 +15,7 @@ import { SessionDetailPage } from "@/pages/session-detail"
 import { EngineersPage } from "@/pages/engineers"
 import { TeamsPage } from "@/pages/teams"
 import { TeamDetailPage } from "@/pages/team-detail"
+import { MaturityPage } from "@/pages/maturity"
 import { AdminPage } from "@/pages/admin"
 import { EngineerProfilePage } from "@/pages/engineer-profile"
 import { NotFoundPage } from "@/pages/not-found"
@@ -78,6 +79,7 @@ function AuthenticatedApp() {
         <Route path="/sessions/:id" element={<SessionDetailPage />} />
         <Route path="/engineers/:id" element={<EngineerProfileRoute dateRange={dateRange} />} />
         <Route path="/engineers" element={<EngineersPage teamId={teamId} dateRange={dateRange} />} />
+        <Route path="/maturity" element={<MaturityPage teamId={teamId} dateRange={dateRange} />} />
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/teams/:teamId" element={<TeamDetailRoute dateRange={dateRange} />} />
         <Route path="/admin" element={<AdminPage />} />
