@@ -45,6 +45,9 @@ class EngineerUpdate(BaseModel):
     role: str | None = None
     team_id: str | None = None
     is_active: bool | None = None
+    github_username: str | None = None
+    avatar_url: str | None = None
+    display_name: str | None = None
 
 
 class EngineerCreateResponse(BaseModel):

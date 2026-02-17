@@ -16,6 +16,7 @@ coverage.xml
 *.swp
 .env
 .env.*
+!.env.example
 .DS_Store
 uv.lock
 frontend/node_modules/

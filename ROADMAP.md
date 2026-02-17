@@ -59,8 +59,17 @@
 
 ## Tier 6 — AI DevEx Maturity
 
-- [ ] **Tool classification & leverage scoring** — categorize tool usage into tiers (core, extended, orchestration, MCP) and score engineers on a leverage spectrum from basic to advanced
-- [ ] **Enhanced tool metadata extraction** — capture subagent types from Task calls, skill names from Skill calls, and MCP tool origins from transcripts
-- [ ] **Project AI-readiness scoring** — detect CLAUDE.md, AGENTS.md, .claude/ config presence in repos; score project-level AI alignment
+- [x] **Tool classification & leverage scoring** — categorize tool usage into tiers (core, extended, orchestration, MCP) and score engineers on a leverage spectrum from basic to advanced
+- [x] **Enhanced tool metadata extraction** — capture subagent types from Task calls, skill names from Skill calls, and MCP tool origins from transcripts
+- [x] **Project AI-readiness scoring** — detect CLAUDE.md, AGENTS.md, .claude/ config presence in repos; score project-level AI alignment
 - [ ] **Agent & skill usage analytics** — track built-in vs custom/marketplace agent usage, skill invocation patterns, and delegation depth
 - [ ] **Cache efficiency dashboard** — surface cache hit ratios, cost savings from caching, and model-specific cache strategies from existing token data
+
+## Tier 7 — Tooling Landscape & Performance
+
+- [ ] **Tool source classification** — distinguish built-in vs marketplace vs custom tools/agents/skills; identify which MCP servers tools originate from
+- [ ] **Cross-team tooling landscape** — analyze overlap/reuse of custom tools, agents, skills, and MCP servers across teams; highlight unique vs shared tooling
+- [ ] **Bright spot detection** — surface high-performing engineers and effective patterns to cross-pollinate across teams
+- [ ] **Performance measurement views** — leadership-oriented scorecards combining productivity, quality, cost efficiency, and adoption metrics per engineer
+- [ ] **Claude vs non-Claude PR comparison** — activate the existing stub with real PR data; side-by-side metrics for AI-assisted vs unassisted pull requests
+- [ ] **GitHub integration setup** — connect to real GitHub repos for PR data, avatars, repository metadata, and AI-readiness scoring
