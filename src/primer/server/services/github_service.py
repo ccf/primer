@@ -227,8 +227,12 @@ def get_pull_request_commits(full_name: str, pr_number: int) -> list[str]:
         return []
 
 
-def check_file_exists(full_name: str, path: str, ref: str | None = None) -> bool:
-    """Check if a file or directory exists in a GitHub repository."""
+def check_file_exists(full_name: str, path: str, ref: str | None = None) -> bool | None:
+    """Check if a file or directory exists in a GitHub repository.
+
+    Returns True if exists, False if confirmed not found (404),
+    None on transient errors (rate limit, server error, network).
+    """
     if not is_configured():
         return False
     try:
@@ -241,21 +245,33 @@ def check_file_exists(full_name: str, path: str, ref: str | None = None) -> bool
             headers=_github_headers(),
             timeout=10.0,
         )
-        return resp.status_code == 200
+        if resp.status_code == 200:
+            return True
+        if resp.status_code == 404:
+            return False
+        # Other status codes (rate limit, server error) are transient
+        logger.warning("Unexpected status %d checking %s/%s", resp.status_code, full_name, path)
+        return None
     except httpx.HTTPError:
-        return False
+        logger.warning("HTTP error checking %s/%s", full_name, path)
+        return None
 
 
-def check_ai_readiness(full_name: str, default_branch: str | None = None) -> dict:
+def check_ai_readiness(full_name: str, default_branch: str | None = None) -> dict | None:
     """Check a repo for CLAUDE.md, AGENTS.md, and .claude/ directory.
 
     Returns dict with has_claude_md, has_agents_md, has_claude_dir, ai_readiness_score.
     Scoring: CLAUDE.md = 50pts, .claude/ = 30pts, AGENTS.md = 20pts.
+    Returns None if any check had a transient error (caller should not cache).
     """
-    ref = default_branch or "main"
+    ref = default_branch or None  # let GitHub API use repo's actual default branch
     has_claude_md = check_file_exists(full_name, "CLAUDE.md", ref=ref)
     has_agents_md = check_file_exists(full_name, "AGENTS.md", ref=ref)
     has_claude_dir = check_file_exists(full_name, ".claude", ref=ref)
+
+    # If any check had a transient error, don't return results to avoid caching bad data
+    if has_claude_md is None or has_agents_md is None or has_claude_dir is None:
+        return None
 
     score = 0.0
     if has_claude_md:
@@ -299,11 +315,12 @@ def sync_repository(db: Session, full_name: str, since_days: int = 30) -> dict:
     )
     if should_check_readiness:
         readiness = check_ai_readiness(full_name, repo.default_branch)
-        repo.has_claude_md = readiness["has_claude_md"]
-        repo.has_agents_md = readiness["has_agents_md"]
-        repo.has_claude_dir = readiness["has_claude_dir"]
-        repo.ai_readiness_score = readiness["ai_readiness_score"]
-        repo.ai_readiness_checked_at = now
+        if readiness is not None:  # Only cache if all checks succeeded
+            repo.has_claude_md = readiness["has_claude_md"]
+            repo.has_agents_md = readiness["has_agents_md"]
+            repo.has_claude_dir = readiness["has_claude_dir"]
+            repo.ai_readiness_score = readiness["ai_readiness_score"]
+            repo.ai_readiness_checked_at = now
 
     since = (now - timedelta(days=since_days)).isoformat()
     prs = list_pull_requests(full_name, state="all", since=since)

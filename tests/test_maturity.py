@@ -107,8 +107,35 @@ def test_maturity_with_data(client, admin_headers, seeded_maturity_data):
 def test_maturity_orchestration_adoption(client, admin_headers, seeded_maturity_data):
     resp = client.get("/api/v1/analytics/maturity", headers=admin_headers)
     data = resp.json()
-    # 1 out of 2 engineers uses orchestration
+    # Alice uses orchestration+skill, Bob uses core only → 1/2
     assert data["orchestration_adoption_rate"] == 0.5
+
+
+def test_maturity_skill_only_adoption(client, admin_headers, db_session):
+    """Engineer using only Skill tools (no orchestration) should count for adoption."""
+    team = Team(name="skill-team")
+    db_session.add(team)
+    db_session.flush()
+
+    eng = Engineer(name="Carol", email="carol@test.com", team_id=team.id, api_key_hash="x")
+    db_session.add(eng)
+    db_session.flush()
+
+    now = datetime.now(tz=UTC)
+    s = Session(id=str(uuid.uuid4()), engineer_id=eng.id, started_at=now)
+    db_session.add(s)
+    db_session.flush()
+
+    # Only skill tools, no orchestration
+    db_session.add(ToolUsage(session_id=s.id, tool_name="Skill:commit", call_count=5))
+    db_session.add(ToolUsage(session_id=s.id, tool_name="Read", call_count=10))
+    db_session.flush()
+
+    resp = client.get(f"/api/v1/analytics/maturity?team_id={team.id}", headers=admin_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    # Carol uses skill tools → should count for adoption rate
+    assert data["orchestration_adoption_rate"] == 1.0
 
 
 def test_maturity_agent_skill_breakdown(client, admin_headers, seeded_maturity_data):
