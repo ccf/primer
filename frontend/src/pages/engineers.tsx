@@ -1,9 +1,14 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { getApiKey } from "@/lib/api"
-import { useEngineerAnalytics, useEngineerBenchmarks } from "@/hooks/use-api-queries"
+import {
+  useEngineerAnalytics,
+  useEngineerBenchmarks,
+  useQualityMetrics,
+  useMaturityAnalytics,
+} from "@/hooks/use-api-queries"
 import { EngineerLeaderboard } from "@/components/engineers/engineer-leaderboard"
-import { BenchmarkTable } from "@/components/engineers/benchmark-table"
+import { mergeEngineerData } from "@/components/engineers/merge-engineer-data"
 import { TableSkeleton } from "@/components/shared/loading-skeleton"
 import { EmptyState } from "@/components/shared/empty-state"
 import type { DateRange } from "@/components/layout/date-range-picker"
@@ -23,11 +28,21 @@ export function EngineersPage({ teamId, dateRange }: EngineersPageProps) {
   const startDate = dateRange?.startDate
   const endDate = dateRange?.endDate
   const { data, isLoading } = useEngineerAnalytics(teamId, startDate, endDate, sortBy)
-  const { data: benchmarks, isLoading: loadingBenchmarks } = useEngineerBenchmarks(
-    teamId,
-    startDate,
-    endDate,
-    canBenchmark,
+  const { data: benchmarks } = useEngineerBenchmarks(teamId, startDate, endDate, canBenchmark)
+  const { data: quality } = useQualityMetrics(teamId, startDate, endDate)
+  const { data: maturity } = useMaturityAnalytics(teamId, startDate, endDate)
+
+  const engineers = useMemo(
+    () =>
+      data?.engineers
+        ? mergeEngineerData(
+            data.engineers,
+            benchmarks?.engineers,
+            quality?.engineer_quality,
+            maturity?.engineer_profiles,
+          )
+        : [],
+    [data, benchmarks, quality, maturity],
   )
 
   if (isLoading) {
@@ -43,23 +58,12 @@ export function EngineersPage({ teamId, dateRange }: EngineersPageProps) {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Engineers</h1>
 
-      {/* Benchmark Table for team_lead / admin */}
-      {canBenchmark && (
-        loadingBenchmarks ? (
-          <TableSkeleton />
-        ) : benchmarks && benchmarks.engineers.length > 0 ? (
-          <BenchmarkTable
-            engineers={benchmarks.engineers}
-            benchmark={benchmarks.benchmark}
-          />
-        ) : null
-      )}
-
       {!data || data.engineers.length === 0 ? (
         <EmptyState message="No engineers found" />
       ) : (
         <EngineerLeaderboard
-          engineers={data.engineers}
+          engineers={engineers}
+          benchmark={benchmarks?.benchmark}
           onSortChange={setSortBy}
           sortBy={sortBy}
         />
