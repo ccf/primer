@@ -140,7 +140,7 @@ def main():
 
     # Check server is running
     try:
-        r = httpx.get(f"{SERVER_URL}/api/v1/health", timeout=5)
+        r = httpx.get(f"{SERVER_URL}/health", timeout=5)
         check("Server reachable", r.status_code == 200, SERVER_URL)
     except httpx.ConnectError:
         check("Server reachable", False, f"Cannot connect to {SERVER_URL}")
