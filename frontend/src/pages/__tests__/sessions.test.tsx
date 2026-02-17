@@ -2,6 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
 
+vi.mock("@/lib/auth-context", () => ({
+  useAuth: vi.fn(() => ({ user: null, loading: false, login: vi.fn(), logout: vi.fn() })),
+}))
+
+vi.mock("@/lib/api", () => ({
+  getApiKey: vi.fn(() => "test-key"),
+  apiFetch: vi.fn(),
+}))
+
 vi.mock("@/hooks/use-api-queries", () => ({
   useSessions: vi.fn(),
   useEngineers: vi.fn(),
@@ -66,7 +75,7 @@ describe("SessionsPage", () => {
   const renderPage = (teamId: string | null = null) =>
     render(
       <MemoryRouter>
-        <SessionsPage teamId={teamId} />
+        <SessionsPage teamId={teamId} dateRange={null} />
       </MemoryRouter>,
     )
 

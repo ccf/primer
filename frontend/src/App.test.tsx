@@ -38,6 +38,16 @@ vi.mock("@/hooks/use-api-queries", () => ({
   useEngineers: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useEngineerAnalytics: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useEngineerBenchmarks: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useEngineerProfile: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useBottleneckAnalytics: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useToolAdoption: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useSkillInventory: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useQualityMetrics: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useClaudePRComparison: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  usePersonalizedTips: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useConfigOptimization: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useLearningPaths: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useTimeToTeamAverage: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useSessions: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useSessionDetail: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useTranscript: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
@@ -88,9 +98,9 @@ describe("App", () => {
     >)
 
     render(<App />)
-    // Sidebar navigation links
+    // Sidebar navigation links (leadership role for API key users)
     expect(screen.getByText("Primer")).toBeInTheDocument()
-    expect(screen.getByText("Overview")).toBeInTheDocument()
+    expect(screen.getByText("Dashboard")).toBeInTheDocument()
     expect(screen.getByText("Sessions")).toBeInTheDocument()
     expect(screen.getByText("Engineers")).toBeInTheDocument()
   })
