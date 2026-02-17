@@ -15,7 +15,7 @@ def classify_tool(name: str) -> str:
     """Classify a single tool name into a category."""
     if name.startswith(TASK_PREFIX):
         return "orchestration"
-    if name.startswith(SKILL_PREFIX):
+    if name == "Skill" or name.startswith(SKILL_PREFIX):
         return "skill"
     if name in CORE_TOOLS:
         return "core"
