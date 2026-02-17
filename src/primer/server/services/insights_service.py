@@ -1597,12 +1597,17 @@ def get_time_to_team_average(
     eng_rows = db.query(Engineer.id, Engineer.name).filter(Engineer.id.in_(engineer_ids)).all()
     eng_names = {eid: name for eid, name in eng_rows}
 
-    # First session date per engineer within the filtered range
+    # Use all-time first session date for accurate ramp-up timing
+    first_session_rows = (
+        db.query(SessionModel.engineer_id, func.min(SessionModel.started_at))
+        .filter(SessionModel.engineer_id.in_(engineer_ids))
+        .group_by(SessionModel.engineer_id)
+        .all()
+    )
     eng_first: dict[str, datetime] = {}
-    for eid, sess_list_raw in eng_sessions.items():
-        dates = [s.started_at for s in sess_list_raw if s.started_at]
-        if dates:
-            eng_first[eid] = min(dates)
+    for eid, first_dt in first_session_rows:
+        if first_dt:
+            eng_first[eid] = first_dt
 
     engineers: list[EngineerRampup] = []
     matched_count = 0
@@ -1632,6 +1637,16 @@ def get_time_to_team_average(
                 weekly_buckets[week_num].append(outcome)
 
         if not weekly_buckets:
+            engineers.append(
+                EngineerRampup(
+                    engineer_id=eid,
+                    name=eng_names.get(eid, "Unknown"),
+                    first_session_date=first_dt.isoformat(),
+                    weeks_to_team_average=None,
+                    current_success_rate=None,
+                    weekly_success_rates=[],
+                )
+            )
             continue
 
         # Compute weekly success rates
