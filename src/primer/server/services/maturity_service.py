@@ -252,7 +252,8 @@ def get_maturity_analytics(
 
     # Aggregate metrics
     avg_score = sum(all_scores) / len(all_scores) if all_scores else 0.0
-    total_engineers = len(eng_tools)
+    # Use distinct engineers from scoped sessions (not just those with tool usage rows)
+    total_engineers = len(set(eid for eid, _ in session_engineer.values()))
     adoption_rate = engineers_using_orchestration / total_engineers if total_engineers > 0 else 0.0
 
     return MaturityAnalyticsResponse(

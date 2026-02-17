@@ -309,10 +309,10 @@ def sync_repository(db: Session, full_name: str, since_days: int = 30) -> dict:
 
     # AI readiness check with 24h cooldown
     now = datetime.now(tz=UTC)
-    should_check_readiness = (
-        repo.ai_readiness_checked_at is None
-        or (now - repo.ai_readiness_checked_at).total_seconds() > 86400
-    )
+    checked_at = repo.ai_readiness_checked_at
+    if checked_at is not None and checked_at.tzinfo is None:
+        checked_at = checked_at.replace(tzinfo=UTC)
+    should_check_readiness = checked_at is None or (now - checked_at).total_seconds() > 86400
     if should_check_readiness:
         readiness = check_ai_readiness(full_name, repo.default_branch)
         if readiness is not None:  # Only cache if all checks succeeded
