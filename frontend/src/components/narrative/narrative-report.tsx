@@ -58,7 +58,7 @@ export function NarrativeReport({ data, onRefresh, isRefreshing }: NarrativeRepo
           <CardHeader className="pb-2">
             <CardTitle className="text-base">{section.title}</CardTitle>
           </CardHeader>
-          <CardContent className="prose prose-sm dark:prose-invert max-w-none">
+          <CardContent className="prose prose-sm dark:prose-invert max-w-none text-left [&_p]:mb-4 [&_p]:leading-relaxed [&_p+p]:mt-4 [&_ul]:mt-2 [&_li]:my-0.5">
             <ReactMarkdown>{section.content}</ReactMarkdown>
           </CardContent>
         </Card>
