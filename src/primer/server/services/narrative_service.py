@@ -19,7 +19,7 @@ from primer.common.schemas import NarrativeResponse, NarrativeSection
 logger = logging.getLogger(__name__)
 
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
-NARRATIVE_MODEL = "claude-sonnet-4-5-20250929"
+NARRATIVE_MODEL = "claude-sonnet-4-6"
 CACHE_TTL_HOURS = 6
 MIN_SESSIONS = 5
 

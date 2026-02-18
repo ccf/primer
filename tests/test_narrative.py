@@ -81,7 +81,7 @@ def _seed_sessions(db, engineer_id, count=6):
             output_tokens=500,
             duration_seconds=120.0,
             started_at=datetime.now(UTC) - timedelta(days=i),
-            primary_model="claude-sonnet-4-5-20250929",
+            primary_model="claude-sonnet-4-6",
         )
         db.add(s)
         db.flush()
@@ -116,7 +116,7 @@ MOCK_ANTHROPIC_RESPONSE = {
             ),
         }
     ],
-    "model": "claude-sonnet-4-5-20250929",
+    "model": "claude-sonnet-4-6",
     "usage": {"input_tokens": 1500, "output_tokens": 800},
 }
 
@@ -147,11 +147,14 @@ def mock_api_key():
 
 class TestNarrativeStatus:
     def test_status_unavailable_without_key(self, client, admin_headers):
-        r = client.get("/api/v1/analytics/narrative/status", headers=admin_headers)
-        assert r.status_code == 200
-        data = r.json()
-        assert data["available"] is False
-        assert "not configured" in data["reason"]
+        with patch("primer.server.routers.analytics.settings") as mock_settings:
+            mock_settings.anthropic_api_key = ""
+            mock_settings.admin_api_key = "primer-admin-dev-key"
+            r = client.get("/api/v1/analytics/narrative/status", headers=admin_headers)
+            assert r.status_code == 200
+            data = r.json()
+            assert data["available"] is False
+            assert "not configured" in data["reason"]
 
     def test_status_available_with_key(self, client, admin_headers):
         with patch("primer.server.routers.analytics.settings") as mock_settings:
@@ -175,7 +178,7 @@ class TestNarrativeEndpoint:
         assert data["scope_label"] == "Narrative Tester"
         assert len(data["sections"]) == 6
         assert data["cached"] is False
-        assert data["model_used"] == "claude-sonnet-4-5-20250929"
+        assert data["model_used"] == "claude-sonnet-4-6"
         assert "total_sessions" in data["data_summary"]
 
     def test_team_scope(
@@ -229,13 +232,14 @@ class TestNarrativeEndpoint:
 
     def test_api_key_not_configured(self, client, db_session, engineer):
         _seed_sessions(db_session, engineer.id)
-        # Default settings has empty anthropic_api_key
-        r = client.get(
-            "/api/v1/analytics/narrative?scope=engineer",
-            cookies=_jwt_cookie(engineer),
-        )
-        assert r.status_code == 503
-        assert "not configured" in r.json()["detail"]
+        with patch("primer.server.services.narrative_service.settings") as mock_settings:
+            mock_settings.anthropic_api_key = ""
+            r = client.get(
+                "/api/v1/analytics/narrative?scope=engineer",
+                cookies=_jwt_cookie(engineer),
+            )
+            assert r.status_code == 503
+            assert "not configured" in r.json()["detail"]
 
 
 class TestNarrativeCaching:
