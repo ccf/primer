@@ -60,6 +60,9 @@ class PrimerSettings(BaseSettings):
     github_installation_id: int | None = None
     github_webhook_secret: str = ""
 
+    # Anthropic API (for narrative insights)
+    anthropic_api_key: str = ""
+
     # Alert thresholds (defaults)
     alert_friction_spike_multiplier: float = 2.0
     alert_usage_drop_ratio: float = 0.5

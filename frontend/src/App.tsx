@@ -16,6 +16,7 @@ import { EngineersPage } from "@/pages/engineers"
 import { TeamsPage } from "@/pages/teams"
 import { TeamDetailPage } from "@/pages/team-detail"
 import { MaturityPage } from "@/pages/maturity"
+import { NarrativePage } from "@/pages/narrative"
 import { AdminPage } from "@/pages/admin"
 import { EngineerProfilePage } from "@/pages/engineer-profile"
 import { NotFoundPage } from "@/pages/not-found"
@@ -88,7 +89,7 @@ function AuthenticatedApp() {
         <Route path="/overview" element={<Navigate to="/" replace />} />
         <Route path="/bottlenecks" element={<Navigate to="/" replace />} />
         <Route path="/tool-adoption" element={<Navigate to="/" replace />} />
-        <Route path="/insights" element={<Navigate to="/" replace />} />
+        <Route path="/insights" element={<NarrativePage teamId={teamId} dateRange={dateRange} />} />
         <Route path="/growth" element={<Navigate to="/" replace />} />
         <Route path="/quality" element={<Navigate to="/" replace />} />
         <Route path="/session-insights" element={<Navigate to="/" replace />} />

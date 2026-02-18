@@ -20,6 +20,8 @@ import type {
   LearningPathsResponse,
   MaturityAnalyticsResponse,
   ModelRanking,
+  NarrativeResponse,
+  NarrativeStatusResponse,
   OnboardingAccelerationResponse,
   OverviewStats,
   PatternSharingResponse,
@@ -495,5 +497,32 @@ export function useMaturityAnalytics(teamId: string | null, startDate?: string, 
       apiFetch<MaturityAnalyticsResponse>(
         `/api/v1/analytics/maturity${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
       ),
+  })
+}
+
+export function useNarrativeStatus() {
+  return useQuery({
+    queryKey: ["narrative-status"],
+    queryFn: () => apiFetch<NarrativeStatusResponse>("/api/v1/analytics/narrative/status"),
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+export function useNarrative(
+  scope: string,
+  teamId?: string | null,
+  startDate?: string,
+  endDate?: string,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ["narrative", scope, teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<NarrativeResponse>(
+        `/api/v1/analytics/narrative${buildParams({ scope, team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+    retry: 0,
   })
 }

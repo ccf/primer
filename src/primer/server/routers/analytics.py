@@ -21,6 +21,8 @@ from primer.common.schemas import (
     LearningPathsResponse,
     MaturityAnalyticsResponse,
     ModelRanking,
+    NarrativeResponse,
+    NarrativeStatusResponse,
     OnboardingAccelerationResponse,
     OverviewStats,
     PatternSharingResponse,
@@ -542,3 +544,64 @@ def time_to_team_average(
     return get_time_to_team_average(
         db, team_id=tid, engineer_id=None, start_date=start_date, end_date=end_date
     )
+
+
+@router.get("/narrative/status", response_model=NarrativeStatusResponse)
+def narrative_status(
+    auth: AuthContext = Depends(get_auth_context),
+):
+    if not settings.anthropic_api_key:
+        return NarrativeStatusResponse(
+            available=False, reason="PRIMER_ANTHROPIC_API_KEY not configured"
+        )
+    return NarrativeStatusResponse(available=True)
+
+
+@router.get("/narrative", response_model=NarrativeResponse)
+def narrative(
+    scope: str = Query(default="engineer", pattern="^(engineer|team|org)$"),
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    force_refresh: bool = False,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.narrative_service import generate_narrative
+
+    # Resolve scope parameters
+    if scope == "engineer":
+        if not auth.engineer_id:
+            raise HTTPException(status_code=400, detail="Engineer scope requires engineer auth")
+        eid = auth.engineer_id
+        tid = None
+    elif scope == "team":
+        tid, _ = _resolve_scope(auth, team_id)
+        if not tid:
+            raise HTTPException(status_code=400, detail="No team context available")
+        eid = None
+    else:  # org
+        if auth.role not in ("admin", "team_lead"):
+            raise HTTPException(status_code=403, detail="Org scope requires admin or team_lead")
+        tid = None
+        eid = None
+
+    try:
+        return generate_narrative(
+            db,
+            scope=scope,
+            team_id=tid,
+            engineer_id=eid,
+            start_date=start_date,
+            end_date=end_date,
+            force_refresh=force_refresh,
+        )
+    except ValueError as e:
+        error_msg = str(e)
+        if "not configured" in error_msg:
+            raise HTTPException(status_code=503, detail=error_msg) from None
+        if "Insufficient data" in error_msg:
+            raise HTTPException(status_code=422, detail=error_msg) from None
+        raise HTTPException(status_code=500, detail=error_msg) from None
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from None

@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiFetch } from "@/lib/api"
-import type { AlertConfigResponse } from "@/types/api"
+import type { AlertConfigResponse, NarrativeResponse } from "@/types/api"
 
 export function useAcknowledgeAlert() {
   const qc = useQueryClient()
@@ -125,5 +125,21 @@ export function useDeleteAlertConfig() {
       qc.invalidateQueries({ queryKey: ["alert-configs"] })
       qc.invalidateQueries({ queryKey: ["alert-thresholds"] })
     },
+  })
+}
+
+export function useRefreshNarrative() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (params: { scope: string; teamId?: string | null; startDate?: string; endDate?: string }) => {
+      const sp = new URLSearchParams()
+      sp.set("scope", params.scope)
+      sp.set("force_refresh", "true")
+      if (params.teamId) sp.set("team_id", params.teamId)
+      if (params.startDate) sp.set("start_date", params.startDate)
+      if (params.endDate) sp.set("end_date", params.endDate)
+      return apiFetch<NarrativeResponse>(`/api/v1/analytics/narrative?${sp.toString()}`)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["narrative"] }),
   })
 }
