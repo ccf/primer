@@ -14,6 +14,7 @@ from primer.common.models import (  # noqa: F401 — ensure all models are regis
     GitRepository,
     IngestEvent,
     ModelUsage,
+    NarrativeCache,
     PullRequest,
     RefreshToken,
     Session,

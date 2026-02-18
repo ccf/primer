@@ -1132,3 +1132,26 @@ class MaturityAnalyticsResponse(BaseModel):
     sessions_analyzed: int
     avg_leverage_score: float
     orchestration_adoption_rate: float
+
+
+# --- Narrative Insights ---
+
+
+class NarrativeSection(BaseModel):
+    title: str
+    content: str
+
+
+class NarrativeResponse(BaseModel):
+    scope: str
+    scope_label: str
+    sections: list[NarrativeSection]
+    generated_at: datetime
+    cached: bool = False
+    model_used: str
+    data_summary: dict
+
+
+class NarrativeStatusResponse(BaseModel):
+    available: bool
+    reason: str | None = None

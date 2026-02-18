@@ -322,6 +322,24 @@ class PullRequest(Base):
     commits: Mapped[list["SessionCommit"]] = relationship(back_populates="pull_request")
 
 
+class NarrativeCache(Base):
+    __tablename__ = "narrative_cache"
+    __table_args__ = (
+        UniqueConstraint("scope", "scope_id", "date_range_key", name="uq_narrative_scope"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    scope: Mapped[str] = mapped_column(String(20))
+    scope_id: Mapped[str | None] = mapped_column(String(36))
+    date_range_key: Mapped[str] = mapped_column(String(50))
+    sections: Mapped[list] = mapped_column(JSON)
+    model_used: Mapped[str] = mapped_column(String(100))
+    prompt_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    completion_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+
+
 class SessionCommit(Base):
     __tablename__ = "session_commits"
     __table_args__ = (UniqueConstraint("session_id", "commit_sha"),)

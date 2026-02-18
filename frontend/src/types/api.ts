@@ -888,3 +888,25 @@ export interface MaturityAnalyticsResponse {
   avg_leverage_score: number
   orchestration_adoption_rate: number
 }
+
+// --- Narrative Insights ---
+
+export interface NarrativeSection {
+  title: string
+  content: string
+}
+
+export interface NarrativeResponse {
+  scope: string
+  scope_label: string
+  sections: NarrativeSection[]
+  generated_at: string
+  cached: boolean
+  model_used: string
+  data_summary: Record<string, unknown>
+}
+
+export interface NarrativeStatusResponse {
+  available: boolean
+  reason: string | null
+}
