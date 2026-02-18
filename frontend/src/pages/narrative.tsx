@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { AlertCircle, Lightbulb, ServerOff } from "lucide-react"
+import { AlertCircle, BarChart3, Lightbulb, ServerOff } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import { getApiKey } from "@/lib/api"
@@ -23,8 +23,14 @@ export function NarrativePage({ teamId, dateRange }: NarrativePageProps) {
   const role = user?.role ?? (isApiKeyUser ? "admin" : "engineer")
   const effectiveRole = getEffectiveRole(role)
   const isLeadership = effectiveRole === "leadership"
+  const hasTeam = !!user?.team_id
 
-  const [scope, setScope] = useState<Scope>(isLeadership ? "team" : "engineer")
+  const defaultScope: Scope = isLeadership
+    ? hasTeam
+      ? "team"
+      : "org"
+    : "engineer"
+  const [scope, setScope] = useState<Scope>(defaultScope)
 
   const startDate = dateRange?.startDate
   const endDate = dateRange?.endDate
@@ -51,7 +57,7 @@ export function NarrativePage({ teamId, dateRange }: NarrativePageProps) {
 
   const scopeButtons: { value: Scope; label: string; visible: boolean }[] = [
     { value: "engineer", label: "My Report", visible: !!user },
-    { value: "team", label: "Team", visible: isLeadership || !!user?.team_id },
+    { value: "team", label: "Team", visible: hasTeam && (isLeadership || !!user?.team_id) },
     { value: "org", label: "Organization", visible: role === "admin" || role === "team_lead" || isApiKeyUser },
   ]
 
@@ -100,11 +106,24 @@ export function NarrativePage({ teamId, dateRange }: NarrativePageProps) {
         <NarrativeSkeleton />
       ) : error ? (
         <div className="flex flex-col items-center gap-3 py-16 text-center">
-          <AlertCircle className="h-10 w-10 text-destructive" />
-          <h3 className="text-lg font-semibold">Failed to generate insights</h3>
-          <p className="max-w-md text-sm text-muted-foreground">
-            {error instanceof Error ? error.message : "An unexpected error occurred"}
-          </p>
+          {String(error).includes("Insufficient data") || String(error).includes("422") ? (
+            <>
+              <BarChart3 className="h-10 w-10 text-muted-foreground" />
+              <h3 className="text-lg font-semibold">Not enough data yet</h3>
+              <p className="max-w-md text-sm text-muted-foreground">
+                At least 5 sessions are needed to generate meaningful insights.
+                Keep using Claude Code and check back soon!
+              </p>
+            </>
+          ) : (
+            <>
+              <AlertCircle className="h-10 w-10 text-destructive" />
+              <h3 className="text-lg font-semibold">Failed to generate insights</h3>
+              <p className="max-w-md text-sm text-muted-foreground">
+                {error instanceof Error ? error.message : "An unexpected error occurred"}
+              </p>
+            </>
+          )}
         </div>
       ) : data ? (
         <NarrativeReport
