@@ -327,6 +327,80 @@ def _date_range_key(start_date: datetime | None, end_date: datetime | None) -> s
     return "all"
 
 
+def _upsert_cache(
+    db: Session,
+    scope: str,
+    scope_id: str | None,
+    dr_key: str,
+    sections: list[dict],
+    data_summary: dict,
+    model_used: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+    now: datetime,
+) -> None:
+    """Upsert a narrative cache entry, handling concurrent insert races."""
+    from sqlalchemy.exc import IntegrityError
+
+    def _update_existing(entry: NarrativeCache) -> None:
+        entry.sections = sections
+        entry.data_summary = data_summary
+        entry.model_used = model_used
+        entry.prompt_tokens = prompt_tokens
+        entry.completion_tokens = completion_tokens
+        entry.created_at = now
+        entry.expires_at = now + timedelta(hours=settings.narrative_cache_ttl_hours)
+
+    existing = (
+        db.query(NarrativeCache)
+        .filter(
+            NarrativeCache.scope == scope,
+            NarrativeCache.scope_id == scope_id if scope_id else NarrativeCache.scope_id.is_(None),
+            NarrativeCache.date_range_key == dr_key,
+        )
+        .first()
+    )
+
+    if existing:
+        _update_existing(existing)
+        db.flush()
+        return
+
+    try:
+        entry = NarrativeCache(
+            id=str(uuid.uuid4()),
+            scope=scope,
+            scope_id=scope_id,
+            date_range_key=dr_key,
+            sections=sections,
+            data_summary=data_summary,
+            model_used=model_used,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            created_at=now,
+            expires_at=now + timedelta(hours=settings.narrative_cache_ttl_hours),
+        )
+        db.add(entry)
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        # Concurrent insert won the race — update the existing row instead
+        existing = (
+            db.query(NarrativeCache)
+            .filter(
+                NarrativeCache.scope == scope,
+                NarrativeCache.scope_id == scope_id
+                if scope_id
+                else NarrativeCache.scope_id.is_(None),
+                NarrativeCache.date_range_key == dr_key,
+            )
+            .first()
+        )
+        if existing:
+            _update_existing(existing)
+            db.flush()
+
+
 def generate_narrative(
     db: Session,
     scope: str,
@@ -365,7 +439,7 @@ def generate_narrative(
                 generated_at=cached.created_at,
                 cached=True,
                 model_used=cached.model_used,
-                data_summary={"source": "cache", "scope_id": scope_id},
+                data_summary=cached.data_summary or {},
             )
 
     # Verify API key configured
@@ -397,46 +471,6 @@ def generate_narrative(
     if not sections:
         raise ValueError("LLM returned no valid sections")
 
-    # Upsert cache
-    now = datetime.now(UTC)
-    existing = (
-        db.query(NarrativeCache)
-        .filter(
-            NarrativeCache.scope == scope,
-            (
-                NarrativeCache.scope_id == scope_id
-                if scope_id
-                else NarrativeCache.scope_id.is_(None)
-            ),
-            NarrativeCache.date_range_key == dr_key,
-        )
-        .first()
-    )
-
-    if existing:
-        existing.sections = sections
-        existing.model_used = model_used
-        existing.prompt_tokens = prompt_tokens
-        existing.completion_tokens = completion_tokens
-        existing.created_at = now
-        existing.expires_at = now + timedelta(hours=settings.narrative_cache_ttl_hours)
-    else:
-        entry = NarrativeCache(
-            id=str(uuid.uuid4()),
-            scope=scope,
-            scope_id=scope_id,
-            date_range_key=dr_key,
-            sections=sections,
-            model_used=model_used,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            created_at=now,
-            expires_at=now + timedelta(hours=settings.narrative_cache_ttl_hours),
-        )
-        db.add(entry)
-
-    db.flush()
-
     # Build data summary for transparency
     data_summary = {
         "total_sessions": data["total_sessions"],
@@ -446,6 +480,21 @@ def generate_narrative(
         "prompt_tokens": prompt_tokens,
         "completion_tokens": completion_tokens,
     }
+
+    # Upsert cache
+    now = datetime.now(UTC)
+    _upsert_cache(
+        db,
+        scope,
+        scope_id,
+        dr_key,
+        sections,
+        data_summary,
+        model_used,
+        prompt_tokens,
+        completion_tokens,
+        now,
+    )
 
     return NarrativeResponse(
         scope=scope,
