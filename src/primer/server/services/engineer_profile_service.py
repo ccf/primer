@@ -176,6 +176,33 @@ def get_engineer_profile(
     # Quality placeholder (no quality_service models yet)
     quality: dict = {}
 
+    # Distinct project names
+    project_rows = (
+        db.query(SessionModel.project_name)
+        .filter(
+            SessionModel.engineer_id == engineer_id,
+            SessionModel.project_name.isnot(None),
+        )
+        .distinct()
+        .all()
+    )
+    projects = [r[0] for r in project_rows if r[0]]
+
+    # Leverage score from maturity analytics
+    leverage_score: float | None = None
+    try:
+        from primer.server.services.maturity_service import get_maturity_analytics
+
+        maturity = get_maturity_analytics(
+            db, engineer_id=engineer_id, start_date=start_date, end_date=end_date
+        )
+        for ep in maturity.engineer_profiles:
+            if ep.engineer_id == engineer_id:
+                leverage_score = ep.leverage_score
+                break
+    except Exception:
+        leverage_score = None
+
     return EngineerProfileResponse(
         engineer_id=engineer.id,
         name=engineer.name,
@@ -193,4 +220,6 @@ def get_engineer_profile(
         strengths=skills,
         learning_paths=eng_paths,
         quality=quality,
+        leverage_score=leverage_score,
+        projects=projects,
     )

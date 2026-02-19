@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { AlertCircle, BarChart3, Lightbulb, ServerOff } from "lucide-react"
+import { AlertCircle, BarChart3, ServerOff, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import { getApiKey } from "@/lib/api"
@@ -64,8 +64,8 @@ export function NarrativePage({ teamId, dateRange }: NarrativePageProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Lightbulb className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold">Insights</h1>
+        <Sparkles className="h-6 w-6 text-primary" />
+        <h1 className="text-2xl font-bold">Synthesis</h1>
       </div>
 
       {/* Scope selector */}
@@ -96,10 +96,10 @@ export function NarrativePage({ teamId, dateRange }: NarrativePageProps) {
       ) : status?.available === false ? (
         <div className="flex flex-col items-center gap-3 py-16 text-center">
           <ServerOff className="h-10 w-10 text-muted-foreground" />
-          <h3 className="text-lg font-semibold">Insights not available</h3>
+          <h3 className="text-lg font-semibold">Synthesis not available</h3>
           <p className="max-w-md text-sm text-muted-foreground">
             Set the <code className="rounded bg-muted px-1.5 py-0.5 text-xs">PRIMER_ANTHROPIC_API_KEY</code> environment
-            variable to enable LLM-generated narrative insights.
+            variable to enable LLM-generated narrative synthesis.
           </p>
         </div>
       ) : isLoading || refreshMutation.isPending ? (
@@ -112,13 +112,13 @@ export function NarrativePage({ teamId, dateRange }: NarrativePageProps) {
               <h3 className="text-lg font-semibold">Not enough data yet</h3>
               <p className="max-w-md text-sm text-muted-foreground">
                 At least 5 sessions are needed to generate meaningful insights.
-                Keep using Claude Code and check back soon!
+                Keep using Claude Code and check back soon.
               </p>
             </>
           ) : (
             <>
               <AlertCircle className="h-10 w-10 text-destructive" />
-              <h3 className="text-lg font-semibold">Failed to generate insights</h3>
+              <h3 className="text-lg font-semibold">Failed to generate synthesis</h3>
               <p className="max-w-md text-sm text-muted-foreground">
                 {error instanceof Error ? error.message : "An unexpected error occurred"}
               </p>

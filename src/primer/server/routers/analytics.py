@@ -561,19 +561,35 @@ def narrative_status(
 def narrative(
     scope: str = Query(default="engineer", pattern="^(engineer|team|org)$"),
     team_id: str | None = None,
+    engineer_id: str | None = None,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
     force_refresh: bool = False,
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(get_auth_context),
 ):
+    from primer.common.models import Engineer
     from primer.server.services.narrative_service import generate_narrative
 
     # Resolve scope parameters
     if scope == "engineer":
-        if not auth.engineer_id:
-            raise HTTPException(status_code=400, detail="Engineer scope requires engineer auth")
-        eid = auth.engineer_id
+        if engineer_id:
+            # Admin or team_lead viewing another engineer's narrative
+            if auth.role == "admin":
+                eid = engineer_id
+            elif auth.role == "team_lead":
+                eng = db.query(Engineer).filter(Engineer.id == engineer_id).first()
+                if not eng or eng.team_id != auth.team_id:
+                    raise HTTPException(status_code=403, detail="Not your team's engineer")
+                eid = engineer_id
+            else:
+                raise HTTPException(
+                    status_code=403, detail="Only admin or team_lead can view other engineers"
+                )
+        else:
+            if not auth.engineer_id:
+                raise HTTPException(status_code=400, detail="Engineer scope requires engineer auth")
+            eid = auth.engineer_id
         tid = None
     elif scope == "team":
         tid, _ = _resolve_scope(auth, team_id)

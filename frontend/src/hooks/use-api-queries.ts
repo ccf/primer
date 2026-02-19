@@ -514,12 +514,13 @@ export function useNarrative(
   startDate?: string,
   endDate?: string,
   enabled = true,
+  engineerId?: string | null,
 ) {
   return useQuery({
-    queryKey: ["narrative", scope, teamId, startDate, endDate],
+    queryKey: ["narrative", scope, teamId, startDate, endDate, engineerId],
     queryFn: () =>
       apiFetch<NarrativeResponse>(
-        `/api/v1/analytics/narrative${buildParams({ scope, team_id: teamId, start_date: startDate, end_date: endDate })}`,
+        `/api/v1/analytics/narrative${buildParams({ scope, team_id: teamId, engineer_id: engineerId, start_date: startDate, end_date: endDate })}`,
       ),
     enabled,
     staleTime: 5 * 60 * 1000,

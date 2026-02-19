@@ -85,11 +85,13 @@ function AuthenticatedApp() {
         <Route path="/teams/:teamId" element={<TeamDetailRoute dateRange={dateRange} />} />
         <Route path="/admin" element={<AdminPage />} />
 
+        <Route path="/synthesis" element={<NarrativePage teamId={teamId} dateRange={dateRange} />} />
+
         {/* Redirects for deprecated routes */}
         <Route path="/overview" element={<Navigate to="/" replace />} />
         <Route path="/bottlenecks" element={<Navigate to="/" replace />} />
         <Route path="/tool-adoption" element={<Navigate to="/" replace />} />
-        <Route path="/insights" element={<NarrativePage teamId={teamId} dateRange={dateRange} />} />
+        <Route path="/insights" element={<Navigate to="/synthesis" replace />} />
         <Route path="/growth" element={<Navigate to="/" replace />} />
         <Route path="/quality" element={<Navigate to="/" replace />} />
         <Route path="/session-insights" element={<Navigate to="/" replace />} />

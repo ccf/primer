@@ -282,3 +282,42 @@ class TestEngineerProfileEmpty:
         assert overview["total_output_tokens"] == 0
         assert data["weekly_trajectory"] == []
         assert data["friction"] == []
+
+    def test_profile_leverage_score_and_projects(
+        self, client, db_session, engineer_with_key, admin_headers
+    ):
+        """Profile includes leverage_score and projects fields."""
+        eng, _key = engineer_with_key
+        now = datetime.now(UTC)
+
+        _create_session(
+            db_session,
+            eng,
+            started_at=now - timedelta(hours=1),
+            project_name="my-project",
+        )
+        _create_session(
+            db_session,
+            eng,
+            started_at=now - timedelta(hours=2),
+            project_name="other-project",
+        )
+        _create_session(
+            db_session,
+            eng,
+            started_at=now - timedelta(hours=3),
+            project_name="my-project",
+        )
+        db_session.flush()
+
+        r = client.get(
+            f"/api/v1/analytics/engineers/{eng.id}/profile",
+            headers=admin_headers,
+        )
+        assert r.status_code == 200
+        data = r.json()
+
+        assert "leverage_score" in data
+        assert "projects" in data
+        assert isinstance(data["projects"], list)
+        assert set(data["projects"]) == {"my-project", "other-project"}

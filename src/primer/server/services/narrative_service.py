@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 NARRATIVE_MODEL = "claude-sonnet-4-6"
-CACHE_TTL_HOURS = 6
 MIN_SESSIONS = 5
 
 ENGINEER_SECTIONS = [
@@ -420,7 +419,7 @@ def generate_narrative(
         existing.prompt_tokens = prompt_tokens
         existing.completion_tokens = completion_tokens
         existing.created_at = now
-        existing.expires_at = now + timedelta(hours=CACHE_TTL_HOURS)
+        existing.expires_at = now + timedelta(hours=settings.narrative_cache_ttl_hours)
     else:
         entry = NarrativeCache(
             id=str(uuid.uuid4()),
@@ -432,7 +431,7 @@ def generate_narrative(
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             created_at=now,
-            expires_at=now + timedelta(hours=CACHE_TTL_HOURS),
+            expires_at=now + timedelta(hours=settings.narrative_cache_ttl_hours),
         )
         db.add(entry)
 
@@ -457,3 +456,59 @@ def generate_narrative(
         model_used=model_used,
         data_summary=data_summary,
     )
+
+
+def refresh_all_narratives(db: Session) -> int:
+    """Refresh narratives for all engineers, teams, and org scope.
+
+    Skips scopes where cache is still valid.  Returns count of refreshed narratives.
+    """
+    from sqlalchemy import func
+
+    refreshed = 0
+
+    from primer.common.models import Session as SessionModel
+
+    # Engineers with enough sessions
+    engineer_ids = (
+        db.query(SessionModel.engineer_id)
+        .group_by(SessionModel.engineer_id)
+        .having(func.count(SessionModel.id) >= MIN_SESSIONS)
+        .all()
+    )
+
+    for (eid,) in engineer_ids:
+        try:
+            generate_narrative(db, scope="engineer", engineer_id=eid)
+            refreshed += 1
+        except Exception:
+            logger.exception("Failed to refresh narrative for engineer %s", eid)
+
+    # Teams with enough sessions
+    team_ids = (
+        db.query(SessionModel.engineer_id)
+        .join(Engineer, Engineer.id == SessionModel.engineer_id)
+        .filter(Engineer.team_id.isnot(None))
+        .with_entities(Engineer.team_id)
+        .group_by(Engineer.team_id)
+        .having(func.count(SessionModel.id) >= MIN_SESSIONS)
+        .all()
+    )
+
+    for (tid,) in team_ids:
+        try:
+            generate_narrative(db, scope="team", team_id=tid)
+            refreshed += 1
+        except Exception:
+            logger.exception("Failed to refresh narrative for team %s", tid)
+
+    # Org scope
+    total = db.query(func.count(SessionModel.id)).scalar() or 0
+    if total >= MIN_SESSIONS:
+        try:
+            generate_narrative(db, scope="org")
+            refreshed += 1
+        except Exception:
+            logger.exception("Failed to refresh org narrative")
+
+    return refreshed

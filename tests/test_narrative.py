@@ -142,6 +142,7 @@ def mock_api_key():
         mock_settings.anthropic_api_key = "test-api-key"
         mock_settings.productivity_time_multiplier = 3.0
         mock_settings.productivity_hourly_rate = 75.0
+        mock_settings.narrative_cache_ttl_hours = 24
         yield mock_settings
 
 
@@ -341,3 +342,101 @@ class TestNarrativeService:
 
         system, user = _build_prompt("org", "Organization", {"total_sessions": 200})
         assert "Organization Health" in user
+
+
+class TestNarrativeEngineerIdParam:
+    """Tests for admin/team_lead viewing another engineer's narrative."""
+
+    def test_admin_can_view_other_engineer(
+        self, client, db_session, admin_engineer, engineer, mock_anthropic, mock_api_key
+    ):
+        _seed_sessions(db_session, engineer.id)
+        r = client.get(
+            f"/api/v1/analytics/narrative?scope=engineer&engineer_id={engineer.id}",
+            cookies=_jwt_cookie(admin_engineer),
+        )
+        assert r.status_code == 200
+        assert r.json()["scope"] == "engineer"
+        assert r.json()["scope_label"] == "Narrative Tester"
+
+    def test_team_lead_can_view_own_team_engineer(
+        self, client, db_session, team_lead, engineer, mock_anthropic, mock_api_key
+    ):
+        _seed_sessions(db_session, engineer.id)
+        r = client.get(
+            f"/api/v1/analytics/narrative?scope=engineer&engineer_id={engineer.id}",
+            cookies=_jwt_cookie(team_lead),
+        )
+        assert r.status_code == 200
+
+    def test_team_lead_blocked_other_team_engineer(
+        self, client, db_session, team_lead, mock_api_key
+    ):
+        """Team lead cannot view engineer from another team."""
+        other_team = Team(name="Other-Team")
+        db_session.add(other_team)
+        db_session.flush()
+
+        other_eng = Engineer(
+            name="Other Eng",
+            email=f"other-{uuid.uuid4().hex[:6]}@example.com",
+            api_key_hash="",
+            team_id=other_team.id,
+            role="engineer",
+        )
+        db_session.add(other_eng)
+        db_session.flush()
+        _seed_sessions(db_session, other_eng.id)
+
+        r = client.get(
+            f"/api/v1/analytics/narrative?scope=engineer&engineer_id={other_eng.id}",
+            cookies=_jwt_cookie(team_lead),
+        )
+        assert r.status_code == 403
+
+    def test_regular_engineer_blocked(
+        self, client, db_session, engineer, admin_engineer, mock_api_key
+    ):
+        """Regular engineer cannot view another engineer's narrative."""
+        _seed_sessions(db_session, admin_engineer.id)
+        r = client.get(
+            f"/api/v1/analytics/narrative?scope=engineer&engineer_id={admin_engineer.id}",
+            cookies=_jwt_cookie(engineer),
+        )
+        assert r.status_code == 403
+
+
+class TestConfigurableTTL:
+    def test_ttl_reflected_in_cache(self, db_session, engineer, mock_anthropic, mock_api_key):
+        """Cache expiry should use the configurable TTL."""
+        from primer.common.models import NarrativeCache
+        from primer.server.services.narrative_service import generate_narrative
+
+        mock_api_key.narrative_cache_ttl_hours = 48
+        _seed_sessions(db_session, engineer.id)
+
+        generate_narrative(db_session, scope="engineer", engineer_id=engineer.id)
+
+        cached = (
+            db_session.query(NarrativeCache)
+            .filter(
+                NarrativeCache.scope == "engineer",
+                NarrativeCache.scope_id == engineer.id,
+            )
+            .first()
+        )
+        assert cached is not None
+        hours_diff = (cached.expires_at - cached.created_at).total_seconds() / 3600
+        assert abs(hours_diff - 48) < 0.1
+
+
+class TestRefreshAllNarratives:
+    def test_refresh_discovers_scopes(self, db_session, engineer, mock_anthropic, mock_api_key):
+        """refresh_all_narratives finds engineers/teams/org and returns count."""
+        from primer.server.services.narrative_service import refresh_all_narratives
+
+        _seed_sessions(db_session, engineer.id)
+
+        count = refresh_all_narratives(db_session)
+        # Should have refreshed at least: 1 engineer + 1 team + 1 org
+        assert count >= 3

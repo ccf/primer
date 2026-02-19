@@ -62,6 +62,8 @@ class PrimerSettings(BaseSettings):
 
     # Anthropic API (for narrative insights)
     anthropic_api_key: str = ""
+    narrative_cache_ttl_hours: int = 24
+    narrative_auto_refresh: bool = True
 
     # Alert thresholds (defaults)
     alert_friction_spike_multiplier: float = 2.0

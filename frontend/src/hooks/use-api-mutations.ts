@@ -131,11 +131,18 @@ export function useDeleteAlertConfig() {
 export function useRefreshNarrative() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (params: { scope: string; teamId?: string | null; startDate?: string; endDate?: string }) => {
+    mutationFn: (params: {
+      scope: string
+      teamId?: string | null
+      startDate?: string
+      endDate?: string
+      engineerId?: string | null
+    }) => {
       const sp = new URLSearchParams()
       sp.set("scope", params.scope)
       sp.set("force_refresh", "true")
       if (params.teamId) sp.set("team_id", params.teamId)
+      if (params.engineerId) sp.set("engineer_id", params.engineerId)
       if (params.startDate) sp.set("start_date", params.startDate)
       if (params.endDate) sp.set("end_date", params.endDate)
       return apiFetch<NarrativeResponse>(`/api/v1/analytics/narrative?${sp.toString()}`)
