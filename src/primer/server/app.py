@@ -36,15 +36,19 @@ async def _narrative_refresh_loop() -> None:
     from primer.common.database import SessionLocal
     from primer.server.services.narrative_service import refresh_all_narratives
 
+    def _run_refresh() -> int:
+        """Run in worker thread so the DB session is created and closed in the same thread."""
+        db = SessionLocal()
+        try:
+            return refresh_all_narratives(db)
+        finally:
+            db.close()
+
     await asyncio.sleep(30)  # Initial delay to let the server start up
     while True:
         try:
-            db = SessionLocal()
-            try:
-                count = await asyncio.to_thread(refresh_all_narratives, db)
-                logger.info("Narrative auto-refresh completed: %d narratives refreshed", count)
-            finally:
-                db.close()
+            count = await asyncio.to_thread(_run_refresh)
+            logger.info("Narrative auto-refresh completed: %d narratives refreshed", count)
         except Exception:
             logger.exception("Narrative auto-refresh failed")
         await asyncio.sleep(settings.narrative_cache_ttl_hours * 3600)
