@@ -482,6 +482,7 @@ def refresh_all_narratives(db: Session) -> int:
             generate_narrative(db, scope="engineer", engineer_id=eid)
             refreshed += 1
         except Exception:
+            db.rollback()
             logger.exception("Failed to refresh narrative for engineer %s", eid)
 
     # Teams with enough sessions
@@ -500,6 +501,7 @@ def refresh_all_narratives(db: Session) -> int:
             generate_narrative(db, scope="team", team_id=tid)
             refreshed += 1
         except Exception:
+            db.rollback()
             logger.exception("Failed to refresh narrative for team %s", tid)
 
     # Org scope
@@ -509,6 +511,7 @@ def refresh_all_narratives(db: Session) -> int:
             generate_narrative(db, scope="org")
             refreshed += 1
         except Exception:
+            db.rollback()
             logger.exception("Failed to refresh org narrative")
 
     return refreshed
