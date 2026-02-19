@@ -334,6 +334,7 @@ class NarrativeCache(Base):
     date_range_key: Mapped[str] = mapped_column(String(50))
     sections: Mapped[list] = mapped_column(JSON)
     model_used: Mapped[str] = mapped_column(String(100))
+    data_summary: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     prompt_tokens: Mapped[int] = mapped_column(Integer, default=0)
     completion_tokens: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
