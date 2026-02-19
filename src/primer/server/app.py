@@ -42,7 +42,6 @@ async def _narrative_refresh_loop() -> None:
             db = SessionLocal()
             try:
                 count = await asyncio.to_thread(refresh_all_narratives, db)
-                db.commit()
                 logger.info("Narrative auto-refresh completed: %d narratives refreshed", count)
             finally:
                 db.close()
