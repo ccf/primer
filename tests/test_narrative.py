@@ -405,6 +405,18 @@ class TestNarrativeEngineerIdParam:
         )
         assert r.status_code == 403
 
+    def test_engineer_can_view_own_via_engineer_id(
+        self, client, db_session, engineer, mock_anthropic, mock_api_key
+    ):
+        """Engineer can view their own narrative when passing their own engineer_id."""
+        _seed_sessions(db_session, engineer.id)
+        r = client.get(
+            f"/api/v1/analytics/narrative?scope=engineer&engineer_id={engineer.id}",
+            cookies=_jwt_cookie(engineer),
+        )
+        assert r.status_code == 200
+        assert r.json()["scope"] == "engineer"
+
 
 class TestConfigurableTTL:
     def test_ttl_reflected_in_cache(self, db_session, engineer, mock_anthropic, mock_api_key):
