@@ -200,7 +200,7 @@ function ProfileNarrativeSection({
     undefined,
     startDate,
     endDate,
-    status?.available !== false,
+    status?.available === true,
     engineerId,
   )
 

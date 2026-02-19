@@ -41,7 +41,7 @@ export function NarrativePage({ teamId, dateRange }: NarrativePageProps) {
     scope === "team" ? teamId : undefined,
     startDate,
     endDate,
-    status?.available !== false,
+    status?.available === true,
   )
 
   const refreshMutation = useRefreshNarrative()
