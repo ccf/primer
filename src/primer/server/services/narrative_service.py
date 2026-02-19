@@ -480,6 +480,7 @@ def refresh_all_narratives(db: Session) -> int:
     for (eid,) in engineer_ids:
         try:
             generate_narrative(db, scope="engineer", engineer_id=eid)
+            db.commit()
             refreshed += 1
         except Exception:
             db.rollback()
@@ -499,6 +500,7 @@ def refresh_all_narratives(db: Session) -> int:
     for (tid,) in team_ids:
         try:
             generate_narrative(db, scope="team", team_id=tid)
+            db.commit()
             refreshed += 1
         except Exception:
             db.rollback()
@@ -509,6 +511,7 @@ def refresh_all_narratives(db: Session) -> int:
     if total >= MIN_SESSIONS:
         try:
             generate_narrative(db, scope="org")
+            db.commit()
             refreshed += 1
         except Exception:
             db.rollback()
