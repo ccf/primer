@@ -1003,6 +1003,8 @@ class EngineerProfileResponse(BaseModel):
     strengths: SkillInventoryResponse
     learning_paths: list[EngineerLearningPath]
     quality: dict  # flexible dict for quality metrics
+    leverage_score: float | None = None
+    projects: list[str] = []
 
 
 # --- Similar Sessions ---

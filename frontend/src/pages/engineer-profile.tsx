@@ -2,18 +2,21 @@ import { useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
 import { formatNumber, formatCost, formatPercent, formatDuration } from "@/lib/utils"
-import { useEngineerProfile } from "@/hooks/use-api-queries"
+import { useEngineerProfile, useNarrative, useNarrativeStatus } from "@/hooks/use-api-queries"
 import { InlineStat } from "@/components/ui/inline-stat"
 import { PageTabs } from "@/components/ui/page-tabs"
 import { TrajectorySparklines } from "@/components/engineer-profile/trajectory-sparklines"
 import { FrictionTab } from "@/components/engineer-profile/friction-tab"
 import { StrengthsTab } from "@/components/engineer-profile/strengths-tab"
 import { QualityTab } from "@/components/engineer-profile/quality-tab"
+import { NarrativeReport } from "@/components/narrative/narrative-report"
+import { NarrativeSkeleton } from "@/components/narrative/narrative-skeleton"
+import { useRefreshNarrative } from "@/hooks/use-api-mutations"
 import { CardSkeleton } from "@/components/shared/loading-skeleton"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
 const tabs = [
-  { id: "trajectory", label: "Trajectory" },
+  { id: "insights", label: "Insights" },
   { id: "friction", label: "Friction" },
   { id: "strengths", label: "Strengths" },
   { id: "quality", label: "Quality" },
@@ -32,7 +35,7 @@ export function EngineerProfilePage({ dateRange }: EngineerProfilePageProps) {
   const endDate = dateRange?.endDate
 
   const { data: profile, isLoading } = useEngineerProfile(engineerId, startDate, endDate)
-  const [activeTab, setActiveTab] = useState<TabId>("trajectory")
+  const [activeTab, setActiveTab] = useState<TabId>("insights")
 
   if (isLoading) {
     return (
@@ -108,6 +111,9 @@ export function EngineerProfilePage({ dateRange }: EngineerProfilePageProps) {
               value={overview.estimated_cost != null ? formatCost(overview.estimated_cost) : "-"}
             />
             <InlineStat label="Avg Duration" value={formatDuration(overview.avg_session_duration)} />
+            {profile.leverage_score != null && (
+              <InlineStat label="Leverage" value={profile.leverage_score.toFixed(1)} />
+            )}
           </div>
 
           {profile.team_name && (
@@ -117,6 +123,27 @@ export function EngineerProfilePage({ dateRange }: EngineerProfilePageProps) {
               </span>
             </div>
           )}
+
+          {profile.projects.length > 0 && (
+            <div className="mt-4">
+              <p className="mb-2 text-xs font-medium text-muted-foreground">Projects</p>
+              <div className="flex flex-wrap gap-1.5">
+                {profile.projects.slice(0, 8).map((p) => (
+                  <span
+                    key={p}
+                    className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium"
+                  >
+                    {p}
+                  </span>
+                ))}
+                {profile.projects.length > 8 && (
+                  <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                    +{profile.projects.length - 8} more
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right content */}
@@ -124,8 +151,17 @@ export function EngineerProfilePage({ dateRange }: EngineerProfilePageProps) {
           <PageTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
           <div className="mt-6">
-            {activeTab === "trajectory" && (
-              <TrajectorySparklines data={profile.weekly_trajectory} />
+            {activeTab === "insights" && (
+              <>
+                <TrajectorySparklines data={profile.weekly_trajectory} />
+                <div className="mt-8">
+                  <ProfileNarrativeSection
+                    engineerId={engineerId}
+                    startDate={startDate}
+                    endDate={endDate}
+                  />
+                </div>
+              </>
             )}
             {activeTab === "friction" && (
               <FrictionTab
@@ -146,5 +182,58 @@ export function EngineerProfilePage({ dateRange }: EngineerProfilePageProps) {
         </div>
       </div>
     </div>
+  )
+}
+
+function ProfileNarrativeSection({
+  engineerId,
+  startDate,
+  endDate,
+}: {
+  engineerId: string
+  startDate?: string
+  endDate?: string
+}) {
+  const { data: status } = useNarrativeStatus()
+  const { data, isLoading, error } = useNarrative(
+    "engineer",
+    undefined,
+    startDate,
+    endDate,
+    status?.available !== false,
+    engineerId,
+  )
+
+  const refreshMutation = useRefreshNarrative()
+
+  const handleRefresh = () => {
+    refreshMutation.mutate({
+      scope: "engineer",
+      startDate,
+      endDate,
+      engineerId,
+    })
+  }
+
+  if (status?.available === false) return null
+  if (isLoading || refreshMutation.isPending) return <NarrativeSkeleton />
+  if (error) {
+    if (String(error).includes("422") || String(error).includes("Insufficient")) {
+      return (
+        <p className="py-4 text-center text-sm text-muted-foreground">
+          Not enough session data for narrative synthesis yet.
+        </p>
+      )
+    }
+    return null
+  }
+  if (!data) return null
+
+  return (
+    <NarrativeReport
+      data={refreshMutation.data ?? data}
+      onRefresh={handleRefresh}
+      isRefreshing={refreshMutation.isPending}
+    />
   )
 }

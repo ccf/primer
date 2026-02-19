@@ -762,6 +762,8 @@ export interface EngineerProfileResponse {
   strengths: SkillInventoryResponse
   learning_paths: EngineerLearningPath[]
   quality: Record<string, unknown>
+  leverage_score: number | null
+  projects: string[]
 }
 
 // --- Similar Sessions ---
