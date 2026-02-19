@@ -603,7 +603,7 @@ def narrative(
         eid = None
 
     try:
-        return generate_narrative(
+        result = generate_narrative(
             db,
             scope=scope,
             team_id=tid,
@@ -612,6 +612,8 @@ def narrative(
             end_date=end_date,
             force_refresh=force_refresh,
         )
+        db.commit()
+        return result
     except ValueError as e:
         error_msg = str(e)
         if "not configured" in error_msg:

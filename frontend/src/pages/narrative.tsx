@@ -55,9 +55,14 @@ export function NarrativePage({ teamId, dateRange }: NarrativePageProps) {
     })
   }
 
+  const handleScopeChange = (newScope: Scope) => {
+    refreshMutation.reset()
+    setScope(newScope)
+  }
+
   const scopeButtons: { value: Scope; label: string; visible: boolean }[] = [
     { value: "engineer", label: "My Report", visible: !!user },
-    { value: "team", label: "Team", visible: hasTeam && (isLeadership || !!user?.team_id) },
+    { value: "team", label: "Team", visible: hasTeam && isLeadership },
     { value: "org", label: "Organization", visible: role === "admin" || role === "team_lead" || isApiKeyUser },
   ]
 
@@ -75,7 +80,7 @@ export function NarrativePage({ teamId, dateRange }: NarrativePageProps) {
           .map((btn) => (
             <button
               key={btn.value}
-              onClick={() => setScope(btn.value)}
+              onClick={() => handleScopeChange(btn.value)}
               className={cn(
                 "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
                 scope === btn.value
