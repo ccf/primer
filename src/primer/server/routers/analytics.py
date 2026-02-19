@@ -574,8 +574,10 @@ def narrative(
     # Resolve scope parameters
     if scope == "engineer":
         if engineer_id:
-            # Admin or team_lead viewing another engineer's narrative
-            if auth.role == "admin":
+            if engineer_id == auth.engineer_id:
+                # Engineer viewing their own narrative
+                eid = engineer_id
+            elif auth.role == "admin":
                 eid = engineer_id
             elif auth.role == "team_lead":
                 eng = db.query(Engineer).filter(Engineer.id == engineer_id).first()
