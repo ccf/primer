@@ -479,9 +479,10 @@ def refresh_all_narratives(db: Session) -> int:
 
     for (eid,) in engineer_ids:
         try:
-            generate_narrative(db, scope="engineer", engineer_id=eid)
+            result = generate_narrative(db, scope="engineer", engineer_id=eid)
             db.commit()
-            refreshed += 1
+            if not result.cached:
+                refreshed += 1
         except Exception:
             db.rollback()
             logger.exception("Failed to refresh narrative for engineer %s", eid)
@@ -499,9 +500,10 @@ def refresh_all_narratives(db: Session) -> int:
 
     for (tid,) in team_ids:
         try:
-            generate_narrative(db, scope="team", team_id=tid)
+            result = generate_narrative(db, scope="team", team_id=tid)
             db.commit()
-            refreshed += 1
+            if not result.cached:
+                refreshed += 1
         except Exception:
             db.rollback()
             logger.exception("Failed to refresh narrative for team %s", tid)
@@ -510,9 +512,10 @@ def refresh_all_narratives(db: Session) -> int:
     total = db.query(func.count(SessionModel.id)).scalar() or 0
     if total >= MIN_SESSIONS:
         try:
-            generate_narrative(db, scope="org")
+            result = generate_narrative(db, scope="org")
             db.commit()
-            refreshed += 1
+            if not result.cached:
+                refreshed += 1
         except Exception:
             db.rollback()
             logger.exception("Failed to refresh org narrative")
