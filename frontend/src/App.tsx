@@ -18,6 +18,7 @@ import { TeamDetailPage } from "@/pages/team-detail"
 import { MaturityPage } from "@/pages/maturity"
 import { NarrativePage } from "@/pages/narrative"
 import { AdminPage } from "@/pages/admin"
+import { ExplorerPage } from "@/pages/explorer"
 import { EngineerProfilePage } from "@/pages/engineer-profile"
 import { NotFoundPage } from "@/pages/not-found"
 import type { DateRange } from "@/components/layout/date-range-picker"
@@ -84,6 +85,7 @@ function AuthenticatedApp() {
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/teams/:teamId" element={<TeamDetailRoute dateRange={dateRange} />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/explorer" element={<ExplorerPage teamId={teamId} dateRange={dateRange} />} />
 
         <Route path="/synthesis" element={<NarrativePage teamId={teamId} dateRange={dateRange} />} />
 

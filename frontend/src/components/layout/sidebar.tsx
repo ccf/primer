@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom"
-import { LayoutDashboard, MonitorDot, Settings, Sparkles, Users, Users2, User } from "lucide-react"
+import { LayoutDashboard, MessageSquare, MonitorDot, Settings, Sparkles, Users, Users2, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import { getApiKey } from "@/lib/api"
@@ -16,6 +16,7 @@ const engineerLinks: NavItem[] = [
   { to: "/profile", label: "Home", icon: User },
   { to: "/sessions", label: "Sessions", icon: MonitorDot },
   { to: "/synthesis", label: "Synthesis", icon: Sparkles },
+  { to: "/explorer", label: "Explorer", icon: MessageSquare },
 ]
 
 const leadershipLinks: NavItem[] = [
@@ -25,6 +26,7 @@ const leadershipLinks: NavItem[] = [
   { to: "/sessions", label: "Sessions", icon: MonitorDot },
   { to: "/maturity", label: "AI Maturity", icon: Sparkles },
   { to: "/synthesis", label: "Synthesis", icon: Sparkles },
+  { to: "/explorer", label: "Explorer", icon: MessageSquare },
 ]
 
 const adminLink: NavItem = { to: "/admin", label: "Admin", icon: Settings }
