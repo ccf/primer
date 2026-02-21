@@ -72,5 +72,9 @@ class PrimerSettings(BaseSettings):
     alert_cost_spike_critical: float = 3.0
     alert_success_rate_drop_pp: float = 20.0
 
+    # Explorer (conversational data explorer)
+    explorer_model: str = "claude-sonnet-4-6"
+    explorer_max_tool_rounds: int = 5
+
 
 settings = PrimerSettings()

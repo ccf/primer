@@ -912,3 +912,12 @@ export interface NarrativeStatusResponse {
   available: boolean
   reason: string | null
 }
+
+// --- Explorer (Conversational Data Explorer) ---
+
+export interface ExplorerChatMessage {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  toolCalls?: { name: string; input: Record<string, unknown> }[]
+}
