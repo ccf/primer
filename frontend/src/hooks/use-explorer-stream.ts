@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { getApiKey } from "@/lib/api"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
@@ -167,6 +167,12 @@ export function useExplorerStream(
     },
     [isStreaming, messages, teamId, dateRange],
   )
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort()
+    }
+  }, [])
 
   return { messages, sendMessage, isStreaming, error, clearMessages }
 }
