@@ -12,6 +12,7 @@ from primer.common.schemas import (
 from primer.server.services.analytics_service import (
     _build_overview,
     get_friction_report,
+    get_tool_rankings,
 )
 from primer.server.services.insights_service import (
     get_config_optimization,
@@ -176,6 +177,11 @@ def get_engineer_profile(
     # Quality placeholder (no quality_service models yet)
     quality: dict = {}
 
+    # Tool rankings
+    tool_rankings = get_tool_rankings(
+        db, engineer_id=engineer_id, limit=10, start_date=start_date, end_date=end_date
+    )
+
     # Distinct project names
     project_rows = (
         db.query(SessionModel.project_name)
@@ -222,4 +228,5 @@ def get_engineer_profile(
         quality=quality,
         leverage_score=leverage_score,
         projects=projects,
+        tool_rankings=tool_rankings,
     )

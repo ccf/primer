@@ -2,16 +2,14 @@ import { useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
 import { formatNumber, formatCost, formatPercent, formatDuration } from "@/lib/utils"
-import { useEngineerProfile, useNarrative, useNarrativeStatus } from "@/hooks/use-api-queries"
+import { useEngineerProfile } from "@/hooks/use-api-queries"
 import { InlineStat } from "@/components/ui/inline-stat"
 import { PageTabs } from "@/components/ui/page-tabs"
 import { TrajectorySparklines } from "@/components/engineer-profile/trajectory-sparklines"
 import { FrictionTab } from "@/components/engineer-profile/friction-tab"
 import { StrengthsTab } from "@/components/engineer-profile/strengths-tab"
 import { QualityTab } from "@/components/engineer-profile/quality-tab"
-import { NarrativeReport } from "@/components/narrative/narrative-report"
-import { NarrativeSkeleton } from "@/components/narrative/narrative-skeleton"
-import { useRefreshNarrative } from "@/hooks/use-api-mutations"
+import { InsightsReport } from "@/components/engineer-profile/insights-report"
 import { CardSkeleton } from "@/components/shared/loading-skeleton"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
@@ -155,7 +153,8 @@ export function EngineerProfilePage({ dateRange }: EngineerProfilePageProps) {
               <>
                 <TrajectorySparklines data={profile.weekly_trajectory} />
                 <div className="mt-8">
-                  <ProfileNarrativeSection
+                  <InsightsReport
+                    profile={profile}
                     engineerId={engineerId}
                     startDate={startDate}
                     endDate={endDate}
@@ -182,58 +181,5 @@ export function EngineerProfilePage({ dateRange }: EngineerProfilePageProps) {
         </div>
       </div>
     </div>
-  )
-}
-
-function ProfileNarrativeSection({
-  engineerId,
-  startDate,
-  endDate,
-}: {
-  engineerId: string
-  startDate?: string
-  endDate?: string
-}) {
-  const { data: status } = useNarrativeStatus()
-  const { data, isLoading, error } = useNarrative(
-    "engineer",
-    undefined,
-    startDate,
-    endDate,
-    status?.available === true,
-    engineerId,
-  )
-
-  const refreshMutation = useRefreshNarrative()
-
-  const handleRefresh = () => {
-    refreshMutation.mutate({
-      scope: "engineer",
-      startDate,
-      endDate,
-      engineerId,
-    })
-  }
-
-  if (status?.available === false) return null
-  if (isLoading || refreshMutation.isPending) return <NarrativeSkeleton />
-  if (error) {
-    if (String(error).includes("422") || String(error).includes("Insufficient")) {
-      return (
-        <p className="py-4 text-center text-sm text-muted-foreground">
-          Not enough session data for narrative synthesis yet.
-        </p>
-      )
-    }
-    return null
-  }
-  if (!data) return null
-
-  return (
-    <NarrativeReport
-      data={refreshMutation.data ?? data}
-      onRefresh={handleRefresh}
-      isRefreshing={refreshMutation.isPending}
-    />
   )
 }
