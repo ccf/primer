@@ -107,11 +107,12 @@ MOCK_ANTHROPIC_RESPONSE = {
             "text": json.dumps(
                 [
                     {"title": "At a Glance", "content": "You had **6 sessions** this period."},
-                    {"title": "How You Work", "content": "Your primary tool is Read."},
-                    {"title": "Strengths & Wins", "content": "Good success rate."},
-                    {"title": "Friction & Pain Points", "content": "Some tool errors."},
-                    {"title": "Growth Opportunities", "content": "Try more tools."},
-                    {"title": "Tips & Recommendations", "content": "Keep going!"},
+                    {"title": "How You Use Claude Code", "content": "Your primary tool is Read."},
+                    {"title": "Impressive Things You Did", "content": "Good success rate."},
+                    {"title": "Where Things Go Wrong", "content": "Some tool errors."},
+                    {"title": "New Usage Patterns", "content": "Emerging patterns."},
+                    {"title": "On the Horizon", "content": "Try more tools."},
+                    {"title": "Memorable Moment", "content": "Keep going!"},
                 ]
             ),
         }
@@ -177,7 +178,7 @@ class TestNarrativeEndpoint:
         data = r.json()
         assert data["scope"] == "engineer"
         assert data["scope_label"] == "Narrative Tester"
-        assert len(data["sections"]) == 6
+        assert len(data["sections"]) == 7
         assert data["cached"] is False
         assert data["model_used"] == "claude-sonnet-4-6"
         assert "total_sessions" in data["data_summary"]
@@ -335,7 +336,10 @@ class TestNarrativeService:
         system, user = _build_prompt("engineer", "Alice", {"total_sessions": 10})
         assert "JSON array" in system
         assert "At a Glance" in user
+        assert "Memorable Moment" in user
         assert "Alice" in user
+        # Engineer scope includes formatting instructions
+        assert "What's working:" in user
 
         system, user = _build_prompt("team", "Platform", {"total_sessions": 50})
         assert "Team Overview" in user

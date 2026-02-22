@@ -99,6 +99,8 @@ class TestEngineerProfileOverview:
         assert overview["total_input_tokens"] == 3500
         assert overview["total_output_tokens"] == 1800
         assert overview["avg_session_duration"] is not None
+        assert "tool_rankings" in data
+        assert isinstance(data["tool_rankings"], list)
 
 
 class TestEngineerProfileWeeklyTrajectory:
@@ -282,6 +284,7 @@ class TestEngineerProfileEmpty:
         assert overview["total_output_tokens"] == 0
         assert data["weekly_trajectory"] == []
         assert data["friction"] == []
+        assert data["tool_rankings"] == []
 
     def test_profile_leverage_score_and_projects(
         self, client, db_session, engineer_with_key, admin_headers

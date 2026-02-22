@@ -764,6 +764,7 @@ export interface EngineerProfileResponse {
   quality: Record<string, unknown>
   leverage_score: number | null
   projects: string[]
+  tool_rankings: ToolRanking[]
 }
 
 // --- Similar Sessions ---

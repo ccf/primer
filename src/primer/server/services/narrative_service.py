@@ -24,11 +24,12 @@ MIN_SESSIONS = 5
 
 ENGINEER_SECTIONS = [
     "At a Glance",
-    "How You Work",
-    "Strengths & Wins",
-    "Friction & Pain Points",
-    "Growth Opportunities",
-    "Tips & Recommendations",
+    "How You Use Claude Code",
+    "Impressive Things You Did",
+    "Where Things Go Wrong",
+    "New Usage Patterns",
+    "On the Horizon",
+    "Memorable Moment",
 ]
 
 TEAM_SECTIONS = [
@@ -236,10 +237,48 @@ Do NOT wrap the JSON in code fences or add any text before/after the JSON array.
 
     section_list = "\n".join(f"  {i + 1}. {s}" for i, s in enumerate(sections))
 
+    # Section-specific formatting instructions for engineer scope
+    engineer_formatting = """
+Section formatting rules (FOLLOW EXACTLY):
+
+1. "At a Glance" — Write exactly 4 paragraphs, each starting with a bold label:
+   - **What's working:** (1-2 sentences on strengths)
+   - **What's hindering:** (1-2 sentences on blockers)
+   - **Quick wins:** (1-2 actionable suggestions)
+   - **Ambitious workflows:** (1-2 forward-looking ideas)
+
+2. "How You Use Claude Code" — 2-3 paragraphs analyzing interaction style and patterns.
+   End with a callout line: **Key pattern:** followed by a one-sentence insight.
+
+3. "Impressive Things You Did" — 2-3 items. Each item as:
+   ### Title
+   Description paragraph (2-3 sentences).
+
+4. "Where Things Go Wrong" — 2-3 friction categories. Each as:
+   ### Category Name
+   Description paragraph, then bullet examples:
+   - Example detail
+   - Example detail
+
+5. "New Usage Patterns" — 2-3 emerging patterns. Each as:
+   ### Pattern Name
+   Description paragraph (2-3 sentences).
+
+6. "On the Horizon" — 2-3 forward-looking ideas. Each as:
+   ### Idea Name
+   Description paragraph.
+   **Getting started:** One-sentence actionable tip.
+
+7. "Memorable Moment" — A single short paragraph (2-3 sentences), warm/fun tone,
+   highlighting one standout moment from the data."""
+
+    format_instructions = engineer_formatting if scope == "engineer" else ""
+
     user_prompt = f"""Generate a narrative insight report for: **{scope_label}** (scope: {scope}).
 
 Produce exactly these sections in order:
 {section_list}
+{format_instructions}
 
 Here is the analytics data:
 

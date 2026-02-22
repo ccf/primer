@@ -1005,6 +1005,7 @@ class EngineerProfileResponse(BaseModel):
     quality: dict  # flexible dict for quality metrics
     leverage_score: float | None = None
     projects: list[str] = []
+    tool_rankings: list[ToolRanking] = []
 
 
 # --- Similar Sessions ---
