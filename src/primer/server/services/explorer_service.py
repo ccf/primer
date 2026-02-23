@@ -5,6 +5,7 @@ Tools are mapped to existing analytics service functions, enabling natural
 language exploration of Claude Code usage data.
 """
 
+import asyncio
 import json
 import logging
 from collections.abc import AsyncGenerator
@@ -395,7 +396,8 @@ async def stream_explorer_chat(
     from primer.server.services.analytics_service import get_overview
 
     try:
-        overview = get_overview(
+        overview = await asyncio.to_thread(
+            get_overview,
             db,
             team_id=team_id,
             engineer_id=engineer_id,
@@ -557,7 +559,8 @@ async def stream_explorer_chat(
         tool_results_content: list[dict] = []
         for tu in tool_uses:
             try:
-                result_str = _execute_tool(
+                result_str = await asyncio.to_thread(
+                    _execute_tool,
                     tu["name"],
                     tu["input"],
                     db,

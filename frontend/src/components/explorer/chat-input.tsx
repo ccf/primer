@@ -1,4 +1,4 @@
-import { useRef, useEffect, type KeyboardEvent } from "react"
+import { useRef, type KeyboardEvent } from "react"
 import { Send } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -11,13 +11,12 @@ interface ChatInputProps {
 export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Auto-resize textarea
-  useEffect(() => {
+  function handleInput() {
     const el = textareaRef.current
     if (!el) return
     el.style.height = "auto"
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`
-  })
+  }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -43,6 +42,7 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
         rows={1}
         placeholder={placeholder ?? "Ask about your data..."}
         disabled={disabled}
+        onInput={handleInput}
         onKeyDown={handleKeyDown}
         className={cn(
           "flex-1 resize-none bg-transparent px-2 py-1.5 text-sm outline-none",
