@@ -2,17 +2,8 @@ import { useState } from "react"
 import ReactMarkdown from "react-markdown"
 import { ChevronDown, ChevronRight, Clock, RefreshCw, Sparkles } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { timeAgo } from "@/lib/utils"
 import type { NarrativeResponse } from "@/types/api"
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return "just now"
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
-}
 
 interface NarrativeReportProps {
   data: NarrativeResponse
