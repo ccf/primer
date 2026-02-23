@@ -569,9 +569,9 @@ async def stream_explorer_chat(
                     start_date,
                     end_date,
                 )
-                # Truncate very large results
+                # Truncate very large results with valid JSON
                 if len(result_str) > 20000:
-                    result_str = result_str[:20000] + '..."}'
+                    result_str = json.dumps({"truncated": True, "data": result_str[:20000]})
             except Exception:
                 logger.exception("Tool execution failed: %s", tu["name"])
                 result_str = json.dumps({"error": f"Tool {tu['name']} failed"})
