@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import { cn } from "@/lib/utils"
 import type { ChatMessage as ChatMessageType } from "@/hooks/use-explorer-stream"
 
@@ -27,15 +28,15 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
     <div className={cn("flex w-full gap-3", isUser ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          "max-w-[80%] rounded-xl px-4 py-3",
+          "rounded-2xl px-5 py-4",
           isUser
-            ? "bg-primary text-primary-foreground"
-            : "bg-card border border-border",
+            ? "max-w-[75%] bg-primary text-primary-foreground"
+            : "max-w-[85%] bg-card border border-border/60",
         )}
       >
         {/* Tool call indicators */}
         {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-1.5">
+          <div className="mb-3 flex flex-wrap gap-1.5">
             {message.toolCalls.map((tc, i) => (
               <span
                 key={i}
@@ -52,15 +53,38 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
         <div
           className={cn(
             "text-sm leading-relaxed",
-            !isUser && "prose prose-sm dark:prose-invert max-w-none",
-            !isUser &&
-              "[&_table]:text-xs [&_table]:w-full [&_th]:text-left [&_th]:pb-1 [&_td]:py-0.5",
+            isUser && "whitespace-pre-wrap",
+            !isUser && [
+              "prose prose-sm dark:prose-invert max-w-none",
+              // Headings
+              "prose-headings:font-semibold prose-headings:tracking-tight",
+              "prose-h3:text-sm prose-h3:mt-4 prose-h3:mb-2",
+              "prose-h4:text-sm prose-h4:mt-3 prose-h4:mb-1",
+              // Paragraphs
+              "prose-p:my-2 prose-p:leading-relaxed",
+              // Lists
+              "prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5",
+              // Bold / emphasis
+              "prose-strong:font-semibold prose-strong:text-foreground",
+              // Code
+              "prose-code:rounded prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:text-xs prose-code:font-normal prose-code:before:content-none prose-code:after:content-none",
+              // Tables
+              "[&_table]:my-3 [&_table]:w-full [&_table]:text-xs [&_table]:border-collapse",
+              "[&_thead]:border-b [&_thead]:border-border/60",
+              "[&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-medium [&_th]:text-muted-foreground",
+              "[&_td]:px-3 [&_td]:py-2 [&_td]:border-t [&_td]:border-border/40",
+              "[&_tr:hover]:bg-accent/50",
+              // Horizontal rules
+              "prose-hr:my-3 prose-hr:border-border/40",
+            ],
           )}
         >
           {isUser ? (
-            <p className="whitespace-pre-wrap">{message.content}</p>
+            message.content
           ) : message.content ? (
-            <ReactMarkdown>{message.content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {message.content}
+            </ReactMarkdown>
           ) : isStreaming ? (
             <span className="inline-flex items-center gap-1.5 text-muted-foreground">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary/60" />
@@ -72,4 +96,3 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
     </div>
   )
 }
-
