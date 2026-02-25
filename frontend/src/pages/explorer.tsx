@@ -29,14 +29,17 @@ export function ExplorerPage({ teamId, dateRange }: ExplorerPageProps) {
   useEffect(() => { sendMessageRef.current = sendMessage })
 
   // Auto-send initial message passed from floating explorer.
-  // Uses setTimeout so it survives StrictMode's cleanup/re-run cycle:
-  // the first timer is cleared by cleanup, the second timer fires.
+  // navigate must happen inside the timeout — if called before, the state
+  // change triggers a re-render whose cleanup clears the timer.
+  // setTimeout also survives StrictMode's cleanup/re-run cycle.
   useEffect(() => {
     const initialMessage = (location.state as { initialMessage?: string })?.initialMessage
     if (!initialMessage) return
 
-    navigate(location.pathname, { replace: true, state: {} })
-    const timer = setTimeout(() => sendMessageRef.current(initialMessage), 0)
+    const timer = setTimeout(() => {
+      sendMessageRef.current(initialMessage)
+      navigate(location.pathname, { replace: true, state: {} })
+    }, 0)
     return () => clearTimeout(timer)
   }, [location.state, location.pathname, navigate])
 
