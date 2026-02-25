@@ -1,4 +1,4 @@
-import { useState, useCallback, type ReactNode } from "react"
+import { useState, useCallback, useEffect, type ReactNode } from "react"
 import { Sidebar } from "./sidebar"
 import { Header } from "./header"
 import type { DateRange } from "./date-range-picker"
@@ -17,6 +17,17 @@ export function AppShell({ children, teamId, onTeamChange, dateRange, onDateRang
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem(SIDEBAR_KEY) === "true" } catch { return false }
   })
+
+  // Sync sidebar state from other tabs via storage events
+  useEffect(() => {
+    const sync = () => {
+      try {
+        setCollapsed(localStorage.getItem(SIDEBAR_KEY) === "true")
+      } catch { /* noop */ }
+    }
+    window.addEventListener("storage", sync)
+    return () => window.removeEventListener("storage", sync)
+  }, [])
 
   const toggleSidebar = useCallback(() => {
     setCollapsed((prev) => {
