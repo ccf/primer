@@ -20,8 +20,8 @@ describe("Badge", () => {
   it("applies default variant classes", () => {
     const { container } = render(<Badge>Default</Badge>)
     const el = container.firstChild as HTMLElement
-    expect(el.className).toContain("bg-primary")
-    expect(el.className).toContain("text-primary-foreground")
+    expect(el.className).toContain("bg-primary/10")
+    expect(el.className).toContain("text-primary")
   })
 
   it("applies secondary variant classes", () => {
@@ -34,8 +34,8 @@ describe("Badge", () => {
   it("applies destructive variant classes", () => {
     const { container } = render(<Badge variant="destructive">Error</Badge>)
     const el = container.firstChild as HTMLElement
-    expect(el.className).toContain("bg-destructive")
-    expect(el.className).toContain("text-destructive-foreground")
+    expect(el.className).toContain("bg-destructive/10")
+    expect(el.className).toContain("text-destructive")
   })
 
   it("applies outline variant classes", () => {

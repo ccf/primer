@@ -14,12 +14,15 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, teamId, onTeamChange, dateRange, onDateRangeChange }: AppShellProps) {
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === "true")
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem(SIDEBAR_KEY) === "true" } catch { return false }
+  })
 
   const toggleSidebar = useCallback(() => {
     setCollapsed((prev) => {
       const next = !prev
-      localStorage.setItem(SIDEBAR_KEY, String(next))
+      try { localStorage.setItem(SIDEBAR_KEY, String(next)) } catch { /* noop */ }
+      window.dispatchEvent(new Event("sidebar-toggle"))
       return next
     })
   }, [])

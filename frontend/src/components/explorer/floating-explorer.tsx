@@ -1,22 +1,35 @@
-import { useRef, useState, type KeyboardEvent } from "react"
+import { useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { Sparkles, Send, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const SIDEBAR_KEY = "primer-sidebar-collapsed"
 
+function subscribeSidebarState(callback: () => void) {
+  window.addEventListener("storage", callback)
+  window.addEventListener("sidebar-toggle", callback)
+  return () => {
+    window.removeEventListener("storage", callback)
+    window.removeEventListener("sidebar-toggle", callback)
+  }
+}
+
+function getSidebarCollapsed() {
+  try { return localStorage.getItem(SIDEBAR_KEY) === "true" } catch { return false }
+}
+
 export function FloatingExplorer() {
   const location = useLocation()
   const navigate = useNavigate()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const [dismissed, setDismissed] = useState(false)
-  const sidebarCollapsed = localStorage.getItem(SIDEBAR_KEY) === "true"
+  const [dismissedPath, setDismissedPath] = useState<string | null>(null)
+  const sidebarCollapsed = useSyncExternalStore(subscribeSidebarState, getSidebarCollapsed)
 
   // Don't show on the explorer page itself or login
   if (location.pathname === "/explorer") return null
   if (location.pathname === "/login") return null
   if (location.pathname === "/auth/callback") return null
-  if (dismissed) return null
+  if (dismissedPath === location.pathname) return null
 
   function handleInput() {
     const el = textareaRef.current
@@ -66,7 +79,7 @@ export function FloatingExplorer() {
           <Send className="h-4 w-4" />
         </button>
         <button
-          onClick={() => setDismissed(true)}
+          onClick={() => setDismissedPath(location.pathname)}
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground"
         >
           <X className="h-3.5 w-3.5" />

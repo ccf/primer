@@ -19,27 +19,21 @@ vi.mock("../alert-bell", () => ({
   AlertBell: () => null,
 }))
 
-vi.mock("@/lib/theme-context", () => ({
-  useTheme: vi.fn().mockReturnValue({ resolved: "light", setTheme: vi.fn() }),
-}))
-
-const mockClearApiKey = vi.fn()
 const mockGetApiKey = vi.fn()
 
 vi.mock("@/lib/api", () => ({
-  clearApiKey: () => mockClearApiKey(),
+  clearApiKey: vi.fn(),
   getApiKey: () => mockGetApiKey(),
 }))
 
-const mockLogout = vi.fn().mockResolvedValue(undefined)
-
 vi.mock("@/lib/auth-context", () => ({
-  useAuth: () => ({ user: null, logout: mockLogout }),
+  useAuth: () => ({ user: null, logout: vi.fn() }),
 }))
 
 describe("Header", () => {
   const onTeamChange = vi.fn()
   const onDateRangeChange = vi.fn()
+  const onToggleSidebar = vi.fn()
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -48,7 +42,7 @@ describe("Header", () => {
     mockGetApiKey.mockReturnValue("test-key")
   })
 
-  const renderHeader = (props?: { teamId?: string | null }) =>
+  const renderHeader = (props?: { teamId?: string | null; sidebarCollapsed?: boolean }) =>
     render(
       <MemoryRouter>
         <Header
@@ -56,6 +50,8 @@ describe("Header", () => {
           onTeamChange={onTeamChange}
           dateRange={null}
           onDateRangeChange={onDateRangeChange}
+          sidebarCollapsed={props?.sidebarCollapsed ?? false}
+          onToggleSidebar={onToggleSidebar}
         />
       </MemoryRouter>,
     )
@@ -110,47 +106,19 @@ describe("Header", () => {
     expect(onTeamChange).toHaveBeenCalledWith(null)
   })
 
-  it("renders avatar button for user menu", () => {
-    renderHeader()
+  it("shows sidebar toggle button when sidebar is collapsed", () => {
+    renderHeader({ sidebarCollapsed: true })
 
-    const avatarButton = screen.getByLabelText("User menu")
-    expect(avatarButton).toBeInTheDocument()
+    const toggleButton = screen.getByTitle("Expand sidebar")
+    expect(toggleButton).toBeInTheDocument()
+
+    fireEvent.click(toggleButton)
+    expect(onToggleSidebar).toHaveBeenCalled()
   })
 
-  it("opens dropdown with sign out and theme toggle on avatar click", () => {
-    renderHeader()
+  it("hides sidebar toggle button when sidebar is expanded", () => {
+    renderHeader({ sidebarCollapsed: false })
 
-    const avatarButton = screen.getByLabelText("User menu")
-    fireEvent.click(avatarButton)
-
-    expect(screen.getByText("Sign out")).toBeInTheDocument()
-    expect(screen.getByText("Dark mode")).toBeInTheDocument()
-  })
-
-  it("calls clearApiKey and reload when clicking sign out", () => {
-    const reloadMock = vi.fn()
-    Object.defineProperty(window, "location", { value: { reload: reloadMock }, writable: true })
-
-    renderHeader()
-
-    const avatarButton = screen.getByLabelText("User menu")
-    fireEvent.click(avatarButton)
-
-    const signOutButton = screen.getByText("Sign out")
-    fireEvent.click(signOutButton)
-
-    expect(mockClearApiKey).toHaveBeenCalled()
-    expect(reloadMock).toHaveBeenCalled()
-  })
-
-  it("closes dropdown on outside click", () => {
-    renderHeader()
-
-    const avatarButton = screen.getByLabelText("User menu")
-    fireEvent.click(avatarButton)
-    expect(screen.getByText("Sign out")).toBeInTheDocument()
-
-    fireEvent.mouseDown(document.body)
-    expect(screen.queryByText("Sign out")).not.toBeInTheDocument()
+    expect(screen.queryByTitle("Expand sidebar")).not.toBeInTheDocument()
   })
 })

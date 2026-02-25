@@ -22,7 +22,7 @@ export function PageTabs<T extends string>({ tabs, activeTab, onChange }: PageTa
           className={cn(
             "relative px-4 py-2.5 text-sm font-medium transition-colors",
             activeTab === tab.id
-              ? "text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-primary"
+              ? "text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-primary after:content-['']"
               : "text-muted-foreground hover:text-foreground",
           )}
         >

@@ -58,7 +58,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { resolved, setTheme } = useTheme()
   const navigate = useNavigate()
   const isApiKeyUser = !user && !!getApiKey()
-  const role = user?.role ?? (isApiKeyUser ? "admin" : "admin")
+  const role = user?.role ?? (isApiKeyUser ? "admin" : "engineer")
   const effectiveRole = getEffectiveRole(role)
   const isAdmin = role === "admin" || isApiKeyUser
 
