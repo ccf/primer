@@ -51,7 +51,7 @@ export function FloatingExplorer() {
   }
 
   return (
-    <div className={cn("fixed bottom-6 right-0 z-40 flex justify-center px-6 animate-slide-up pointer-events-none", sidebarCollapsed ? "left-16" : "left-60")}>
+    <div className={cn("fixed bottom-6 right-0 z-40 flex justify-center px-6 animate-slide-up pointer-events-none transition-[left] duration-200 ease-out", sidebarCollapsed ? "left-16" : "left-60")}>
       <div
         className={cn(
           "pointer-events-auto w-full max-w-xl",
