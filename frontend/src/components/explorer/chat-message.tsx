@@ -60,10 +60,10 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
               "prose-headings:font-semibold prose-headings:tracking-tight",
               "prose-h3:text-sm prose-h3:mt-4 prose-h3:mb-2",
               "prose-h4:text-sm prose-h4:mt-3 prose-h4:mb-1",
-              // Paragraphs — generous spacing so stacked items don't feel crowded
-              "prose-p:my-3 prose-p:leading-relaxed",
+              // Paragraphs — generous spacing so stacked items breathe
+              "prose-p:my-4 prose-p:leading-relaxed",
               // Lists
-              "prose-ul:my-3 prose-ol:my-3 prose-li:my-1",
+              "prose-ul:my-4 prose-ol:my-4 prose-li:my-1.5",
               // Bold / emphasis
               "prose-strong:font-semibold prose-strong:text-foreground",
               // Code
