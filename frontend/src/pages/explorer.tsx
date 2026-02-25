@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react"
-import { useLocation } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import { ChatMessage } from "@/components/explorer/chat-message"
 import { ChatInput } from "@/components/explorer/chat-input"
 import { useExplorerStream } from "@/hooks/use-explorer-stream"
@@ -19,6 +19,7 @@ interface ExplorerPageProps {
 
 export function ExplorerPage({ teamId, dateRange }: ExplorerPageProps) {
   const location = useLocation()
+  const navigate = useNavigate()
   const { messages, sendMessage, isStreaming, error } = useExplorerStream(
     teamId,
     dateRange,
@@ -32,7 +33,7 @@ export function ExplorerPage({ teamId, dateRange }: ExplorerPageProps) {
     if (initialMessage && !initialMessageSent.current) {
       initialMessageSent.current = true
       sendMessage(initialMessage)
-      window.history.replaceState({}, "")
+      navigate(location.pathname, { replace: true, state: {} })
     }
   }, [location.state, sendMessage])
 
