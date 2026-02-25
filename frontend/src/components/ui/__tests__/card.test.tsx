@@ -11,7 +11,7 @@ describe("Card", () => {
   it("applies default classes", () => {
     const { container } = render(<Card>Test</Card>)
     const el = container.firstChild as HTMLElement
-    expect(el.className).toContain("rounded-xl")
+    expect(el.className).toContain("rounded-2xl")
     expect(el.className).toContain("border")
     expect(el.className).toContain("bg-card")
     expect(el.className).toContain("shadow-sm")
@@ -21,7 +21,7 @@ describe("Card", () => {
     const { container } = render(<Card className="my-custom">Test</Card>)
     const el = container.firstChild as HTMLElement
     expect(el.className).toContain("my-custom")
-    expect(el.className).toContain("rounded-xl")
+    expect(el.className).toContain("rounded-2xl")
   })
 })
 
