@@ -25,17 +25,20 @@ export function ExplorerPage({ teamId, dateRange }: ExplorerPageProps) {
     dateRange,
   )
   const scrollRef = useRef<HTMLDivElement>(null)
-  const initialMessageSent = useRef(false)
+  const sendMessageRef = useRef(sendMessage)
+  sendMessageRef.current = sendMessage
 
-  // Auto-send initial message passed from floating explorer
+  // Auto-send initial message passed from floating explorer.
+  // Uses setTimeout so it survives StrictMode's cleanup/re-run cycle:
+  // the first timer is cleared by cleanup, the second timer fires.
   useEffect(() => {
     const initialMessage = (location.state as { initialMessage?: string })?.initialMessage
-    if (initialMessage && !initialMessageSent.current) {
-      initialMessageSent.current = true
-      sendMessage(initialMessage)
-      navigate(location.pathname, { replace: true, state: {} })
-    }
-  }, [location.state, sendMessage])
+    if (!initialMessage) return
+
+    navigate(location.pathname, { replace: true, state: {} })
+    const timer = setTimeout(() => sendMessageRef.current(initialMessage), 0)
+    return () => clearTimeout(timer)
+  }, [location.state, navigate])
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
