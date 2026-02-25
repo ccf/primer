@@ -39,8 +39,8 @@ export function AppShell({ children, teamId, onTeamChange, dateRange, onDateRang
           sidebarCollapsed={collapsed}
           onToggleSidebar={toggleSidebar}
         />
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="mx-auto min-h-full max-w-[1280px]">{children}</div>
+        <main className="flex flex-1 flex-col overflow-y-auto p-6">
+          <div className="mx-auto w-full max-w-[1280px] flex-1">{children}</div>
         </main>
       </div>
     </div>
