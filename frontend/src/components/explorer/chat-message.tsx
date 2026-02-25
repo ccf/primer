@@ -60,10 +60,10 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
               "prose-headings:font-semibold prose-headings:tracking-tight",
               "prose-h3:text-sm prose-h3:mt-4 prose-h3:mb-2",
               "prose-h4:text-sm prose-h4:mt-3 prose-h4:mb-1",
-              // Paragraphs
-              "prose-p:my-2 prose-p:leading-relaxed",
+              // Paragraphs — generous spacing so stacked items don't feel crowded
+              "prose-p:my-3 prose-p:leading-relaxed",
               // Lists
-              "prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5",
+              "prose-ul:my-3 prose-ol:my-3 prose-li:my-1",
               // Bold / emphasis
               "prose-strong:font-semibold prose-strong:text-foreground",
               // Code
@@ -74,8 +74,12 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
               "[&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-medium [&_th]:text-muted-foreground",
               "[&_td]:px-3 [&_td]:py-2 [&_td]:border-t [&_td]:border-border/40",
               "[&_tr:hover]:bg-accent/50",
+              // Breathing room after tables before prose resumes
+              "[&_table+*]:mt-5",
               // Horizontal rules
-              "prose-hr:my-3 prose-hr:border-border/40",
+              "prose-hr:my-4 prose-hr:border-border/40",
+              // First child flush, last child flush
+              "[&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
             ],
           )}
         >
