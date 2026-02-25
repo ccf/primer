@@ -33,8 +33,9 @@ export function ExplorerPage({ teamId, dateRange }: ExplorerPageProps) {
   // change triggers a re-render whose cleanup clears the timer.
   // setTimeout also survives StrictMode's cleanup/re-run cycle.
   useEffect(() => {
-    const initialMessage = (location.state as { initialMessage?: string })?.initialMessage
-    if (!initialMessage) return
+    const raw = (location.state as Record<string, unknown> | null)?.initialMessage
+    if (!raw || typeof raw !== "string") return
+    const initialMessage = raw
 
     const timer = setTimeout(() => {
       sendMessageRef.current(initialMessage)

@@ -2,8 +2,7 @@ import { useState, useCallback, useEffect, type ReactNode } from "react"
 import { Sidebar } from "./sidebar"
 import { Header } from "./header"
 import type { DateRange } from "./date-range-picker"
-
-const SIDEBAR_KEY = "primer-sidebar-collapsed"
+import { SIDEBAR_KEY } from "@/lib/constants"
 
 interface AppShellProps {
   children: ReactNode
