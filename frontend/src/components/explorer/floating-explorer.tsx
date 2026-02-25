@@ -2,8 +2,7 @@ import { useRef, useState, useSyncExternalStore, type KeyboardEvent } from "reac
 import { useLocation, useNavigate } from "react-router-dom"
 import { Sparkles, Send, X } from "lucide-react"
 import { cn } from "@/lib/utils"
-
-const SIDEBAR_KEY = "primer-sidebar-collapsed"
+import { SIDEBAR_KEY } from "@/lib/constants"
 
 function subscribeSidebarState(callback: () => void) {
   window.addEventListener("storage", callback)
