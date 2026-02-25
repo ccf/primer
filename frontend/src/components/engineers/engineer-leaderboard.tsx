@@ -205,7 +205,7 @@ export function EngineerLeaderboard({
               {engineers.map((eng) => (
                 <Fragment key={eng.engineer_id}>
                   <tr
-                    className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/30"
+                    className="cursor-pointer border-b border-border/40 last:border-0 hover:bg-muted/30"
                     onMouseEnter={() => setHoveredId(eng.engineer_id)}
                     onMouseLeave={() => setHoveredId(null)}
                     onClick={() => navigate(`/engineers/${eng.engineer_id}`)}

@@ -24,7 +24,7 @@ export function FrictionList({ data }: FrictionListProps) {
       <CardContent>
         <div className="space-y-2">
           {data.map((f) => (
-            <div key={f.friction_type} className="rounded-lg border border-border">
+            <div key={f.friction_type} className="rounded-xl border border-border/60">
               <div className="flex w-full items-center justify-between p-3 text-sm">
                 <button
                   onClick={() => setExpanded(expanded === f.friction_type ? null : f.friction_type)}

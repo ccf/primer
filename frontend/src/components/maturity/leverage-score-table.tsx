@@ -55,7 +55,7 @@ export function LeverageScoreTable({ data }: LeverageScoreTableProps) {
             </thead>
             <tbody>
               {data.map((profile) => (
-                <tr key={profile.engineer_id} className="border-b border-border/50">
+                <tr key={profile.engineer_id} className="border-b border-border/40">
                   <td className="py-2 font-medium">{profile.name}</td>
                   <td className="py-2">
                     <ScoreBar score={profile.leverage_score} />

@@ -1,8 +1,8 @@
 import { useState } from "react"
-import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import { getApiKey } from "@/lib/api"
 import { EmptyState } from "@/components/shared/empty-state"
+import { PageTabs } from "@/components/ui/page-tabs"
 import { AdminEngineersTab } from "@/components/admin/admin-engineers-tab"
 import { AdminTeamsTab } from "@/components/admin/admin-teams-tab"
 import { AdminAlertsTab } from "@/components/admin/admin-alerts-tab"
@@ -33,24 +33,9 @@ export function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Admin</h1>
+      <h1 className="text-2xl font-semibold">Admin</h1>
 
-      <div className="flex gap-1 border-b border-border">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              "px-4 py-2 text-sm font-medium transition-colors",
-              activeTab === tab.id
-                ? "border-b-2 border-primary text-primary"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <PageTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
       {activeTab === "engineers" && <AdminEngineersTab />}
       {activeTab === "teams" && <AdminTeamsTab />}

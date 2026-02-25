@@ -19,7 +19,7 @@ export function TeamsPage() {
   if (loadingTeams) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Teams</h1>
+        <h1 className="text-2xl font-semibold">Teams</h1>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
             <CardSkeleton key={i} />
@@ -32,7 +32,7 @@ export function TeamsPage() {
   if (!teams || teams.length === 0) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Teams</h1>
+        <h1 className="text-2xl font-semibold">Teams</h1>
         <EmptyState message="No teams found" />
       </div>
     )
@@ -40,7 +40,7 @@ export function TeamsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Teams</h1>
+      <h1 className="text-2xl font-semibold">Teams</h1>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {teams.map((team) => (
           <Link key={team.id} to={`/teams/${team.id}`}>

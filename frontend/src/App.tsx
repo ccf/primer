@@ -21,6 +21,7 @@ import { AdminPage } from "@/pages/admin"
 import { ExplorerPage } from "@/pages/explorer"
 import { EngineerProfilePage } from "@/pages/engineer-profile"
 import { NotFoundPage } from "@/pages/not-found"
+import { FloatingExplorer } from "@/components/explorer/floating-explorer"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
 const queryClient = new QueryClient({
@@ -67,41 +68,44 @@ function AuthenticatedApp() {
   }
 
   return (
-    <AppShell
-      teamId={teamId}
-      onTeamChange={setTeamId}
-      dateRange={dateRange}
-      onDateRangeChange={setDateRange}
-    >
-      <Routes>
-        <Route path="/" element={<RoleRedirect />} />
-        <Route path="/profile" element={<ProfilePage teamId={teamId} dateRange={dateRange} />} />
-        <Route path="/dashboard" element={<DashboardPage teamId={teamId} dateRange={dateRange} />} />
-        <Route path="/sessions" element={<SessionsPage teamId={teamId} dateRange={dateRange} />} />
-        <Route path="/sessions/:id" element={<SessionDetailPage />} />
-        <Route path="/engineers/:id" element={<EngineerProfileRoute dateRange={dateRange} />} />
-        <Route path="/engineers" element={<EngineersPage teamId={teamId} dateRange={dateRange} />} />
-        <Route path="/maturity" element={<MaturityPage teamId={teamId} dateRange={dateRange} />} />
-        <Route path="/teams" element={<TeamsPage />} />
-        <Route path="/teams/:teamId" element={<TeamDetailRoute dateRange={dateRange} />} />
-        <Route path="/admin" element={<AdminPage />} />
-        <Route path="/explorer" element={<ExplorerPage teamId={teamId} dateRange={dateRange} />} />
+    <>
+      <AppShell
+        teamId={teamId}
+        onTeamChange={setTeamId}
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
+      >
+        <Routes>
+          <Route path="/" element={<RoleRedirect />} />
+          <Route path="/profile" element={<ProfilePage teamId={teamId} dateRange={dateRange} />} />
+          <Route path="/dashboard" element={<DashboardPage teamId={teamId} dateRange={dateRange} />} />
+          <Route path="/sessions" element={<SessionsPage teamId={teamId} dateRange={dateRange} />} />
+          <Route path="/sessions/:id" element={<SessionDetailPage />} />
+          <Route path="/engineers/:id" element={<EngineerProfileRoute dateRange={dateRange} />} />
+          <Route path="/engineers" element={<EngineersPage teamId={teamId} dateRange={dateRange} />} />
+          <Route path="/maturity" element={<MaturityPage teamId={teamId} dateRange={dateRange} />} />
+          <Route path="/teams" element={<TeamsPage />} />
+          <Route path="/teams/:teamId" element={<TeamDetailRoute dateRange={dateRange} />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/explorer" element={<ExplorerPage teamId={teamId} dateRange={dateRange} />} />
 
-        <Route path="/synthesis" element={<NarrativePage teamId={teamId} dateRange={dateRange} />} />
+          <Route path="/synthesis" element={<NarrativePage teamId={teamId} dateRange={dateRange} />} />
 
-        {/* Redirects for deprecated routes */}
-        <Route path="/overview" element={<Navigate to="/" replace />} />
-        <Route path="/bottlenecks" element={<Navigate to="/" replace />} />
-        <Route path="/tool-adoption" element={<Navigate to="/" replace />} />
-        <Route path="/insights" element={<Navigate to="/synthesis" replace />} />
-        <Route path="/growth" element={<Navigate to="/" replace />} />
-        <Route path="/quality" element={<Navigate to="/" replace />} />
-        <Route path="/session-insights" element={<Navigate to="/" replace />} />
-        <Route path="/projects" element={<Navigate to="/" replace />} />
+          {/* Redirects for deprecated routes */}
+          <Route path="/overview" element={<Navigate to="/" replace />} />
+          <Route path="/bottlenecks" element={<Navigate to="/" replace />} />
+          <Route path="/tool-adoption" element={<Navigate to="/" replace />} />
+          <Route path="/insights" element={<Navigate to="/synthesis" replace />} />
+          <Route path="/growth" element={<Navigate to="/" replace />} />
+          <Route path="/quality" element={<Navigate to="/" replace />} />
+          <Route path="/session-insights" element={<Navigate to="/" replace />} />
+          <Route path="/projects" element={<Navigate to="/" replace />} />
 
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-    </AppShell>
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </AppShell>
+      <FloatingExplorer />
+    </>
   )
 }
 

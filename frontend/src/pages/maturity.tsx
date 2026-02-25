@@ -1,6 +1,6 @@
 import { useState } from "react"
-import { cn } from "@/lib/utils"
 import { useMaturityAnalytics } from "@/hooks/use-api-queries"
+import { PageTabs } from "@/components/ui/page-tabs"
 import { MaturitySummary } from "@/components/maturity/maturity-summary"
 import { ToolCategoryChart } from "@/components/maturity/tool-category-chart"
 import { AgentSkillTable } from "@/components/maturity/agent-skill-table"
@@ -32,24 +32,9 @@ export function MaturityPage({ teamId, dateRange }: MaturityPageProps) {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">AI Maturity</h1>
+      <h1 className="text-2xl font-semibold">AI Maturity</h1>
 
-      <div className="flex gap-1 border-b border-border">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              "px-4 py-2 text-sm font-medium transition-colors",
-              activeTab === tab.id
-                ? "border-b-2 border-primary text-primary"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <PageTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
       {isLoading && (
         <div className="space-y-4">

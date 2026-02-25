@@ -105,7 +105,7 @@ export function ProfilePage({ teamId, dateRange }: ProfilePageProps) {
         {/* Team badge */}
         {profile.team_name && (
           <div className="mt-6">
-            <span className="inline-flex items-center rounded-full border border-border px-3 py-1 text-xs font-medium">
+            <span className="inline-flex items-center rounded-full border border-border/60 px-3 py-1 text-xs font-medium">
               {profile.team_name}
             </span>
           </div>

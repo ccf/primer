@@ -21,7 +21,7 @@ export function SessionTable({ sessions, selectedIndex = -1 }: SessionTableProps
   }, [selectedIndex])
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
+    <div className="overflow-x-auto rounded-xl border border-border/60">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border bg-muted/50">
@@ -42,7 +42,7 @@ export function SessionTable({ sessions, selectedIndex = -1 }: SessionTableProps
               ref={i === selectedIndex ? selectedRef : undefined}
               onClick={() => navigate(`/sessions/${s.id}`)}
               className={cn(
-                "cursor-pointer border-b border-border transition-colors hover:bg-muted/30 last:border-0",
+                "cursor-pointer border-b border-border/40 transition-colors hover:bg-muted/30 last:border-0",
                 i === selectedIndex && "ring-2 ring-ring ring-inset",
               )}
             >

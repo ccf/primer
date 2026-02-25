@@ -42,7 +42,7 @@ export function StatCard({ label, value, subtitle, icon: Icon, className, delta 
             </div>
             {subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
           </div>
-          <div className="rounded-lg bg-primary/10 p-2.5">
+          <div className="rounded-xl bg-primary/10 p-2.5">
             <Icon className="h-5 w-5 text-primary" />
           </div>
         </div>
