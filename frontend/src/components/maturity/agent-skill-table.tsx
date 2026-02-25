@@ -41,7 +41,7 @@ export function AgentSkillTable({ data }: AgentSkillTableProps) {
             </thead>
             <tbody>
               {data.map((item) => (
-                <tr key={item.name} className="border-b border-border/50">
+                <tr key={item.name} className="border-b border-border/40">
                   <td className="py-2 font-mono text-xs">{item.name}</td>
                   <td className="py-2">
                     <Badge variant={item.category === "orchestration" ? "default" : "secondary"}>

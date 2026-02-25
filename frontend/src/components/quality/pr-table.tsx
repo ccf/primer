@@ -37,7 +37,7 @@ export function PRTable({ prs }: Props) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
+    <div className="overflow-x-auto rounded-xl border border-border/60">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border bg-muted/50 text-left text-xs font-medium text-muted-foreground">
@@ -62,7 +62,7 @@ export function PRTable({ prs }: Props) {
         </thead>
         <tbody>
           {sorted.map((pr) => (
-            <tr key={`${pr.repository}-${pr.pr_number}`} className="border-b border-border last:border-0">
+            <tr key={`${pr.repository}-${pr.pr_number}`} className="border-b border-border/40 last:border-0">
               <td className="px-3 py-2 text-xs text-muted-foreground">{pr.repository}</td>
               <td className="px-3 py-2 font-mono">#{pr.pr_number}</td>
               <td className="max-w-[200px] truncate px-3 py-2">{pr.title ?? "-"}</td>

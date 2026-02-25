@@ -48,7 +48,7 @@ export function EngineersPage({ teamId, dateRange }: EngineersPageProps) {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Engineers</h1>
+        <h1 className="text-2xl font-semibold">Engineers</h1>
         <TableSkeleton />
       </div>
     )
@@ -56,7 +56,7 @@ export function EngineersPage({ teamId, dateRange }: EngineersPageProps) {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Engineers</h1>
+      <h1 className="text-2xl font-semibold">Engineers</h1>
 
       {!data || data.engineers.length === 0 ? (
         <EmptyState message="No engineers found" />

@@ -1,59 +1,187 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: oklch(1 0 0);
-  --color-foreground: oklch(0.145 0 0);
-  --color-card: oklch(1 0 0);
-  --color-card-foreground: oklch(0.145 0 0);
-  --color-primary: oklch(0.205 0 0);
-  --color-primary-foreground: oklch(0.985 0 0);
-  --color-secondary: oklch(0.97 0 0);
-  --color-secondary-foreground: oklch(0.205 0 0);
-  --color-muted: oklch(0.97 0 0);
-  --color-muted-foreground: oklch(0.556 0 0);
-  --color-accent: oklch(0.97 0 0);
-  --color-accent-foreground: oklch(0.205 0 0);
+  /* ── Light Mode Color Palette ── */
+  /* Warm off-white backgrounds inspired by claude.ai */
+  --color-background: oklch(0.985 0.002 90);
+  --color-foreground: oklch(0.2 0.01 260);
+  --color-card: oklch(0.995 0.001 90);
+  --color-card-foreground: oklch(0.2 0.01 260);
+
+  /* Primary: Primer Indigo brand color */
+  --color-primary: oklch(0.585 0.233 264);
+  --color-primary-foreground: oklch(1 0 0);
+
+  /* Secondary and muted tones */
+  --color-secondary: oklch(0.965 0.003 90);
+  --color-secondary-foreground: oklch(0.25 0.01 260);
+  --color-muted: oklch(0.96 0.003 90);
+  --color-muted-foreground: oklch(0.5 0.01 260);
+
+  /* Accent: subtle warm gray for hovers */
+  --color-accent: oklch(0.955 0.004 90);
+  --color-accent-foreground: oklch(0.2 0.01 260);
+
+  /* Semantic colors */
   --color-destructive: oklch(0.577 0.245 27.325);
   --color-destructive-foreground: oklch(0.985 0 0);
-  --color-border: oklch(0.922 0 0);
-  --color-input: oklch(0.922 0 0);
-  --color-ring: oklch(0.708 0 0);
   --color-success: oklch(0.627 0.194 149.214);
   --color-warning: oklch(0.769 0.188 70.08);
   --color-info: oklch(0.623 0.214 259.815);
+
+  /* Borders: extremely subtle, almost invisible like claude.ai */
+  --color-border: oklch(0.93 0.003 90);
+  --color-input: oklch(0.92 0.003 90);
+  --color-ring: oklch(0.585 0.233 264);
+
+  /* Sidebar-specific theming */
+  --color-sidebar: oklch(0.975 0.003 90);
+  --color-sidebar-foreground: oklch(0.25 0.01 260);
+  --color-sidebar-border: oklch(0.935 0.003 90);
+
+  /* Explorer overlay backdrop */
+  --color-explorer-backdrop: oklch(0.3 0.01 260 / 0.3);
+
+  /* Radii */
   --radius-sm: 0.25rem;
-  --radius-md: calc(var(--radius-sm) + 0.125rem);
-  --radius-lg: calc(var(--radius-sm) + 0.25rem);
-  --radius-xl: calc(var(--radius-sm) + 0.5rem);
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
 }
 
+/* ── Dark Mode ── */
 .dark {
-  --color-background: oklch(0.145 0 0);
-  --color-foreground: oklch(0.985 0 0);
-  --color-card: oklch(0.205 0 0);
-  --color-card-foreground: oklch(0.985 0 0);
-  --color-primary: oklch(0.985 0 0);
-  --color-primary-foreground: oklch(0.205 0 0);
-  --color-secondary: oklch(0.269 0 0);
-  --color-secondary-foreground: oklch(0.985 0 0);
-  --color-muted: oklch(0.269 0 0);
-  --color-muted-foreground: oklch(0.708 0 0);
-  --color-accent: oklch(0.269 0 0);
-  --color-accent-foreground: oklch(0.985 0 0);
+  /* Rich dark backgrounds, not pure black */
+  --color-background: oklch(0.16 0.01 260);
+  --color-foreground: oklch(0.93 0.005 90);
+  --color-card: oklch(0.2 0.01 260);
+  --color-card-foreground: oklch(0.93 0.005 90);
+
+  /* Primary: slightly lighter indigo for dark mode legibility */
+  --color-primary: oklch(0.65 0.233 264);
+  --color-primary-foreground: oklch(1 0 0);
+
+  /* Secondary and muted tones */
+  --color-secondary: oklch(0.24 0.01 260);
+  --color-secondary-foreground: oklch(0.9 0.005 90);
+  --color-muted: oklch(0.24 0.01 260);
+  --color-muted-foreground: oklch(0.6 0.01 260);
+
+  /* Accent */
+  --color-accent: oklch(0.25 0.012 260);
+  --color-accent-foreground: oklch(0.9 0.005 90);
+
+  /* Semantic colors */
   --color-destructive: oklch(0.577 0.245 27.325);
   --color-destructive-foreground: oklch(0.985 0 0);
-  --color-border: oklch(0.35 0 0);
-  --color-input: oklch(0.35 0 0);
-  --color-ring: oklch(0.556 0 0);
   --color-success: oklch(0.627 0.194 149.214);
   --color-warning: oklch(0.769 0.188 70.08);
   --color-info: oklch(0.623 0.214 259.815);
+
+  /* Borders: very subtle dark mode borders */
+  --color-border: oklch(0.3 0.005 260);
+  --color-input: oklch(0.3 0.005 260);
+  --color-ring: oklch(0.65 0.233 264);
+
+  /* Sidebar: even darker, like chatgpt's sidebar */
+  --color-sidebar: oklch(0.14 0.01 260);
+  --color-sidebar-foreground: oklch(0.85 0.005 90);
+  --color-sidebar-border: oklch(0.26 0.005 260);
+
+  /* Explorer overlay backdrop */
+  --color-explorer-backdrop: oklch(0.05 0.01 260 / 0.6);
 }
 
+/* ── Base Styles ── */
 body {
   font-family:
-    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
   color: var(--color-foreground);
   background: var(--color-background);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Elevated Shadow Utility ── */
+.shadow-elevated {
+  box-shadow:
+    0 8px 32px -4px oklch(0 0 0 / 0.08),
+    0 4px 12px -2px oklch(0 0 0 / 0.04);
+}
+
+.dark .shadow-elevated {
+  box-shadow:
+    0 8px 32px -4px oklch(0 0 0 / 0.4),
+    0 4px 12px -2px oklch(0 0 0 / 0.2);
+}
+
+/* ── Animations ── */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sidebar-expand {
+  from { width: 4rem; }
+  to { width: 15rem; }
+}
+
+@keyframes sidebar-collapse {
+  from { width: 15rem; }
+  to { width: 4rem; }
+}
+
+/* ── Animation Utilities ── */
+.animate-fade-in {
+  animation: fade-in 200ms ease-out;
+}
+
+.animate-slide-up {
+  animation: slide-up 200ms ease-out;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: oklch(0.75 0 0 / 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.6 0 0 / 0.5);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: oklch(0.4 0 0 / 0.4);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.5 0 0 / 0.5);
 }

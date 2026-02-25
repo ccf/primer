@@ -112,7 +112,7 @@ export function DashboardPage({ teamId, dateRange }: DashboardPageProps) {
       </div>
 
       {/* KPI row */}
-      <div className="flex gap-8 border-b border-border pb-4">
+      <div className="flex gap-8 border-b border-border/60 pb-4">
         <InlineStat label="Sessions" value={formatNumber(overview.total_sessions)} />
         <InlineStat label="Engineers" value={formatNumber(overview.total_engineers)} />
         <InlineStat

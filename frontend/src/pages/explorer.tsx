@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react"
-import { Search } from "lucide-react"
+import { useLocation } from "react-router-dom"
 import { ChatMessage } from "@/components/explorer/chat-message"
 import { ChatInput } from "@/components/explorer/chat-input"
 import { useExplorerStream } from "@/hooks/use-explorer-stream"
@@ -18,11 +18,23 @@ interface ExplorerPageProps {
 }
 
 export function ExplorerPage({ teamId, dateRange }: ExplorerPageProps) {
+  const location = useLocation()
   const { messages, sendMessage, isStreaming, error } = useExplorerStream(
     teamId,
     dateRange,
   )
   const scrollRef = useRef<HTMLDivElement>(null)
+  const initialMessageSent = useRef(false)
+
+  // Auto-send initial message passed from floating explorer
+  useEffect(() => {
+    const initialMessage = (location.state as { initialMessage?: string })?.initialMessage
+    if (initialMessage && !initialMessageSent.current) {
+      initialMessageSent.current = true
+      sendMessage(initialMessage)
+      window.history.replaceState({}, "")
+    }
+  }, [location.state, sendMessage])
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -36,12 +48,6 @@ export function ExplorerPage({ teamId, dateRange }: ExplorerPageProps) {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-2 border-b border-border px-6 py-3">
-        <Search className="h-5 w-5 text-muted-foreground" />
-        <h1 className="text-lg font-semibold">Explorer</h1>
-      </div>
-
       {/* Messages area */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-4">
         {isEmpty ? (

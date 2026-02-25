@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { AlertCircle, BarChart3, ServerOff, Sparkles } from "lucide-react"
+import { AlertCircle, BarChart3, ServerOff } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import { getApiKey } from "@/lib/api"
@@ -68,10 +68,7 @@ export function NarrativePage({ teamId, dateRange }: NarrativePageProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Sparkles className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold">Synthesis</h1>
-      </div>
+      <h1 className="text-2xl font-semibold">Synthesis</h1>
 
       {/* Scope selector */}
       <div className="flex gap-1">

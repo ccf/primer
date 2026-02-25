@@ -22,7 +22,7 @@ export function ChartSkeleton() {
         <Skeleton className="h-5 w-32" />
       </CardHeader>
       <CardContent>
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-64 w-full rounded-xl" />
       </CardContent>
     </Card>
   )
@@ -31,9 +31,9 @@ export function ChartSkeleton() {
 export function TableSkeleton({ rows = 5 }: { rows?: number }) {
   return (
     <div className="space-y-3">
-      <Skeleton className="h-10 w-full" />
+      <Skeleton className="h-10 w-full rounded-lg" />
       {Array.from({ length: rows }).map((_, i) => (
-        <Skeleton key={i} className="h-12 w-full" />
+        <Skeleton key={i} className="h-12 w-full rounded-lg" />
       ))}
     </div>
   )

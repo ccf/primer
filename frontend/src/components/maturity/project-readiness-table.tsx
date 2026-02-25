@@ -50,7 +50,7 @@ export function ProjectReadinessTable({ data }: ProjectReadinessTableProps) {
             </thead>
             <tbody>
               {data.map((entry) => (
-                <tr key={entry.repository} className="border-b border-border/50">
+                <tr key={entry.repository} className="border-b border-border/40">
                   <td className="py-2 font-mono text-xs">{entry.repository}</td>
                   <td className="py-2 text-center">
                     <div className="flex justify-center">
