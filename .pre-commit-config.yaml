@@ -39,3 +39,17 @@ repos:
         types_or: [ts, tsx]
         files: ^frontend/src/
         pass_filenames: false
+      - id: backend-tests
+        name: backend-tests
+        entry: pytest -v
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+      - id: frontend-tests
+        name: frontend-tests
+        entry: bash -c 'cd frontend && npm test'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
