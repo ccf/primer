@@ -571,11 +571,15 @@ def get_claude_pr_comparison(
             total_prs_analyzed=0,
         )
 
-    # Find PR IDs that have at least one SessionCommit linked to a session
+    # Find PR IDs that have at least one SessionCommit — scoped to PRs in view
+    scoped_pr_ids = {pr.id for pr in all_prs}
     claude_pr_ids = {
         row[0]
         for row in db.query(distinct(SessionCommit.pull_request_id))
-        .filter(SessionCommit.pull_request_id.isnot(None))
+        .filter(
+            SessionCommit.pull_request_id.isnot(None),
+            SessionCommit.pull_request_id.in_(scoped_pr_ids),
+        )
         .all()
     }
 
