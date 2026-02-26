@@ -640,8 +640,8 @@ def _compute_pr_group_metrics(prs: list) -> PRGroupMetrics:
             merge_times.append((pr.merged_at - pr.pr_created_at).total_seconds() / 3600)
     avg_time_to_merge_hours = sum(merge_times) / len(merge_times) if merge_times else None
 
-    avg_additions = sum(pr.additions for pr in prs) / pr_count
-    avg_deletions = sum(pr.deletions for pr in prs) / pr_count
+    avg_additions = sum(pr.additions or 0 for pr in prs) / pr_count
+    avg_deletions = sum(pr.deletions or 0 for pr in prs) / pr_count
 
     return PRGroupMetrics(
         pr_count=pr_count,

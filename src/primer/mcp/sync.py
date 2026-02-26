@@ -55,7 +55,7 @@ def sync_sessions(server_url: str, api_key: str) -> dict:
                 git_info = capture_git_info(cwd, meta.started_at)
                 if git_info.get("branch") and not meta.git_branch:
                     meta.git_branch = git_info["branch"]
-                if git_info.get("remote_url"):
+                if git_info.get("remote_url") and not meta.git_remote_url:
                     meta.git_remote_url = git_info["remote_url"]
                 if git_info.get("commits") and not meta.commits:
                     meta.commits = git_info["commits"]
