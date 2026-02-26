@@ -406,6 +406,23 @@ def _execute_tool(
 
         limit = tool_input.get("limit", 20)
         q = db.query(GitRepository).order_by(GitRepository.ai_readiness_score.desc().nullslast())
+        # Scope: only repos linked to sessions visible to this user
+        if engineer_id:
+            repo_ids = db.query(SessionModel.repository_id).filter(
+                SessionModel.engineer_id == engineer_id,
+                SessionModel.repository_id.isnot(None),
+            )
+            q = q.filter(GitRepository.id.in_(repo_ids))
+        elif team_id:
+            repo_ids = (
+                db.query(SessionModel.repository_id)
+                .join(Engineer, Engineer.id == SessionModel.engineer_id)
+                .filter(
+                    Engineer.team_id == team_id,
+                    SessionModel.repository_id.isnot(None),
+                )
+            )
+            q = q.filter(GitRepository.id.in_(repo_ids))
         repos = q.limit(limit).all()
         return json.dumps(
             [
@@ -422,25 +439,14 @@ def _execute_tool(
         )
 
     if tool_name == "search_pull_requests":
-        from primer.common.models import GitRepository, PullRequest
+        from primer.server.services.quality_service import _build_pr_scope_query
 
         limit = tool_input.get("limit", 20)
-        q = (
-            db.query(PullRequest, GitRepository.full_name, Engineer.name.label("author_name"))
-            .join(GitRepository, GitRepository.id == PullRequest.repository_id)
-            .outerjoin(Engineer, Engineer.id == PullRequest.engineer_id)
-        )
-        # Scope filters
-        if engineer_id:
-            q = q.filter(PullRequest.engineer_id == engineer_id)
-        elif team_id:
-            q = q.filter(Engineer.team_id == team_id)
-        if start_date:
-            q = q.filter(PullRequest.pr_created_at >= start_date)
-        if end_date:
-            q = q.filter(PullRequest.pr_created_at <= end_date)
+        q = _build_pr_scope_query(db, team_id, engineer_id, start_date, end_date)
 
         # Optional filters
+        from primer.common.models import GitRepository, PullRequest
+
         repo = tool_input.get("repo")
         if repo:
             q = q.filter(GitRepository.full_name.ilike(f"%{repo}%"))
@@ -464,7 +470,7 @@ def _execute_tool(
                     "additions": pr.additions,
                     "deletions": pr.deletions,
                     "review_comments_count": pr.review_comments_count,
-                    "pr_created_at": pr.pr_created_at.isoformat() if pr.pr_created_at else None,
+                    "pr_created_at": (pr.pr_created_at.isoformat() if pr.pr_created_at else None),
                     "merged_at": pr.merged_at.isoformat() if pr.merged_at else None,
                 }
                 for pr, repo_name, author_name in rows
