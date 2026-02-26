@@ -505,11 +505,12 @@ def _seed_github_data(db, engineer, team):
     db.add_all([repo, repo2])
     db.flush()
 
-    # Create a session for linking commits
+    # Create sessions linking repos to the engineer (needed for scope filtering)
     session_id = str(uuid.uuid4())
     session = SessionModel(
         id=session_id,
         engineer_id=engineer.id,
+        repository_id=repo.id,
         message_count=5,
         user_message_count=3,
         assistant_message_count=2,
@@ -521,7 +522,22 @@ def _seed_github_data(db, engineer, team):
         primary_model="claude-sonnet-4-6",
         project_name="webapp",
     )
-    db.add(session)
+    session2 = SessionModel(
+        id=str(uuid.uuid4()),
+        engineer_id=engineer.id,
+        repository_id=repo2.id,
+        message_count=3,
+        user_message_count=2,
+        assistant_message_count=1,
+        tool_call_count=0,
+        input_tokens=200,
+        output_tokens=100,
+        duration_seconds=30.0,
+        started_at=datetime.now(UTC) - timedelta(days=2),
+        primary_model="claude-sonnet-4-6",
+        project_name="api",
+    )
+    db.add_all([session, session2])
     db.flush()
 
     # Claude-assisted PR (has SessionCommit linked to a session)

@@ -6,7 +6,6 @@ from datetime import datetime
 from sqlalchemy import case, distinct, func
 from sqlalchemy.orm import Session
 
-from primer.common.config import settings
 from primer.common.models import (
     Engineer,
     GitRepository,
@@ -26,6 +25,7 @@ from primer.common.schemas import (
     QualityOverview,
 )
 from primer.server.services.analytics_service import base_session_query
+from primer.server.services.github_service import is_configured
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,7 @@ def get_quality_metrics(
             engineer_quality=[],
             recent_prs=github_prs,
             sessions_analyzed=0,
-            github_connected=bool(settings.github_app_id),
+            github_connected=is_configured(),
         )
 
     overview = _compute_overview(db, session_id_q)
@@ -97,7 +97,7 @@ def get_quality_metrics(
         engineer_quality=engineer_quality,
         recent_prs=merged_prs[:30],
         sessions_analyzed=total_sessions,
-        github_connected=bool(settings.github_app_id),
+        github_connected=is_configured(),
     )
 
 
