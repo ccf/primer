@@ -175,6 +175,64 @@ TOOL_DEFINITIONS = [
             "required": ["session_id"],
         },
     },
+    {
+        "name": "get_pr_comparison",
+        "description": (
+            "Compare Claude-assisted PRs vs non-Claude PRs: merge rate, review comments, "
+            "time to merge, size"
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "get_repo_readiness",
+        "description": (
+            "Get AI readiness scores for repositories: checks for CLAUDE.md, "
+            ".claude/ directory, AGENTS.md"
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Max repositories to return (default 20)",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "search_pull_requests",
+        "description": (
+            "Search pull requests by repo, state, author. Shows title, "
+            "additions/deletions, review comments, merge status"
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "repo": {
+                    "type": "string",
+                    "description": "Filter by repository name (substring match on full_name)",
+                },
+                "state": {
+                    "type": "string",
+                    "description": "Filter by state: open, closed, merged",
+                },
+                "author": {
+                    "type": "string",
+                    "description": "Filter by engineer name (substring match)",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max pull requests to return (default 20)",
+                },
+            },
+            "required": [],
+        },
+    },
 ]
 
 
@@ -337,6 +395,83 @@ def _execute_tool(
             default=str,
         )
 
+    if tool_name == "get_pr_comparison":
+        from primer.server.services.quality_service import get_claude_pr_comparison
+
+        result = get_claude_pr_comparison(**kwargs)
+        return result.model_dump_json()
+
+    if tool_name == "get_repo_readiness":
+        from primer.common.models import GitRepository
+
+        limit = tool_input.get("limit", 20)
+        q = db.query(GitRepository).order_by(GitRepository.ai_readiness_score.desc().nullslast())
+        repos = q.limit(limit).all()
+        return json.dumps(
+            [
+                {
+                    "full_name": r.full_name,
+                    "ai_readiness_score": r.ai_readiness_score,
+                    "has_claude_md": r.has_claude_md,
+                    "has_agents_md": r.has_agents_md,
+                    "has_claude_dir": r.has_claude_dir,
+                }
+                for r in repos
+            ],
+            default=str,
+        )
+
+    if tool_name == "search_pull_requests":
+        from primer.common.models import GitRepository, PullRequest
+
+        limit = tool_input.get("limit", 20)
+        q = (
+            db.query(PullRequest, GitRepository.full_name, Engineer.name.label("author_name"))
+            .join(GitRepository, GitRepository.id == PullRequest.repository_id)
+            .outerjoin(Engineer, Engineer.id == PullRequest.engineer_id)
+        )
+        # Scope filters
+        if engineer_id:
+            q = q.filter(PullRequest.engineer_id == engineer_id)
+        elif team_id:
+            q = q.filter(Engineer.team_id == team_id)
+        if start_date:
+            q = q.filter(PullRequest.pr_created_at >= start_date)
+        if end_date:
+            q = q.filter(PullRequest.pr_created_at <= end_date)
+
+        # Optional filters
+        repo = tool_input.get("repo")
+        if repo:
+            q = q.filter(GitRepository.full_name.ilike(f"%{repo}%"))
+        state = tool_input.get("state")
+        if state:
+            q = q.filter(PullRequest.state == state)
+        author = tool_input.get("author")
+        if author:
+            q = q.filter(Engineer.name.ilike(f"%{author}%"))
+
+        q = q.order_by(PullRequest.pr_created_at.desc()).limit(limit)
+        rows = q.all()
+        return json.dumps(
+            [
+                {
+                    "repository": repo_name,
+                    "pr_number": pr.github_pr_number,
+                    "title": pr.title,
+                    "state": pr.state,
+                    "author": author_name,
+                    "additions": pr.additions,
+                    "deletions": pr.deletions,
+                    "review_comments_count": pr.review_comments_count,
+                    "pr_created_at": pr.pr_created_at.isoformat() if pr.pr_created_at else None,
+                    "merged_at": pr.merged_at.isoformat() if pr.merged_at else None,
+                }
+                for pr, repo_name, author_name in rows
+            ],
+            default=str,
+        )
+
     return json.dumps({"error": f"Unknown tool: {tool_name}"})
 
 
@@ -351,6 +486,8 @@ You help users explore their engineering team's Claude Code usage data through c
 
 ## Your role
 - Answer questions about Claude Code usage patterns, costs, productivity, and friction
+- You can also answer questions about GitHub pull requests, code quality,
+  and repository AI readiness
 - Provide concise, data-driven answers with specific numbers
 - Use markdown formatting for clarity (bold key metrics, use tables for comparisons)
 - When relevant, suggest which dashboard page has more detail

@@ -50,7 +50,7 @@ export function LoginPage() {
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
             <img src="/logo-mark.svg" alt="Primer" className="h-7 w-7" />
           </div>
-          <CardTitle className="text-xl">Primer Dashboard</CardTitle>
+          <CardTitle className="text-xl">Primer</CardTitle>
           <CardDescription>Sign in to view your Claude Code insights</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

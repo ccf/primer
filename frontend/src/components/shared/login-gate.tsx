@@ -38,7 +38,7 @@ export function LoginGate() {
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
             <img src="/logo-mark.svg" alt="Primer" className="h-7 w-7" />
           </div>
-          <CardTitle className="text-xl">Primer Dashboard</CardTitle>
+          <CardTitle className="text-xl">Primer</CardTitle>
           <CardDescription>Enter your admin API key to continue</CardDescription>
         </CardHeader>
         <CardContent>
