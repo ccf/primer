@@ -87,7 +87,7 @@ describe("App", () => {
     mockGetApiKey.mockReturnValue(null)
 
     render(<App />)
-    expect(screen.getByText("Primer Dashboard")).toBeInTheDocument()
+    expect(screen.getByText("Primer")).toBeInTheDocument()
     expect(screen.getByText("Sign in with GitHub")).toBeInTheDocument()
   })
 
@@ -100,7 +100,7 @@ describe("App", () => {
     render(<App />)
     // Sidebar navigation links (leadership role for API key users)
     expect(screen.getByText("Primer")).toBeInTheDocument()
-    expect(screen.getByText("Dashboard")).toBeInTheDocument()
+    expect(screen.getByText("Organization")).toBeInTheDocument()
     expect(screen.getByText("Sessions")).toBeInTheDocument()
     expect(screen.getByText("Engineers")).toBeInTheDocument()
   })

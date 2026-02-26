@@ -25,9 +25,9 @@ beforeEach(() => {
 })
 
 describe("LoginGate", () => {
-  it('renders "Primer Dashboard" title', () => {
+  it('renders "Primer" title', () => {
     render(<LoginGate />)
-    expect(screen.getByText("Primer Dashboard")).toBeInTheDocument()
+    expect(screen.getByText("Primer")).toBeInTheDocument()
   })
 
   it('renders "Enter your admin API key to continue"', () => {

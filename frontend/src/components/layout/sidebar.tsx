@@ -37,7 +37,7 @@ const engineerLinks: NavItem[] = [
 ]
 
 const leadershipLinks: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/dashboard", label: "Organization", icon: LayoutDashboard },
   { to: "/engineers", label: "Engineers", icon: Users },
   { to: "/teams", label: "Teams", icon: Users2 },
   { to: "/sessions", label: "Sessions", icon: MonitorDot },

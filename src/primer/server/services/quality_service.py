@@ -546,24 +546,108 @@ def get_claude_pr_comparison(
 ) -> ClaudePRComparisonResponse:
     """Compare Claude-assisted PRs vs non-Claude PRs.
 
-    NOTE: This feature requires PR tracking models (PullRequest, SessionCommit)
-    which are not yet implemented.  Until those tables exist this function
-    returns empty metrics so the API contract is honoured and the frontend
-    can render a "no data" state.
+    A PR is "Claude-assisted" if it has at least one commit linked to a
+    session via SessionCommit.
     """
-    empty = PRGroupMetrics(
-        pr_count=0,
-        merge_rate=None,
-        avg_review_comments=None,
-        avg_time_to_merge_hours=None,
-        avg_additions=None,
-        avg_deletions=None,
-    )
+    # All PRs in scope
+    base = _build_pr_scope_query(db, team_id, engineer_id, start_date, end_date)
+    all_prs = base.with_entities(PullRequest).all()
+
+    if not all_prs:
+        empty = PRGroupMetrics(
+            pr_count=0,
+            merge_rate=None,
+            avg_review_comments=None,
+            avg_time_to_merge_hours=None,
+            avg_additions=None,
+            avg_deletions=None,
+        )
+        return ClaudePRComparisonResponse(
+            claude_assisted=empty,
+            non_claude=empty,
+            delta_review_comments=None,
+            delta_merge_time_hours=None,
+            delta_merge_rate=None,
+            total_prs_analyzed=0,
+        )
+
+    # Find PR IDs that have at least one SessionCommit linked to a session
+    claude_pr_ids = {
+        row[0]
+        for row in db.query(distinct(SessionCommit.pull_request_id))
+        .filter(SessionCommit.pull_request_id.isnot(None))
+        .all()
+    }
+
+    claude_prs = [pr for pr in all_prs if pr.id in claude_pr_ids]
+    non_claude_prs = [pr for pr in all_prs if pr.id not in claude_pr_ids]
+
+    claude_metrics = _compute_pr_group_metrics(claude_prs)
+    non_claude_metrics = _compute_pr_group_metrics(non_claude_prs)
+
+    delta_review_comments = None
+    claude_comments = claude_metrics.avg_review_comments
+    non_claude_comments = non_claude_metrics.avg_review_comments
+    if claude_comments is not None and non_claude_comments is not None:
+        delta_review_comments = claude_comments - non_claude_comments
+
+    delta_merge_time = None
+    claude_merge = claude_metrics.avg_time_to_merge_hours
+    non_claude_merge = non_claude_metrics.avg_time_to_merge_hours
+    if claude_merge is not None and non_claude_merge is not None:
+        delta_merge_time = claude_merge - non_claude_merge
+
+    delta_merge_rate = None
+    if claude_metrics.merge_rate is not None and non_claude_metrics.merge_rate is not None:
+        delta_merge_rate = claude_metrics.merge_rate - non_claude_metrics.merge_rate
+
     return ClaudePRComparisonResponse(
-        claude_assisted=empty,
-        non_claude=empty,
-        delta_review_comments=None,
-        delta_merge_time_hours=None,
-        delta_merge_rate=None,
-        total_prs_analyzed=0,
+        claude_assisted=claude_metrics,
+        non_claude=non_claude_metrics,
+        delta_review_comments=delta_review_comments,
+        delta_merge_time_hours=delta_merge_time,
+        delta_merge_rate=delta_merge_rate,
+        total_prs_analyzed=len(all_prs),
+    )
+
+
+def _compute_pr_group_metrics(prs: list) -> PRGroupMetrics:
+    """Compute aggregate metrics for a group of PRs."""
+    if not prs:
+        return PRGroupMetrics(
+            pr_count=0,
+            merge_rate=None,
+            avg_review_comments=None,
+            avg_time_to_merge_hours=None,
+            avg_additions=None,
+            avg_deletions=None,
+        )
+
+    pr_count = len(prs)
+    merged = sum(1 for pr in prs if pr.state == "merged")
+    closed = sum(1 for pr in prs if pr.state == "closed")
+    denominator = merged + closed
+    merge_rate = merged / denominator if denominator > 0 else None
+
+    comment_counts = [
+        pr.review_comments_count for pr in prs if pr.review_comments_count is not None
+    ]
+    avg_review_comments = sum(comment_counts) / len(comment_counts) if comment_counts else None
+
+    merge_times = []
+    for pr in prs:
+        if pr.merged_at and pr.pr_created_at:
+            merge_times.append((pr.merged_at - pr.pr_created_at).total_seconds() / 3600)
+    avg_time_to_merge_hours = sum(merge_times) / len(merge_times) if merge_times else None
+
+    avg_additions = sum(pr.additions for pr in prs) / pr_count
+    avg_deletions = sum(pr.deletions for pr in prs) / pr_count
+
+    return PRGroupMetrics(
+        pr_count=pr_count,
+        merge_rate=merge_rate,
+        avg_review_comments=avg_review_comments,
+        avg_time_to_merge_hours=avg_time_to_merge_hours,
+        avg_additions=avg_additions,
+        avg_deletions=avg_deletions,
     )

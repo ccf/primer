@@ -14,6 +14,9 @@ const TOOL_LABELS: Record<string, string> = {
   get_productivity: "Productivity",
   search_sessions: "Sessions",
   get_session_detail: "Session Detail",
+  get_pr_comparison: "Pull Requests",
+  get_repo_readiness: "Repositories",
+  search_pull_requests: "Pull Requests",
 }
 
 interface ChatMessageProps {

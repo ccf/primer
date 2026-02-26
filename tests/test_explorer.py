@@ -7,7 +7,15 @@ from unittest.mock import patch
 
 import pytest
 
-from primer.common.models import Engineer, SessionFacets, Team, ToolUsage
+from primer.common.models import (
+    Engineer,
+    GitRepository,
+    PullRequest,
+    SessionCommit,
+    SessionFacets,
+    Team,
+    ToolUsage,
+)
 from primer.common.models import Session as SessionModel
 from primer.server.services.auth_service import create_access_token
 
@@ -476,3 +484,308 @@ class TestSSEFormat:
         event = _sse_event("done", {})
         assert "event: done\n" in event
         assert "data: {}" in event
+
+
+def _seed_github_data(db, engineer, team):
+    """Seed GitHub repos, PRs, and session commits for explorer GitHub tool tests."""
+    repo = GitRepository(
+        full_name="acme/webapp",
+        has_claude_md=True,
+        has_agents_md=False,
+        has_claude_dir=True,
+        ai_readiness_score=0.75,
+    )
+    repo2 = GitRepository(
+        full_name="acme/api",
+        has_claude_md=False,
+        has_agents_md=True,
+        has_claude_dir=False,
+        ai_readiness_score=0.40,
+    )
+    db.add_all([repo, repo2])
+    db.flush()
+
+    # Create a session for linking commits
+    session_id = str(uuid.uuid4())
+    session = SessionModel(
+        id=session_id,
+        engineer_id=engineer.id,
+        message_count=5,
+        user_message_count=3,
+        assistant_message_count=2,
+        tool_call_count=1,
+        input_tokens=500,
+        output_tokens=250,
+        duration_seconds=60.0,
+        started_at=datetime.now(UTC) - timedelta(days=1),
+        primary_model="claude-sonnet-4-6",
+        project_name="webapp",
+    )
+    db.add(session)
+    db.flush()
+
+    # Claude-assisted PR (has SessionCommit linked to a session)
+    pr_claude = PullRequest(
+        repository_id=repo.id,
+        engineer_id=engineer.id,
+        github_pr_number=1,
+        title="Add login feature",
+        state="merged",
+        additions=200,
+        deletions=50,
+        review_comments_count=3,
+        pr_created_at=datetime.now(UTC) - timedelta(days=5),
+        merged_at=datetime.now(UTC) - timedelta(days=3),
+    )
+    # Non-Claude PR
+    pr_regular = PullRequest(
+        repository_id=repo.id,
+        engineer_id=engineer.id,
+        github_pr_number=2,
+        title="Fix CSS styles",
+        state="merged",
+        additions=30,
+        deletions=10,
+        review_comments_count=1,
+        pr_created_at=datetime.now(UTC) - timedelta(days=4),
+        merged_at=datetime.now(UTC) - timedelta(days=2),
+    )
+    # Open PR on repo2
+    pr_open = PullRequest(
+        repository_id=repo2.id,
+        engineer_id=engineer.id,
+        github_pr_number=10,
+        title="Add API endpoint",
+        state="open",
+        additions=100,
+        deletions=20,
+        review_comments_count=0,
+        pr_created_at=datetime.now(UTC) - timedelta(days=1),
+    )
+    db.add_all([pr_claude, pr_regular, pr_open])
+    db.flush()
+
+    # Link pr_claude to session via SessionCommit
+    commit = SessionCommit(
+        session_id=session_id,
+        repository_id=repo.id,
+        pull_request_id=pr_claude.id,
+        commit_sha="abc123def456",
+        lines_added=200,
+        lines_deleted=50,
+    )
+    db.add(commit)
+    db.flush()
+
+    return {
+        "repo": repo,
+        "repo2": repo2,
+        "session": session,
+        "pr_claude": pr_claude,
+        "pr_regular": pr_regular,
+        "pr_open": pr_open,
+        "commit": commit,
+    }
+
+
+class TestGitHubTools:
+    def test_get_pr_comparison(self, db_session, engineer, team):
+        """get_pr_comparison returns Claude vs non-Claude metrics."""
+        _seed_github_data(db_session, engineer, team)
+
+        from primer.server.services.explorer_service import _execute_tool
+
+        result = _execute_tool(
+            "get_pr_comparison",
+            {},
+            db_session,
+            team_id=team.id,
+            engineer_id=None,
+            start_date=None,
+            end_date=None,
+        )
+        data = json.loads(result)
+        assert data["total_prs_analyzed"] == 3
+        assert data["claude_assisted"]["pr_count"] == 1
+        assert data["non_claude"]["pr_count"] == 2
+
+    def test_get_repo_readiness(self, db_session, engineer, team):
+        """get_repo_readiness returns repos ordered by score."""
+        _seed_github_data(db_session, engineer, team)
+
+        from primer.server.services.explorer_service import _execute_tool
+
+        result = _execute_tool(
+            "get_repo_readiness",
+            {},
+            db_session,
+            team_id=team.id,
+            engineer_id=None,
+            start_date=None,
+            end_date=None,
+        )
+        data = json.loads(result)
+        assert isinstance(data, list)
+        assert len(data) == 2
+        # Highest score first
+        assert data[0]["full_name"] == "acme/webapp"
+        assert data[0]["ai_readiness_score"] == 0.75
+        assert data[0]["has_claude_md"] is True
+        assert data[1]["full_name"] == "acme/api"
+
+    def test_get_repo_readiness_with_limit(self, db_session, engineer, team):
+        """get_repo_readiness respects limit parameter."""
+        _seed_github_data(db_session, engineer, team)
+
+        from primer.server.services.explorer_service import _execute_tool
+
+        result = _execute_tool(
+            "get_repo_readiness",
+            {"limit": 1},
+            db_session,
+            team_id=team.id,
+            engineer_id=None,
+            start_date=None,
+            end_date=None,
+        )
+        data = json.loads(result)
+        assert len(data) == 1
+
+    def test_search_pull_requests(self, db_session, engineer, team):
+        """search_pull_requests returns all PRs for the engineer."""
+        _seed_github_data(db_session, engineer, team)
+
+        from primer.server.services.explorer_service import _execute_tool
+
+        result = _execute_tool(
+            "search_pull_requests",
+            {},
+            db_session,
+            team_id=team.id,
+            engineer_id=None,
+            start_date=None,
+            end_date=None,
+        )
+        data = json.loads(result)
+        assert isinstance(data, list)
+        assert len(data) == 3
+
+    def test_search_pull_requests_by_repo(self, db_session, engineer, team):
+        """search_pull_requests filters by repo name."""
+        _seed_github_data(db_session, engineer, team)
+
+        from primer.server.services.explorer_service import _execute_tool
+
+        result = _execute_tool(
+            "search_pull_requests",
+            {"repo": "api"},
+            db_session,
+            team_id=team.id,
+            engineer_id=None,
+            start_date=None,
+            end_date=None,
+        )
+        data = json.loads(result)
+        assert len(data) == 1
+        assert data[0]["repository"] == "acme/api"
+
+    def test_search_pull_requests_by_state(self, db_session, engineer, team):
+        """search_pull_requests filters by state."""
+        _seed_github_data(db_session, engineer, team)
+
+        from primer.server.services.explorer_service import _execute_tool
+
+        result = _execute_tool(
+            "search_pull_requests",
+            {"state": "open"},
+            db_session,
+            team_id=team.id,
+            engineer_id=None,
+            start_date=None,
+            end_date=None,
+        )
+        data = json.loads(result)
+        assert len(data) == 1
+        assert data[0]["state"] == "open"
+
+    def test_search_pull_requests_by_author(self, db_session, engineer, team):
+        """search_pull_requests filters by author name."""
+        _seed_github_data(db_session, engineer, team)
+
+        from primer.server.services.explorer_service import _execute_tool
+
+        result = _execute_tool(
+            "search_pull_requests",
+            {"author": "Explorer Tester"},
+            db_session,
+            team_id=team.id,
+            engineer_id=None,
+            start_date=None,
+            end_date=None,
+        )
+        data = json.loads(result)
+        assert len(data) == 3
+
+    def test_scope_isolation_engineer(self, db_session, team):
+        """Engineer scope restricts PR search to own PRs."""
+        eng1 = Engineer(
+            name="Engineer A",
+            email=f"eng-a-{uuid.uuid4().hex[:6]}@example.com",
+            api_key_hash="",
+            team_id=team.id,
+            role="engineer",
+        )
+        eng2 = Engineer(
+            name="Engineer B",
+            email=f"eng-b-{uuid.uuid4().hex[:6]}@example.com",
+            api_key_hash="",
+            team_id=team.id,
+            role="engineer",
+        )
+        db_session.add_all([eng1, eng2])
+        db_session.flush()
+
+        repo = GitRepository(full_name=f"acme/scope-test-{uuid.uuid4().hex[:6]}")
+        db_session.add(repo)
+        db_session.flush()
+
+        # PR for eng1
+        pr1 = PullRequest(
+            repository_id=repo.id,
+            engineer_id=eng1.id,
+            github_pr_number=100,
+            title="Eng1 PR",
+            state="merged",
+            additions=10,
+            deletions=5,
+            pr_created_at=datetime.now(UTC),
+        )
+        # PR for eng2
+        pr2 = PullRequest(
+            repository_id=repo.id,
+            engineer_id=eng2.id,
+            github_pr_number=101,
+            title="Eng2 PR",
+            state="open",
+            additions=20,
+            deletions=10,
+            pr_created_at=datetime.now(UTC),
+        )
+        db_session.add_all([pr1, pr2])
+        db_session.flush()
+
+        from primer.server.services.explorer_service import _execute_tool
+
+        # eng1 should only see their own PR
+        result = _execute_tool(
+            "search_pull_requests",
+            {},
+            db_session,
+            team_id=None,
+            engineer_id=eng1.id,
+            start_date=None,
+            end_date=None,
+        )
+        data = json.loads(result)
+        assert len(data) == 1
+        assert data[0]["title"] == "Eng1 PR"
