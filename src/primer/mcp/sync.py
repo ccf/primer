@@ -1,10 +1,11 @@
 """Sync local Claude Code session data to the Primer server."""
 
 import logging
+import os
 
 import httpx
 
-from primer.hook.extractor import extract_from_jsonl, load_facets
+from primer.hook.extractor import capture_git_info, extract_from_jsonl, load_facets
 from primer.mcp.reader import list_local_sessions
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,21 @@ def sync_sessions(server_url: str, api_key: str) -> dict:
             meta = extract_from_jsonl(local_session.transcript_path)
             meta.session_id = local_session.session_id
             facets = load_facets(local_session.session_id)
+
+            # Capture git info from the project directory
+            cwd = local_session.project_path
+            if cwd and os.path.isdir(cwd):
+                if not meta.project_path:
+                    meta.project_path = cwd
+                    meta.project_name = os.path.basename(cwd)
+                git_info = capture_git_info(cwd, meta.started_at)
+                if git_info.get("branch") and not meta.git_branch:
+                    meta.git_branch = git_info["branch"]
+                if git_info.get("remote_url"):
+                    meta.git_remote_url = git_info["remote_url"]
+                if git_info.get("commits") and not meta.commits:
+                    meta.commits = git_info["commits"]
+
             payload = meta.to_ingest_payload(api_key=api_key, facets=facets)
 
             resp = httpx.post(

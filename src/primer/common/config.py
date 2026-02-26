@@ -60,6 +60,9 @@ class PrimerSettings(BaseSettings):
     github_installation_id: int | None = None
     github_webhook_secret: str = ""
 
+    # GitHub personal access token (simpler alternative to GitHub App)
+    github_token: str = ""
+
     # Anthropic API (for narrative insights)
     anthropic_api_key: str = ""
     narrative_cache_ttl_hours: int = 24

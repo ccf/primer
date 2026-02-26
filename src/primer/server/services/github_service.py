@@ -1,4 +1,4 @@
-"""GitHub App integration: token management, API client, PR sync."""
+"""GitHub integration: App or personal access token, API client, PR sync."""
 
 import logging
 import threading
@@ -29,12 +29,16 @@ _token_cache: dict[str, object] = {"access_token": None, "expires_at": 0.0}
 _token_lock = threading.Lock()
 
 
-def is_configured() -> bool:
+def _has_app_credentials() -> bool:
     return bool(
         settings.github_app_id
         and settings.github_app_private_key
         and settings.github_installation_id
     )
+
+
+def is_configured() -> bool:
+    return _has_app_credentials() or bool(settings.github_token)
 
 
 def _generate_app_jwt() -> str:
@@ -73,9 +77,14 @@ def _get_installation_token() -> str:
 
 
 def _github_headers() -> dict[str, str]:
-    token = _get_installation_token()
+    if _has_app_credentials():
+        token = _get_installation_token()
+        return {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+        }
     return {
-        "Authorization": f"Bearer {token}",
+        "Authorization": f"Bearer {settings.github_token}",
         "Accept": "application/vnd.github+json",
     }
 
