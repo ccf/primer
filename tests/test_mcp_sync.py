@@ -4,13 +4,21 @@ from primer.hook.extractor import SessionMetadata
 from primer.mcp.reader import LocalSession
 
 
-def _local(sid, path="/t/t.jsonl"):
+def _local(sid, path="/t/t.jsonl", agent_type="claude_code"):
     return LocalSession(
         session_id=sid,
         transcript_path=path,
         facets_path=None,
         has_facets=False,
+        agent_type=agent_type,
     )
+
+
+def _make_mock_extractor(meta=None):
+    """Create a mock extractor that returns given metadata."""
+    ext = MagicMock()
+    ext.extract.return_value = meta or SessionMetadata(session_id="")
+    return ext
 
 
 # --- get_server_session_ids ---
@@ -74,10 +82,10 @@ def test_sync_all_already_synced(mock_list, mock_server_ids):
 
 @patch("primer.mcp.sync.httpx.post")
 @patch("primer.mcp.sync.load_facets")
-@patch("primer.mcp.sync.extract_from_jsonl")
+@patch("primer.mcp.sync.get_extractor_for")
 @patch("primer.mcp.sync.get_server_session_ids")
 @patch("primer.mcp.sync.list_local_sessions")
-def test_sync_uploads_missing(mock_list, mock_server_ids, mock_extract, mock_facets, mock_post):
+def test_sync_uploads_missing(mock_list, mock_server_ids, mock_get_ext, mock_facets, mock_post):
     mock_list.return_value = [
         _local("s1", "/t/s1.jsonl"),
         _local("s2", "/t/s2.jsonl"),
@@ -85,7 +93,7 @@ def test_sync_uploads_missing(mock_list, mock_server_ids, mock_extract, mock_fac
     mock_server_ids.return_value = {"s1"}  # s2 is missing
 
     meta = SessionMetadata(session_id="")
-    mock_extract.return_value = meta
+    mock_get_ext.return_value = _make_mock_extractor(meta)
     mock_facets.return_value = None
 
     mock_resp = MagicMock()
@@ -102,17 +110,17 @@ def test_sync_uploads_missing(mock_list, mock_server_ids, mock_extract, mock_fac
 
 @patch("primer.mcp.sync.httpx.post")
 @patch("primer.mcp.sync.load_facets")
-@patch("primer.mcp.sync.extract_from_jsonl")
+@patch("primer.mcp.sync.get_extractor_for")
 @patch("primer.mcp.sync.get_server_session_ids")
 @patch("primer.mcp.sync.list_local_sessions")
-def test_sync_upload_failure(mock_list, mock_server_ids, mock_extract, mock_facets, mock_post):
+def test_sync_upload_failure(mock_list, mock_server_ids, mock_get_ext, mock_facets, mock_post):
     mock_list.return_value = [
         _local("s1", "/t/s1.jsonl"),
     ]
     mock_server_ids.return_value = set()
 
     meta = SessionMetadata(session_id="")
-    mock_extract.return_value = meta
+    mock_get_ext.return_value = _make_mock_extractor(meta)
     mock_facets.return_value = None
 
     mock_resp = MagicMock()
@@ -126,15 +134,35 @@ def test_sync_upload_failure(mock_list, mock_server_ids, mock_extract, mock_face
     assert result["errors"] == 1
 
 
-@patch("primer.mcp.sync.extract_from_jsonl")
+@patch("primer.mcp.sync.get_extractor_for")
 @patch("primer.mcp.sync.get_server_session_ids")
 @patch("primer.mcp.sync.list_local_sessions")
-def test_sync_extraction_exception(mock_list, mock_server_ids, mock_extract):
+def test_sync_extraction_exception(mock_list, mock_server_ids, mock_get_ext):
     mock_list.return_value = [
         _local("s1", "/t/s1.jsonl"),
     ]
     mock_server_ids.return_value = set()
-    mock_extract.side_effect = RuntimeError("parse failed")
+    mock_ext = MagicMock()
+    mock_ext.extract.side_effect = RuntimeError("parse failed")
+    mock_get_ext.return_value = mock_ext
+
+    from primer.mcp.sync import sync_sessions
+
+    result = sync_sessions("http://test:8000", "key")
+    assert result["errors"] == 1
+    assert result["synced"] == 0
+
+
+@patch("primer.mcp.sync.get_extractor_for")
+@patch("primer.mcp.sync.get_server_session_ids")
+@patch("primer.mcp.sync.list_local_sessions")
+def test_sync_unknown_agent_type(mock_list, mock_server_ids, mock_get_ext):
+    """Unknown agent_type returns None from get_extractor_for, counted as error."""
+    mock_list.return_value = [
+        _local("s1", "/t/s1.jsonl", agent_type="unknown_agent"),
+    ]
+    mock_server_ids.return_value = set()
+    mock_get_ext.return_value = None
 
     from primer.mcp.sync import sync_sessions
 

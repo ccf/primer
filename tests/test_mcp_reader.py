@@ -1,10 +1,16 @@
 import json
+from pathlib import Path
 
 import primer.mcp.reader as reader
 
 
+def _mock_home(tmp_path, monkeypatch):
+    """Point Path.home() at tmp_path so extractors don't find real sessions."""
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+
+
 def test_list_local_sessions_empty(tmp_path, monkeypatch):
-    monkeypatch.setattr(reader, "get_usage_data_dir", lambda: tmp_path / "usage-data")
+    _mock_home(tmp_path, monkeypatch)
     result = reader.list_local_sessions()
     assert result == []
 
@@ -31,8 +37,7 @@ def _setup_session(tmp_path, monkeypatch, session_id, project_path, *, has_facet
     if has_facets:
         (facets_dir / f"{session_id}.json").write_text('{"outcome":"success"}')
 
-    monkeypatch.setattr(reader, "get_usage_data_dir", lambda: usage_dir)
-    monkeypatch.setattr(reader, "get_claude_data_dir", lambda: claude_dir)
+    _mock_home(tmp_path, monkeypatch)
 
 
 def test_list_local_sessions(tmp_path, monkeypatch):
@@ -71,8 +76,7 @@ def test_list_local_sessions_fallback_search(tmp_path, monkeypatch):
     proj_dir.mkdir(parents=True)
     (proj_dir / "orphan.jsonl").write_text('{"type":"human"}\n')
 
-    monkeypatch.setattr(reader, "get_usage_data_dir", lambda: usage_dir)
-    monkeypatch.setattr(reader, "get_claude_data_dir", lambda: claude_dir)
+    _mock_home(tmp_path, monkeypatch)
 
     result = reader.list_local_sessions()
     assert len(result) == 1

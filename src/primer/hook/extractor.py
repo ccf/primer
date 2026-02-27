@@ -1,4 +1,11 @@
-"""Extract structured metadata from Claude Code JSONL session transcripts."""
+"""Extract structured metadata from session transcripts.
+
+Provides the SessionExtractor protocol and ClaudeCodeExtractor implementation.
+Module-level functions (extract_from_jsonl, load_facets, etc.) are kept as
+backward-compatible aliases.
+"""
+
+from __future__ import annotations
 
 import json
 import logging
@@ -7,8 +14,27 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from typing import Protocol
 
 logger = logging.getLogger(__name__)
+
+
+class SessionExtractor(Protocol):
+    """Protocol that all agent extractors must implement."""
+
+    agent_type: str
+
+    def discover_sessions(self) -> list:
+        """Return list of LocalSession objects found on disk."""
+        ...
+
+    def extract(self, transcript_path: str) -> SessionMetadata:
+        """Parse a transcript file and return SessionMetadata."""
+        ...
+
+    def get_data_dir(self) -> Path:
+        """Return the root data directory for this agent."""
+        ...
 
 
 @dataclass
@@ -431,4 +457,74 @@ def load_facets(session_id: str) -> dict | None:
             "friction_detail": data.get("frictionDetail"),
         }
     except (json.JSONDecodeError, OSError):
+        return None
+
+
+class ClaudeCodeExtractor:
+    """Extractor for Claude Code sessions (~/.claude/)."""
+
+    agent_type = "claude_code"
+
+    def get_data_dir(self) -> Path:
+        return Path.home() / ".claude"
+
+    def discover_sessions(self) -> list:
+        """Discover Claude Code sessions from ~/.claude/usage-data/session-meta/."""
+        from primer.mcp.reader import LocalSession
+
+        data_dir = self.get_data_dir()
+        meta_dir = data_dir / "usage-data" / "session-meta"
+        facets_dir = data_dir / "usage-data" / "facets"
+        projects_dir = data_dir / "projects"
+
+        if not meta_dir.exists():
+            return []
+
+        results: list[LocalSession] = []
+        for meta_file in meta_dir.glob("*.json"):
+            session_id = meta_file.stem
+            try:
+                with open(meta_file) as f:
+                    meta = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                continue
+
+            project_path = meta.get("project_path")
+            transcript_path = self._find_transcript(projects_dir, session_id, project_path)
+            if not transcript_path:
+                continue
+
+            facets_path = facets_dir / f"{session_id}.json"
+            has_facets = facets_path.exists()
+            results.append(
+                LocalSession(
+                    session_id=session_id,
+                    transcript_path=str(transcript_path),
+                    facets_path=str(facets_path) if has_facets else None,
+                    has_facets=has_facets,
+                    project_path=project_path,
+                    agent_type=self.agent_type,
+                )
+            )
+        return results
+
+    def extract(self, transcript_path: str) -> SessionMetadata:
+        return extract_from_jsonl(transcript_path)
+
+    @staticmethod
+    def _find_transcript(
+        projects_dir: Path, session_id: str, project_path: str | None
+    ) -> Path | None:
+        if project_path:
+            dir_name = project_path.replace("/", "-")
+            candidate = projects_dir / dir_name / f"{session_id}.jsonl"
+            if candidate.exists():
+                return candidate
+        if projects_dir.exists():
+            for project_dir in projects_dir.iterdir():
+                if not project_dir.is_dir():
+                    continue
+                candidate = project_dir / f"{session_id}.jsonl"
+                if candidate.exists():
+                    return candidate
         return None
