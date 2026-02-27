@@ -18,7 +18,8 @@ class SessionMetadata:
     project_name: str = ""
     git_branch: str = ""
     git_remote_url: str = ""
-    claude_version: str = ""
+    agent_type: str = "claude_code"
+    agent_version: str = ""
     permission_mode: str = ""
     end_reason: str = ""
     started_at: datetime | None = None
@@ -47,7 +48,8 @@ class SessionMetadata:
             "project_path": self.project_path or None,
             "project_name": self.project_name or None,
             "git_branch": self.git_branch or None,
-            "claude_version": self.claude_version or None,
+            "agent_type": self.agent_type,
+            "agent_version": self.agent_version or None,
             "permission_mode": self.permission_mode or None,
             "end_reason": self.end_reason or None,
             "started_at": self.started_at.isoformat() if self.started_at else None,
@@ -271,7 +273,7 @@ def _process_entry(
             meta.project_path = entry["cwd"]
             meta.project_name = Path(entry["cwd"]).name
         if "version" in entry:
-            meta.claude_version = entry["version"]
+            meta.agent_version = entry["version"]
         if "permissionMode" in entry:
             meta.permission_mode = entry["permissionMode"]
 
@@ -422,7 +424,7 @@ def load_facets(session_id: str) -> dict | None:
             "outcome": data.get("outcome"),
             "session_type": data.get("sessionType"),
             "primary_success": data.get("primarySuccess"),
-            "claude_helpfulness": data.get("claudeHelpfulness"),
+            "agent_helpfulness": data.get("claudeHelpfulness"),
             "brief_summary": data.get("briefSummary"),
             "user_satisfaction_counts": data.get("userSatisfactionCounts"),
             "friction_counts": data.get("frictionCounts"),

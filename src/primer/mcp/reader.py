@@ -15,6 +15,7 @@ class LocalSession:
     facets_path: str | None
     has_facets: bool
     project_path: str | None = None
+    agent_type: str = "claude_code"
 
 
 def get_claude_data_dir() -> Path:

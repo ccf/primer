@@ -48,10 +48,11 @@ def upsert_session(db: Session, engineer_id: str, payload: SessionIngestPayload)
 
     # Update scalar fields
     for field in [
+        "agent_type",
         "project_path",
         "project_name",
         "git_branch",
-        "claude_version",
+        "agent_version",
         "permission_mode",
         "end_reason",
         "started_at",
@@ -155,7 +156,7 @@ def upsert_facets(db: Session, session_id: str, facets: SessionFacetsPayload) ->
         "outcome",
         "session_type",
         "primary_success",
-        "claude_helpfulness",
+        "agent_helpfulness",
         "brief_summary",
         "user_satisfaction_counts",
         "friction_counts",

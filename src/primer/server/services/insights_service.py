@@ -870,7 +870,7 @@ def get_pattern_sharing(
             SessionFacets.session_id,
             SessionFacets.session_type,
             SessionFacets.outcome,
-            SessionFacets.claude_helpfulness,
+            SessionFacets.agent_helpfulness,
             SessionFacets.goal_categories,
         )
         .filter(SessionFacets.session_id.in_(session_ids_q))
@@ -903,7 +903,7 @@ def get_pattern_sharing(
             duration_seconds=s.duration_seconds,
             tool_count=session_tool_count.get(sid, 0),
             outcome=facet.outcome if facet else None,
-            helpfulness=facet.claude_helpfulness if facet else None,
+            helpfulness=facet.agent_helpfulness if facet else None,
             tools_used=sorted(set(session_tools.get(sid, []))),
         )
 

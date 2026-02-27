@@ -52,6 +52,7 @@ def base_session_query(
     engineer_id: str | None = None,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
+    agent_type: str | None = None,
 ):
     q = db.query(SessionModel)
     if engineer_id:
@@ -62,6 +63,8 @@ def base_session_query(
         q = q.filter(SessionModel.started_at >= start_date)
     if end_date:
         q = q.filter(SessionModel.started_at <= end_date)
+    if agent_type:
+        q = q.filter(SessionModel.agent_type == agent_type)
     return q
 
 

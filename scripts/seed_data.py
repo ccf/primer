@@ -985,7 +985,7 @@ def main():
                     "git_branch": git_branch,
                     "git_remote_url": git_remote_url,
                     "commits": commits,
-                    "claude_version": random.choice(CLAUDE_VERSIONS),
+                    "agent_version": random.choice(CLAUDE_VERSIONS),
                     "permission_mode": random.choice(PERMISSION_MODES),
                     "end_reason": (
                         random.choice(END_REASONS)

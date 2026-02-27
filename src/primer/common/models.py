@@ -88,10 +88,13 @@ class Session(Base):
     repository_id: Mapped[str | None] = mapped_column(
         ForeignKey("git_repositories.id"), nullable=True
     )
+    agent_type: Mapped[str] = mapped_column(
+        String(30), nullable=False, server_default="claude_code"
+    )
     project_path: Mapped[str | None] = mapped_column(String(1024))
     project_name: Mapped[str | None] = mapped_column(String(255))
     git_branch: Mapped[str | None] = mapped_column(String(255))
-    claude_version: Mapped[str | None] = mapped_column(String(50))
+    agent_version: Mapped[str | None] = mapped_column(String(50))
     permission_mode: Mapped[str | None] = mapped_column(String(50))
     end_reason: Mapped[str | None] = mapped_column(String(100))
     started_at: Mapped[datetime | None] = mapped_column(DateTime)
@@ -143,7 +146,7 @@ class SessionFacets(Base):
     outcome: Mapped[str | None] = mapped_column(String(50))
     session_type: Mapped[str | None] = mapped_column(String(50))
     primary_success: Mapped[str | None] = mapped_column(String(50))
-    claude_helpfulness: Mapped[str | None] = mapped_column(String(50))
+    agent_helpfulness: Mapped[str | None] = mapped_column(String(50))
     brief_summary: Mapped[str | None] = mapped_column(Text)
     user_satisfaction_counts: Mapped[dict | None] = mapped_column(JSON)
     friction_counts: Mapped[dict | None] = mapped_column(JSON)
@@ -180,11 +183,16 @@ class ModelUsage(Base):
 
 class DailyStats(Base):
     __tablename__ = "daily_stats"
-    __table_args__ = (UniqueConstraint("engineer_id", "date", name="uq_daily_stats_engineer_date"),)
+    __table_args__ = (
+        UniqueConstraint("engineer_id", "date", "agent_type", name="uq_daily_stats_engineer_date"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     engineer_id: Mapped[str] = mapped_column(ForeignKey("engineers.id"), nullable=False)
     date: Mapped[date] = mapped_column(Date, nullable=False)
+    agent_type: Mapped[str] = mapped_column(
+        String(30), nullable=False, server_default="claude_code"
+    )
     message_count: Mapped[int] = mapped_column(Integer, default=0)
     session_count: Mapped[int] = mapped_column(Integer, default=0)
     tool_call_count: Mapped[int] = mapped_column(Integer, default=0)

@@ -18,13 +18,16 @@ export interface EngineerResponse {
   created_at: string
 }
 
+export type AgentType = 'claude_code' | 'codex_cli' | 'gemini_cli'
+
 export interface SessionResponse {
   id: string
   engineer_id: string
+  agent_type: AgentType
   project_path: string | null
   project_name: string | null
   git_branch: string | null
-  claude_version: string | null
+  agent_version: string | null
   permission_mode: string | null
   end_reason: string | null
   started_at: string | null
@@ -51,7 +54,7 @@ export interface SessionFacetsResponse {
   outcome: string | null
   session_type: string | null
   primary_success: string | null
-  claude_helpfulness: string | null
+  agent_helpfulness: string | null
   brief_summary: string | null
   user_satisfaction_counts: Record<string, number> | null
   friction_counts: Record<string, number> | null
