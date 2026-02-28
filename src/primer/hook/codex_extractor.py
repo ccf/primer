@@ -44,7 +44,7 @@ class CodexExtractor:
         seen_ids: set[str] = set()
 
         for rollout_file in sessions_dir.glob("**/rollout-*.jsonl"):
-            session_id = self._extract_session_id(rollout_file)
+            session_id, project_path = self._extract_session_meta(rollout_file)
             if not session_id or session_id in seen_ids:
                 continue
             seen_ids.add(session_id)
@@ -54,7 +54,7 @@ class CodexExtractor:
                     transcript_path=str(rollout_file),
                     facets_path=None,
                     has_facets=False,
-                    project_path=self._extract_project_path(rollout_file),
+                    project_path=project_path,
                     agent_type=self.agent_type,
                 )
             )
@@ -256,29 +256,11 @@ class CodexExtractor:
         return None
 
     @staticmethod
-    def _extract_session_id(rollout_file: Path) -> str | None:
-        """Extract session ID from the first SessionMeta entry in the file."""
-        try:
-            with open(rollout_file) as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        entry = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    session_meta = entry.get("SessionMeta") or entry.get("session_meta")
-                    if session_meta and "id" in session_meta:
-                        return session_meta["id"]
-            # Fallback: use filename stem
-            return rollout_file.stem
-        except OSError:
-            return None
+    def _extract_session_meta(rollout_file: Path) -> tuple[str | None, str | None]:
+        """Extract session ID and project path from the first SessionMeta entry.
 
-    @staticmethod
-    def _extract_project_path(rollout_file: Path) -> str | None:
-        """Extract project path from the first SessionMeta entry."""
+        Returns (session_id, project_path). Reads the file once.
+        """
         try:
             with open(rollout_file) as f:
                 for line in f:
@@ -290,8 +272,11 @@ class CodexExtractor:
                     except json.JSONDecodeError:
                         continue
                     session_meta = entry.get("SessionMeta") or entry.get("session_meta")
-                    if session_meta and "cwd" in session_meta:
-                        return session_meta["cwd"]
-            return None
+                    if session_meta:
+                        sid = session_meta.get("id")
+                        cwd = session_meta.get("cwd")
+                        return (sid or rollout_file.stem, cwd)
+            # Fallback: use filename stem
+            return (rollout_file.stem, None)
         except OSError:
-            return None
+            return (None, None)

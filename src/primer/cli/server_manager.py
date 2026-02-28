@@ -192,7 +192,13 @@ def _systemd_start(host: str, port: int) -> tuple[bool, str]:
 
 
 def _systemd_stop() -> tuple[bool, str]:
-    subprocess.run(["systemctl", "--user", "stop", "primer-server"], check=True)
+    result = subprocess.run(
+        ["systemctl", "--user", "stop", "primer-server"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return False, "Server may not be running (systemd stop failed)."
     return True, "Server stopped via systemd."
 
 
