@@ -80,7 +80,7 @@ def doctor() -> None:
     try:
         import httpx
 
-        resp = httpx.get(f"{server_url}/api/v1/health", timeout=3.0)
+        resp = httpx.get(f"{server_url}/health", timeout=3.0)
         if resp.status_code == 200:
             console.success(f"Server reachable: {server_url}")
         else:

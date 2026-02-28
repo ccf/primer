@@ -1,14 +1,15 @@
 """Seed the database with realistic test data for development."""
 
 import math
+import os
 import random
 import uuid
 from datetime import datetime, timedelta
 
 import httpx
 
-SERVER_URL = "http://localhost:8000"
-ADMIN_KEY = "primer-admin-dev-key"
+SERVER_URL = os.environ.get("PRIMER_SERVER_URL", "http://localhost:8000")
+ADMIN_KEY = os.environ.get("PRIMER_ADMIN_API_KEY", "primer-admin-dev-key")
 ADMIN_HEADERS = {"x-admin-key": ADMIN_KEY}
 
 # ── Engineer personas ──────────────────────────────────────────────
@@ -1109,9 +1110,10 @@ def _build_tool_usages(
 def main():
     random.seed(42)
 
-    # Create teams
+    # Create or fetch teams
     teams = []
-    for name in ["Platform", "Backend", "Frontend"]:
+    team_names = ["Platform", "Backend", "Frontend"]
+    for name in team_names:
         r = httpx.post(f"{SERVER_URL}/api/v1/teams", json={"name": name}, headers=ADMIN_HEADERS)
         if r.status_code == 200:
             teams.append(r.json())
@@ -1119,7 +1121,15 @@ def main():
         elif r.status_code == 409:
             print(f"Team {name} already exists")
 
-    # Create engineers
+    # If teams weren't created (already existed), fetch them
+    if len(teams) < len(team_names):
+        r = httpx.get(f"{SERVER_URL}/api/v1/teams", headers=ADMIN_HEADERS)
+        if r.status_code == 200:
+            all_teams = r.json()
+            teams = [t for t in all_teams if t["name"] in team_names]
+            teams.sort(key=lambda t: team_names.index(t["name"]))
+
+    # Create or fetch engineers
     engineers = []
     for name, email, team_idx, role, github_user, github_id, persona_type, agent_mix in ENGINEERS:
         team_id = teams[team_idx]["id"] if teams else None
@@ -1150,8 +1160,28 @@ def main():
         elif r.status_code == 409:
             print(f"Engineer {email} already exists")
 
+    # If some engineers already existed, fetch them from the API
+    if len(engineers) < len(ENGINEERS):
+        r = httpx.get(f"{SERVER_URL}/api/v1/engineers", headers=ADMIN_HEADERS)
+        if r.status_code == 200:
+            all_engs = r.json()
+            eng_lookup = {e["email"]: e for e in all_engs}
+            engineers = []
+            for _name, email, team_idx, _role, _gh, _ghid, persona_type, agent_mix in ENGINEERS:
+                if email in eng_lookup:
+                    eng_data = eng_lookup[email]
+                    engineers.append(
+                        {
+                            "engineer": eng_data,
+                            "persona": persona_type,
+                            "team_idx": team_idx,
+                            "agent_mix": agent_mix,
+                        }
+                    )
+            print(f"Fetched {len(engineers)} existing engineers for session seeding.")
+
     if not engineers:
-        print("No new engineers created. Skipping session seeding.")
+        print("No engineers found. Cannot seed sessions.")
         return
 
     now = datetime.now()
