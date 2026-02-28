@@ -98,6 +98,7 @@ export interface OverviewStats {
   end_reason_counts: Record<string, number>
   cache_hit_rate: number | null
   avg_health_score: number | null
+  agent_type_counts: Record<string, number>
 }
 
 export interface FrictionReport {
