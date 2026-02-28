@@ -147,7 +147,7 @@ _UNIT_TEMPLATE = textwrap.dedent("""\
     ExecStart={exec_start}
     {env_lines}
     StandardOutput=append:{log_path}
-    StandardErrorOutput=append:{log_path}
+    StandardError=append:{log_path}
     Restart=on-failure
 
     [Install]
@@ -232,6 +232,7 @@ def _pidfile_start(host: str, port: int) -> tuple[bool, str]:
         stderr=log_file,
         start_new_session=True,
     )
+    log_file.close()
     PID_FILE.write_text(str(proc.pid))
     return True, f"Server started (PID {proc.pid}). Logs: {SERVER_LOG}"
 

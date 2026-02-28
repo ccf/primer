@@ -69,12 +69,8 @@ class CodexExtractor:
         last_ts: datetime | None = None
         ordinal = 0
 
-        # Track cumulative tokens for delta computation
-        prev_cumulative: dict[str, int] = {
-            "input": 0,
-            "output": 0,
-            "cache_read": 0,
-        }
+        # Track cumulative tokens per model for delta computation
+        prev_cumulative: dict[str, dict[str, int]] = {}
 
         path = Path(transcript_path)
         if not path.exists():
@@ -181,9 +177,7 @@ class CodexExtractor:
             elif event_type == "AgentMessage" or "AgentMessage" in event:
                 meta.message_count += 1
                 meta.assistant_message_count += 1
-            elif event_type in ("ExecCommandBegin", "ExecCommandEnd") or any(
-                k in event for k in ("ExecCommandBegin", "ExecCommandEnd")
-            ):
+            elif event_type == "ExecCommandBegin" or "ExecCommandBegin" in event:
                 tool_counter["exec_command"] += 1
                 meta.tool_call_count += 1
             return
@@ -210,13 +204,17 @@ class CodexExtractor:
                     "cache_creation": 0,
                 }
 
+            if model not in prev_cumulative:
+                prev_cumulative[model] = {"input": 0, "output": 0, "cache_read": 0}
+            prev = prev_cumulative[model]
+
             curr_input = token_data.get("input_tokens", 0)
             curr_output = token_data.get("output_tokens", 0)
             curr_cached = token_data.get("cached_input_tokens", 0)
 
-            delta_input = max(0, curr_input - prev_cumulative["input"])
-            delta_output = max(0, curr_output - prev_cumulative["output"])
-            delta_cached = max(0, curr_cached - prev_cumulative["cache_read"])
+            delta_input = max(0, curr_input - prev["input"])
+            delta_output = max(0, curr_output - prev["output"])
+            delta_cached = max(0, curr_cached - prev["cache_read"])
 
             model_tokens[model]["input"] += delta_input
             model_tokens[model]["output"] += delta_output
@@ -226,9 +224,9 @@ class CodexExtractor:
             meta.output_tokens += delta_output
             meta.cache_read_tokens += delta_cached
 
-            prev_cumulative["input"] = curr_input
-            prev_cumulative["output"] = curr_output
-            prev_cumulative["cache_read"] = curr_cached
+            prev["input"] = curr_input
+            prev["output"] = curr_output
+            prev["cache_read"] = curr_cached
 
     @staticmethod
     def _parse_timestamp(entry: dict) -> datetime | None:
