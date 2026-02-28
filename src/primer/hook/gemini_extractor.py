@@ -149,7 +149,7 @@ class GeminiExtractor:
 
         # Try to load token data from metadata in the session file
         usage = (
-            data.get("usageMetadata") or data.get("usage_metadata", {})
+            (data.get("usageMetadata") or data.get("usage_metadata", {}))
             if isinstance(data, dict)
             else {}
         )

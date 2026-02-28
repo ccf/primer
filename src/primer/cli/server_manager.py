@@ -26,6 +26,11 @@ def get_strategy() -> str:
     return "pidfile"
 
 
+def _xml_escape(s: str) -> str:
+    """Escape XML special characters in a string."""
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def _server_env() -> dict[str, str]:
     """Build environment dict for the server subprocess, inheriting current env."""
     env = os.environ.copy()
@@ -81,7 +86,7 @@ _PLIST_TEMPLATE = textwrap.dedent("""\
 def _write_launchd_plist(host: str, port: int) -> None:
     assert LAUNCHD_PLIST is not None
     args = _uvicorn_args(host, port)
-    args_xml = "\n            ".join(f"<string>{a}</string>" for a in args)
+    args_xml = "\n            ".join(f"<string>{_xml_escape(a)}</string>" for a in args)
     env = _server_env()
     env_lines = []
     for k in (
@@ -93,7 +98,7 @@ def _write_launchd_plist(host: str, port: int) -> None:
         "PATH",
     ):
         if k in env:
-            env_lines.append(f"<key>{k}</key>\n            <string>{env[k]}</string>")
+            env_lines.append(f"<key>{k}</key>\n            <string>{_xml_escape(env[k])}</string>")
     env_xml = "\n            ".join(env_lines)
     content = _PLIST_TEMPLATE.format(args_xml=args_xml, env_xml=env_xml, log_path=str(SERVER_LOG))
     LAUNCHD_PLIST.parent.mkdir(parents=True, exist_ok=True)

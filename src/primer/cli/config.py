@@ -124,4 +124,5 @@ def _toml_value(v: object) -> str:
         return str(v)
     if isinstance(v, float):
         return str(v)
-    return f'"{v}"'
+    s = str(v).replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{s}"'

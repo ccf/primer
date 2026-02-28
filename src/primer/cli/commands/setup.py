@@ -53,7 +53,8 @@ def setup(name: str | None, email: str | None, server_url: str | None) -> None:
         if resp.status_code == 200:
             data = resp.json()
             api_key = data.get("api_key", "")
-            console.success(f"Registered! Engineer ID: {data.get('id', 'unknown')}")
+            eng_id = data.get("engineer", {}).get("id") or data.get("id", "unknown")
+            console.success(f"Registered! Engineer ID: {eng_id}")
             if api_key:
                 set_value("auth.api_key", api_key)
                 console.success("API key saved to config.toml")
