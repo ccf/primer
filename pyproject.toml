@@ -22,7 +22,11 @@ dependencies = [
     "aiosqlite>=0.20.0",
     "slowapi>=0.1.9",
     "python-dotenv>=1.0.0",
+    "click>=8.1.0",
 ]
+
+[project.scripts]
+primer = "primer.cli.main:cli"
 
 [project.optional-dependencies]
 dev = [
@@ -45,13 +49,18 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "N", "UP", "B", "A", "S", "T20", "SIM", "TCH", "RUF"]
-ignore = ["S101", "S104", "S106", "S607", "B008"]
+ignore = ["S101", "S104", "S106", "S603", "S607", "B008"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "S106"]
 "scripts/**/*.py" = ["T20", "S311"]
+"src/primer/cli/**/*.py" = ["T20"]
 "alembic/**/*.py" = ["E501", "W291", "UP", "I001", "RUF"]
 
 [tool.bandit]
 exclude_dirs = ["tests", "alembic"]
 skips = ["B101", "B104", "B105", "B404", "B603", "B607"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"alembic" = "primer/_alembic"
+"alembic.ini" = "primer/_alembic.ini"

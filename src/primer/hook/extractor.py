@@ -120,7 +120,7 @@ class SessionMetadata:
 def _run_git(args: list[str], cwd: str) -> str | None:
     """Run a git command and return stdout, or None on failure."""
     try:
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(
             ["git", *args],
             cwd=cwd,
             capture_output=True,
