@@ -6,6 +6,7 @@ import signal
 import subprocess
 import sys
 import textwrap
+from pathlib import Path
 
 from primer.cli.paths import (
     LAUNCHD_PLIST,
@@ -32,8 +33,24 @@ def _xml_escape(s: str) -> str:
 
 
 def _server_env() -> dict[str, str]:
-    """Build environment dict for the server subprocess, inheriting current env."""
+    """Build environment dict for the server subprocess, inheriting current env.
+
+    Also loads .env file (if present) so PRIMER_* vars like GitHub OAuth
+    and Anthropic API keys are available to the managed server process.
+    """
     env = os.environ.copy()
+    # Load .env file if it exists (doesn't override already-set vars)
+    for env_path in [Path(".env"), Path.home() / ".primer" / ".env"]:
+        if env_path.exists():
+            for line in env_path.read_text().splitlines():
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, value = line.partition("=")
+                key = key.strip()
+                value = value.strip().strip("\"'")
+                if key not in env:
+                    env[key] = value
     return env
 
 
@@ -89,16 +106,10 @@ def _write_launchd_plist(host: str, port: int) -> None:
     args_xml = "\n            ".join(f"<string>{_xml_escape(a)}</string>" for a in args)
     env = _server_env()
     env_lines = []
-    for k in (
-        "PRIMER_DATABASE_URL",
-        "PRIMER_ADMIN_API_KEY",
-        "PRIMER_SERVER_HOST",
-        "PRIMER_SERVER_PORT",
-        "PRIMER_LOG_LEVEL",
-        "PATH",
-    ):
-        if k in env:
-            env_lines.append(f"<key>{k}</key>\n            <string>{_xml_escape(env[k])}</string>")
+    # Forward all PRIMER_* env vars + PATH so the server picks up full config
+    for k, v in sorted(env.items()):
+        if k.startswith("PRIMER_") or k == "PATH":
+            env_lines.append(f"<key>{k}</key>\n            <string>{_xml_escape(v)}</string>")
     env_xml = "\n            ".join(env_lines)
     content = _PLIST_TEMPLATE.format(
         args_xml=args_xml, env_xml=env_xml, log_path=_xml_escape(str(SERVER_LOG))
@@ -168,15 +179,10 @@ def _write_systemd_unit(host: str, port: int) -> None:
     exec_start = " ".join(args)
     env = _server_env()
     env_lines = []
-    for k in (
-        "PRIMER_DATABASE_URL",
-        "PRIMER_ADMIN_API_KEY",
-        "PRIMER_SERVER_HOST",
-        "PRIMER_SERVER_PORT",
-        "PRIMER_LOG_LEVEL",
-    ):
-        if k in env:
-            env_lines.append(f"Environment={k}={env[k]}")
+    # Forward all PRIMER_* env vars so the server picks up full config
+    for k, v in sorted(env.items()):
+        if k.startswith("PRIMER_"):
+            env_lines.append(f"Environment={k}={v}")
     content = _UNIT_TEMPLATE.format(
         exec_start=exec_start,
         env_lines="\n".join(env_lines),
