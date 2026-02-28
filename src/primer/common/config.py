@@ -47,7 +47,7 @@ class PrimerSettings(BaseSettings):
     # Rate limiting
     rate_limit_enabled: bool = True
     rate_limit_default: str = "60/minute"
-    rate_limit_ingest: str = "120/minute"
+    rate_limit_ingest: str = "300/minute"
     rate_limit_auth: str = "10/minute"
 
     # Slack notifications

@@ -91,15 +91,149 @@ PERSONAS = {
     },
 }
 
+# ── Agent type config (models, tools, versions per CLI) ───────────
+AGENT_TYPE_CONFIG = {
+    "claude_code": {
+        "model_weights": None,  # uses PERSONAS[persona]["model_weights"]
+        "tools": [
+            "Read",
+            "Edit",
+            "Write",
+            "Bash",
+            "Grep",
+            "Glob",
+            "Task:explore",
+            "Task:python-pro",
+            "Task:frontend-developer",
+            "Skill:commit",
+            "Skill:review-pr",
+            "EnterPlanMode",
+            "WebSearch",
+            "AskUserQuestion",
+        ],
+        "versions": ["1.0.17", "1.0.16", "1.0.15", "1.0.14", "1.0.13"],
+        "permission_modes": ["default", "plan", "bypassPermissions"],
+    },
+    "codex_cli": {
+        "model_weights": {
+            "power_user": {"o3": 40, "o4-mini": 25, "codex-mini": 20, "gpt-4.1": 15},
+            "moderate": {"o3": 30, "o4-mini": 35, "codex-mini": 20, "gpt-4.1": 15},
+            "occasional": {"o4-mini": 45, "codex-mini": 30, "gpt-4.1": 25},
+            "new_hire": {"o4-mini": 40, "gpt-4.1": 35, "codex-mini": 25},
+        },
+        "tools": [
+            "exec_command",
+            "shell",
+            "file_read",
+            "file_write",
+            "function_call",
+        ],
+        "versions": ["0.1.20250613", "0.1.20250530", "0.1.2025051"],
+        "permission_modes": ["auto", "suggest", "ask"],
+    },
+    "gemini_cli": {
+        "model_weights": {
+            "power_user": {"gemini-2.5-pro": 55, "gemini-2.5-flash": 30, "gemini-2.0-flash": 15},
+            "moderate": {"gemini-2.5-pro": 40, "gemini-2.5-flash": 40, "gemini-2.0-flash": 20},
+            "occasional": {"gemini-2.5-flash": 50, "gemini-2.0-flash": 35, "gemini-2.5-pro": 15},
+            "new_hire": {"gemini-2.5-flash": 55, "gemini-2.0-flash": 30, "gemini-2.5-pro": 15},
+        },
+        "tools": [
+            "readFile",
+            "writeFile",
+            "editFile",
+            "runShell",
+            "searchWeb",
+            "listFiles",
+            "grepSearch",
+        ],
+        "versions": ["1.0.0", "0.9.2", "0.9.1"],
+        "permission_modes": [None],
+    },
+}
+
+# (name, email, team_idx, role, github_user, github_id, persona, agent_mix)
 ENGINEERS = [
-    ("Alice Chen", "alice@example.com", 0, "admin", "alicechen", 1001, "power_user"),
-    ("Bob Smith", "bob@example.com", 0, "team_lead", "bobsmith", 1002, "moderate"),
-    ("Carol Davis", "carol@example.com", 1, "team_lead", "caroldavis", 1003, "power_user"),
-    ("Dan Wilson", "dan@example.com", 1, "engineer", "danwilson", 1004, "moderate"),
-    ("Eve Martinez", "eve@example.com", 2, "engineer", "evemartinez", 1005, "occasional"),
-    ("Frank Lee", "frank@example.com", 0, "engineer", "franklee", 1006, "moderate"),
-    ("Grace Kim", "grace@example.com", 1, "engineer", "gracekim", 1007, "new_hire"),
-    ("Hiro Tanaka", "hiro@example.com", 2, "engineer", "hirotanaka", 1008, "occasional"),
+    (
+        "Alice Chen",
+        "alice@example.com",
+        0,
+        "admin",
+        "alicechen",
+        1001,
+        "power_user",
+        {"claude_code": 65, "codex_cli": 20, "gemini_cli": 15},
+    ),
+    (
+        "Bob Smith",
+        "bob@example.com",
+        0,
+        "team_lead",
+        "bobsmith",
+        1002,
+        "moderate",
+        {"claude_code": 75, "codex_cli": 15, "gemini_cli": 10},
+    ),
+    (
+        "Carol Davis",
+        "carol@example.com",
+        1,
+        "team_lead",
+        "caroldavis",
+        1003,
+        "power_user",
+        {"claude_code": 70, "codex_cli": 20, "gemini_cli": 10},
+    ),
+    (
+        "Dan Wilson",
+        "dan@example.com",
+        1,
+        "engineer",
+        "danwilson",
+        1004,
+        "moderate",
+        {"claude_code": 100},
+    ),
+    (
+        "Eve Martinez",
+        "eve@example.com",
+        2,
+        "engineer",
+        "evemartinez",
+        1005,
+        "occasional",
+        {"claude_code": 70, "gemini_cli": 30},
+    ),
+    (
+        "Frank Lee",
+        "frank@example.com",
+        0,
+        "engineer",
+        "franklee",
+        1006,
+        "moderate",
+        {"claude_code": 60, "codex_cli": 40},
+    ),
+    (
+        "Grace Kim",
+        "grace@example.com",
+        1,
+        "engineer",
+        "gracekim",
+        1007,
+        "new_hire",
+        {"claude_code": 80, "codex_cli": 10, "gemini_cli": 10},
+    ),
+    (
+        "Hiro Tanaka",
+        "hiro@example.com",
+        2,
+        "engineer",
+        "hirotanaka",
+        1008,
+        "occasional",
+        {"claude_code": 50, "codex_cli": 25, "gemini_cli": 25},
+    ),
 ]
 
 # ── Projects ───────────────────────────────────────────────────────
@@ -528,6 +662,7 @@ FRICTION_DETAILS = {
     ],
 }
 
+# ── Assistant responses by agent type ─────────────────────────────
 ASSISTANT_RESPONSES = [
     "Let me look at the code first.",
     "I'll read the file to understand the current implementation.",
@@ -541,6 +676,39 @@ ASSISTANT_RESPONSES = [
     "I've made the changes. Here's a summary of what was modified.",
 ]
 
+CODEX_ASSISTANT_RESPONSES = [
+    "Reading the file to understand the structure.",
+    "I'll execute the command to check the current state.",
+    "Found the issue. Applying the fix now.",
+    "Running tests to verify the change.",
+    "Here's the updated implementation.",
+    "Let me read the test file first.",
+    "Writing the new file with the changes.",
+    "The command completed successfully.",
+    "I've applied the patch. Let me verify.",
+    "Changes applied. Here's what was modified.",
+]
+
+GEMINI_ASSISTANT_RESPONSES = [
+    "Let me read the relevant files.",
+    "I'll search the codebase for that pattern.",
+    "Found it. Let me edit the file now.",
+    "Running the shell command to verify.",
+    "Here's the implementation with the requested changes.",
+    "Let me search the web for the latest docs on this.",
+    "I'll list the files in this directory first.",
+    "The edit was applied successfully.",
+    "Let me grep for related usages.",
+    "Changes complete. Here's a summary.",
+]
+
+ASSISTANT_RESPONSES_BY_AGENT = {
+    "claude_code": ASSISTANT_RESPONSES,
+    "codex_cli": CODEX_ASSISTANT_RESPONSES,
+    "gemini_cli": GEMINI_ASSISTANT_RESPONSES,
+}
+
+# ── Tool call/result templates by agent type ─────────────────────
 TOOL_CALL_TEMPLATES = [
     {"name": "Read", "input_preview": '{"file_path": "src/main.py"}'},
     {"name": "Edit", "input_preview": '{"file_path": "src/main.py", "old_string": "..."}'},
@@ -564,9 +732,215 @@ TOOL_RESULT_TEMPLATES = [
     {"name": "EnterPlanMode", "output_preview": "Entered plan mode."},
 ]
 
+CODEX_TOOL_CALL_TEMPLATES = [
+    {"name": "exec_command", "input_preview": '{"command": "pytest -v tests/"}'},
+    {"name": "shell", "input_preview": '{"command": "ls -la src/"}'},
+    {"name": "file_read", "input_preview": '{"path": "src/main.py"}'},
+    {"name": "file_write", "input_preview": '{"path": "src/main.py", "content": "..."}'},
+    {"name": "function_call", "input_preview": '{"name": "apply_patch", "args": {...}}'},
+]
 
-def _generate_messages(session_type: str, msg_count: int, model: str) -> list[dict]:
+CODEX_TOOL_RESULT_TEMPLATES = [
+    {"name": "exec_command", "output_preview": "PASSED 12 tests in 0.5s"},
+    {"name": "shell", "output_preview": "src/main.py\nsrc/utils.py\nsrc/handler.py"},
+    {"name": "file_read", "output_preview": "import os\nimport sys\n\ndef main():\n    ..."},
+    {"name": "file_write", "output_preview": "File written successfully."},
+    {"name": "function_call", "output_preview": "Patch applied successfully."},
+]
+
+GEMINI_TOOL_CALL_TEMPLATES = [
+    {"name": "readFile", "input_preview": '{"path": "src/main.py"}'},
+    {"name": "writeFile", "input_preview": '{"path": "src/new_file.py", "content": "..."}'},
+    {"name": "editFile", "input_preview": '{"path": "src/main.py", "edits": [...]}'},
+    {"name": "runShell", "input_preview": '{"command": "pytest -v tests/"}'},
+    {"name": "searchWeb", "input_preview": '{"query": "python async patterns"}'},
+    {"name": "listFiles", "input_preview": '{"path": "src/"}'},
+    {"name": "grepSearch", "input_preview": '{"pattern": "def handle_", "path": "src/"}'},
+]
+
+GEMINI_TOOL_RESULT_TEMPLATES = [
+    {"name": "readFile", "output_preview": "import os\nimport sys\n\ndef main():\n    ..."},
+    {"name": "writeFile", "output_preview": "File written successfully."},
+    {"name": "editFile", "output_preview": "File updated successfully."},
+    {"name": "runShell", "output_preview": "PASSED 12 tests in 0.5s"},
+    {"name": "searchWeb", "output_preview": "Found 5 relevant results."},
+    {"name": "listFiles", "output_preview": "src/main.py\nsrc/utils.py\nsrc/handler.py"},
+    {"name": "grepSearch", "output_preview": "src/handler.py:15: def handle_request"},
+]
+
+TOOL_TEMPLATES_BY_AGENT = {
+    "claude_code": (TOOL_CALL_TEMPLATES, TOOL_RESULT_TEMPLATES),
+    "codex_cli": (CODEX_TOOL_CALL_TEMPLATES, CODEX_TOOL_RESULT_TEMPLATES),
+    "gemini_cli": (GEMINI_TOOL_CALL_TEMPLATES, GEMINI_TOOL_RESULT_TEMPLATES),
+}
+
+# ── Project tool weights by agent type ────────────────────────────
+CODEX_PROJECT_TOOL_WEIGHTS = {
+    "api-service": {
+        "exec_command": 25,
+        "shell": 15,
+        "file_read": 20,
+        "file_write": 25,
+        "function_call": 15,
+    },
+    "web-app": {
+        "exec_command": 15,
+        "shell": 10,
+        "file_read": 25,
+        "file_write": 30,
+        "function_call": 20,
+    },
+    "cli-tool": {
+        "exec_command": 35,
+        "shell": 20,
+        "file_read": 15,
+        "file_write": 20,
+        "function_call": 10,
+    },
+    "shared-lib": {
+        "exec_command": 15,
+        "shell": 10,
+        "file_read": 30,
+        "file_write": 25,
+        "function_call": 20,
+    },
+    "data-pipeline": {
+        "exec_command": 30,
+        "shell": 20,
+        "file_read": 15,
+        "file_write": 20,
+        "function_call": 15,
+    },
+    "mobile-app": {
+        "exec_command": 15,
+        "shell": 10,
+        "file_read": 25,
+        "file_write": 30,
+        "function_call": 20,
+    },
+}
+
+GEMINI_PROJECT_TOOL_WEIGHTS = {
+    "api-service": {
+        "readFile": 15,
+        "writeFile": 15,
+        "editFile": 20,
+        "runShell": 25,
+        "searchWeb": 5,
+        "listFiles": 10,
+        "grepSearch": 10,
+    },
+    "web-app": {
+        "readFile": 20,
+        "writeFile": 15,
+        "editFile": 25,
+        "runShell": 10,
+        "searchWeb": 10,
+        "listFiles": 10,
+        "grepSearch": 10,
+    },
+    "cli-tool": {
+        "readFile": 10,
+        "writeFile": 10,
+        "editFile": 15,
+        "runShell": 35,
+        "searchWeb": 5,
+        "listFiles": 10,
+        "grepSearch": 15,
+    },
+    "shared-lib": {
+        "readFile": 25,
+        "writeFile": 10,
+        "editFile": 20,
+        "runShell": 15,
+        "searchWeb": 5,
+        "listFiles": 10,
+        "grepSearch": 15,
+    },
+    "data-pipeline": {
+        "readFile": 15,
+        "writeFile": 15,
+        "editFile": 15,
+        "runShell": 30,
+        "searchWeb": 5,
+        "listFiles": 10,
+        "grepSearch": 10,
+    },
+    "mobile-app": {
+        "readFile": 20,
+        "writeFile": 15,
+        "editFile": 20,
+        "runShell": 15,
+        "searchWeb": 10,
+        "listFiles": 10,
+        "grepSearch": 10,
+    },
+}
+
+PROJECT_TOOL_WEIGHTS_BY_AGENT = {
+    "claude_code": None,  # uses PROJECTS[name]["tool_weights"]
+    "codex_cli": CODEX_PROJECT_TOOL_WEIGHTS,
+    "gemini_cli": GEMINI_PROJECT_TOOL_WEIGHTS,
+}
+
+# ── Friction types by agent type ──────────────────────────────────
+CODEX_FRICTION_TYPES = ["exec_error", "permission_denied", "timeout", "context_limit"]
+CODEX_FRICTION_DETAILS = {
+    "exec_error": [
+        "exec_command failed: command not found 'jq'",
+        "shell command returned non-zero exit code",
+        "file_write failed: permission denied on /etc/config",
+    ],
+    "permission_denied": [
+        "User denied execution of 'rm -rf node_modules'",
+        "Sandbox blocked network access",
+    ],
+    "timeout": [
+        "Command timed out after 120s: npm install",
+        "Long-running test suite exceeded timeout",
+    ],
+    "context_limit": [
+        "Context window exhausted after reading large file",
+        "Response truncated due to token limit",
+    ],
+}
+
+GEMINI_FRICTION_TYPES = ["tool_error", "permission_denied", "timeout", "context_limit"]
+GEMINI_FRICTION_DETAILS = {
+    "tool_error": [
+        "runShell failed: command not found 'jq'",
+        "editFile rejected: file not found",
+        "writeFile failed: permission denied",
+        "grepSearch returned no results",
+    ],
+    "permission_denied": [
+        "User denied shell execution for destructive command",
+        "Blocked from writing to protected path",
+    ],
+    "timeout": [
+        "Shell command timed out after 120s",
+        "API request to external service timed out",
+    ],
+    "context_limit": [
+        "Context window exhausted after reading large file",
+        "Conversation exceeded token limit",
+    ],
+}
+
+FRICTION_BY_AGENT = {
+    "claude_code": (FRICTION_TYPES, FRICTION_DETAILS),
+    "codex_cli": (CODEX_FRICTION_TYPES, CODEX_FRICTION_DETAILS),
+    "gemini_cli": (GEMINI_FRICTION_TYPES, GEMINI_FRICTION_DETAILS),
+}
+
+
+def _generate_messages(
+    session_type: str, msg_count: int, model: str, agent_type: str = "claude_code"
+) -> list[dict]:
     """Generate synthetic transcript messages for a session."""
+    responses = ASSISTANT_RESPONSES_BY_AGENT[agent_type]
+    call_templates, result_templates = TOOL_TEMPLATES_BY_AGENT[agent_type]
+
     messages = []
     ordinal = 0
 
@@ -578,12 +952,12 @@ def _generate_messages(session_type: str, msg_count: int, model: str) -> list[di
     remaining = msg_count - 1
     while remaining > 0:
         # Assistant turn
-        text = random.choice(ASSISTANT_RESPONSES)
+        text = random.choice(responses)
         tool_calls = None
         if random.random() < 0.6:
             n_tools = random.randint(1, 3)
-            k = min(n_tools, len(TOOL_CALL_TEMPLATES))
-            tool_calls = random.sample(TOOL_CALL_TEMPLATES, k=k)
+            k = min(n_tools, len(call_templates))
+            tool_calls = random.sample(call_templates, k=k)
         token_count = random.randint(100, 2000)
         messages.append(
             {
@@ -601,8 +975,8 @@ def _generate_messages(session_type: str, msg_count: int, model: str) -> list[di
         # Tool results for each tool call
         if tool_calls and remaining > 0:
             for tc in tool_calls:
-                tr_match = [t for t in TOOL_RESULT_TEMPLATES if t["name"] == tc["name"]]
-                tr = random.choice(tr_match) if tr_match else random.choice(TOOL_RESULT_TEMPLATES)
+                tr_match = [t for t in result_templates if t["name"] == tc["name"]]
+                tr = random.choice(tr_match) if tr_match else random.choice(result_templates)
                 messages.append(
                     {
                         "ordinal": ordinal,
@@ -640,8 +1014,6 @@ def _generate_messages(session_type: str, msg_count: int, model: str) -> list[di
     return messages
 
 
-CLAUDE_VERSIONS = ["1.0.17", "1.0.16", "1.0.15", "1.0.14", "1.0.13"]
-PERMISSION_MODES = ["default", "plan", "bypassPermissions"]
 END_REASONS = ["user_exit", "conversation_end", "timeout", "error"]
 PRIMARY_SUCCESS_VALUES = ["full", "partial", "none"]
 
@@ -710,10 +1082,18 @@ def _generate_branch(session_type: str) -> str:
     return template.format(slug=slug)
 
 
-def _build_tool_usages(persona: dict, project: dict) -> list[dict]:
+def _build_tool_usages(
+    persona: dict, project: dict, agent_type: str = "claude_code", project_name: str = ""
+) -> list[dict]:
     """Generate tool usages combining persona and project biases."""
-    available_tools = persona["tool_bias"]
-    proj_weights = project["tool_weights"]
+    if agent_type == "claude_code":
+        available_tools = persona["tool_bias"]
+        proj_weights = project["tool_weights"]
+    else:
+        agent_cfg = AGENT_TYPE_CONFIG[agent_type]
+        available_tools = agent_cfg["tools"]
+        agent_proj_weights = PROJECT_TOOL_WEIGHTS_BY_AGENT[agent_type]
+        proj_weights = agent_proj_weights.get(project_name, {}) if agent_proj_weights else {}
 
     n_tools = random.randint(2, min(6, len(available_tools)))
     selected = random.sample(available_tools, k=n_tools)
@@ -741,7 +1121,7 @@ def main():
 
     # Create engineers
     engineers = []
-    for name, email, team_idx, role, github_user, github_id, persona_type in ENGINEERS:
+    for name, email, team_idx, role, github_user, github_id, persona_type, agent_mix in ENGINEERS:
         team_id = teams[team_idx]["id"] if teams else None
         r = httpx.post(
             f"{SERVER_URL}/api/v1/engineers",
@@ -750,7 +1130,9 @@ def main():
         )
         if r.status_code == 200:
             data = r.json()
-            engineers.append({**data, "persona": persona_type, "team_idx": team_idx})
+            engineers.append(
+                {**data, "persona": persona_type, "team_idx": team_idx, "agent_mix": agent_mix}
+            )
             key_preview = data["api_key"][:20]
             print(f"Created engineer: {name} (persona: {persona_type}, key: {key_preview}...)")
             eng_id = data["engineer"]["id"]
@@ -786,11 +1168,15 @@ def main():
             project_names, k=min(n_projects, len(project_names))
         )
 
+    agent_type_totals = {"claude_code": 0, "codex_cli": 0, "gemini_cli": 0}
+
     for eng_data in engineers:
         api_key = eng_data["api_key"]
         eng_id = eng_data["engineer"]["id"]
-        persona = PERSONAS[eng_data["persona"]]
+        persona_type = eng_data["persona"]
+        persona = PERSONAS[persona_type]
         preferred_projects = engineer_projects[eng_id]
+        eng_agent_mix = eng_data["agent_mix"]
         eng_sessions = 0
 
         for day_offset in range(90):
@@ -808,6 +1194,10 @@ def main():
 
             for _ in range(n_sessions):
                 session_id = str(uuid.uuid4())
+
+                # Pick agent type for this session
+                agent_type = _weighted_choice(eng_agent_mix)
+                agent_cfg = AGENT_TYPE_CONFIG[agent_type]
 
                 # Pick time weighted toward working hours
                 hour = random.choices(range(24), weights=HOUR_WEIGHTS, k=1)[0]
@@ -835,52 +1225,76 @@ def main():
                     project_name = random.choice(project_names)
                 project = PROJECTS[project_name]
 
-                # Tool usages
-                tool_usages = _build_tool_usages(persona, project)
+                # Tool usages (agent-specific)
+                tool_usages = _build_tool_usages(
+                    persona, project, agent_type=agent_type, project_name=project_name
+                )
                 tool_count = sum(t["call_count"] for t in tool_usages)
 
-                # Model (persona-weighted)
-                model = _weighted_choice(persona["model_weights"])
+                # Model (agent-specific weights)
+                if agent_type == "claude_code":
+                    model_weights = persona["model_weights"]
+                else:
+                    model_weights = agent_cfg["model_weights"][persona_type]
+                model = _weighted_choice(model_weights)
 
                 # Tokens (log-normal, scaled by persona + model)
                 token_scale = persona["token_scale"]
                 if "opus" in model:
-                    token_scale *= 1.8  # Opus sessions tend to be larger
+                    token_scale *= 1.8
                 elif "haiku" in model:
                     token_scale *= 0.5
+                elif model in ("o3", "gemini-2.5-pro"):
+                    token_scale *= 1.6  # reasoning models produce more tokens
+                elif model in ("gpt-4.1-nano", "gemini-2.0-flash"):
+                    token_scale *= 0.5
+                elif "flash" in model or "mini" in model:
+                    token_scale *= 0.7
 
                 inp_tokens = _lognormal_tokens(8.5, 1.0, token_scale)
                 out_tokens = _lognormal_tokens(7.5, 1.0, token_scale)
 
-                # Cache tokens (50% of sessions have cache)
+                # Cache tokens (agent-specific probability)
+                cache_prob = {"claude_code": 0.5, "codex_cli": 0.35, "gemini_cli": 0.3}
                 cache_read = 0
                 cache_creation = 0
-                if random.random() < 0.5:
+                if random.random() < cache_prob[agent_type]:
                     cache_read = int(inp_tokens * random.uniform(0.1, 0.6))
                     cache_creation = int(inp_tokens * random.uniform(0.02, 0.15))
 
-                # Model usages (sometimes split across models)
+                # Model usages (sometimes split across models within same agent)
                 model_usages = []
                 if random.random() < 0.15:
-                    # Multi-model session
-                    secondary = random.choice([m for m in persona["model_weights"] if m != model])
-                    split = random.uniform(0.6, 0.9)
-                    model_usages = [
-                        {
-                            "model_name": model,
-                            "input_tokens": int(inp_tokens * split),
-                            "output_tokens": int(out_tokens * split),
-                            "cache_read_tokens": int(cache_read * split),
-                            "cache_creation_tokens": int(cache_creation * split),
-                        },
-                        {
-                            "model_name": secondary,
-                            "input_tokens": int(inp_tokens * (1 - split)),
-                            "output_tokens": int(out_tokens * (1 - split)),
-                            "cache_read_tokens": int(cache_read * (1 - split)),
-                            "cache_creation_tokens": int(cache_creation * (1 - split)),
-                        },
-                    ]
+                    others = [m for m in model_weights if m != model]
+                    if others:
+                        secondary = random.choice(others)
+                        split = random.uniform(0.6, 0.9)
+                        model_usages = [
+                            {
+                                "model_name": model,
+                                "input_tokens": int(inp_tokens * split),
+                                "output_tokens": int(out_tokens * split),
+                                "cache_read_tokens": int(cache_read * split),
+                                "cache_creation_tokens": int(cache_creation * split),
+                            },
+                            {
+                                "model_name": secondary,
+                                "input_tokens": int(inp_tokens * (1 - split)),
+                                "output_tokens": int(out_tokens * (1 - split)),
+                                "cache_read_tokens": int(cache_read * (1 - split)),
+                                "cache_creation_tokens": int(cache_creation * (1 - split)),
+                            },
+                        ]
+                    else:
+                        model_usages = [
+                            {
+                                "model_name": model,
+                                "input_tokens": inp_tokens,
+                                "output_tokens": out_tokens,
+                                "cache_read_tokens": cache_read,
+                                "cache_creation_tokens": cache_creation,
+                            }
+                        ]
                 else:
                     model_usages = [
                         {
@@ -898,17 +1312,18 @@ def main():
                     outcome_weights[k] = v + project["outcome_bias"].get(k, 0)
                 outcome = _weighted_choice(outcome_weights)
 
-                # Friction (more likely on failures)
+                # Friction (agent-specific types, more likely on failures)
+                friction_types, friction_details = FRICTION_BY_AGENT[agent_type]
                 friction_counts = None
                 friction_detail = None
                 friction_prob = (
                     0.08 if outcome == "success" else 0.25 if outcome == "partial" else 0.4
                 )
                 if random.random() < friction_prob:
-                    ft = random.choice(FRICTION_TYPES)
+                    ft = random.choice(friction_types)
                     friction_counts = {ft: random.randint(1, 4)}
                     if random.random() < 0.7:
-                        friction_detail = random.choice(FRICTION_DETAILS.get(ft, ["Unspecified"]))
+                        friction_detail = random.choice(friction_details.get(ft, ["Unspecified"]))
 
                 # First prompt
                 first_prompt = random.choice(FIRST_PROMPTS[session_type])
@@ -967,8 +1382,10 @@ def main():
                         "user_satisfaction_counts": satisfaction,
                     }
 
-                # Generate transcript messages
-                session_messages = _generate_messages(session_type, msg_count, model)
+                # Generate transcript messages (agent-specific)
+                session_messages = _generate_messages(
+                    session_type, msg_count, model, agent_type=agent_type
+                )
 
                 # Git data
                 git_branch = _generate_branch(session_type)
@@ -978,15 +1395,21 @@ def main():
                     session_type, started_at, ended_at, eng_name, git_branch
                 )
 
+                # Agent-specific version and permission mode
+                agent_version = random.choice(agent_cfg["versions"])
+                perm_modes = agent_cfg["permission_modes"]
+                permission_mode = random.choice(perm_modes)
+
                 payload = {
                     "session_id": session_id,
                     "api_key": api_key,
+                    "agent_type": agent_type,
                     "project_name": project_name,
                     "git_branch": git_branch,
                     "git_remote_url": git_remote_url,
                     "commits": commits,
-                    "agent_version": random.choice(CLAUDE_VERSIONS),
-                    "permission_mode": random.choice(PERMISSION_MODES),
+                    "agent_version": agent_version,
+                    "permission_mode": permission_mode,
                     "end_reason": (
                         random.choice(END_REASONS)
                         if outcome != "success"
@@ -1015,11 +1438,15 @@ def main():
                 if r.status_code == 200:
                     eng_sessions += 1
                     total_sessions += 1
+                    agent_type_totals[agent_type] += 1
 
         eng_name = eng_data["engineer"]["name"]
         print(f"Seeded {eng_sessions} sessions for {eng_name} ({eng_data['persona']})")
 
     print(f"\nSeed complete! Total sessions: {total_sessions}")
+    print(f"  claude_code: {agent_type_totals['claude_code']}")
+    print(f"  codex_cli:   {agent_type_totals['codex_cli']}")
+    print(f"  gemini_cli:  {agent_type_totals['gemini_cli']}")
 
 
 if __name__ == "__main__":
