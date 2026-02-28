@@ -1170,12 +1170,23 @@ def main():
             for _name, email, team_idx, _role, _gh, _ghid, persona_type, agent_mix in ENGINEERS:
                 if email in eng_lookup:
                     eng_data = eng_lookup[email]
+                    # Rotate API key so we have a valid key for session seeding
+                    # (api_key is not returned by the list endpoint)
+                    rot = httpx.post(
+                        f"{SERVER_URL}/api/v1/engineers/{eng_data['id']}/rotate-key",
+                        headers=ADMIN_HEADERS,
+                    )
+                    api_key = rot.json()["api_key"] if rot.status_code == 200 else None
+                    if not api_key:
+                        print(f"Warning: could not get API key for {email}, skipping")
+                        continue
                     engineers.append(
                         {
                             "engineer": eng_data,
                             "persona": persona_type,
                             "team_idx": team_idx,
                             "agent_mix": agent_mix,
+                            "api_key": api_key,
                         }
                     )
             print(f"Fetched {len(engineers)} existing engineers for session seeding.")
