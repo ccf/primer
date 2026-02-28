@@ -100,7 +100,9 @@ def _write_launchd_plist(host: str, port: int) -> None:
         if k in env:
             env_lines.append(f"<key>{k}</key>\n            <string>{_xml_escape(env[k])}</string>")
     env_xml = "\n            ".join(env_lines)
-    content = _PLIST_TEMPLATE.format(args_xml=args_xml, env_xml=env_xml, log_path=str(SERVER_LOG))
+    content = _PLIST_TEMPLATE.format(
+        args_xml=args_xml, env_xml=env_xml, log_path=_xml_escape(str(SERVER_LOG))
+    )
     LAUNCHD_PLIST.parent.mkdir(parents=True, exist_ok=True)
     LAUNCHD_PLIST.write_text(content)
 

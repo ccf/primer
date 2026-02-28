@@ -143,7 +143,8 @@ def _replace_in_section(text: str, section: str, key: str, value: object) -> str
         if in_section and key_pattern.match(stripped):
             m = key_pattern.match(stripped)
             assert m is not None
-            lines[i] = m.group(1) + _toml_value(value)
+            leading = line[: len(line) - len(line.lstrip())]
+            lines[i] = leading + m.group(1) + _toml_value(value)
             return "\n".join(lines)
     return None
 

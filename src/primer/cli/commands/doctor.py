@@ -50,7 +50,8 @@ def doctor() -> None:
     # 4. Admin API key
     admin_key = os.environ.get("PRIMER_ADMIN_API_KEY") or get_value("auth.admin_api_key") or ""
     if admin_key:
-        console.success(f"Admin API key: {admin_key[:12]}...")
+        masked = admin_key[:12] + "..." if len(admin_key) > 12 else "***"
+        console.success(f"Admin API key: {masked}")
     else:
         console.error("Admin API key not configured")
         all_ok = False
@@ -58,7 +59,8 @@ def doctor() -> None:
     # 5. Engineer API key
     api_key = os.environ.get("PRIMER_API_KEY") or get_value("auth.api_key") or ""
     if api_key:
-        console.success(f"API key: {api_key[:12]}...")
+        masked = api_key[:12] + "..." if len(api_key) > 12 else "***"
+        console.success(f"API key: {masked}")
     else:
         console.warn("API key not set (run: primer setup)")
 
