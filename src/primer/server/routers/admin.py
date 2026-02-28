@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from sqlalchemy.orm import Session
 
+from primer.common.config import settings
 from primer.common.database import get_db
 from primer.common.models import Engineer, IngestEvent, Team
 from primer.common.models import Session as SessionModel
@@ -54,6 +55,25 @@ def list_ingest_events(
         q = q.filter(IngestEvent.status == status)
     q = q.order_by(IngestEvent.created_at.desc())
     return q.offset(offset).limit(limit).all()
+
+
+@router.post("/backfill-facets")
+def backfill_facets(
+    background_tasks: BackgroundTasks,
+    limit: int = Query(default=50, le=500),
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_role("admin")),
+):
+    """Trigger LLM facet extraction for sessions that are missing facets."""
+    if not settings.anthropic_api_key:
+        return {"error": "PRIMER_ANTHROPIC_API_KEY is not configured"}
+    if not settings.facet_extraction_enabled:
+        return {"error": "Facet extraction is disabled (set PRIMER_FACET_EXTRACTION_ENABLED=true)"}
+
+    from primer.server.services.facet_extraction_service import backfill_facets as _backfill
+
+    background_tasks.add_task(_backfill, db, limit)
+    return {"status": "started", "limit": limit}
 
 
 @router.get("/audit-logs", response_model=list[AuditLogResponse])

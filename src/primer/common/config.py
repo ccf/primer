@@ -79,5 +79,9 @@ class PrimerSettings(BaseSettings):
     explorer_model: str = "claude-sonnet-4-6"
     explorer_max_tool_rounds: int = 5
 
+    # Facet extraction (LLM-powered, runs at ingest time)
+    facet_extraction_enabled: bool = False
+    facet_extraction_model: str = "claude-haiku-4-5-20251001"
+
 
 settings = PrimerSettings()
