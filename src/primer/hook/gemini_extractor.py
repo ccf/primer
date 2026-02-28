@@ -281,7 +281,7 @@ class GeminiExtractor:
             with open(telemetry_path) as f:
                 for line in f:
                     line = line.strip()
-                    if not line or session_id not in line:
+                    if not line:
                         continue
                     try:
                         event = json.loads(line)
@@ -289,6 +289,10 @@ class GeminiExtractor:
                         continue
 
                     attrs = event.get("attributes", event.get("resourceAttributes", {}))
+                    # Verify this event belongs to our session via exact match
+                    event_session = attrs.get("session_id", event.get("session_id", ""))
+                    if event_session != session_id:
+                        continue
                     if not attrs:
                         continue
 

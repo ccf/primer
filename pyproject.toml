@@ -49,12 +49,13 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "N", "UP", "B", "A", "S", "T20", "SIM", "TCH", "RUF"]
-ignore = ["S101", "S104", "S106", "S603", "S607", "B008"]
+ignore = ["S101", "S104", "S106", "S607", "B008"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "S106"]
 "scripts/**/*.py" = ["T20", "S311"]
-"src/primer/cli/**/*.py" = ["T20"]
+"src/primer/cli/**/*.py" = ["T20", "S603"]
+"src/primer/hook/**/*.py" = ["S603"]
 "alembic/**/*.py" = ["E501", "W291", "UP", "I001", "RUF"]
 
 [tool.bandit]

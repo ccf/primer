@@ -35,7 +35,8 @@ def config_set(key: str, value: str) -> None:
     from primer.cli.config import set_value
 
     set_value(key, value)
-    console.success(f"{key} = {value}")
+    display = value[:12] + "..." if key in SENSITIVE_KEYS and len(value) > 12 else value
+    console.success(f"{key} = {display}")
 
 
 @configure.command("list")
