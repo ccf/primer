@@ -364,7 +364,11 @@ class TestBackfillEndpoint:
         assert resp.status_code in (401, 403)
 
     def test_returns_started(self, client, admin_headers):
-        with patch("primer.server.routers.admin.settings") as mock_settings:
+        svc = "primer.server.services.facet_extraction_service"
+        with (
+            patch("primer.server.routers.admin.settings") as mock_settings,
+            patch(f"{svc}.SessionLocal"),  # prevent background task hitting real DB
+        ):
             mock_settings.anthropic_api_key = "test-key"
             mock_settings.facet_extraction_enabled = True
             resp = client.post(

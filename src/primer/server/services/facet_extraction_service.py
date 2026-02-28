@@ -9,7 +9,6 @@ import logging
 import re
 
 import httpx
-from sqlalchemy.orm import Session
 
 from primer.common.config import settings
 from primer.common.database import SessionLocal
@@ -284,61 +283,71 @@ def extract_and_store_facets(session_id: str, messages: list[dict]) -> bool:
         db.close()
 
 
-def backfill_facets(db: Session, limit: int = 50) -> dict:
+def backfill_facets(limit: int = 50) -> dict:
     """Extract facets for sessions that have messages but no facets.
 
+    Creates its own database session to avoid holding a request-scoped
+    connection open during long-running LLM calls.
+
     Args:
-        db: Database session (for querying, not for writes — each
-            extraction creates its own session for writes).
         limit: Max sessions to process.
 
     Returns:
         Dict with counts: processed, success, skipped, failed.
     """
-    # Find sessions with messages but no facets
-    sessions = (
-        db.query(SessionModel)
-        .filter(
-            SessionModel.has_facets.is_(False),
-            SessionModel.user_message_count >= MIN_USER_MESSAGES,
-            SessionModel.duration_seconds >= MIN_DURATION_SECONDS,
-        )
-        .order_by(SessionModel.started_at.desc())
-        .limit(limit)
-        .all()
-    )
-
-    result = {"processed": 0, "success": 0, "skipped": 0, "failed": 0}
-
-    for session in sessions:
-        result["processed"] += 1
-
-        # Load messages for this session
-        msg_rows = (
-            db.query(SessionMessage)
-            .filter(SessionMessage.session_id == session.id)
-            .order_by(SessionMessage.ordinal)
+    db = SessionLocal()
+    try:
+        # Find sessions with messages but no facets
+        sessions = (
+            db.query(SessionModel)
+            .filter(
+                SessionModel.has_facets.is_(False),
+                SessionModel.user_message_count >= MIN_USER_MESSAGES,
+                SessionModel.duration_seconds >= MIN_DURATION_SECONDS,
+            )
+            .order_by(SessionModel.started_at.desc())
+            .limit(limit)
             .all()
         )
 
-        if not msg_rows:
-            result["skipped"] += 1
-            continue
+        result = {"processed": 0, "success": 0, "skipped": 0, "failed": 0}
 
-        messages = [
-            {
-                "role": m.role,
-                "content_text": m.content_text,
-                "tool_calls": m.tool_calls,
-                "tool_results": m.tool_results,
-            }
-            for m in msg_rows
-        ]
+        for session in sessions:
+            result["processed"] += 1
 
-        success = extract_and_store_facets(session.id, messages)
-        if success:
-            result["success"] += 1
-        else:
-            result["failed"] += 1
+            # Load messages for this session
+            msg_rows = (
+                db.query(SessionMessage)
+                .filter(SessionMessage.session_id == session.id)
+                .order_by(SessionMessage.ordinal)
+                .all()
+            )
 
-    return result
+            if not msg_rows:
+                result["skipped"] += 1
+                continue
+
+            messages = [
+                {
+                    "role": m.role,
+                    "content_text": m.content_text,
+                    "tool_calls": m.tool_calls,
+                    "tool_results": m.tool_results,
+                }
+                for m in msg_rows
+            ]
+
+            # Close the query session before making LLM calls to avoid
+            # holding the connection open during the Anthropic API request
+            db.close()
+            success = extract_and_store_facets(session.id, messages)
+            db = SessionLocal()
+
+            if success:
+                result["success"] += 1
+            else:
+                result["failed"] += 1
+
+        return result
+    finally:
+        db.close()

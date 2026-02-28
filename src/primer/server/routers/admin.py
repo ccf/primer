@@ -61,7 +61,6 @@ def list_ingest_events(
 def backfill_facets(
     background_tasks: BackgroundTasks,
     limit: int = Query(default=50, le=500),
-    db: Session = Depends(get_db),
     auth: AuthContext = Depends(require_role("admin")),
 ):
     """Trigger LLM facet extraction for sessions that are missing facets."""
@@ -72,7 +71,7 @@ def backfill_facets(
 
     from primer.server.services.facet_extraction_service import backfill_facets as _backfill
 
-    background_tasks.add_task(_backfill, db, limit)
+    background_tasks.add_task(_backfill, limit)
     return {"status": "started", "limit": limit}
 
 
