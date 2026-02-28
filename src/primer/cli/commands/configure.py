@@ -21,7 +21,7 @@ def config_get(key: str) -> None:
     if value is None:
         console.warn(f"{key} is not set")
     elif key in SENSITIVE_KEYS:
-        console.kvp(key, value[:12] + "..." if len(value) > 12 else value)
+        console.kvp(key, value[:12] + "..." if len(value) > 12 else "***")
     else:
         console.kvp(key, value)
 
@@ -56,8 +56,8 @@ def config_list() -> None:
             for k, v in values.items():
                 dotted = f"{section}.{k}"
                 display = str(v)
-                if dotted in SENSITIVE_KEYS and len(display) > 12:
-                    display = display[:12] + "..."
+                if dotted in SENSITIVE_KEYS:
+                    display = display[:12] + "..." if len(display) > 12 else "***"
                 console.kvp(f"  {k}", display)
         else:
             console.kvp(section, str(values))
