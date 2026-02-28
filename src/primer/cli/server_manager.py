@@ -47,7 +47,7 @@ def _server_env() -> dict[str, str]:
                 if not line or line.startswith("#") or "=" not in line:
                     continue
                 key, _, value = line.partition("=")
-                key = key.strip()
+                key = key.strip().removeprefix("export").strip()
                 value = value.strip().strip("\"'")
                 if key not in env:
                     env[key] = value
