@@ -8,6 +8,7 @@ import pytest
 @pytest.fixture(autouse=True)
 def _set_api_key(monkeypatch):
     monkeypatch.setattr("primer.mcp.tools.API_KEY", "test-key")
+    monkeypatch.setattr("primer.mcp.tools.ADMIN_API_KEY", "")
     monkeypatch.setattr("primer.mcp.tools.SERVER_URL", "http://test:8000")
 
 

@@ -39,6 +39,15 @@ def test_init_creates_config(tmp_path, monkeypatch):
     primer_home = _patch_primer_home(monkeypatch, tmp_path)
     config_file = primer_home / "config.toml"
 
+    # Prevent load_config_into_env from leaking PRIMER_* vars into os.environ
+    monkeypatch.delenv("PRIMER_ADMIN_API_KEY", raising=False)
+    monkeypatch.delenv("PRIMER_DATABASE_URL", raising=False)
+    monkeypatch.delenv("PRIMER_SERVER_HOST", raising=False)
+    monkeypatch.delenv("PRIMER_SERVER_PORT", raising=False)
+    monkeypatch.delenv("PRIMER_SERVER_URL", raising=False)
+    monkeypatch.delenv("PRIMER_API_KEY", raising=False)
+    monkeypatch.delenv("PRIMER_LOG_LEVEL", raising=False)
+
     # Patch alembic to avoid real migrations
     monkeypatch.setattr("alembic.command.upgrade", lambda cfg, rev: None)
 
