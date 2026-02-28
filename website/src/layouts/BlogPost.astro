@@ -1,0 +1,49 @@
+---
+import BaseLayout from "./BaseLayout.astro";
+
+interface Props {
+  frontmatter: {
+    title: string;
+    description: string;
+    date: string;
+    author?: string;
+  };
+}
+
+const { frontmatter } = Astro.props;
+const formattedDate = new Date(frontmatter.date).toLocaleDateString("en-US", {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+---
+
+<BaseLayout title={`${frontmatter.title} — Primer Blog`} description={frontmatter.description}>
+  <article class="max-w-3xl mx-auto px-6 py-20">
+    <header class="mb-12">
+      <a href="/blog/" class="text-sm text-muted-foreground hover:text-foreground transition-colors mb-4 inline-block">
+        &larr; Back to Blog
+      </a>
+      <h1 class="font-display text-4xl md:text-5xl tracking-tight mb-4">
+        {frontmatter.title}
+      </h1>
+      <div class="flex items-center gap-3 text-sm text-muted-foreground">
+        <time datetime={frontmatter.date}>{formattedDate}</time>
+        {frontmatter.author && (
+          <>
+            <span>&middot;</span>
+            <span>{frontmatter.author}</span>
+          </>
+        )}
+      </div>
+    </header>
+
+    <div class="prose prose-neutral dark:prose-invert max-w-none
+      prose-headings:font-display prose-headings:tracking-tight
+      prose-a:text-primer-brand prose-a:no-underline hover:prose-a:underline
+      prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-sm
+      prose-pre:bg-[#0F0B2A] prose-pre:border prose-pre:border-border">
+      <slot />
+    </div>
+  </article>
+</BaseLayout>

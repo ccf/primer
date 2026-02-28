@@ -1,0 +1,44 @@
+---
+title: "Introducing Primer"
+description: "Today we're releasing Primer — an open-source platform for understanding how your engineering team uses AI coding tools."
+date: "2026-02-28"
+author: "Primer Team"
+---
+
+AI coding assistants are changing how software gets built. Claude Code, Codex CLI, Gemini CLI — engineers are adopting these tools rapidly, but engineering leaders have almost no visibility into what's actually happening.
+
+**How many sessions are running per day? What's the cost? Where are engineers hitting friction?**
+
+Today we're releasing **Primer** — an open-source, self-hosted platform that answers these questions.
+
+## What Primer does
+
+Primer captures session metadata from AI coding tools and aggregates it into a unified analytics dashboard. It tracks:
+
+- **Sessions** — every interaction with an AI coding tool
+- **Costs** — per-engineer, per-model, per-team breakdowns
+- **Friction** — permission denials, tool failures, and workflow bottlenecks
+- **PR links** — which sessions contributed to which pull requests
+
+## Why self-hosted?
+
+Session data contains sensitive information about your engineering workflows. Primer runs entirely on your infrastructure — no data ever leaves your network.
+
+## Multi-agent from day one
+
+Primer supports Claude Code, OpenAI's Codex CLI, and Google's Gemini CLI out of the box. The extractor registry makes it easy to add support for new tools as they emerge.
+
+## Get started
+
+```bash
+pip install primer-io
+primer init
+primer server start
+primer hook install
+```
+
+Visit [the documentation](/docs/) for the full setup guide.
+
+## What's next
+
+We're working on AI maturity scoring, deeper GitHub integration, and an expanded MCP sidecar with team-level insights. Follow along on [GitHub](https://github.com/anthropics/primer).

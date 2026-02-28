@@ -1,0 +1,90 @@
+---
+title: "Setting Up Primer in 5 Minutes"
+description: "A step-by-step guide to installing Primer, connecting your first AI coding tool, and seeing your first insights."
+date: "2026-02-22"
+author: "Primer Team"
+---
+
+This guide walks you through installing Primer on your machine and seeing your first session data in under 5 minutes.
+
+## Prerequisites
+
+- Python 3.12+
+- An AI coding tool (Claude Code, Codex CLI, or Gemini CLI)
+
+## Step 1: Install Primer
+
+```bash
+pip install primer-io
+```
+
+This installs the `primer` CLI, server, hook system, and MCP sidecar.
+
+## Step 2: Initialize
+
+```bash
+primer init
+```
+
+This creates a local SQLite database and config file. For production use, you can configure PostgreSQL — see the [docs](/docs/).
+
+## Step 3: Start the server
+
+```bash
+primer server start
+```
+
+The server starts in the background and listens on `http://localhost:8000`. Open the dashboard in your browser to confirm it's running.
+
+## Step 4: Install the hook
+
+```bash
+primer hook install
+```
+
+This registers a session-end hook with Claude Code. Every time a Claude Code session ends, the hook captures session metadata and sends it to your Primer server.
+
+For Codex CLI and Gemini CLI, sessions are discovered automatically via the MCP sidecar's sync command.
+
+## Step 5: Register yourself
+
+```bash
+primer setup
+```
+
+This creates your engineer profile. Your name and email are pulled from `git config` by default.
+
+## Step 6: Use your AI tool
+
+Start a Claude Code session, do some work, and end it. Within seconds, the session will appear in your Primer dashboard.
+
+## Step 7 (optional): MCP sidecar
+
+Add the Primer MCP server to your Claude Code config for in-editor insights:
+
+```json
+{
+  "mcpServers": {
+    "primer": {
+      "command": "python",
+      "args": ["-m", "primer.mcp.server"]
+    }
+  }
+}
+```
+
+Now you can ask Claude "What are my usage stats?" and get live data from Primer.
+
+## Verify everything
+
+```bash
+primer doctor
+```
+
+This runs health checks on your database, hook, server, and MCP connection.
+
+## Next steps
+
+- Set up [teams and engineer profiles](/docs/)
+- Configure [alert thresholds](/docs/)
+- Connect [GitHub integration](/docs/) for PR linking

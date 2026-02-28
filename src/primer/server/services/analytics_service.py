@@ -52,6 +52,7 @@ def base_session_query(
     engineer_id: str | None = None,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
+    agent_type: str | None = None,
 ):
     q = db.query(SessionModel)
     if engineer_id:
@@ -62,6 +63,8 @@ def base_session_query(
         q = q.filter(SessionModel.started_at >= start_date)
     if end_date:
         q = q.filter(SessionModel.started_at <= end_date)
+    if agent_type:
+        q = q.filter(SessionModel.agent_type == agent_type)
     return q
 
 
@@ -178,6 +181,12 @@ def _build_overview(
     for name, inp, out, cr, cc in cost_q.all():
         estimated_cost += estimate_cost(name, inp or 0, out or 0, cr or 0, cc or 0)
 
+    # Agent type counts
+    agent_q = q.filter(SessionModel.agent_type.isnot(None)).with_entities(SessionModel.agent_type)
+    agent_type_counts: dict[str, int] = {}
+    for (at,) in agent_q.all():
+        agent_type_counts[at] = agent_type_counts.get(at, 0) + 1
+
     # Success rate
     success_rate = _compute_success_rate(db, team_id, engineer_id, start_date, end_date)
 
@@ -259,6 +268,7 @@ def _build_overview(
         end_reason_counts=end_reason_counts,
         cache_hit_rate=cache_hit_rate,
         avg_health_score=avg_health_score,
+        agent_type_counts=agent_type_counts,
     )
 
 

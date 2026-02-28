@@ -1,0 +1,45 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getCollection } from "astro:content";
+
+const posts = (await getCollection("blog")).sort(
+  (a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime()
+);
+---
+
+<BaseLayout
+  title="Blog — Primer"
+  description="Updates, guides, and insights about AI coding tool usage and the Primer platform."
+>
+  <div class="max-w-4xl mx-auto px-6 py-20">
+    <header class="mb-16">
+      <h1 class="font-display text-4xl md:text-5xl tracking-tight mb-4">Blog</h1>
+      <p class="text-lg text-muted-foreground">
+        Updates, guides, and insights from the Primer team.
+      </p>
+    </header>
+
+    <div class="space-y-8">
+      {posts.map(post => {
+        const formattedDate = new Date(post.data.date).toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+        return (
+          <article class="group">
+            <a href={`/blog/${post.id}/`} class="block p-6 -mx-6 rounded-xl hover:bg-muted/50 transition-colors">
+              <time class="text-sm text-muted-foreground" datetime={post.data.date}>
+                {formattedDate}
+              </time>
+              <h2 class="font-display text-2xl tracking-tight mt-2 mb-2 group-hover:text-primer-brand transition-colors">
+                {post.data.title}
+              </h2>
+              <p class="text-muted-foreground">{post.data.description}</p>
+            </a>
+          </article>
+        );
+      })}
+    </div>
+  </div>
+</BaseLayout>

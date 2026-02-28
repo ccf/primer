@@ -1,6 +1,9 @@
 from datetime import date, datetime
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+AgentType = Literal["claude_code", "codex_cli", "gemini_cli"]
 
 # --- Team ---
 
@@ -65,11 +68,18 @@ class SessionFacetsPayload(BaseModel):
     outcome: str | None = None
     session_type: str | None = None
     primary_success: str | None = None
-    claude_helpfulness: str | None = None
+    agent_helpfulness: str | None = None
     brief_summary: str | None = None
     user_satisfaction_counts: dict[str, int] | None = None
     friction_counts: dict[str, int] | None = None
     friction_detail: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_claude_helpfulness(cls, data: dict) -> dict:
+        if isinstance(data, dict) and "claude_helpfulness" in data:
+            data.setdefault("agent_helpfulness", data.pop("claude_helpfulness"))
+        return data
 
 
 class SessionFacetsResponse(BaseModel):
@@ -78,7 +88,7 @@ class SessionFacetsResponse(BaseModel):
     outcome: str | None
     session_type: str | None
     primary_success: str | None
-    claude_helpfulness: str | None
+    agent_helpfulness: str | None
     brief_summary: str | None
     user_satisfaction_counts: dict[str, int] | None
     friction_counts: dict[str, int] | None
@@ -163,10 +173,11 @@ class CommitPayload(BaseModel):
 class SessionIngestPayload(BaseModel):
     session_id: str
     api_key: str
+    agent_type: AgentType = "claude_code"
     project_path: str | None = None
     project_name: str | None = None
     git_branch: str | None = None
-    claude_version: str | None = None
+    agent_version: str | None = None
     permission_mode: str | None = None
     end_reason: str | None = None
     started_at: datetime | None = None
@@ -189,6 +200,13 @@ class SessionIngestPayload(BaseModel):
     messages: list[SessionMessagePayload] = []
     git_remote_url: str | None = None
     commits: list[CommitPayload] = []
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_claude_version(cls, data: dict) -> dict:
+        if isinstance(data, dict) and "claude_version" in data:
+            data.setdefault("agent_version", data.pop("claude_version"))
+        return data
 
 
 class BulkIngestPayload(BaseModel):
@@ -213,10 +231,11 @@ class BulkIngestResponse(BaseModel):
 class SessionResponse(BaseModel):
     id: str
     engineer_id: str
+    agent_type: str = "claude_code"
     project_path: str | None
     project_name: str | None
     git_branch: str | None
-    claude_version: str | None
+    agent_version: str | None
     permission_mode: str | None
     end_reason: str | None
     started_at: datetime | None
@@ -265,6 +284,7 @@ class OverviewStats(BaseModel):
     end_reason_counts: dict[str, int] = {}
     cache_hit_rate: float | None = None
     avg_health_score: float | None = None
+    agent_type_counts: dict[str, int] = {}
 
 
 class FrictionReport(BaseModel):

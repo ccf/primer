@@ -79,7 +79,7 @@ def test_extract_basic_session():
     assert meta.session_id == "sess-123"
     assert meta.project_path == "/home/user/project"
     assert meta.project_name == "project"
-    assert meta.claude_version == "1.0.0"
+    assert meta.agent_version == "1.0.0"
     assert meta.permission_mode == "default"
     assert meta.message_count == 3  # 1 human + 2 assistant
     assert meta.user_message_count == 1

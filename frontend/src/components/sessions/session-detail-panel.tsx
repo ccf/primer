@@ -62,12 +62,12 @@ export function SessionDetailPanel({ session }: SessionDetailPanelProps) {
       </div>
 
       {/* Session metadata */}
-      {(session.end_reason || session.permission_mode || session.claude_version) && (
+      {(session.end_reason || session.permission_mode || session.agent_version) && (
         <div className="flex flex-wrap gap-4 text-sm">
-          {session.claude_version && (
+          {session.agent_version && (
             <div>
-              <span className="text-muted-foreground">Claude Version: </span>
-              <span className="font-medium">{session.claude_version}</span>
+              <span className="text-muted-foreground">Agent Version: </span>
+              <span className="font-medium">{session.agent_version}</span>
             </div>
           )}
           {session.permission_mode && (
@@ -119,10 +119,10 @@ export function SessionDetailPanel({ session }: SessionDetailPanelProps) {
                   <p className="text-sm font-medium">{facets.session_type}</p>
                 </div>
               )}
-              {facets.claude_helpfulness && (
+              {facets.agent_helpfulness && (
                 <div>
                   <p className="text-xs text-muted-foreground">Helpfulness</p>
-                  <p className="text-sm font-medium">{facets.claude_helpfulness}</p>
+                  <p className="text-sm font-medium">{facets.agent_helpfulness}</p>
                 </div>
               )}
               {facets.primary_success && (

@@ -1,11 +1,12 @@
-"""Sync local Claude Code session data to the Primer server."""
+"""Sync local session data from all supported agents to the Primer server."""
 
 import logging
 import os
 
 import httpx
 
-from primer.hook.extractor import capture_git_info, extract_from_jsonl, load_facets
+from primer.hook.extractor import capture_git_info, load_facets
+from primer.hook.extractor_registry import get_extractor_for
 from primer.mcp.reader import list_local_sessions
 
 logger = logging.getLogger(__name__)
@@ -42,9 +43,16 @@ def sync_sessions(server_url: str, api_key: str) -> dict:
 
     for local_session in missing:
         try:
-            meta = extract_from_jsonl(local_session.transcript_path)
+            extractor = get_extractor_for(local_session.agent_type)
+            if not extractor:
+                errors += 1
+                continue
+            meta = extractor.extract(local_session.transcript_path)
             meta.session_id = local_session.session_id
-            facets = load_facets(local_session.session_id)
+            meta.agent_type = local_session.agent_type
+
+            # Load facets (currently only Claude Code has facets)
+            facets = load_facets(local_session.session_id) if local_session.has_facets else None
 
             # Capture git info from the project directory
             cwd = local_session.project_path
