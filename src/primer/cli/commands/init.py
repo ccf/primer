@@ -47,13 +47,14 @@ def init() -> None:
 
     os.environ.setdefault("PRIMER_DATABASE_URL", db_url)
 
+    import importlib.resources
+
     try:
-        from alembic import command
         from alembic.config import Config
 
         alembic_cfg = Config()
+        from alembic import command
         # Look for bundled alembic in package, fall back to project root
-        import importlib.resources
 
         try:
             pkg_root = importlib.resources.files("primer")
