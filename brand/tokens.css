@@ -1,0 +1,25 @@
+/* Primer Design Tokens — shared across website/ and frontend/ */
+:root {
+  /* Brand */
+  --primer-brand: #6366F1;
+  --primer-foreground: #4338CA;
+  --primer-surface: #EEF2FF;
+  --primer-border: #C7D2FE;
+  --primer-dark: #0F0B2A;
+
+  /* Extended Palette */
+  --primer-50: #EEF2FF;
+  --primer-100: #E0E7FF;
+  --primer-200: #C7D2FE;
+  --primer-400: #818CF8;
+  --primer-500: #6366F1;
+  --primer-600: #4F46E5;
+  --primer-700: #4338CA;
+  --primer-900: #312E81;
+
+  /* Semantic */
+  --primer-success: #16A34A;
+  --primer-warning: #D97706;
+  --primer-critical: #DC2626;
+  --primer-info: #2563EB;
+}

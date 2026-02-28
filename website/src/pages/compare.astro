@@ -1,0 +1,99 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+const features = [
+  { name: "Open source (MIT)", primer: true, agentsview: false, diy: true },
+  { name: "Self-hosted", primer: true, agentsview: false, diy: true },
+  { name: "Data stays on your infra", primer: true, agentsview: false, diy: true },
+  { name: "Claude Code support", primer: true, agentsview: true, diy: "manual" },
+  { name: "Codex CLI support", primer: true, agentsview: false, diy: "manual" },
+  { name: "Gemini CLI support", primer: true, agentsview: false, diy: "manual" },
+  { name: "Usage dashboard", primer: true, agentsview: true, diy: false },
+  { name: "Cost analysis", primer: true, agentsview: true, diy: false },
+  { name: "Friction detection", primer: true, agentsview: true, diy: false },
+  { name: "MCP sidecar", primer: true, agentsview: false, diy: false },
+  { name: "GitHub PR linking", primer: true, agentsview: true, diy: false },
+  { name: "Alert thresholds", primer: true, agentsview: true, diy: false },
+  { name: "Team management", primer: true, agentsview: true, diy: false },
+  { name: "REST API", primer: true, agentsview: false, diy: "manual" },
+  { name: "Audit trail", primer: true, agentsview: false, diy: false },
+  { name: "No vendor lock-in", primer: true, agentsview: false, diy: true },
+];
+
+function renderCell(value: boolean | string) {
+  if (value === true) return { text: "\u2713", class: "text-emerald-500 font-semibold" };
+  if (value === false) return { text: "\u2014", class: "text-muted-foreground/40" };
+  return { text: value, class: "text-muted-foreground text-xs" };
+}
+---
+
+<BaseLayout
+  title="Compare — Primer vs Alternatives"
+  description="See how Primer compares to AgentsView, DIY solutions, and other AI usage tracking tools."
+>
+  <div class="max-w-5xl mx-auto px-6 py-20">
+    <header class="text-center mb-16">
+      <h1 class="font-display text-4xl md:text-5xl tracking-tight mb-4">
+        How Primer compares
+      </h1>
+      <p class="text-lg text-muted-foreground max-w-2xl mx-auto">
+        The only open-source, self-hosted platform for AI coding tool analytics
+        with built-in MCP integration.
+      </p>
+    </header>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-border">
+            <th class="text-left py-4 pr-4 font-semibold">Feature</th>
+            <th class="text-center py-4 px-4">
+              <div class="flex flex-col items-center gap-1">
+                <img src="/logo-mark.svg" alt="" width="20" height="20" class="dark:hidden" />
+                <img src="/logo-mark-light.svg" alt="" width="20" height="20" class="hidden dark:block" />
+                <span class="font-semibold text-primer-brand">Primer</span>
+              </div>
+            </th>
+            <th class="text-center py-4 px-4">
+              <div class="flex flex-col items-center gap-1">
+                <span class="text-lg">A</span>
+                <span class="font-semibold">AgentsView</span>
+              </div>
+            </th>
+            <th class="text-center py-4 px-4">
+              <div class="flex flex-col items-center gap-1">
+                <span class="text-lg">&gt;_</span>
+                <span class="font-semibold">DIY</span>
+              </div>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {features.map((f, i) => (
+            <tr class={`border-b border-border/50 ${i % 2 === 0 ? "bg-muted/30" : ""}`}>
+              <td class="py-3 pr-4">{f.name}</td>
+              <td class="py-3 px-4 text-center">
+                <span class={renderCell(f.primer).class}>{renderCell(f.primer).text}</span>
+              </td>
+              <td class="py-3 px-4 text-center">
+                <span class={renderCell(f.agentsview).class}>{renderCell(f.agentsview).text}</span>
+              </td>
+              <td class="py-3 px-4 text-center">
+                <span class={renderCell(f.diy).class}>{renderCell(f.diy).text}</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-16 text-center">
+      <a
+        href="/docs/"
+        class="inline-flex items-center px-6 py-3 rounded-lg bg-primer-brand text-white font-medium hover:bg-primer-600 transition-colors"
+      >
+        Get Started with Primer
+      </a>
+    </div>
+  </div>
+</BaseLayout>

@@ -1,0 +1,40 @@
+---
+title: "Understanding Your Team's Claude Code Usage"
+description: "A guide to the key metrics and patterns that reveal how your engineering team interacts with AI coding tools."
+date: "2026-02-25"
+author: "Primer Team"
+---
+
+When you first deploy Primer and start seeing session data flow in, the volume of information can be overwhelming. This guide walks through the key metrics and what they tell you about your team's AI adoption.
+
+## Sessions per day
+
+The most basic metric — and one of the most useful. A steady increase in daily sessions suggests healthy adoption. A sudden drop might indicate a broken hook, a tool outage, or friction that's causing engineers to give up.
+
+## Token distribution
+
+Not all sessions are equal. Some are quick questions; others are deep multi-hour coding sessions. Looking at the token distribution (input vs output) tells you:
+
+- **High input, low output** — the engineer is providing lots of context but getting short answers. This often indicates prompt refinement or complex debugging.
+- **Low input, high output** — the AI is generating substantial code. These are the high-leverage sessions.
+- **High cache read tokens** — the engineer is working in a long session with lots of context reuse.
+
+## Cost per engineer
+
+Primer breaks down costs by engineer and model. This isn't about policing usage — it's about understanding value. An engineer spending $50/day on Claude Code who ships 3x faster is a great investment. An engineer spending $5/day but hitting constant friction might need training or better tooling.
+
+## Friction signals
+
+Primer's friction detection looks for patterns that indicate problems:
+
+- **Permission denials** — the engineer asked the AI to do something it wasn't allowed to
+- **Tool failures** — commands that failed during execution
+- **Short sessions** — sessions that ended quickly, possibly because the engineer gave up
+
+## Tool usage patterns
+
+Which tools does your team use most? If everyone's using Read and Grep but nobody's using Edit, your team might be using AI for research but not for implementation. This suggests an opportunity for training.
+
+## Getting started
+
+If you haven't set up Primer yet, check out the [5-minute setup guide](/blog/setup-in-5-minutes/). Once data is flowing, the dashboard will start showing these metrics automatically.
