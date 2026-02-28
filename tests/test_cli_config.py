@@ -3,6 +3,7 @@
 import os
 
 from primer.cli.config import (
+    _toml_value,
     get_value,
     load_config_into_env,
     read_config,
@@ -75,3 +76,27 @@ def test_load_config_env_precedence(tmp_path, monkeypatch):
     load_config_into_env(path)
 
     assert os.environ["PRIMER_SERVER_HOST"] == "from-env"
+
+
+# ---------------------------------------------------------------------------
+# _toml_value serialization
+# ---------------------------------------------------------------------------
+
+
+def test_toml_value_bool():
+    assert _toml_value(True) == "true"
+    assert _toml_value(False) == "false"
+
+
+def test_toml_value_int():
+    assert _toml_value(42) == "42"
+    assert _toml_value(0) == "0"
+
+
+def test_toml_value_float():
+    assert _toml_value(3.14) == "3.14"
+
+
+def test_toml_value_string():
+    assert _toml_value("hello") == '"hello"'
+    assert _toml_value("") == '""'
