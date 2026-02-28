@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from primer.common.config import settings
@@ -31,6 +31,7 @@ router = APIRouter(prefix="/api/v1/ingest", tags=["ingest"])
 def ingest_session(
     request: Request,
     payload: SessionIngestPayload,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     engineer = verify_api_key(payload.api_key, db)
@@ -57,6 +58,19 @@ def ingest_session(
         # Send Slack notifications only after a successful commit
         if alert_snapshots:
             send_alert_notifications(alert_snapshots)
+
+        # Auto-extract facets if enabled and not already provided
+        if (
+            settings.facet_extraction_enabled
+            and settings.anthropic_api_key
+            and payload.messages
+            and not payload.facets
+        ):
+            from primer.server.services.facet_extraction_service import extract_and_store_facets
+
+            messages = [m.model_dump() for m in payload.messages]
+            background_tasks.add_task(extract_and_store_facets, payload.session_id, messages)
+
         return IngestResponse(status="ok", session_id=payload.session_id, created=created)
     except Exception as e:
         db.rollback()
