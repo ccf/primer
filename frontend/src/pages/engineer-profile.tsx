@@ -1,10 +1,9 @@
 import { useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
-import { formatNumber, formatCost, formatPercent, formatDuration } from "@/lib/utils"
 import { useEngineerProfile } from "@/hooks/use-api-queries"
-import { InlineStat } from "@/components/ui/inline-stat"
 import { PageTabs } from "@/components/ui/page-tabs"
+import { ProfileSidebar } from "@/components/shared/profile-sidebar"
 import { TrajectorySparklines } from "@/components/engineer-profile/trajectory-sparklines"
 import { FrictionTab } from "@/components/engineer-profile/friction-tab"
 import { StrengthsTab } from "@/components/engineer-profile/strengths-tab"
@@ -54,9 +53,9 @@ export function EngineerProfilePage({ dateRange }: EngineerProfilePageProps) {
       <div className="space-y-4">
         <Link
           to="/engineers"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          className="group inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
           Back to engineers
         </Link>
         <div className="py-8 text-center text-sm text-muted-foreground">
@@ -66,82 +65,20 @@ export function EngineerProfilePage({ dateRange }: EngineerProfilePageProps) {
     )
   }
 
-  const overview = profile.overview
-
   return (
     <div className="space-y-6">
       <Link
         to="/engineers"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        className="group inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" />
+        <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
         Back to engineers
       </Link>
 
-      <div className="flex gap-8">
+      <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
         {/* Left sidebar */}
-        <div className="w-72 shrink-0">
-          {profile.avatar_url ? (
-            <img
-              src={profile.avatar_url}
-              alt={profile.display_name ?? profile.name}
-              className="h-48 w-48 rounded-full"
-            />
-          ) : (
-            <div className="flex h-48 w-48 items-center justify-center rounded-full bg-muted text-4xl font-medium">
-              {(profile.display_name ?? profile.name).charAt(0).toUpperCase()}
-            </div>
-          )}
-
-          <div className="mt-4">
-            <h1 className="text-xl font-semibold">{profile.display_name ?? profile.name}</h1>
-            {profile.github_username && (
-              <p className="text-sm text-muted-foreground">@{profile.github_username}</p>
-            )}
-            <p className="mt-1 text-sm text-muted-foreground">{profile.email}</p>
-          </div>
-
-          <div className="mt-6 grid grid-cols-2 gap-4">
-            <InlineStat label="Sessions" value={formatNumber(overview.total_sessions)} />
-            <InlineStat label="Success Rate" value={formatPercent(overview.success_rate)} />
-            <InlineStat
-              label="Est. Cost"
-              value={overview.estimated_cost != null ? formatCost(overview.estimated_cost) : "-"}
-            />
-            <InlineStat label="Avg Duration" value={formatDuration(overview.avg_session_duration)} />
-            {profile.leverage_score != null && (
-              <InlineStat label="Leverage" value={profile.leverage_score.toFixed(1)} />
-            )}
-          </div>
-
-          {profile.team_name && (
-            <div className="mt-6">
-              <span className="inline-flex items-center rounded-full border border-border/60 px-3 py-1 text-xs font-medium">
-                {profile.team_name}
-              </span>
-            </div>
-          )}
-
-          {profile.projects.length > 0 && (
-            <div className="mt-4">
-              <p className="mb-2 text-xs font-medium text-muted-foreground">Projects</p>
-              <div className="flex flex-wrap gap-1.5">
-                {profile.projects.slice(0, 8).map((p) => (
-                  <span
-                    key={p}
-                    className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium"
-                  >
-                    {p}
-                  </span>
-                ))}
-                {profile.projects.length > 8 && (
-                  <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                    +{profile.projects.length - 8} more
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
+        <div className="lg:w-72 lg:shrink-0">
+          <ProfileSidebar profile={profile} />
         </div>
 
         {/* Right content */}

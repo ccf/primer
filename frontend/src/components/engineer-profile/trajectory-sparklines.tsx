@@ -45,14 +45,14 @@ function SparklineCard({ title, data, formatter, gradientId }: SparklineCardProp
           <AreaChart data={filtered}>
             <defs>
               <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.35} />
+                <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0.05} />
               </linearGradient>
             </defs>
             <Tooltip
               contentStyle={{
-                backgroundColor: "hsl(var(--card))",
-                border: "1px solid hsl(var(--border))",
+                backgroundColor: "var(--color-card)",
+                border: "1px solid var(--color-border)",
                 borderRadius: "8px",
                 fontSize: "12px",
               }}
@@ -62,7 +62,7 @@ function SparklineCard({ title, data, formatter, gradientId }: SparklineCardProp
             <Area
               type="monotone"
               dataKey="value"
-              stroke="hsl(var(--primary))"
+              stroke="var(--color-primary)"
               fill={`url(#${gradientId})`}
               strokeWidth={2}
               dot={false}
@@ -80,32 +80,29 @@ export function TrajectorySparklines({ data }: TrajectorySparklineProps) {
   const costData = data.map((d) => ({ week: d.week, value: d.estimated_cost }))
   const durationData = data.map((d) => ({ week: d.week, value: d.avg_duration }))
 
+  const cards = [
+    { title: "Sessions", data: sessionsData, formatter: (v: number) => String(v), gradientId: "sparkSessions" },
+    { title: "Success Rate", data: successData, formatter: (v: number) => formatPercent(v), gradientId: "sparkSuccess" },
+    { title: "Cost", data: costData, formatter: (v: number) => formatCost(v), gradientId: "sparkCost" },
+    { title: "Avg Duration", data: durationData, formatter: (v: number) => formatDuration(v), gradientId: "sparkDuration" },
+  ]
+
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <SparklineCard
-        title="Sessions"
-        data={sessionsData}
-        formatter={(v) => String(v)}
-        gradientId="sparkSessions"
-      />
-      <SparklineCard
-        title="Success Rate"
-        data={successData}
-        formatter={(v) => formatPercent(v)}
-        gradientId="sparkSuccess"
-      />
-      <SparklineCard
-        title="Cost"
-        data={costData}
-        formatter={(v) => formatCost(v)}
-        gradientId="sparkCost"
-      />
-      <SparklineCard
-        title="Avg Duration"
-        data={durationData}
-        formatter={(v) => formatDuration(v)}
-        gradientId="sparkDuration"
-      />
+      {cards.map((c, i) => (
+        <div
+          key={c.gradientId}
+          className="animate-stagger-in"
+          style={{ animationDelay: `${i * 60}ms` }}
+        >
+          <SparklineCard
+            title={c.title}
+            data={c.data}
+            formatter={c.formatter}
+            gradientId={c.gradientId}
+          />
+        </div>
+      ))}
     </div>
   )
 }

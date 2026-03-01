@@ -1,14 +1,13 @@
 import { useSearchParams } from "react-router-dom"
 import { useAuth } from "@/lib/auth-context"
 import { useEngineerProfile } from "@/hooks/use-api-queries"
-import { InlineStat } from "@/components/ui/inline-stat"
 import { PageTabs } from "@/components/ui/page-tabs"
+import { ProfileSidebar } from "@/components/shared/profile-sidebar"
 import { ProfileOverviewTab } from "@/components/profile/profile-overview-tab"
 import { ProfileSessionsTab } from "@/components/profile/profile-sessions-tab"
 import { ProfileInsightsTab } from "@/components/profile/profile-insights-tab"
 import { ProfileGrowthTab } from "@/components/profile/profile-growth-tab"
 import { CardSkeleton } from "@/components/shared/loading-skeleton"
-import { formatNumber, formatPercent, formatCost, formatDuration } from "@/lib/utils"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
 const tabs = [
@@ -63,53 +62,11 @@ export function ProfilePage({ teamId, dateRange }: ProfilePageProps) {
     )
   }
 
-  const overview = profile.overview
-
   return (
-    <div className="flex gap-8">
+    <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
       {/* Left sidebar */}
-      <div className="w-72 shrink-0">
-        {/* Avatar */}
-        {profile.avatar_url ? (
-          <img
-            src={profile.avatar_url}
-            alt={profile.display_name ?? profile.name}
-            className="h-48 w-48 rounded-full"
-          />
-        ) : (
-          <div className="flex h-48 w-48 items-center justify-center rounded-full bg-muted text-4xl font-medium">
-            {(profile.display_name ?? profile.name).charAt(0).toUpperCase()}
-          </div>
-        )}
-
-        {/* Name */}
-        <div className="mt-4">
-          <h1 className="text-xl font-semibold">{profile.display_name ?? profile.name}</h1>
-          {profile.github_username && (
-            <p className="text-sm text-muted-foreground">@{profile.github_username}</p>
-          )}
-          <p className="mt-1 text-sm text-muted-foreground">{profile.email}</p>
-        </div>
-
-        {/* Stats grid */}
-        <div className="mt-6 grid grid-cols-2 gap-4">
-          <InlineStat label="Sessions" value={formatNumber(overview.total_sessions)} />
-          <InlineStat label="Success Rate" value={formatPercent(overview.success_rate)} />
-          <InlineStat
-            label="Est. Cost"
-            value={overview.estimated_cost != null ? formatCost(overview.estimated_cost) : "-"}
-          />
-          <InlineStat label="Avg Duration" value={formatDuration(overview.avg_session_duration)} />
-        </div>
-
-        {/* Team badge */}
-        {profile.team_name && (
-          <div className="mt-6">
-            <span className="inline-flex items-center rounded-full border border-border/60 px-3 py-1 text-xs font-medium">
-              {profile.team_name}
-            </span>
-          </div>
-        )}
+      <div className="lg:w-72 lg:shrink-0">
+        <ProfileSidebar profile={profile} />
       </div>
 
       {/* Right content */}
