@@ -1,0 +1,160 @@
+---
+import DocsPage from "../../layouts/DocsPage.astro";
+---
+
+<DocsPage
+  title="Configuration"
+  section="Getting Started"
+  description="Configure the server, database, and authentication settings."
+>
+  <p>
+    All Primer settings use the <code>PRIMER_</code> environment variable prefix. Settings can be
+    provided as environment variables or in a <code>.env</code> file in the project root.
+  </p>
+
+  <pre><code>cp .env.example .env</code></pre>
+
+  <h2>Server Settings</h2>
+
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>PRIMER_DATABASE_URL</code></td><td><code>sqlite:///./primer.db</code></td><td>Database connection string (SQLite or PostgreSQL)</td></tr>
+      <tr><td><code>PRIMER_ADMIN_API_KEY</code></td><td><code>primer-admin-dev-key</code></td><td>Shared secret for admin API access</td></tr>
+      <tr><td><code>PRIMER_SERVER_HOST</code></td><td><code>0.0.0.0</code></td><td>Server bind address</td></tr>
+      <tr><td><code>PRIMER_SERVER_PORT</code></td><td><code>8000</code></td><td>Server bind port</td></tr>
+      <tr><td><code>PRIMER_LOG_LEVEL</code></td><td><code>info</code></td><td>Logging level (debug, info, warning, error)</td></tr>
+      <tr><td><code>PRIMER_CORS_ORIGINS</code></td><td><code>["http://localhost:5173"]</code></td><td>Allowed CORS origins (JSON array)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>GitHub OAuth</h2>
+
+  <p>
+    Required for GitHub-based dashboard login. See the
+    <a href={`${import.meta.env.BASE_URL}docs/github/`}>GitHub Integration</a> guide for setup instructions.
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>PRIMER_GITHUB_CLIENT_ID</code></td><td>OAuth App client ID</td></tr>
+      <tr><td><code>PRIMER_GITHUB_CLIENT_SECRET</code></td><td>OAuth App client secret</td></tr>
+      <tr><td><code>PRIMER_GITHUB_REDIRECT_URI</code></td><td>OAuth callback URL (default: <code>http://localhost:5173/auth/callback</code>)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>GitHub App</h2>
+
+  <p>Required for PR sync, commit correlation, and AI-readiness scoring.</p>
+
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>PRIMER_GITHUB_APP_ID</code></td><td>GitHub App ID (numeric)</td></tr>
+      <tr><td><code>PRIMER_GITHUB_APP_PRIVATE_KEY</code></td><td>RSA private key (PEM format, <code>\n</code> for newlines)</td></tr>
+      <tr><td><code>PRIMER_GITHUB_INSTALLATION_ID</code></td><td>App installation ID (numeric)</td></tr>
+      <tr><td><code>PRIMER_GITHUB_WEBHOOK_SECRET</code></td><td>Webhook HMAC secret</td></tr>
+    </tbody>
+  </table>
+
+  <h2>JWT Authentication</h2>
+
+  <p>Used for dashboard session tokens.</p>
+
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>PRIMER_JWT_SECRET_KEY</code></td><td><code>change-me-in-production</code></td><td>Secret for JWT signing — change this in production!</td></tr>
+      <tr><td><code>PRIMER_JWT_ACCESS_TOKEN_EXPIRE_MINUTES</code></td><td><code>15</code></td><td>Access token lifetime</td></tr>
+      <tr><td><code>PRIMER_JWT_REFRESH_TOKEN_EXPIRE_DAYS</code></td><td><code>7</code></td><td>Refresh token lifetime</td></tr>
+    </tbody>
+  </table>
+
+  <p>Generate a secure JWT secret:</p>
+
+  <pre><code>python -c "import secrets; print(secrets.token_urlsafe(32))"</code></pre>
+
+  <h2>Rate Limiting</h2>
+
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>PRIMER_RATE_LIMIT_ENABLED</code></td><td><code>true</code></td><td>Enable/disable rate limiting</td></tr>
+      <tr><td><code>PRIMER_RATE_LIMIT_DEFAULT</code></td><td><code>60/minute</code></td><td>Default limit for all endpoints</td></tr>
+      <tr><td><code>PRIMER_RATE_LIMIT_INGEST</code></td><td><code>120/minute</code></td><td>Limit for ingest endpoints</td></tr>
+      <tr><td><code>PRIMER_RATE_LIMIT_AUTH</code></td><td><code>10/minute</code></td><td>Limit for auth endpoints</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Productivity Estimation</h2>
+
+  <p>Controls the ROI calculations shown in the dashboard.</p>
+
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>PRIMER_PRODUCTIVITY_TIME_MULTIPLIER</code></td><td><code>3.0</code></td><td>Estimated time savings multiplier vs manual work</td></tr>
+      <tr><td><code>PRIMER_PRODUCTIVITY_HOURLY_RATE</code></td><td><code>75.0</code></td><td>Hourly rate for value calculations (USD)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Alert Thresholds</h2>
+
+  <p>Default thresholds for anomaly detection. These can be overridden per-team in the admin panel.</p>
+
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>PRIMER_ALERT_FRICTION_SPIKE_MULTIPLIER</code></td><td><code>2.0</code></td><td>Trigger when friction is Nx the baseline</td></tr>
+      <tr><td><code>PRIMER_ALERT_USAGE_DROP_RATIO</code></td><td><code>0.5</code></td><td>Trigger when usage drops below ratio of baseline</td></tr>
+      <tr><td><code>PRIMER_ALERT_COST_SPIKE_WARNING</code></td><td><code>2.0</code></td><td>Warning when cost is Nx the baseline</td></tr>
+      <tr><td><code>PRIMER_ALERT_COST_SPIKE_CRITICAL</code></td><td><code>3.0</code></td><td>Critical when cost is Nx the baseline</td></tr>
+      <tr><td><code>PRIMER_ALERT_SUCCESS_RATE_DROP_PP</code></td><td><code>20.0</code></td><td>Trigger when success rate drops N percentage points</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Slack Notifications</h2>
+
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>PRIMER_SLACK_WEBHOOK_URL</code></td><td>—</td><td>Slack incoming webhook URL</td></tr>
+      <tr><td><code>PRIMER_SLACK_ALERTS_ENABLED</code></td><td><code>false</code></td><td>Enable alert delivery to Slack</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Hook and MCP Client Settings</h2>
+
+  <p>
+    These variables are used by the SessionEnd hook and MCP sidecar running on developer machines,
+    not the server.
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>PRIMER_SERVER_URL</code></td><td><code>http://localhost:8000</code></td><td>URL of the Primer API server</td></tr>
+      <tr><td><code>PRIMER_API_KEY</code></td><td>—</td><td>Engineer API key for authentication</td></tr>
+      <tr><td><code>PRIMER_ADMIN_API_KEY</code></td><td>—</td><td>Admin key (MCP sidecar only, for team analytics)</td></tr>
+    </tbody>
+  </table>
+</DocsPage>

@@ -1,0 +1,135 @@
+---
+import DocsPage from "../../layouts/DocsPage.astro";
+---
+
+<DocsPage
+  title="CLI Reference"
+  section="Getting Started"
+  description="Complete reference for the primer CLI commands."
+>
+  <p>
+    Primer ships with a <code>primer</code> CLI for managing the server, installing hooks, and
+    running development utilities. All commands accept <code>--help</code> for usage details.
+  </p>
+
+  <h2>Server</h2>
+
+  <h3>primer server start</h3>
+  <p>Start the Primer API server as a managed background process.</p>
+  <pre><code>primer server start [--host HOST] [--port PORT]</code></pre>
+
+  <h3>primer server stop</h3>
+  <p>Stop the managed server process.</p>
+  <pre><code>primer server stop</code></pre>
+
+  <h3>primer server status</h3>
+  <p>Show whether the server is running and the API health check result.</p>
+  <pre><code>primer server status</code></pre>
+
+  <h3>primer server logs</h3>
+  <p>Tail the server log output.</p>
+  <pre><code>primer server logs [--lines N]</code></pre>
+
+  <h2>Setup</h2>
+
+  <h3>primer init</h3>
+  <p>
+    Initialize Primer: creates <code>~/.primer/.env</code> with your server URL and API key,
+    and runs database migrations.
+  </p>
+  <pre><code>primer init [--server-url URL] [--api-key KEY]</code></pre>
+
+  <h3>primer hook install</h3>
+  <p>
+    Install the SessionEnd hook into <code>~/.claude/settings.json</code> so sessions are
+    automatically uploaded after each Claude Code session.
+  </p>
+  <pre><code>primer hook install</code></pre>
+
+  <h3>primer hook uninstall</h3>
+  <p>Remove the SessionEnd hook from Claude Code settings.</p>
+  <pre><code>primer hook uninstall</code></pre>
+
+  <h3>primer doctor</h3>
+  <p>
+    Run a health check: verifies server connectivity, hook installation, API key validity,
+    and database status.
+  </p>
+  <pre><code>primer doctor</code></pre>
+
+  <h2>Development Utilities</h2>
+
+  <h3>uvicorn (API server)</h3>
+  <p>Run the FastAPI server directly with auto-reload for development:</p>
+  <pre><code>uvicorn primer.server.app:app --reload</code></pre>
+
+  <h3>alembic (migrations)</h3>
+  <p>Apply all pending database migrations:</p>
+  <pre><code>alembic upgrade head</code></pre>
+
+  <p>Generate a new migration after model changes:</p>
+  <pre><code>alembic revision --autogenerate -m "description"</code></pre>
+
+  <h3>seed data</h3>
+  <p>Populate the database with realistic sample data for development:</p>
+  <pre><code>python scripts/seed_data.py</code></pre>
+
+  <h3>MCP server</h3>
+  <p>Run the MCP sidecar server directly:</p>
+  <pre><code>python -m primer.mcp.server</code></pre>
+
+  <h2>Frontend</h2>
+
+  <pre><code># Development server
+cd frontend && npm run dev
+
+# Production build
+cd frontend && npm run build
+
+# Type check
+cd frontend && npx tsc -b --noEmit
+
+# Lint
+cd frontend && npm run lint</code></pre>
+
+  <h2>Testing &amp; Quality</h2>
+
+  <pre><code># Run tests
+pytest -v
+
+# Run tests with coverage
+pytest -v --cov=primer --cov-report=term-missing
+
+# Lint
+ruff check .
+ruff check . --fix
+
+# Format
+ruff format .
+ruff format --check .
+
+# Security scan
+bandit -r src/ -c pyproject.toml</code></pre>
+
+  <h2>Environment Variables</h2>
+
+  <p>
+    The CLI reads configuration from environment variables or a <code>.env</code> file. All
+    variables use the <code>PRIMER_</code> prefix. See the
+    <a href={`${import.meta.env.BASE_URL}docs/configuration/`}>Configuration</a> page for the
+    full reference.
+  </p>
+
+  <p>Key variables for the CLI:</p>
+
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>PRIMER_SERVER_URL</code></td><td>URL of the Primer API server</td></tr>
+      <tr><td><code>PRIMER_API_KEY</code></td><td>Your engineer API key</td></tr>
+      <tr><td><code>PRIMER_ADMIN_API_KEY</code></td><td>Admin key (for team management commands)</td></tr>
+    </tbody>
+  </table>
+</DocsPage>

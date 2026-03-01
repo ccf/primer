@@ -21,7 +21,7 @@ const formattedDate = new Date(frontmatter.date).toLocaleDateString("en-US", {
 <BaseLayout title={`${frontmatter.title} — Primer Blog`} description={frontmatter.description}>
   <article class="max-w-3xl mx-auto px-6 py-20">
     <header class="mb-12">
-      <a href="/blog/" class="text-sm text-muted-foreground hover:text-foreground transition-colors mb-4 inline-block">
+      <a href={`${import.meta.env.BASE_URL}blog/`} class="text-sm text-muted-foreground hover:text-foreground transition-colors mb-4 inline-block">
         &larr; Back to Blog
       </a>
       <h1 class="font-display text-4xl md:text-5xl tracking-tight mb-4">

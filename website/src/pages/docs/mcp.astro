@@ -1,0 +1,135 @@
+---
+import DocsPage from "../../layouts/DocsPage.astro";
+---
+
+<DocsPage
+  title="MCP Sidecar"
+  section="Architecture"
+  description="Model Context Protocol server for in-editor insights."
+>
+  <p>
+    The Primer MCP sidecar is a Model Context Protocol server that gives Claude Code direct
+    access to your team's usage data during conversations — no context switching required.
+  </p>
+
+  <h2>Available Tools</h2>
+
+  <p>The sidecar exposes 5 tools to Claude:</p>
+
+  <table>
+    <thead>
+      <tr><th>Tool</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>sync</code></td>
+        <td>Upload any local sessions that haven't been synced yet. Useful after offline work.</td>
+      </tr>
+      <tr>
+        <td><code>my_stats</code></td>
+        <td>Personal usage analytics: session counts, token usage, tools used, and outcomes.</td>
+      </tr>
+      <tr>
+        <td><code>team_overview</code></td>
+        <td>Team-level analytics: aggregate usage, costs, and outcome distribution.</td>
+      </tr>
+      <tr>
+        <td><code>friction_report</code></td>
+        <td>Friction points your team encounters most frequently, with type and count.</td>
+      </tr>
+      <tr>
+        <td><code>recommendations</code></td>
+        <td>Actionable recommendations based on usage patterns and friction analysis.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Installation</h2>
+
+  <p>Add the sidecar to <code>~/.claude/settings.json</code>:</p>
+
+  <pre><code>&#123;
+  "mcpServers": &#123;
+    "primer": &#123;
+      "command": "python",
+      "args": ["-m", "primer.mcp.server"],
+      "env": &#123;
+        "PRIMER_SERVER_URL": "http://localhost:8000",
+        "PRIMER_API_KEY": "primer_...",
+        "PRIMER_ADMIN_API_KEY": "your-admin-key"
+      &#125;
+    &#125;
+  &#125;
+&#125;</code></pre>
+
+  <p>
+    After saving, restart Claude Code. The Primer tools will appear in Claude's tool list.
+  </p>
+
+  <h2>Authentication</h2>
+
+  <p>The sidecar uses two keys depending on the tool:</p>
+
+  <ul>
+    <li>
+      <strong><code>PRIMER_API_KEY</code></strong> — Your engineer API key. Used by <code>sync</code>
+      and <code>my_stats</code> to authenticate as you.
+    </li>
+    <li>
+      <strong><code>PRIMER_ADMIN_API_KEY</code></strong> — Admin key. Used by <code>team_overview</code>,
+      <code>friction_report</code>, and <code>recommendations</code> to access team-wide data.
+      Falls back to <code>PRIMER_API_KEY</code> if not set.
+    </li>
+  </ul>
+
+  <h2>Example Usage</h2>
+
+  <p>Once registered, you can ask Claude questions like:</p>
+
+  <ul>
+    <li>"What are my top friction points this week?"</li>
+    <li>"How does our team's token usage compare to last month?"</li>
+    <li>"What recommendations do you have for improving our AI workflow?"</li>
+    <li>"Sync my recent sessions and show me my stats."</li>
+  </ul>
+
+  <p>Claude will call the appropriate Primer tools and return insights inline.</p>
+
+  <h2>Running Manually</h2>
+
+  <p>You can run the MCP server directly to test it:</p>
+
+  <pre><code>PRIMER_SERVER_URL=http://localhost:8000 \
+PRIMER_API_KEY=primer_... \
+PRIMER_ADMIN_API_KEY=primer-admin-dev-key \
+python -m primer.mcp.server</code></pre>
+
+  <h2>Architecture</h2>
+
+  <p>
+    The sidecar is built with <code>FastMCP</code> and makes HTTP calls to the Primer REST API
+    using <code>httpx</code>. It has no persistent state — all data lives in the API server.
+  </p>
+
+  <pre><code>Claude Code
+  └── MCP tool call (e.g., team_overview)
+        └── primer.mcp.tools.primer_team_overview()
+              └── httpx GET /api/v1/analytics/overview
+                    └── Returns JSON string to Claude</code></pre>
+
+  <p>
+    The sidecar is lightweight and runs locally alongside Claude Code, one instance per
+    developer machine.
+  </p>
+
+  <h2>Source</h2>
+
+  <p>
+    The MCP implementation lives in <code>src/primer/mcp/</code>:
+  </p>
+
+  <ul>
+    <li><code>server.py</code> — FastMCP app, tool registration</li>
+    <li><code>tools.py</code> — Tool implementations with httpx calls</li>
+  </ul>
+</DocsPage>

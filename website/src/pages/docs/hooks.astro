@@ -1,0 +1,141 @@
+---
+import DocsPage from "../../layouts/DocsPage.astro";
+---
+
+<DocsPage
+  title="Hook System"
+  section="Architecture"
+  description="How session data is captured from AI coding tools."
+>
+  <p>
+    The SessionEnd hook is the data collection layer of Primer. It runs automatically at the end
+    of each Claude Code, Codex CLI, or Gemini CLI session, extracts session metadata from the
+    transcript, and uploads it to your Primer server.
+  </p>
+
+  <h2>How It Works</h2>
+
+  <p>When a Claude Code session ends, the hook:</p>
+
+  <ol>
+    <li>Reads the session transcript (a JSONL file in <code>~/.claude/projects/</code>)</li>
+    <li>Parses messages, token counts, tool calls, model names, and session metadata</li>
+    <li>Loads facets from <code>~/.claude/usage-data/facets/</code> if available</li>
+    <li>POSTs the extracted data to <code>/api/v1/ingest/session</code></li>
+    <li>Fails silently if the server is unreachable (sessions can be synced later via MCP)</li>
+  </ol>
+
+  <h2>Installation</h2>
+
+  <p>First, make sure you have a Primer engineer account and API key:</p>
+
+  <pre><code>curl -X POST http://localhost:8000/api/v1/engineers \
+  -H "x-admin-key: primer-admin-dev-key" \
+  -H "Content-Type: application/json" \
+  -d '&#123;"name": "Your Name", "email": "you@example.com"&#125;'
+# Save the api_key from the response</code></pre>
+
+  <p>Set your environment variables and install:</p>
+
+  <pre><code>export PRIMER_SERVER_URL=http://your-primer-server:8000
+export PRIMER_API_KEY=primer_...
+python scripts/install_hook.py</code></pre>
+
+  <p>
+    Or use the CLI: <code>primer hook install</code>
+  </p>
+
+  <h3>What Gets Installed</h3>
+
+  <p>
+    The installer adds a <code>SessionEnd</code> hook to <code>~/.claude/settings.json</code>:
+  </p>
+
+  <pre><code>&#123;
+  "hooks": &#123;
+    "SessionEnd": [
+      &#123;
+        "matcher": "",
+        "hooks": [
+          &#123;
+            "type": "command",
+            "command": "python -m primer.hook.extractor"
+          &#125;
+        ]
+      &#125;
+    ]
+  &#125;
+&#125;</code></pre>
+
+  <h2>Verifying the Hook</h2>
+
+  <p>Check that the hook is registered:</p>
+
+  <pre><code>cat ~/.claude/settings.json | python -m json.tool</code></pre>
+
+  <p>After completing a Claude Code session, verify it was uploaded:</p>
+
+  <pre><code>curl http://localhost:8000/api/v1/sessions \
+  -H "x-admin-key: primer-admin-dev-key" | python -m json.tool</code></pre>
+
+  <h2>What Data Is Extracted</h2>
+
+  <p>The extractor parses the JSONL transcript and captures:</p>
+
+  <table>
+    <thead>
+      <tr><th>Field</th><th>Source</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Session ID, start/end times</td><td>Transcript metadata</td></tr>
+      <tr><td>Message counts (user, assistant, total)</td><td>Transcript messages</td></tr>
+      <tr><td>Input/output/cache tokens</td><td>Usage fields in messages</td></tr>
+      <tr><td>Tool call counts (per tool)</td><td>Tool use blocks</td></tr>
+      <tr><td>Model names and per-model token usage</td><td>Message metadata</td></tr>
+      <tr><td>Project path, git branch</td><td>Session environment</td></tr>
+      <tr><td>First prompt, session summary</td><td>Message content</td></tr>
+      <tr><td>Permission mode, end reason</td><td>Session metadata</td></tr>
+      <tr><td>Agent type and version</td><td>Session metadata</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Multi-Agent Support</h2>
+
+  <p>
+    Primer supports multiple AI coding tools through agent-specific extractors. The hook
+    automatically detects the agent type and uses the appropriate extraction logic:
+  </p>
+
+  <ul>
+    <li><strong>Claude Code</strong> — JSONL transcript with tool use blocks</li>
+    <li><strong>Codex CLI</strong> — OpenAI-compatible conversation format</li>
+    <li><strong>Gemini CLI</strong> — Gemini conversation format</li>
+  </ul>
+
+  <p>
+    All agents upload to the same ingest endpoint. The <code>agent_type</code> field on each
+    session identifies the source.
+  </p>
+
+  <h2>Offline Sync</h2>
+
+  <p>
+    If the Primer server is unreachable when a session ends, the hook fails silently without
+    disrupting your workflow. You can sync missed sessions later using the MCP sidecar:
+  </p>
+
+  <pre><code># In Claude Code, call the sync MCP tool
+# Or directly via CLI:
+python -m primer.mcp.server  # Then call the sync tool</code></pre>
+
+  <h2>Uninstalling</h2>
+
+  <pre><code>python scripts/install_hook.py --uninstall
+# Or:
+primer hook uninstall</code></pre>
+
+  <p>
+    This removes the <code>SessionEnd</code> entry from <code>~/.claude/settings.json</code>.
+    Your existing session data on the server is not affected.
+  </p>
+</DocsPage>

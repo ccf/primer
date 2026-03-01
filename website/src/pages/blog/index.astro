@@ -28,7 +28,7 @@ const posts = (await getCollection("blog")).sort(
         });
         return (
           <article class="group">
-            <a href={`/blog/${post.id}/`} class="block p-6 -mx-6 rounded-xl hover:bg-muted/50 transition-colors">
+            <a href={`${import.meta.env.BASE_URL}blog/${post.id}/`} class="block p-6 -mx-6 rounded-xl hover:bg-muted/50 transition-colors">
               <time class="text-sm text-muted-foreground" datetime={post.data.date}>
                 {formattedDate}
               </time>

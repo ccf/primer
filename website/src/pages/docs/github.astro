@@ -1,0 +1,167 @@
+---
+import DocsPage from "../../layouts/DocsPage.astro";
+---
+
+<DocsPage
+  title="GitHub Integration"
+  section="Guides"
+  description="Link AI sessions to pull requests automatically."
+>
+  <p>
+    Primer integrates with GitHub in two ways: <strong>GitHub OAuth</strong> for dashboard login,
+    and a <strong>GitHub App</strong> for PR sync, commit correlation, and AI-readiness scoring.
+    Both are optional and independent.
+  </p>
+
+  <h2>GitHub OAuth (Dashboard Login)</h2>
+
+  <p>OAuth lets engineers sign in with their GitHub account instead of API keys.</p>
+
+  <h3>1. Create an OAuth App</h3>
+
+  <ol>
+    <li>Go to <strong>GitHub Settings → Developer settings → OAuth Apps</strong></li>
+    <li>Click <strong>New OAuth App</strong></li>
+    <li>
+      Fill in:
+      <ul>
+        <li><strong>Application name</strong>: Primer</li>
+        <li><strong>Homepage URL</strong>: <code>http://localhost:5173</code></li>
+        <li><strong>Authorization callback URL</strong>: <code>http://localhost:5173/auth/callback</code></li>
+      </ul>
+    </li>
+    <li>Click <strong>Register application</strong></li>
+    <li>Copy the <strong>Client ID</strong></li>
+    <li>Click <strong>Generate a new client secret</strong> and copy it</li>
+  </ol>
+
+  <h3>2. Configure Primer</h3>
+
+  <pre><code>PRIMER_GITHUB_CLIENT_ID=Iv1.abc123...
+PRIMER_GITHUB_CLIENT_SECRET=abc123secret...
+PRIMER_GITHUB_REDIRECT_URI=http://localhost:5173/auth/callback
+PRIMER_JWT_SECRET_KEY=your-secure-random-string</code></pre>
+
+  <p>Generate a JWT secret:</p>
+
+  <pre><code>python -c "import secrets; print(secrets.token_urlsafe(32))"</code></pre>
+
+  <h3>How Login Works</h3>
+
+  <ol>
+    <li>Engineer clicks "Sign in with GitHub" on the login page</li>
+    <li>Redirected to GitHub for authorization (scopes: <code>read:user</code>, <code>user:email</code>)</li>
+    <li>GitHub redirects back to <code>/auth/callback</code> with an authorization code</li>
+    <li>Primer exchanges the code for a GitHub access token</li>
+    <li>Fetches profile (name, username, avatar, email)</li>
+    <li>Finds or creates an engineer record, issues JWT cookies</li>
+  </ol>
+
+  <h3>Auto-Provisioning</h3>
+
+  <p>On first login, Primer:</p>
+  <ul>
+    <li>Matches by GitHub ID if an engineer record exists → updates profile</li>
+    <li>Matches by email → links GitHub profile to existing engineer</li>
+    <li>Otherwise creates a new engineer with role <code>engineer</code></li>
+  </ul>
+
+  <p>To pre-provision a user:</p>
+
+  <pre><code>python scripts/provision_user.py your-github-username --role admin --team Platform</code></pre>
+
+  <h2>GitHub App (PR Sync &amp; AI Readiness)</h2>
+
+  <p>The GitHub App enables:</p>
+  <ul>
+    <li>Syncing pull request data (additions, deletions, review comments, merge status)</li>
+    <li>Correlating session commits with PRs</li>
+    <li>Checking repositories for AI-readiness configuration</li>
+    <li>Real-time webhooks for push and PR events</li>
+  </ul>
+
+  <h3>1. Create a GitHub App</h3>
+
+  <ol>
+    <li>Go to <strong>GitHub Settings → Developer settings → GitHub Apps</strong></li>
+    <li>Click <strong>New GitHub App</strong></li>
+    <li>
+      Fill in:
+      <ul>
+        <li><strong>App name</strong>: Primer Analytics (must be globally unique)</li>
+        <li><strong>Homepage URL</strong>: <code>http://localhost:5173</code></li>
+        <li><strong>Webhook URL</strong>: Your server URL + <code>/api/v1/webhooks/github</code> (or leave blank)</li>
+        <li><strong>Webhook secret</strong>: <code>python -c "import secrets; print(secrets.token_hex(32))"</code></li>
+      </ul>
+    </li>
+    <li>
+      Set permissions:
+      <ul>
+        <li>Repository → Contents: <strong>Read-only</strong></li>
+        <li>Repository → Pull requests: <strong>Read-only</strong></li>
+        <li>Repository → Metadata: Read-only (auto-granted)</li>
+      </ul>
+    </li>
+    <li>Subscribe to events: <strong>Pull request</strong>, <strong>Push</strong></li>
+    <li>Click <strong>Create GitHub App</strong></li>
+  </ol>
+
+  <h3>2. Generate a Private Key</h3>
+
+  <p>On the app's settings page, scroll to <strong>Private keys</strong> and click <strong>Generate a private key</strong>. A <code>.pem</code> file is downloaded.</p>
+
+  <h3>3. Install the App</h3>
+
+  <p>Click <strong>Install App</strong> in the sidebar, choose your account or organization, and note the installation ID from the URL: <code>https://github.com/settings/installations/&lt;ID&gt;</code>.</p>
+
+  <h3>4. Configure Primer</h3>
+
+  <pre><code>PRIMER_GITHUB_APP_ID=123456
+PRIMER_GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----"
+PRIMER_GITHUB_INSTALLATION_ID=78901234
+PRIMER_GITHUB_WEBHOOK_SECRET=your-webhook-secret</code></pre>
+
+  <p>For the private key, either paste with <code>\n</code> for newlines, or load from file:</p>
+
+  <pre><code>export PRIMER_GITHUB_APP_PRIVATE_KEY=$(cat path/to/key.pem)</code></pre>
+
+  <h3>Verify the Connection</h3>
+
+  <pre><code>python scripts/verify_github.py
+
+# Test syncing a specific repository
+python scripts/verify_github.py --repo owner/repo-name</code></pre>
+
+  <h3>Manual PR Sync</h3>
+
+  <pre><code>curl -X POST "http://localhost:8000/api/v1/analytics/github/sync?repository=owner/repo" \
+  -H "x-admin-key: your-admin-key"</code></pre>
+
+  <h2>AI-Readiness Scoring</h2>
+
+  <p>When a repository is synced, Primer checks for AI tooling configuration:</p>
+
+  <table>
+    <thead>
+      <tr><th>File / Directory</th><th>Points</th><th>What it indicates</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>CLAUDE.md</code></td><td>50</td><td>Project instructions for Claude Code</td></tr>
+      <tr><td><code>.claude/</code></td><td>30</td><td>Claude Code configuration directory</td></tr>
+      <tr><td><code>AGENTS.md</code></td><td>20</td><td>Agent delegation instructions</td></tr>
+    </tbody>
+  </table>
+
+  <p>Scores are cached for 24 hours and appear in the AI Maturity page under "Project Readiness."</p>
+
+  <h2>Webhooks for Local Development</h2>
+
+  <p>Use a tunnel to receive webhooks during local development:</p>
+
+  <pre><code># ngrok
+ngrok http 8000
+# Set webhook URL to: https://abc123.ngrok.io/api/v1/webhooks/github
+
+# cloudflared
+cloudflared tunnel --url http://localhost:8000</code></pre>
+</DocsPage>
