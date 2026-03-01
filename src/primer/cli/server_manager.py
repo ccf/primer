@@ -38,23 +38,15 @@ def _server_env() -> dict[str, str]:
     Also loads .env file (if present) so PRIMER_* vars like GitHub OAuth
     and Anthropic API keys are available to the managed server process.
     """
+    from dotenv import dotenv_values
+
     env = os.environ.copy()
     # Load .env file if it exists (doesn't override already-set vars)
     for env_path in [Path(".env"), Path.home() / ".primer" / ".env"]:
         if env_path.exists():
-            for line in env_path.read_text().splitlines():
-                line = line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                key, _, value = line.partition("=")
-                key = key.strip().removeprefix("export").strip()
-                # Strip inline comments, respecting quoted values
-                value = value.strip()
-                if value and value[0] not in ('"', "'"):
-                    value = value.partition(" #")[0].partition("\t#")[0].strip()
-                value = value.strip("\"'")
+            for key, value in dotenv_values(env_path).items():
                 if key not in env:
-                    env[key] = value
+                    env[key] = value or ""
     return env
 
 
