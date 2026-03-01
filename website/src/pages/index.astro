@@ -61,13 +61,13 @@ const features = [
         </p>
         <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
           <a
-            href="/docs/"
+            href={`${import.meta.env.BASE_URL}docs/`}
             class="inline-flex items-center px-6 py-3 rounded-lg bg-primer-brand text-white font-medium hover:bg-primer-600 transition-colors"
           >
             Get Started
           </a>
           <a
-            href="https://github.com/anthropics/primer"
+            href="https://github.com/ccf/primer"
             target="_blank"
             rel="noopener"
             class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-white/10 text-white font-medium hover:bg-white/15 transition-colors"
@@ -176,16 +176,18 @@ const features = [
 
       <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
         <a
-          href="/docs/"
+          href={`${import.meta.env.BASE_URL}docs/`}
           class="inline-flex items-center px-6 py-3 rounded-lg bg-primer-brand text-white font-medium hover:bg-primer-600 transition-colors"
         >
           Read the Docs
         </a>
         <a
-          href="/pricing/"
-          class="inline-flex items-center px-6 py-3 rounded-lg border border-border text-foreground font-medium hover:bg-muted transition-colors"
+          href="https://github.com/ccf/primer"
+          target="_blank"
+          rel="noopener"
+          class="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-border text-foreground font-medium hover:bg-muted transition-colors"
         >
-          View Pricing
+          View on GitHub
         </a>
       </div>
     </div>

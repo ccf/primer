@@ -1,28 +1,22 @@
 ---
+const base = import.meta.env.BASE_URL;
 const year = new Date().getFullYear();
 const columns = [
   {
     title: "Product",
     links: [
-      { href: "/#features", label: "Features" },
-      { href: "/compare/", label: "Compare" },
-      { href: "/pricing/", label: "Pricing" },
-    ],
-  },
-  {
-    title: "Resources",
-    links: [
-      { href: "/docs/", label: "Documentation" },
-      { href: "/blog/", label: "Blog" },
-      { href: "https://github.com/anthropics/primer", label: "GitHub" },
+      { href: `${base}#features`, label: "Features" },
+      { href: `${base}docs/`, label: "Documentation" },
+      { href: `${base}blog/`, label: "Blog" },
     ],
   },
   {
     title: "Community",
     links: [
-      { href: "https://github.com/anthropics/primer/issues", label: "Issues" },
-      { href: "https://github.com/anthropics/primer/discussions", label: "Discussions" },
-      { href: "https://github.com/anthropics/primer/blob/main/LICENSE", label: "MIT License" },
+      { href: "https://github.com/ccf/primer", label: "GitHub" },
+      { href: "https://github.com/ccf/primer/issues", label: "Issues" },
+      { href: "https://github.com/ccf/primer/discussions", label: "Discussions" },
+      { href: "https://github.com/ccf/primer/blob/main/LICENSE", label: "MIT License" },
     ],
   },
 ];
@@ -32,10 +26,10 @@ const columns = [
   <div class="max-w-6xl mx-auto px-6 py-16">
     <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
       <!-- Brand column -->
-      <div class="col-span-2 md:col-span-1">
-        <a href="/" class="flex items-center gap-2 mb-4">
-          <img src="/logo-mark.svg" alt="" width="24" height="24" class="dark:hidden" />
-          <img src="/logo-mark-light.svg" alt="" width="24" height="24" class="hidden dark:block" />
+      <div class="col-span-2 md:col-span-2">
+        <a href={base} class="flex items-center gap-2 mb-4">
+          <img src={`${base}logo-mark.svg`} alt="" width="24" height="24" class="dark:hidden" />
+          <img src={`${base}logo-mark-light.svg`} alt="" width="24" height="24" class="hidden dark:block" />
           <span class="font-display text-lg tracking-tight">primer</span>
         </a>
         <p class="text-sm text-muted-foreground leading-relaxed">

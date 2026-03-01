@@ -6,7 +6,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   site: "https://ccf.github.io",
-  base: "/primer",
+  base: "/primer/",
   integrations: [mdx(), react(), sitemap()],
   vite: {
     plugins: [tailwindcss()],
