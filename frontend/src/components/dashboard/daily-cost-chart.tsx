@@ -1,5 +1,7 @@
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ChartTooltip } from "@/components/charts/chart-tooltip"
+import { CHART_COLORS, AXIS_TICK_STYLE } from "@/lib/chart-colors"
 import type { DailyCostEntry } from "@/types/api"
 import { format, parseISO } from "date-fns"
 import { formatCost } from "@/lib/utils"
@@ -28,18 +30,18 @@ export function DailyCostChart({ data }: DailyCostChartProps) {
           <AreaChart data={chartData}>
             <defs>
               <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                <stop offset="5%" stopColor={CHART_COLORS.tertiary} stopOpacity={0.2} />
+                <stop offset="95%" stopColor={CHART_COLORS.tertiary} stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-            <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-            <YAxis tickFormatter={(v) => formatCost(v as number)} tick={{ fontSize: 11 }} />
-            <Tooltip formatter={(v) => formatCost(v as number)} />
+            <XAxis dataKey="date" tick={AXIS_TICK_STYLE} />
+            <YAxis tickFormatter={(v) => formatCost(v as number)} tick={AXIS_TICK_STYLE} />
+            <Tooltip content={<ChartTooltip formatter={(v) => formatCost(v)} />} />
             <Area
               type="monotone"
               dataKey="cost"
-              stroke="#f59e0b"
+              stroke={CHART_COLORS.tertiary}
               fill="url(#colorCost)"
               strokeWidth={2}
             />

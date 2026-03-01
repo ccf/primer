@@ -1,5 +1,7 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ChartTooltip } from "@/components/charts/chart-tooltip"
+import { CHART_COLORS, AXIS_TICK_STYLE } from "@/lib/chart-colors"
 import type { ToolRanking } from "@/types/api"
 
 interface ToolRankingChartProps {
@@ -22,10 +24,10 @@ export function ToolRankingChart({ data }: ToolRankingChartProps) {
       <CardContent>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={chartData} layout="vertical">
-            <XAxis type="number" tick={{ fontSize: 11 }} />
-            <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 11 }} />
-            <Tooltip />
-            <Bar dataKey="calls" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+            <XAxis type="number" tick={AXIS_TICK_STYLE} />
+            <YAxis dataKey="name" type="category" width={80} tick={AXIS_TICK_STYLE} />
+            <Tooltip content={<ChartTooltip />} />
+            <Bar dataKey="calls" fill={CHART_COLORS.quaternary} radius={[0, 4, 4, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

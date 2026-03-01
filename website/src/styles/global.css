@@ -40,6 +40,9 @@
 
   /* Mono font */
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Prose body color (overridden in dark mode) */
+  --color-prose-body: #0F0B2A;
 }
 
 .dark {

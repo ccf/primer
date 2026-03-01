@@ -1,6 +1,8 @@
 import { useState } from "react"
+import { TrendingUp } from "lucide-react"
 import { useMaturityAnalytics } from "@/hooks/use-api-queries"
 import { PageTabs } from "@/components/ui/page-tabs"
+import { PageHeader } from "@/components/shared/page-header"
 import { MaturitySummary } from "@/components/maturity/maturity-summary"
 import { ToolCategoryChart } from "@/components/maturity/tool-category-chart"
 import { AgentSkillTable } from "@/components/maturity/agent-skill-table"
@@ -32,7 +34,11 @@ export function MaturityPage({ teamId, dateRange }: MaturityPageProps) {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">AI Maturity</h1>
+      <PageHeader
+        icon={TrendingUp}
+        title="AI Maturity"
+        description="Adoption, leverage, and tool proficiency"
+      />
 
       <PageTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 

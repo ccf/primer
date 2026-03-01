@@ -24,7 +24,7 @@ export function SessionTable({ sessions, selectedIndex = -1 }: SessionTableProps
     <div className="overflow-x-auto rounded-xl border border-border/60">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-border bg-muted/50">
+          <tr className="border-b border-border bg-muted/60">
             <th className="px-4 py-3 text-left font-medium text-muted-foreground">Project</th>
             <th className="px-4 py-3 text-left font-medium text-muted-foreground">Model</th>
             <th className="px-4 py-3 text-left font-medium text-muted-foreground">Started</th>
@@ -42,7 +42,7 @@ export function SessionTable({ sessions, selectedIndex = -1 }: SessionTableProps
               ref={i === selectedIndex ? selectedRef : undefined}
               onClick={() => navigate(`/sessions/${s.id}`)}
               className={cn(
-                "cursor-pointer border-b border-border/40 transition-colors hover:bg-muted/30 last:border-0",
+                "cursor-pointer border-b border-border/40 transition-colors even:bg-muted/15 hover:bg-accent/50 last:border-0",
                 i === selectedIndex && "ring-2 ring-ring ring-inset",
               )}
             >

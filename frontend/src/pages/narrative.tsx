@@ -1,11 +1,12 @@
 import { useState } from "react"
-import { AlertCircle, BarChart3, ServerOff } from "lucide-react"
+import { AlertCircle, BarChart3, ServerOff, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import { getApiKey } from "@/lib/api"
 import { getEffectiveRole } from "@/lib/role-utils"
 import { useNarrative, useNarrativeStatus } from "@/hooks/use-api-queries"
 import { useRefreshNarrative } from "@/hooks/use-api-mutations"
+import { PageHeader } from "@/components/shared/page-header"
 import { NarrativeReport } from "@/components/narrative/narrative-report"
 import { NarrativeSkeleton } from "@/components/narrative/narrative-skeleton"
 import type { DateRange } from "@/components/layout/date-range-picker"
@@ -68,7 +69,11 @@ export function NarrativePage({ teamId, dateRange }: NarrativePageProps) {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Synthesis</h1>
+      <PageHeader
+        icon={Sparkles}
+        title="Synthesis"
+        description="LLM-generated narrative insights"
+      />
 
       {/* Scope selector */}
       <div className="flex gap-1">

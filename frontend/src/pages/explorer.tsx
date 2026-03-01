@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
+import { MessageSquare } from "lucide-react"
 import { ChatMessage } from "@/components/explorer/chat-message"
 import { ChatInput } from "@/components/explorer/chat-input"
 import { useExplorerStream } from "@/hooks/use-explorer-stream"
@@ -60,21 +61,28 @@ export function ExplorerPage({ teamId, dateRange }: ExplorerPageProps) {
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-4">
         {isEmpty ? (
           <div className="flex h-full flex-col items-center justify-center gap-6">
-            <div className="text-center">
-              <h2 className="text-xl font-semibold">Explore your data</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Ask questions about your Claude Code usage in natural language
-              </p>
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/8">
+                <MessageSquare className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <h2 className="font-display text-2xl">Explore your data</h2>
+                <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                  Ask questions about your Claude Code usage in natural language.
+                  Get insights about costs, productivity, tool usage, and more.
+                </p>
+              </div>
             </div>
 
             {/* Suggested questions */}
-            <div className="grid w-full max-w-lg gap-2">
-              {SUGGESTED_QUESTIONS.map((q) => (
+            <div className="grid w-full max-w-lg grid-cols-2 gap-2">
+              {SUGGESTED_QUESTIONS.map((q, i) => (
                 <button
                   key={q}
                   onClick={() => sendMessage(q)}
                   disabled={isStreaming}
-                  className="rounded-lg border border-border bg-card px-4 py-3 text-left text-sm transition-colors hover:bg-accent disabled:opacity-50"
+                  className="animate-stagger-in rounded-xl border border-border bg-card px-4 py-3 text-left text-sm transition-colors hover:border-primary/30 hover:bg-accent disabled:opacity-50"
+                  style={{ animationDelay: `${i * 60}ms` }}
                 >
                   {q}
                 </button>

@@ -27,7 +27,7 @@ const pages = [
 ];
 const currentIdx = pages.findIndex(p => p.title === title);
 const prev = currentIdx > 0 ? pages[currentIdx - 1] : null;
-const next = currentIdx < pages.length - 1 ? pages[currentIdx + 1] : null;
+const next = currentIdx >= 0 && currentIdx < pages.length - 1 ? pages[currentIdx + 1] : null;
 ---
 
 <BaseLayout title={`${title} — Primer Docs`} description={description}>

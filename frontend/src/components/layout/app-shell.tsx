@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, type ReactNode } from "react"
+import { useLocation } from "react-router-dom"
 import { Sidebar } from "./sidebar"
 import { Header } from "./header"
 import type { DateRange } from "./date-range-picker"
@@ -13,6 +14,7 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, teamId, onTeamChange, dateRange, onDateRangeChange }: AppShellProps) {
+  const location = useLocation()
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem(SIDEBAR_KEY) === "true" } catch { return false }
   })
@@ -50,7 +52,7 @@ export function AppShell({ children, teamId, onTeamChange, dateRange, onDateRang
           onToggleSidebar={toggleSidebar}
         />
         <main className="flex flex-1 flex-col overflow-y-auto p-6">
-          <div className="mx-auto w-full max-w-[1280px] flex-1">{children}</div>
+          <div key={location.pathname} className="mx-auto w-full max-w-[1280px] flex-1 animate-fade-in">{children}</div>
         </main>
       </div>
     </div>
