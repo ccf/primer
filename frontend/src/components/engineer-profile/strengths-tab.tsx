@@ -78,24 +78,24 @@ export function StrengthsTab({ strengths, learningPaths }: StrengthsTabProps) {
 
       {profiles.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-3">
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Projects</p>
-              <p className="mt-1 text-2xl font-bold">{profiles[0].project_count}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Total Sessions</p>
-              <p className="mt-1 text-2xl font-bold">{profiles[0].total_sessions}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Diversity Score</p>
-              <p className="mt-1 text-2xl font-bold">{profiles[0].diversity_score.toFixed(1)}</p>
-            </CardContent>
-          </Card>
+          {[
+            { label: "Projects", value: profiles[0].project_count },
+            { label: "Total Sessions", value: profiles[0].total_sessions },
+            { label: "Diversity Score", value: profiles[0].diversity_score.toFixed(1) },
+          ].map((item, i) => (
+            <div
+              key={item.label}
+              className="animate-stagger-in"
+              style={{ animationDelay: `${i * 60}ms` }}
+            >
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground">{item.label}</p>
+                  <p className="mt-1 text-2xl font-bold">{item.value}</p>
+                </CardContent>
+              </Card>
+            </div>
+          ))}
         </div>
       )}
 
@@ -123,7 +123,11 @@ export function StrengthsTab({ strengths, learningPaths }: StrengthsTabProps) {
           <h3 className="text-sm font-medium">Learning Recommendations</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             {allRecommendations.map((rec, i) => (
-              <Card key={i}>
+              <Card
+                key={i}
+                className="animate-stagger-in"
+                style={{ animationDelay: `${i * 60}ms` }}
+              >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="space-y-1">
