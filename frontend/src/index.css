@@ -168,7 +168,7 @@ main h1 {
 
 /* ── Animation Utilities ── */
 .animate-fade-in {
-  animation: fade-in 200ms ease-out;
+  animation: fade-in 200ms ease-out both;
 }
 
 .animate-slide-up {
@@ -216,4 +216,13 @@ main h1 {
 
 .dark ::-webkit-scrollbar-thumb:hover {
   background: oklch(0.5 0 0 / 0.5);
+}
+
+/* ── Reduced Motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-slide-up,
+  .animate-stagger-in {
+    animation: none;
+  }
 }
