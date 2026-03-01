@@ -386,8 +386,8 @@ class TestBackfillEndpoint:
                 "/api/v1/admin/backfill-facets",
                 headers=admin_headers,
             )
-        assert resp.status_code == 200
-        assert "error" in resp.json()
+        assert resp.status_code == 422
+        assert "ANTHROPIC_API_KEY" in resp.json()["detail"]
 
     def test_disabled_error(self, client, admin_headers):
         with patch("primer.server.routers.admin.settings") as mock_settings:
@@ -397,5 +397,5 @@ class TestBackfillEndpoint:
                 "/api/v1/admin/backfill-facets",
                 headers=admin_headers,
             )
-        assert resp.status_code == 200
-        assert "error" in resp.json()
+        assert resp.status_code == 422
+        assert "disabled" in resp.json()["detail"]

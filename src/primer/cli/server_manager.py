@@ -48,7 +48,11 @@ def _server_env() -> dict[str, str]:
                     continue
                 key, _, value = line.partition("=")
                 key = key.strip().removeprefix("export").strip()
-                value = value.strip().strip("\"'")
+                # Strip inline comments, respecting quoted values
+                value = value.strip()
+                if value and value[0] not in ('"', "'"):
+                    value = value.partition(" #")[0].partition("\t#")[0].strip()
+                value = value.strip("\"'")
                 if key not in env:
                     env[key] = value
     return env
