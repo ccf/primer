@@ -1,0 +1,202 @@
+---
+layout: ../../layouts/DocsPage.astro
+title: "Configuration"
+section: "Getting Started"
+description: "Configure the server, database, authentication, and integrations."
+---
+import Callout from '../../components/docs/Callout.astro';
+
+## Overview
+
+All Primer settings use the `PRIMER_` environment variable prefix. Settings can be provided as environment variables, in a `.env` file in the project root, or managed interactively with the CLI.
+
+```bash
+cp .env.example .env
+```
+
+To update settings interactively:
+
+```bash
+primer configure
+```
+
+This opens a guided wizard that walks through core settings and writes them to your `.env` file.
+
+## Server Settings
+
+Core settings for the Primer API server.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PRIMER_DATABASE_URL` | `sqlite:///./primer.db` | Database connection string (SQLite or PostgreSQL) |
+| `PRIMER_ADMIN_API_KEY` | `primer-admin-dev-key` | Shared secret for admin API access |
+| `PRIMER_SERVER_HOST` | `0.0.0.0` | Server bind address |
+| `PRIMER_SERVER_PORT` | `8000` | Server bind port |
+| `PRIMER_LOG_LEVEL` | `info` | Logging level (`debug`, `info`, `warning`, `error`) |
+| `PRIMER_CORS_ORIGINS` | `["http://localhost:5173"]` | Allowed CORS origins (JSON array) |
+
+<Callout type="warning" title="Change the admin key in production">
+The default key `primer-admin-dev-key` is public and should never be used outside local development. Generate a secure key before deploying:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+</Callout>
+
+## Database
+
+Primer supports SQLite for development and PostgreSQL for production deployments.
+
+### SQLite (default)
+
+```bash
+PRIMER_DATABASE_URL=sqlite:///./primer.db
+```
+
+SQLite requires zero setup and is ideal for single-user development. The database file is created automatically on first run.
+
+### PostgreSQL (production)
+
+```bash
+PRIMER_DATABASE_URL=postgresql://user:pass@host:5432/primer
+```
+
+<Callout type="note" title="Use PostgreSQL for teams">
+SQLite does not handle concurrent writes safely. If multiple engineers are uploading sessions simultaneously, you will encounter database lock errors. Use PostgreSQL for any deployment serving more than one user.
+</Callout>
+
+After changing the database URL, run migrations to initialize the schema:
+
+```bash
+alembic upgrade head
+```
+
+## JWT Authentication
+
+JWT tokens are used for dashboard session management. Engineers authenticate via GitHub OAuth or admin API key, and receive a JWT pair (access + refresh) for subsequent requests.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PRIMER_JWT_SECRET_KEY` | `change-me-in-production` | Secret key for signing JWT tokens |
+| `PRIMER_JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `15` | Access token lifetime in minutes |
+| `PRIMER_JWT_REFRESH_TOKEN_EXPIRE_DAYS` | `7` | Refresh token lifetime in days |
+
+<Callout type="important" title="Change JWT_SECRET_KEY before deploying">
+The default value is insecure and well-known. Generate a strong secret:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+If this key is compromised, an attacker can forge authentication tokens for any user.
+</Callout>
+
+## Rate Limiting
+
+Primer uses `slowapi` to enforce per-route rate limits. Rate limit keys are derived from the API key prefix (for authenticated requests) or client IP (for unauthenticated requests).
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PRIMER_RATE_LIMIT_ENABLED` | `true` | Enable or disable rate limiting globally |
+| `PRIMER_RATE_LIMIT_DEFAULT` | `60/minute` | Default limit for all endpoints |
+| `PRIMER_RATE_LIMIT_INGEST` | `120/minute` | Limit for session ingest endpoints |
+| `PRIMER_RATE_LIMIT_AUTH` | `10/minute` | Limit for authentication endpoints |
+
+Rate limits are expressed in the format `count/period` where period can be `second`, `minute`, `hour`, or `day`. For example, `120/minute` allows 120 requests per minute per key.
+
+<Callout type="tip" title="Disable for development">
+Set `PRIMER_RATE_LIMIT_ENABLED=false` during local development to avoid hitting limits while testing.
+</Callout>
+
+## GitHub OAuth
+
+Required for GitHub-based dashboard login. This lets engineers sign into the dashboard with their GitHub account instead of using an API key.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PRIMER_GITHUB_CLIENT_ID` | — | OAuth App client ID |
+| `PRIMER_GITHUB_CLIENT_SECRET` | — | OAuth App client secret |
+| `PRIMER_GITHUB_REDIRECT_URI` | `http://localhost:5173/auth/callback` | OAuth callback URL |
+
+See the [GitHub Integration](../github/) guide for step-by-step instructions on creating the OAuth App.
+
+## GitHub App
+
+Required for PR sync, commit correlation, and AI-readiness scoring. The GitHub App allows Primer to access repository data and correlate Claude Code sessions with pull requests.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PRIMER_GITHUB_APP_ID` | — | GitHub App ID (numeric) |
+| `PRIMER_GITHUB_APP_PRIVATE_KEY` | — | RSA private key in PEM format (use `\n` for newlines) |
+| `PRIMER_GITHUB_INSTALLATION_ID` | — | App installation ID (numeric) |
+| `PRIMER_GITHUB_WEBHOOK_SECRET` | — | Webhook HMAC secret for verifying payloads |
+
+<Callout type="note" title="PEM key formatting">
+When storing the private key in a `.env` file, replace actual newlines with `\n`. The key should be a single line:
+
+```text
+PRIMER_GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----"
+```
+</Callout>
+
+See the [GitHub Integration](../github/) guide for complete setup instructions.
+
+## Productivity Estimation
+
+Controls the ROI calculations displayed in the dashboard. These settings determine how Primer estimates the business value of AI-assisted coding.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PRIMER_PRODUCTIVITY_TIME_MULTIPLIER` | `3.0` | Estimated time savings multiplier versus manual work |
+| `PRIMER_PRODUCTIVITY_HOURLY_RATE` | `75.0` | Hourly rate for value calculations (USD) |
+
+The time multiplier represents how much longer the equivalent work would have taken without AI assistance. A value of `3.0` means Primer estimates that a 1-hour AI-assisted session produced 3 hours worth of manual output. Adjust this based on your team's observed productivity gains.
+
+## Alert Thresholds
+
+Default thresholds for anomaly detection. Alerts fire when metrics deviate significantly from baseline values calculated over the preceding period.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PRIMER_ALERT_FRICTION_SPIKE_MULTIPLIER` | `2.0` | Alert when friction is N times the baseline |
+| `PRIMER_ALERT_USAGE_DROP_RATIO` | `0.5` | Alert when usage drops below this ratio of baseline |
+| `PRIMER_ALERT_COST_SPIKE_WARNING` | `2.0` | Warning when cost is N times the baseline |
+| `PRIMER_ALERT_COST_SPIKE_CRITICAL` | `3.0` | Critical alert when cost is N times the baseline |
+| `PRIMER_ALERT_SUCCESS_RATE_DROP_PP` | `20.0` | Alert when success rate drops by N percentage points |
+
+These defaults can be overridden per-team in the admin panel. The priority chain is: **team-specific threshold > global config threshold > code defaults**.
+
+See the [Alert Thresholds](../alerts/) guide for details on setting up alerts and notification channels.
+
+## Slack Notifications
+
+Primer can deliver alert notifications to a Slack channel via an incoming webhook.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PRIMER_SLACK_WEBHOOK_URL` | — | Slack incoming webhook URL |
+| `PRIMER_SLACK_ALERTS_ENABLED` | `false` | Enable alert delivery to Slack |
+
+To set up Slack notifications:
+
+1. Create an [incoming webhook](https://api.slack.com/messaging/webhooks) in your Slack workspace.
+2. Set `PRIMER_SLACK_WEBHOOK_URL` to the webhook URL.
+3. Set `PRIMER_SLACK_ALERTS_ENABLED=true`.
+
+Alerts will be delivered to the configured channel with severity level, metric details, and a link to the relevant dashboard view.
+
+## Hook and MCP Client Settings
+
+These variables are used by the SessionEnd hook and MCP sidecar running on **developer machines**, not the server. They tell the client-side components where to find the Primer server and how to authenticate.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PRIMER_SERVER_URL` | `http://localhost:8000` | URL of the Primer API server |
+| `PRIMER_API_KEY` | — | Engineer API key for authentication |
+| `PRIMER_ADMIN_API_KEY` | — | Admin key (MCP sidecar only, for team-wide analytics) |
+
+<Callout type="note" title="MCP admin key">
+The MCP sidecar uses `PRIMER_ADMIN_API_KEY` to access team-level analytics endpoints. If only `PRIMER_API_KEY` is set, the sidecar will fall back to it but some team-wide tools (like `team_overview` and `friction_report`) will return limited data.
+</Callout>
+
+These are typically set in `~/.primer/config.toml` by `primer setup` and `primer init`, but can also be set as environment variables or in a project-level `.env` file.

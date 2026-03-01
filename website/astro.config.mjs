@@ -8,6 +8,9 @@ export default defineConfig({
   site: "https://ccf.github.io",
   base: "/primer/",
   integrations: [mdx(), react(), sitemap()],
+  markdown: {
+    shikiConfig: { theme: "one-dark-pro" },
+  },
   vite: {
     plugins: [tailwindcss()],
   },

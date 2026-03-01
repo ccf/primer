@@ -1,0 +1,190 @@
+---
+layout: ../../layouts/DocsPage.astro
+title: "GitHub Integration"
+section: "Guides"
+description: "OAuth login, PR sync, commit correlation, and AI-readiness scoring."
+---
+import Callout from '../../components/docs/Callout.astro';
+
+## Overview
+
+Primer integrates with GitHub in two independent ways:
+
+- **GitHub OAuth** — Dashboard login with GitHub accounts; auto-provisions engineer records
+- **GitHub App** — PR sync, commit correlation, AI-readiness scoring, and webhooks
+
+Both are optional. You can use OAuth without the App, or vice versa.
+
+## GitHub OAuth (Dashboard Login)
+
+OAuth lets engineers sign in with their GitHub account instead of entering API keys directly.
+
+### Create an OAuth App
+
+1. Go to **GitHub Settings > Developer settings > OAuth Apps**
+2. Click **New OAuth App**
+3. Fill in:
+   - **Application name**: Primer
+   - **Homepage URL**: `http://localhost:5173`
+   - **Authorization callback URL**: `http://localhost:5173/auth/callback`
+4. Click **Register application**
+5. Copy the **Client ID**
+6. Click **Generate a new client secret** and copy it
+
+<Callout type="warning" title="Production callback URL">
+For production deployments, replace `localhost:5173` with your actual dashboard domain in both the Homepage URL and Authorization callback URL fields.
+</Callout>
+
+### Configure Primer
+
+```bash
+PRIMER_GITHUB_CLIENT_ID=Iv1.abc123...
+PRIMER_GITHUB_CLIENT_SECRET=abc123secret...
+PRIMER_GITHUB_REDIRECT_URI=http://localhost:5173/auth/callback
+PRIMER_JWT_SECRET_KEY=your-secure-random-string
+```
+
+Generate a JWT secret:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+### Login Flow
+
+1. Engineer clicks "Sign in with GitHub" on the login page
+2. Redirected to GitHub for authorization (scopes: `read:user`, `user:email`)
+3. GitHub redirects back to `/auth/callback` with an authorization code
+4. Primer exchanges the code for a GitHub access token
+5. Fetches profile (name, username, avatar, email)
+6. Finds or creates an engineer record; issues JWT cookies
+7. Engineer is now logged in and can view their dashboard
+
+### Auto-Provisioning Logic
+
+On first login, Primer:
+
+- Matches by GitHub ID if an existing engineer record has it — updates profile
+- Matches by email — links GitHub profile to existing engineer
+- Otherwise creates a new engineer record with role `engineer`
+
+To pre-provision a user (so they land in the right team on first login):
+
+```bash
+python scripts/provision_user.py your-github-username --role admin --team Platform
+```
+
+<Callout type="tip" title="Pre-provisioning best practice">
+Pre-provision engineers before they log in for the first time. This ensures they are assigned to the correct team immediately rather than being created without a team assignment.
+</Callout>
+
+---
+
+## GitHub App (PR Sync & AI Readiness)
+
+The GitHub App enables deeper integration:
+
+- Syncing pull request data (additions, deletions, review comments, merge status)
+- Correlating session commits with PRs
+- Checking repositories for AI-readiness configuration
+- Real-time webhooks for push and PR events
+
+### Step 1: Create a GitHub App
+
+1. Go to **GitHub Settings > Developer settings > GitHub Apps**
+2. Click **New GitHub App**
+3. Fill in:
+   - **App name**: Primer Analytics (must be globally unique)
+   - **Homepage URL**: `http://localhost:5173`
+   - **Webhook URL**: `https://your-server/api/v1/webhooks/github` (or leave blank for now)
+   - **Webhook secret**: generate with `python -c "import secrets; print(secrets.token_hex(32))"`
+4. Set permissions:
+   - Repository > Contents: **Read-only**
+   - Repository > Pull requests: **Read-only**
+   - Repository > Metadata: Read-only (auto-granted)
+5. Subscribe to events: **Pull request**, **Push**
+6. Click **Create GitHub App**
+
+### Step 2: Generate a Private Key
+
+On the app's settings page, scroll to **Private keys** and click **Generate a private key**. A `.pem` file downloads — keep it safe, as you will need it for Primer's configuration.
+
+### Step 3: Install the App
+
+Click **Install App** in the sidebar, choose your account or organization. Note the installation ID from the URL: `https://github.com/settings/installations/<ID>`.
+
+### Step 4: Configure Primer
+
+```bash
+PRIMER_GITHUB_APP_ID=123456
+PRIMER_GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----"
+PRIMER_GITHUB_INSTALLATION_ID=78901234
+PRIMER_GITHUB_WEBHOOK_SECRET=your-webhook-secret
+```
+
+For the private key, either paste with `\n` for newlines or load from file:
+
+```bash
+export PRIMER_GITHUB_APP_PRIVATE_KEY=$(cat path/to/key.pem)
+```
+
+<Callout type="important" title="Keep the private key secure">
+The `.pem` file grants access to your GitHub App. Store it securely and never commit it to version control. Use environment variables or a secrets manager in production.
+</Callout>
+
+### Verify the Connection
+
+```bash
+python scripts/verify_github.py
+
+# Test syncing a specific repository
+python scripts/verify_github.py --repo owner/repo-name
+```
+
+### Manual PR Sync
+
+Trigger a sync for a specific repository:
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/analytics/github/sync?repository=owner/repo" \
+  -H "x-admin-key: your-admin-key"
+```
+
+This fetches all recent PRs from the repository and correlates any matching commits with existing Primer sessions.
+
+---
+
+## AI-Readiness Scoring
+
+When a repository is synced, Primer checks for AI tooling configuration and assigns a readiness score:
+
+| File / Directory | Points | What it indicates |
+|-----------------|--------|------------------|
+| `CLAUDE.md` | 50 | Project instructions for Claude Code |
+| `.claude/` | 30 | Claude Code configuration directory |
+| `AGENTS.md` | 20 | Agent delegation instructions |
+
+Scores are cached for 24 hours and appear in the AI Maturity page under "Project Readiness." A repository with all three files scores 100/100.
+
+Repositories without any AI configuration files score 0/100. Use the AI Maturity dashboard to identify which repositories need `CLAUDE.md` files added to improve AI coding tool effectiveness.
+
+---
+
+## Webhooks for Local Development
+
+Use a tunnel to receive GitHub webhooks during local development:
+
+```bash
+# ngrok
+ngrok http 8000
+# Set webhook URL to: https://abc123.ngrok.io/api/v1/webhooks/github
+
+# cloudflared
+cloudflared tunnel --url http://localhost:8000
+```
+
+<Callout type="note" title="Webhook verification">
+Primer verifies the webhook signature using the `PRIMER_GITHUB_WEBHOOK_SECRET` you configured. Make sure the same secret is set in both the GitHub App settings and your Primer environment.
+</Callout>
+
+After setting up your tunnel, update the Webhook URL in your GitHub App settings to point to the tunnel URL. Push a commit or open a PR to verify events are flowing through.

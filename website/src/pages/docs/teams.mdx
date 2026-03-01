@@ -1,0 +1,150 @@
+---
+layout: ../../layouts/DocsPage.astro
+title: "Team Setup"
+section: "Guides"
+description: "Register engineers, create teams, and distribute API keys."
+---
+import Callout from '../../components/docs/Callout.astro';
+
+## Overview
+
+Teams group engineers for analytics scoping and alert configuration. All analytics endpoints and MCP tools accept a `team_id` parameter to filter data to a specific team.
+
+A typical setup mirrors your org structure — one team per squad or department (Backend, Frontend, Platform, Data, etc.). Each engineer belongs to exactly one team, and their session data rolls up into that team's analytics.
+
+## Create a Team
+
+```bash
+curl -X POST http://localhost:8000/api/v1/teams \
+  -H "x-admin-key: your-admin-key" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Backend"}'
+```
+
+Response:
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "Backend",
+  "created_at": "2025-01-15T10:30:00"
+}
+```
+
+Save the `id` — you will use it when registering engineers and filtering analytics.
+
+Name teams to match your org structure (Backend, Frontend, Platform, Data, etc.). You can always rename or reorganize teams later without losing historical session data.
+
+## Register an Engineer
+
+```bash
+curl -X POST http://localhost:8000/api/v1/engineers \
+  -H "x-admin-key: your-admin-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Alice",
+    "email": "alice@example.com",
+    "team_id": "550e8400-e29b-41d4-a716-446655440000"
+  }'
+```
+
+Response:
+
+```json
+{
+  "engineer": {
+    "id": "660e8400-e29b-41d4-a716-446655440001",
+    "name": "Alice",
+    "email": "alice@example.com",
+    "team_id": "550e8400-e29b-41d4-a716-446655440000",
+    "created_at": "2025-01-15T10:30:00"
+  },
+  "api_key": "primer_abc123..."
+}
+```
+
+<Callout type="important" title="API key shown only once">
+The `api_key` cannot be retrieved again. Share it with the engineer immediately and ask them to store it securely. If it is lost, an admin will need to regenerate a new key.
+</Callout>
+
+## Distribute API Keys
+
+Each engineer sets their API key in their environment:
+
+```bash
+export PRIMER_SERVER_URL=https://your-primer-server.internal
+export PRIMER_API_KEY=primer_abc123...
+```
+
+Then installs the hook:
+
+```bash
+primer hook install
+```
+
+Or they can run the full setup wizard, which handles both steps interactively:
+
+```bash
+primer setup
+```
+
+<Callout type="tip" title="Shell configuration">
+Add the environment variables to your shell profile (`~/.zshrc`, `~/.bashrc`, etc.) so they persist across terminal sessions.
+</Callout>
+
+## GitHub-Based Login
+
+With GitHub OAuth configured, engineers log in to the dashboard with their GitHub account. Primer automatically links them to an existing engineer record by GitHub ID or email, or creates a new record if none matches.
+
+To pre-provision a user from their GitHub username:
+
+```bash
+python scripts/provision_user.py alice-github-username --role admin --team Platform
+```
+
+Pre-provisioning ensures the engineer lands in the correct team on their first login rather than being assigned to no team.
+
+See [GitHub Integration](../github/) for OAuth setup.
+
+## Admin Panel
+
+The dashboard's Admin section (accessible with the admin API key) provides a UI for:
+
+- Creating and listing teams and engineers
+- Configuring per-team alert thresholds
+- Viewing the audit log of admin actions
+
+The Admin panel is the easiest way to manage teams if you prefer a visual interface over `curl` commands.
+
+## Filter Analytics by Team
+
+All analytics endpoints accept an optional `team_id` query parameter:
+
+```bash
+curl "http://localhost:8000/api/v1/analytics/overview?team_id=550e8400-e29b-41d4-a716-446655440000" \
+  -H "x-admin-key: your-admin-key"
+```
+
+The MCP `team_overview` and `friction_report` tools also accept `team_id`:
+
+```text
+# In Claude Code:
+"Show me the Backend team's friction report"
+# Claude will call friction_report(team_id="550e8400-...")
+```
+
+When no `team_id` is provided, analytics endpoints return data across all teams — useful for org-wide views in the dashboard.
+
+## Recommended Onboarding Checklist
+
+1. Create teams matching your org structure (Backend, Frontend, Platform, etc.)
+2. Register each engineer via the API or Admin panel
+3. Share API keys securely with engineers (one-time display — save before closing)
+4. Engineers run `primer setup` or set env vars and `primer hook install`
+5. Configure GitHub OAuth so engineers can log in with their GitHub accounts
+6. Optionally register the MCP sidecar for in-editor analytics
+7. After a few sessions, configure alert thresholds appropriate for your team size and budget
+
+<Callout type="note" title="Getting started quickly">
+For a quick test drive before onboarding your team, run `python scripts/seed_data.py` to populate Primer with realistic sample data. See [Installation](../installation/) for details.
+</Callout>

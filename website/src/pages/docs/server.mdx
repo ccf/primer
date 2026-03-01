@@ -1,0 +1,329 @@
+---
+layout: ../../layouts/DocsPage.astro
+title: "Server & API"
+section: "Architecture"
+description: "FastAPI server, REST API endpoints, and authentication."
+---
+import Callout from '../../components/docs/Callout.astro';
+
+## Overview
+
+The Primer server is a FastAPI application built on SQLAlchemy 2.0 and Pydantic v2. It receives session data from the hook system, stores and indexes it in a relational database, serves analytics to the dashboard, and backs the MCP sidecar.
+
+The server follows a service-layer architecture: routers define HTTP endpoints, services contain business logic and database queries, and shared models and schemas live in a common package.
+
+```text
+src/primer/server/
+├── app.py          # FastAPI application, router registration, middleware
+├── middleware.py   # Rate limiting (slowapi)
+├── routers/        # Endpoint definitions
+│   ├── health.py
+│   ├── teams.py
+│   ├── engineers.py
+│   ├── sessions.py
+│   ├── ingest.py
+│   ├── analytics.py
+│   ├── alert_configs.py
+│   └── admin.py
+└── services/       # Business logic
+    ├── ingest_service.py
+    ├── analytics_service.py
+    ├── synthesis_service.py
+    ├── alert_config_service.py
+    └── audit_service.py
+```
+
+## Authentication
+
+Primer uses two authentication mechanisms depending on the caller.
+
+### Admin Auth
+
+Pass the `x-admin-key` header with your admin API key. This is required for team management, engineer management, session queries, analytics, and alert configuration.
+
+```bash
+curl http://localhost:8000/api/v1/teams \
+  -H "x-admin-key: your-admin-key"
+```
+
+The admin key is set via the `PRIMER_ADMIN_API_KEY` environment variable on the server. See [Configuration](../configuration/) for details.
+
+### Engineer Auth
+
+Engineer API keys have the form `primer_{urlsafe_base64}` and are stored as bcrypt hashes. They authenticate two ways:
+
+- **In the request body** -- for session ingest endpoints (`/api/v1/ingest/session`, `/api/v1/ingest/bulk`), the key is passed in the JSON payload.
+- **As a header** -- for facet upserts (`/api/v1/ingest/facets/{session_id}`), use the `x-api-key` header.
+
+```bash
+# Facet upsert with header auth
+curl -X POST http://localhost:8000/api/v1/ingest/facets/abc-123 \
+  -H "x-api-key: primer_..." \
+  -H "Content-Type: application/json" \
+  -d '{"outcome": "success", "session_type": "feature"}'
+```
+
+### GitHub OAuth + JWT
+
+The dashboard uses GitHub OAuth for engineer login. After OAuth, the server issues short-lived JWTs for API access and long-lived refresh tokens for session continuity. This flow is handled automatically by the frontend.
+
+<Callout type="warning" title="Key security">
+Engineer API keys are shown only once at creation time. Store them securely. If a key is lost, an admin must create a new engineer account.
+</Callout>
+
+## REST API Reference
+
+Base URL: `http://localhost:8000`. All resource routes are prefixed with `/api/v1/`.
+
+### Health
+
+```text
+GET /health
+```
+
+No authentication required. Returns server status.
+
+```json
+{"status": "ok"}
+```
+
+### Teams
+
+```text
+POST   /api/v1/teams    # Create team (Admin)
+GET    /api/v1/teams    # List all teams (Admin)
+```
+
+Example -- create a team:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/teams \
+  -H "x-admin-key: your-admin-key" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Backend"}'
+```
+
+Response:
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "Backend",
+  "created_at": "2025-01-15T10:30:00"
+}
+```
+
+### Engineers
+
+```text
+POST   /api/v1/engineers                        # Create engineer, returns API key (Admin)
+GET    /api/v1/engineers                        # List engineers (Admin)
+GET    /api/v1/engineers/{engineer_id}/sessions # List engineer sessions (Admin)
+```
+
+When creating an engineer, the response includes the plaintext `api_key` -- this is the only time it is returned.
+
+```bash
+curl -X POST http://localhost:8000/api/v1/engineers \
+  -H "x-admin-key: your-admin-key" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Alice", "email": "alice@example.com", "team_id": "..."}'
+```
+
+### Ingest
+
+```text
+POST   /api/v1/ingest/session             # Ingest or update a session (API key in body)
+POST   /api/v1/ingest/bulk                # Bulk ingest sessions (API key in body)
+POST   /api/v1/ingest/facets/{session_id} # Upsert session facets (x-api-key header)
+```
+
+The session ingest endpoint is idempotent -- sending the same session ID updates the existing record rather than creating a duplicate.
+
+<Callout type="tip" title="Bulk ingest">
+Use `/api/v1/ingest/bulk` when syncing multiple sessions at once (e.g., after offline work). It accepts an array of session payloads and processes them in a single transaction.
+</Callout>
+
+### Sessions
+
+```text
+GET    /api/v1/sessions             # List sessions with filters (Admin)
+GET    /api/v1/sessions/{session_id} # Full session details (Admin)
+```
+
+Query parameters for the list endpoint:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `engineer_id` | string | Filter by engineer |
+| `team_id` | string | Filter by team |
+| `start_date` | ISO date | Sessions after this date |
+| `end_date` | ISO date | Sessions before this date |
+| `limit` | integer | Max results (default 50) |
+| `offset` | integer | Pagination offset |
+
+### Analytics
+
+All analytics endpoints accept optional `team_id`, `start_date`, and `end_date` query parameters for scoping.
+
+```text
+GET    /api/v1/analytics/overview         # Aggregate stats (Admin)
+GET    /api/v1/analytics/friction         # Friction points by frequency (Admin)
+GET    /api/v1/analytics/tools            # Tool usage rankings (Admin)
+GET    /api/v1/analytics/models           # Model usage by tokens (Admin)
+GET    /api/v1/analytics/recommendations  # Actionable recommendations (Admin)
+```
+
+Example -- get overview for a specific team in the last 30 days:
+
+```bash
+curl "http://localhost:8000/api/v1/analytics/overview?team_id=abc&start_date=2025-01-01&end_date=2025-01-31" \
+  -H "x-admin-key: your-admin-key"
+```
+
+### Alert Configs
+
+```text
+GET    /api/v1/alert-configs         # List alert configs (Admin)
+POST   /api/v1/alert-configs         # Create alert config (Admin)
+PUT    /api/v1/alert-configs/{id}    # Update alert config (Admin)
+DELETE /api/v1/alert-configs/{id}    # Delete alert config (Admin)
+```
+
+Alert configs follow a priority chain: **team-specific > global > config defaults**. See [Alert Thresholds](../alerts/) for details.
+
+## Data Model
+
+Primer uses SQLAlchemy 2.0 declarative models with UUID string primary keys. The database schema includes the following core tables:
+
+| Table | Purpose |
+|-------|---------|
+| `teams` | Engineering teams |
+| `engineers` | Individual engineers with bcrypt-hashed API keys, GitHub identity |
+| `sessions` | One record per AI coding session with token counts, timing, metadata |
+| `session_facets` | Qualitative analysis: goal, outcome, session type, friction |
+| `tool_usages` | Per-session tool call counts by tool name |
+| `model_usages` | Per-session model token usage by model name |
+| `daily_stats` | Pre-aggregated per-engineer daily counts |
+| `ingest_events` | Audit log of all ingest operations |
+| `session_messages` | Individual messages within sessions (role, content, tool calls) |
+| `session_commits` | Git commits made during sessions with diff stats |
+
+Supporting tables:
+
+| Table | Purpose |
+|-------|---------|
+| `git_repositories` | Tracked repositories with AI readiness scores |
+| `pull_requests` | GitHub PRs linked to sessions via commits |
+| `alert_configs` | Threshold configuration for usage alerts |
+| `alerts` | Triggered alert instances |
+| `audit_logs` | Admin mutation audit trail (actor, action, resource, IP) |
+| `refresh_tokens` | JWT refresh tokens for dashboard auth |
+| `narrative_cache` | Cached AI-generated narrative summaries |
+
+All tables use `func.now()` for server-side timestamps and UUID strings for primary keys (except auto-increment integer IDs on junction tables).
+
+## Session Ingest Flow
+
+The complete data flow from a coding session to stored analytics:
+
+```text
+Claude Code session ends
+  └── SessionEnd hook fires
+        └── primer.hook.extractor reads JSONL transcript
+              └── Extracts metadata (tokens, tools, git, etc.)
+                    └── POST /api/v1/ingest/session
+                          └── ingest_service stores to DB
+                                ├── sessions table
+                                ├── tool_usages table
+                                ├── model_usages table
+                                ├── session_commits table
+                                ├── daily_stats (upsert)
+                                └── ingest_events (audit)
+```
+
+The ingest service:
+
+1. Validates the engineer API key via bcrypt comparison.
+2. Creates or updates the session record (idempotent on session ID).
+3. Replaces tool and model usage records for the session.
+4. Upserts daily stats for the engineer.
+5. Logs the ingest event for audit purposes.
+
+## Rate Limiting
+
+The server uses slowapi for per-route rate limiting. The rate limit key is derived from the API key prefix (first 8 characters) or the client IP address for unauthenticated requests.
+
+Rate limits are configured per-route. The ingest endpoints have higher limits to accommodate bulk syncing, while analytics endpoints have lower limits to prevent abuse.
+
+<Callout type="note" title="Rate limit headers">
+When rate-limited, the server returns HTTP 429 with a `Retry-After` header indicating how many seconds to wait before retrying.
+</Callout>
+
+## Error Codes
+
+| Status | Meaning |
+|--------|---------|
+| `401` | Missing or invalid engineer API key |
+| `403` | Missing or invalid admin key |
+| `404` | Resource not found |
+| `422` | Validation error (Pydantic schema mismatch) |
+| `429` | Rate limit exceeded |
+
+All error responses follow a consistent JSON format:
+
+```json
+{"detail": "Description of what went wrong"}
+```
+
+Validation errors (422) include field-level detail:
+
+```json
+{
+  "detail": [
+    {
+      "loc": ["body", "name"],
+      "msg": "Field required",
+      "type": "missing"
+    }
+  ]
+}
+```
+
+## Production Deployment
+
+For single-user or small team deployments, the default SQLite database works well. For larger teams with concurrent users, switch to PostgreSQL by setting `PRIMER_DATABASE_URL`.
+
+### Running with Multiple Workers
+
+```bash
+# Multiple uvicorn workers
+uvicorn primer.server.app:app --host 0.0.0.0 --port 8000 --workers 4
+
+# Or via Gunicorn
+gunicorn primer.server.app:app -w 4 -k uvicorn.workers.UvicornWorker
+```
+
+<Callout type="warning" title="SQLite and workers">
+SQLite does not support concurrent writes. If running multiple workers, use PostgreSQL. Set `PRIMER_DATABASE_URL=postgresql+asyncpg://user:pass@host/primer` in your environment.
+</Callout>
+
+### Database Migrations
+
+Primer uses Alembic for schema migrations. After upgrading Primer:
+
+```bash
+alembic upgrade head
+```
+
+To create a new migration after modifying models:
+
+```bash
+alembic revision --autogenerate -m "add new_column to sessions"
+```
+
+### Reverse Proxy
+
+In production, run behind a reverse proxy (nginx, Caddy, etc.) that handles TLS termination, request buffering, and static file serving for the dashboard.
+
+See [Configuration](../configuration/) for all environment variables.
