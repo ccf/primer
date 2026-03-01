@@ -1,13 +1,17 @@
 ---
 interface Props {
-  title: string;
+  title?: string;
   description?: string;
-  section: string;
+  section?: string;
+  frontmatter?: { title: string; description?: string; section: string };
 }
 
 import BaseLayout from "./BaseLayout.astro";
 
-const { title, description, section } = Astro.props;
+const props = Astro.props;
+const title = props.title ?? props.frontmatter?.title ?? '';
+const description = props.description ?? props.frontmatter?.description;
+const section = props.section ?? props.frontmatter?.section ?? '';
 const base = import.meta.env.BASE_URL;
 ---
 

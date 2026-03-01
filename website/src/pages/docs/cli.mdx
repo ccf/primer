@@ -1,0 +1,326 @@
+---
+layout: ../../layouts/DocsPage.astro
+title: "CLI Reference"
+section: "Getting Started"
+description: "Complete reference for the primer command-line interface."
+---
+import Callout from '../../components/docs/Callout.astro';
+
+## Overview
+
+The `primer` CLI is installed automatically when you install the Primer Python package. It provides commands for managing the server, installing hooks, running diagnostics, and configuring your environment.
+
+```bash
+primer --help
+```
+
+All commands accept `--help` for detailed usage information. The CLI reads configuration from `~/.primer/config.toml` and environment variables with the `PRIMER_` prefix.
+
+## primer init
+
+Initialize Primer on your machine. This is the first command you should run after installation.
+
+```bash
+primer init
+```
+
+This command:
+
+1. Creates the `~/.primer/` configuration directory.
+2. Generates a random admin API key and writes it to `config.toml`.
+3. Runs database migrations to set up the schema.
+
+```text
+✓ Created ~/.primer/
+✓ Generated admin key: primer-admin-xxxxx
+✓ Database migrations applied
+Primer is ready. Run `primer server start` to launch the API.
+```
+
+<Callout type="tip" title="Re-running init">
+Running `primer init` again is safe. It will apply any pending migrations without overwriting existing configuration.
+</Callout>
+
+## primer setup
+
+Interactive wizard that creates your engineer profile and configures the client.
+
+```bash
+primer setup
+```
+
+The wizard prompts for:
+
+- **Name** — Your display name in the dashboard.
+- **Email** — Used for identification and GitHub account matching.
+- **Server URL** — The Primer API server address (defaults to `http://localhost:8000`).
+
+On completion, it creates your engineer account on the server and stores the API key in `~/.primer/config.toml`.
+
+<Callout type="important" title="Save your API key">
+Your API key is shown only once during setup. Copy it before closing the terminal.
+</Callout>
+
+## primer server
+
+Manage the Primer API server process.
+
+### primer server start
+
+Start the API server as a managed background process.
+
+```bash
+primer server start [--host HOST] [--port PORT] [--fg]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--host` | `0.0.0.0` | Bind address |
+| `--port` | `8000` | Bind port |
+| `--fg` | — | Run in foreground instead of daemonizing |
+
+By default, the server starts as a background daemon. Use `--fg` to run in the foreground, which is useful for development and debugging.
+
+```bash
+# Start on the default port
+primer server start
+
+# Start on a custom port
+primer server start --port 9000
+
+# Run in the foreground with visible log output
+primer server start --fg
+```
+
+### primer server stop
+
+Stop the managed server process.
+
+```bash
+primer server stop
+```
+
+Sends a graceful shutdown signal to the background server process. If the process does not exit within a few seconds, it is forcefully terminated.
+
+### primer server status
+
+Show whether the server is running and verify API connectivity.
+
+```bash
+primer server status
+```
+
+```text
+Server: running (PID 12345)
+Health: ok
+URL:    http://localhost:8000
+```
+
+### primer server logs
+
+Tail the server log output.
+
+```bash
+primer server logs [-f] [-n N]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-f` | — | Follow log output in real time |
+| `-n` | `50` | Number of lines to display |
+
+```bash
+# Show the last 100 lines
+primer server logs -n 100
+
+# Follow logs in real time
+primer server logs -f
+```
+
+## primer hook
+
+Manage the Claude Code SessionEnd hook that automatically uploads session data to Primer.
+
+### primer hook install
+
+Install the SessionEnd hook into Claude Code's configuration.
+
+```bash
+primer hook install
+```
+
+This adds a `SessionEnd` entry to `~/.claude/settings.json` that triggers the Primer ingest process when a Claude Code session ends. The hook uses your configured `PRIMER_SERVER_URL` and `PRIMER_API_KEY`.
+
+### primer hook uninstall
+
+Remove the SessionEnd hook from Claude Code settings.
+
+```bash
+primer hook uninstall
+```
+
+After uninstalling, Claude Code sessions will no longer be uploaded to Primer. Previously uploaded sessions remain in the database.
+
+### primer hook status
+
+Check whether the hook is installed and functional.
+
+```bash
+primer hook status
+```
+
+```text
+Hook:   installed
+Server: reachable
+Key:    valid (engineer: jane-doe)
+```
+
+This verifies three things:
+
+1. The `SessionEnd` entry exists in `~/.claude/settings.json`.
+2. The configured Primer server is reachable.
+3. The API key is valid and maps to a registered engineer.
+
+## primer sync
+
+Re-upload sessions that failed to sync, for example due to the server being unreachable when a session ended.
+
+```bash
+primer sync
+```
+
+The hook stores failed uploads locally in `~/.primer/pending/`. Running `primer sync` retries all pending uploads and removes them on success.
+
+<Callout type="note" title="Automatic retry">
+The hook automatically retries failed uploads on the next session end. Use `primer sync` to force an immediate retry without waiting for your next session.
+</Callout>
+
+## primer doctor
+
+Run a comprehensive health check to verify your Primer installation.
+
+```bash
+primer doctor
+```
+
+```text
+✓ Server reachable at http://localhost:8000
+✓ Hook installed in ~/.claude/settings.json
+✓ API key valid (engineer: jane-doe)
+✓ Database migrated (version: abc123)
+✓ 0 pending uploads
+```
+
+The doctor checks:
+
+- **Server connectivity** — Can the CLI reach the Primer API.
+- **Hook installation** — Is the SessionEnd hook configured in Claude Code.
+- **API key validity** — Does the stored key authenticate successfully.
+- **Database status** — Are all migrations applied.
+- **Pending uploads** — Are there any failed session uploads waiting to sync.
+
+If any check fails, the doctor provides actionable guidance on how to fix it.
+
+## primer configure
+
+Update your Primer configuration interactively.
+
+```bash
+primer configure
+```
+
+Opens a guided wizard to update settings in `~/.primer/config.toml`. This is useful for changing the server URL, updating API keys, or modifying other settings without manually editing the config file.
+
+See the [Configuration](../configuration/) page for a complete reference of all available settings.
+
+## Development Tools
+
+These commands are not part of the `primer` CLI but are commonly used during Primer development.
+
+### API Server (hot reload)
+
+Run the FastAPI server directly with auto-reload for development:
+
+```bash
+uvicorn primer.server.app:app --reload
+```
+
+This is an alternative to `primer server start --fg` that provides automatic code reloading when source files change.
+
+### Database Migrations
+
+Apply all pending migrations:
+
+```bash
+alembic upgrade head
+```
+
+Generate a new migration after changing SQLAlchemy models:
+
+```bash
+alembic revision --autogenerate -m "description"
+```
+
+<Callout type="warning" title="Review auto-generated migrations">
+Always review the generated migration file before applying it. Alembic's auto-detection can miss certain changes (like column renames) or generate unnecessary operations.
+</Callout>
+
+### Tests
+
+```bash
+# Run the full test suite
+pytest -v
+
+# Run with coverage reporting
+pytest -v --cov=primer --cov-report=term-missing
+```
+
+### Linting and Formatting
+
+```bash
+# Check for lint errors
+ruff check .
+
+# Auto-fix lint errors
+ruff check . --fix
+
+# Format code
+ruff format .
+
+# Check formatting without changes
+ruff format --check .
+```
+
+### Security Scan
+
+```bash
+bandit -r src/ -c pyproject.toml
+```
+
+### MCP Server
+
+Run the MCP sidecar server directly for testing:
+
+```bash
+python -m primer.mcp.server
+```
+
+## Frontend Commands
+
+The React dashboard has its own set of commands, run from the `frontend/` directory.
+
+```bash
+# Development server with hot reload
+cd frontend && npm run dev
+
+# Production build
+cd frontend && npm run build
+
+# ESLint
+cd frontend && npm run lint
+
+# TypeScript type checking
+cd frontend && npx tsc -b --noEmit
+```
+
+See the [Installation](../installation/) guide for initial frontend setup instructions.

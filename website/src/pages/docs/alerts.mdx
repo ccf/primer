@@ -1,0 +1,136 @@
+---
+layout: ../../layouts/DocsPage.astro
+title: "Alert Thresholds"
+section: "Guides"
+description: "Monitor AI usage and get notified when metrics deviate from baseline."
+---
+import Callout from '../../components/docs/Callout.astro';
+
+## How Alerts Work
+
+Primer monitors your team's AI usage and compares recent metrics against a rolling baseline. When a threshold is crossed, Primer logs the event and optionally sends a Slack notification.
+
+Alert thresholds follow a priority chain (highest to lowest):
+
+1. **Team-level config** — per-team overrides set in the admin panel or API
+2. **Global config** — server-wide overrides via the API
+3. **Environment defaults** — `PRIMER_ALERT_*` environment variables
+
+This means a team-level override always wins. If no team-level config exists, Primer falls back to the global config. If neither exists, the environment variable defaults apply.
+
+## Alert Types
+
+| Alert | Env Variable | Default | Trigger |
+|-------|-------------|---------|---------|
+| Friction spike | `PRIMER_ALERT_FRICTION_SPIKE_MULTIPLIER` | `2.0` | Friction events exceed N x baseline |
+| Usage drop | `PRIMER_ALERT_USAGE_DROP_RATIO` | `0.5` | Session count falls below ratio of baseline |
+| Cost spike (warning) | `PRIMER_ALERT_COST_SPIKE_WARNING` | `2.0` | Cost exceeds N x baseline |
+| Cost spike (critical) | `PRIMER_ALERT_COST_SPIKE_CRITICAL` | `3.0` | Cost exceeds N x baseline |
+| Success rate drop | `PRIMER_ALERT_SUCCESS_RATE_DROP_PP` | `20.0` | Success rate falls by N percentage points |
+
+<Callout type="note" title="Baseline calculation">
+The baseline is computed from the trailing rolling window of session data. A friction spike multiplier of `2.0` means the alert fires when recent friction events are at least twice the baseline average.
+</Callout>
+
+## Configure via Environment Variables
+
+Set default thresholds in your `.env` file:
+
+```bash
+PRIMER_ALERT_FRICTION_SPIKE_MULTIPLIER=2.0
+PRIMER_ALERT_USAGE_DROP_RATIO=0.5
+PRIMER_ALERT_COST_SPIKE_WARNING=2.0
+PRIMER_ALERT_COST_SPIKE_CRITICAL=3.0
+PRIMER_ALERT_SUCCESS_RATE_DROP_PP=20.0
+```
+
+These serve as the lowest-priority defaults. Any team-level or global config set via the API takes precedence.
+
+## Configure via the Admin Panel
+
+Go to **Admin > Alert Thresholds** in the dashboard to set per-team overrides without restarting the server. Team-level configs take precedence over environment variable defaults.
+
+You can configure different thresholds per team — for example, stricter cost thresholds for a team with a limited AI budget, or a higher friction spike multiplier for a team that regularly works on complex refactoring tasks.
+
+## Configure via the API
+
+Full CRUD for alert configs:
+
+```bash
+# Create a team-level alert config
+curl -X POST http://localhost:8000/api/v1/alert-configs \
+  -H "x-admin-key: your-admin-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "team_id": "550e8400-e29b-41d4-a716-446655440000",
+    "cost_spike_warning": 1.5,
+    "cost_spike_critical": 2.5,
+    "friction_spike_multiplier": 3.0
+  }'
+```
+
+```bash
+# List all alert configs
+curl http://localhost:8000/api/v1/alert-configs \
+  -H "x-admin-key: your-admin-key"
+```
+
+```bash
+# Update an existing config
+curl -X PUT http://localhost:8000/api/v1/alert-configs/<config-id> \
+  -H "x-admin-key: your-admin-key" \
+  -H "Content-Type: application/json" \
+  -d '{"cost_spike_critical": 4.0}'
+```
+
+```bash
+# Delete a config (reverts to global/env defaults)
+curl -X DELETE http://localhost:8000/api/v1/alert-configs/<config-id> \
+  -H "x-admin-key: your-admin-key"
+```
+
+<Callout type="tip" title="Partial updates">
+The PUT endpoint accepts partial payloads. You only need to include the fields you want to change — omitted fields retain their current values.
+</Callout>
+
+## Slack Notifications
+
+Set up a Slack incoming webhook and configure:
+
+```bash
+PRIMER_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+PRIMER_SLACK_ALERTS_ENABLED=true
+```
+
+When an alert triggers, Primer posts a message to the configured Slack channel containing: alert type, team name, current value, threshold value, and a link to the dashboard.
+
+<Callout type="warning" title="Webhook URL security">
+The Slack webhook URL allows anyone with it to post messages to your channel. Treat it as a secret and do not commit it to version control. Use environment variables or a secrets manager.
+</Callout>
+
+## Viewing Alert History
+
+Alert events are recorded in the audit log. View them in **Admin > Audit Log**, or query the API:
+
+```bash
+curl http://localhost:8000/api/v1/admin/audit-log \
+  -H "x-admin-key: your-admin-key"
+```
+
+The audit log records every alert event with the alert type, affected team, metric values at the time of the alert, and the threshold that was crossed. Use this to track alert frequency over time and tune your thresholds accordingly.
+
+## MCP Friction Report
+
+For a real-time view of friction patterns during a Claude Code session, use the MCP sidecar's `friction_report` tool:
+
+```text
+# In Claude Code with Primer MCP registered:
+"Show me our team's friction report for the past week"
+# Claude calls friction_report() and returns current friction data
+```
+
+<Callout type="tip" title="Interactive friction analysis">
+The `friction_report` MCP tool provides the same data as the Alerts system but surfaced interactively inside Claude. Use it to investigate friction spikes in context without leaving your editor.
+</Callout>
+
+See the [MCP Sidecar](../mcp/) page for setup.
