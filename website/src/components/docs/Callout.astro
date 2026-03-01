@@ -8,44 +8,46 @@ const { type = "note", title } = Astro.props;
 
 const styles = {
   note: {
-    border: "border-blue-500/50",
-    bg: "bg-blue-500/10",
-    icon: "ℹ",
-    iconColor: "text-blue-400",
-    titleColor: "text-blue-300",
+    border: "border-blue-400 dark:border-blue-500/50",
+    bg: "bg-blue-50 dark:bg-blue-500/10",
+    iconColor: "text-blue-600 dark:text-blue-400",
+    titleColor: "text-blue-800 dark:text-blue-300",
+    textColor: "text-blue-900 dark:text-foreground/90",
+    icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
   },
   tip: {
-    border: "border-emerald-500/50",
-    bg: "bg-emerald-500/10",
-    icon: "✦",
-    iconColor: "text-emerald-400",
-    titleColor: "text-emerald-300",
+    border: "border-emerald-400 dark:border-emerald-500/50",
+    bg: "bg-emerald-50 dark:bg-emerald-500/10",
+    iconColor: "text-emerald-600 dark:text-emerald-400",
+    titleColor: "text-emerald-800 dark:text-emerald-300",
+    textColor: "text-emerald-900 dark:text-foreground/90",
+    icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2z"/></svg>`,
   },
   warning: {
-    border: "border-amber-500/50",
-    bg: "bg-amber-500/10",
-    icon: "⚠",
-    iconColor: "text-amber-400",
-    titleColor: "text-amber-300",
+    border: "border-amber-400 dark:border-amber-500/50",
+    bg: "bg-amber-50 dark:bg-amber-500/10",
+    iconColor: "text-amber-600 dark:text-amber-400",
+    titleColor: "text-amber-800 dark:text-amber-300",
+    textColor: "text-amber-900 dark:text-foreground/90",
+    icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
   },
   important: {
-    border: "border-red-500/50",
-    bg: "bg-red-500/10",
-    icon: "!",
-    iconColor: "text-red-400",
-    titleColor: "text-red-300",
+    border: "border-red-400 dark:border-red-500/50",
+    bg: "bg-red-50 dark:bg-red-500/10",
+    iconColor: "text-red-600 dark:text-red-400",
+    titleColor: "text-red-800 dark:text-red-300",
+    textColor: "text-red-900 dark:text-foreground/90",
+    icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
   },
 };
 
 const s = styles[type];
 ---
 
-<div class:list={["not-prose my-6 rounded-lg border-l-4 px-4 py-3", s.border, s.bg]}>
+<div class:list={["not-prose my-6 rounded-lg border-l-4 px-4 py-3 animate-fade-in", s.border, s.bg]}>
   <div class="flex items-start gap-3">
-    <span class:list={["mt-0.5 text-base font-bold leading-none select-none", s.iconColor]} aria-hidden="true">
-      {s.icon}
-    </span>
-    <div class="min-w-0 flex-1 text-sm leading-relaxed text-foreground/90">
+    <span class:list={["mt-0.5 flex-shrink-0", s.iconColor]} aria-hidden="true" set:html={s.icon} />
+    <div class:list={["min-w-0 flex-1 text-sm leading-relaxed", s.textColor]}>
       {title && (
         <p class:list={["mb-1 font-semibold", s.titleColor]}>{title}</p>
       )}

@@ -81,25 +81,39 @@ const sections = [
   description="Learn how to install, configure, and use Primer to track AI coding tool usage across your team."
 >
   <div class="max-w-6xl mx-auto px-6 py-20">
-    <header class="mb-16">
+    <header class="mb-16 animate-fade-in-up">
       <h1 class="font-display text-4xl md:text-5xl tracking-tight mb-4">Documentation</h1>
       <p class="text-lg text-muted-foreground max-w-2xl">
         Everything you need to set up and use Primer for your team.
       </p>
+      <p class="text-sm text-muted-foreground/60 mt-2">
+        9 guides across Getting Started, Architecture, and Guides
+      </p>
+      <!-- Gradient accent line -->
+      <div class="mt-6 h-px bg-gradient-to-r from-primer-brand via-primer-400 to-transparent"></div>
     </header>
 
-    {sections.map(section => (
+    {sections.map((section, sectionIdx) => (
       <div class="mb-12">
-        <h2 class="font-display text-2xl tracking-tight mb-6">{section.title}</h2>
+        <div class="flex items-center gap-3 mb-6">
+          <h2 class="font-display text-2xl tracking-tight">{section.title}</h2>
+          <div class="flex-1 h-px bg-border"></div>
+        </div>
         <div class="grid md:grid-cols-3 gap-4">
-          {section.cards.map(card => (
+          {section.cards.map((card, cardIdx) => (
             <a
               href={card.href}
-              class="group p-5 rounded-xl border border-border bg-card hover:border-primer-border hover:shadow-md transition-all duration-200"
+              class="group relative p-5 rounded-xl border border-border bg-card hover:border-primer-border hover:shadow-md transition-all duration-200 hover:border-l-primer-brand animate-fade-in-up"
+              style={`--delay: ${sectionIdx * 100 + cardIdx * 60}ms`}
             >
-              <div class="w-9 h-9 rounded-lg bg-primer-surface flex items-center justify-center mb-3">
-                <svg class="w-4.5 h-4.5 text-primer-brand" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" d={card.icon} />
+              <div class="flex items-start justify-between">
+                <div class="w-9 h-9 rounded-lg bg-primer-surface flex items-center justify-center mb-3">
+                  <svg class="w-4.5 h-4.5 text-primer-brand" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d={card.icon} />
+                  </svg>
+                </div>
+                <svg class="w-4 h-4 text-muted-foreground/0 group-hover:text-muted-foreground transition-all duration-200 translate-x-0 group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                 </svg>
               </div>
               <h3 class="font-semibold mb-1 group-hover:text-primer-brand transition-colors">{card.title}</h3>
