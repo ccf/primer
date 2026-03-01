@@ -13,24 +13,40 @@ const title = props.title ?? props.frontmatter?.title ?? '';
 const description = props.description ?? props.frontmatter?.description;
 const section = props.section ?? props.frontmatter?.section ?? '';
 const base = import.meta.env.BASE_URL;
+
+const pages = [
+  { title: "Installation", href: `${base}docs/installation/`, section: "Getting Started" },
+  { title: "Configuration", href: `${base}docs/configuration/`, section: "Getting Started" },
+  { title: "CLI Reference", href: `${base}docs/cli/`, section: "Getting Started" },
+  { title: "Server & API", href: `${base}docs/server/`, section: "Architecture" },
+  { title: "Hook System", href: `${base}docs/hooks/`, section: "Architecture" },
+  { title: "MCP Sidecar", href: `${base}docs/mcp/`, section: "Architecture" },
+  { title: "Team Setup", href: `${base}docs/teams/`, section: "Guides" },
+  { title: "GitHub Integration", href: `${base}docs/github/`, section: "Guides" },
+  { title: "Alert Thresholds", href: `${base}docs/alerts/`, section: "Guides" },
+];
+const currentIdx = pages.findIndex(p => p.title === title);
+const prev = currentIdx > 0 ? pages[currentIdx - 1] : null;
+const next = currentIdx < pages.length - 1 ? pages[currentIdx + 1] : null;
 ---
 
 <BaseLayout title={`${title} — Primer Docs`} description={description}>
-  <div class="max-w-3xl mx-auto px-6 py-20">
+  <div class="max-w-4xl mx-auto px-6 py-20">
     <div class="mb-8 flex items-center gap-2 text-sm text-muted-foreground">
       <a href={`${base}docs/`} class="hover:text-foreground transition-colors">Documentation</a>
-      <span>/</span>
+      <svg class="w-3.5 h-3.5 text-muted-foreground/40" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
       <span class="text-muted-foreground/60">{section}</span>
-      <span>/</span>
+      <svg class="w-3.5 h-3.5 text-muted-foreground/40" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
       <span>{title}</span>
     </div>
 
     <div class="prose prose-neutral dark:prose-invert max-w-none
       prose-headings:font-display prose-headings:tracking-tight
       prose-a:text-primer-brand prose-a:no-underline hover:prose-a:underline
-      prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-sm prose-code:font-normal prose-code:before:content-none prose-code:after:content-none
+      prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-sm prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-code:font-mono
       prose-pre:rounded-lg prose-pre:border prose-pre:border-border prose-pre:shadow-sm
-      prose-table:text-sm prose-th:font-semibold">
+      prose-table:text-sm prose-th:font-semibold
+      dark:text-prose-body">
       <h1>{title}</h1>
       <slot />
     </div>
@@ -39,6 +55,29 @@ const base = import.meta.env.BASE_URL;
       <a href={`${base}docs/`} class="text-sm text-muted-foreground hover:text-foreground transition-colors">
         &larr; Back to Documentation
       </a>
+
+      {(prev || next) && (
+        <div class="grid grid-cols-2 gap-4 mt-6">
+          {prev ? (
+            <a href={prev.href} class="group flex flex-col p-4 rounded-lg border border-border hover:border-primer-border transition-all duration-200">
+              <span class="text-xs text-muted-foreground mb-1">Previous</span>
+              <span class="text-sm font-medium group-hover:text-primer-brand transition-colors flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
+                {prev.title}
+              </span>
+            </a>
+          ) : <div />}
+          {next ? (
+            <a href={next.href} class="group flex flex-col items-end p-4 rounded-lg border border-border hover:border-primer-border transition-all duration-200">
+              <span class="text-xs text-muted-foreground mb-1">Next</span>
+              <span class="text-sm font-medium group-hover:text-primer-brand transition-colors flex items-center gap-1.5">
+                {next.title}
+                <svg class="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+              </span>
+            </a>
+          ) : <div />}
+        </div>
+      )}
     </div>
   </div>
 </BaseLayout>

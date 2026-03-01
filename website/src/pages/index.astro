@@ -43,23 +43,25 @@ const features = [
     <div class="absolute inset-0 overflow-hidden">
       <div class="absolute top-20 left-1/4 w-96 h-96 bg-primer-brand/5 rounded-full blur-3xl"></div>
       <div class="absolute bottom-20 right-1/4 w-64 h-64 bg-primer-brand/10 rounded-full blur-3xl"></div>
+      <!-- Dot grid pattern -->
+      <div class="absolute inset-0" style="background-image: radial-gradient(circle, rgba(99,102,241,0.12) 1px, transparent 1px); background-size: 32px 32px;"></div>
     </div>
 
     <div class="relative max-w-6xl mx-auto px-6 py-24 md:py-32 lg:py-40">
       <div class="max-w-3xl mx-auto text-center mb-12">
-        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-sm text-white/70 mb-8">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-sm text-white/70 mb-8 animate-fade-in-up">
           <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
           Open source &middot; Self-hosted &middot; Privacy-first
         </div>
-        <h1 class="font-display text-4xl md:text-5xl lg:text-6xl tracking-tight mb-6">
+        <h1 class="font-display text-4xl md:text-5xl lg:text-6xl tracking-tight mb-6 animate-fade-in-up" style="--delay: 80ms">
           See how your team uses<br />
           <span class="text-primer-400">AI coding tools</span>
         </h1>
-        <p class="text-lg md:text-xl text-white/60 max-w-2xl mx-auto mb-10">
+        <p class="text-lg md:text-xl text-white/60 max-w-2xl mx-auto mb-10 animate-fade-in-up" style="--delay: 160ms">
           Aggregate usage insights across Claude Code, Codex CLI, and Gemini CLI.
           Track costs, detect friction, and accelerate AI adoption across your engineering org.
         </p>
-        <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up" style="--delay: 240ms">
           <a
             href={`${import.meta.env.BASE_URL}docs/`}
             class="inline-flex items-center px-6 py-3 rounded-lg bg-primer-brand text-white font-medium hover:bg-primer-600 transition-colors"
@@ -81,7 +83,9 @@ const features = [
       </div>
 
       <!-- Terminal animation -->
-      <TerminalAnimation client:visible />
+      <div class="animate-fade-in-up" style="--delay: 320ms">
+        <TerminalAnimation client:visible />
+      </div>
     </div>
   </section>
 
@@ -99,8 +103,11 @@ const features = [
       </div>
 
       <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {features.map(feature => (
-          <div class="group p-6 rounded-2xl border border-border bg-card hover:border-primer-border hover:shadow-lg transition-all duration-200">
+        {features.map((feature, idx) => (
+          <div
+            class="group p-6 rounded-2xl border border-border bg-card hover:border-primer-border hover:shadow-lg transition-all duration-200 animate-fade-in-up"
+            style={`--delay: ${idx * 80}ms`}
+          >
             <div class="w-10 h-10 rounded-lg bg-primer-surface flex items-center justify-center mb-4">
               <svg class="w-5 h-5 text-primer-brand" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d={feature.icon} />
@@ -126,23 +133,26 @@ const features = [
         </p>
       </div>
 
-      <div class="grid md:grid-cols-3 gap-8">
-        <div class="text-center">
-          <div class="w-12 h-12 rounded-full bg-primer-brand text-white flex items-center justify-center text-lg font-semibold mx-auto mb-4">1</div>
+      <div class="relative grid md:grid-cols-3 gap-8">
+        <!-- Connector line between steps (visible on md+) -->
+        <div class="hidden md:block absolute top-6 left-1/6 right-1/6 h-px border-t-2 border-dashed border-primer-brand/30"></div>
+
+        <div class="relative text-center animate-fade-in-up" style="--delay: 0ms">
+          <div class="w-12 h-12 rounded-full bg-primer-brand text-white flex items-center justify-center text-lg font-semibold mx-auto mb-4 relative z-10">1</div>
           <h3 class="font-semibold text-lg mb-2">Hook captures sessions</h3>
           <p class="text-sm text-muted-foreground">
             A lightweight hook runs at the end of each Claude Code, Codex CLI, or Gemini CLI session, extracting metadata and sending it to your server.
           </p>
         </div>
-        <div class="text-center">
-          <div class="w-12 h-12 rounded-full bg-primer-brand text-white flex items-center justify-center text-lg font-semibold mx-auto mb-4">2</div>
+        <div class="relative text-center animate-fade-in-up" style="--delay: 100ms">
+          <div class="w-12 h-12 rounded-full bg-primer-brand text-white flex items-center justify-center text-lg font-semibold mx-auto mb-4 relative z-10">2</div>
           <h3 class="font-semibold text-lg mb-2">Server aggregates data</h3>
           <p class="text-sm text-muted-foreground">
             The self-hosted server processes sessions, computes costs, detects friction patterns, and links sessions to GitHub PRs.
           </p>
         </div>
-        <div class="text-center">
-          <div class="w-12 h-12 rounded-full bg-primer-brand text-white flex items-center justify-center text-lg font-semibold mx-auto mb-4">3</div>
+        <div class="relative text-center animate-fade-in-up" style="--delay: 200ms">
+          <div class="w-12 h-12 rounded-full bg-primer-brand text-white flex items-center justify-center text-lg font-semibold mx-auto mb-4 relative z-10">3</div>
           <h3 class="font-semibold text-lg mb-2">Dashboard shows insights</h3>
           <p class="text-sm text-muted-foreground">
             The React dashboard and MCP sidecar give you real-time analytics — from individual sessions to org-wide trends.
@@ -162,16 +172,16 @@ const features = [
         Self-hosted. Your data stays on your infrastructure.
       </p>
 
-      <div class="bg-[#0F0B2A] rounded-xl p-6 text-left font-mono text-sm mb-10">
+      <div class="bg-hero-bg rounded-xl p-6 text-left font-mono text-sm mb-10">
         <div class="flex items-center gap-2 mb-4 text-white/40 text-xs">
           <span class="w-3 h-3 rounded-full bg-[#ff5f57]"></span>
           <span class="w-3 h-3 rounded-full bg-[#febc2e]"></span>
           <span class="w-3 h-3 rounded-full bg-[#28c840]"></span>
         </div>
-        <pre class="text-white/80 whitespace-pre"><span class="text-[#6366F1]">$</span> pip install primer-io
-<span class="text-[#6366F1]">$</span> primer init
-<span class="text-[#6366F1]">$</span> primer server start
-<span class="text-[#6366F1]">$</span> primer hook install</pre>
+        <pre class="text-white/80 whitespace-pre"><span class="text-primer-brand">$</span> pip install primer-io
+<span class="text-primer-brand">$</span> primer init
+<span class="text-primer-brand">$</span> primer server start
+<span class="text-primer-brand">$</span> primer hook install</pre>
       </div>
 
       <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
