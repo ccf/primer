@@ -2,6 +2,9 @@
 @import "../../../brand/tokens.css";
 @plugin "@tailwindcss/typography";
 
+/* Tailwind v4: dark: utilities respond to .dark class on <html>, not prefers-color-scheme */
+@variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* Light mode */
   --color-background: #FAFAFA;
@@ -72,3 +75,19 @@ body * {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
 .dark ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); }
+
+/* Shiki dual-theme: Astro generates media-query switching; override with class-based switching */
+pre.astro-code,
+pre.astro-code span {
+  color: var(--shiki-light) !important;
+  background-color: var(--shiki-light-bg) !important;
+  font-style: var(--shiki-light-font-style) !important;
+  font-weight: var(--shiki-light-font-weight) !important;
+}
+.dark pre.astro-code,
+.dark pre.astro-code span {
+  color: var(--shiki-dark) !important;
+  background-color: var(--shiki-dark-bg) !important;
+  font-style: var(--shiki-dark-font-style) !important;
+  font-weight: var(--shiki-dark-font-weight) !important;
+}

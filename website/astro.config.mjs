@@ -9,7 +9,9 @@ export default defineConfig({
   base: "/primer/",
   integrations: [mdx(), react(), sitemap()],
   markdown: {
-    shikiConfig: { theme: "one-dark-pro" },
+    shikiConfig: {
+      themes: { light: "github-light", dark: "github-dark-dimmed" },
+    },
   },
   vite: {
     plugins: [tailwindcss()],
