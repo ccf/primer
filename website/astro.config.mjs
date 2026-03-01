@@ -5,7 +5,8 @@ import sitemap from "@astrojs/sitemap";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  site: "https://primer.dev",
+  site: "https://ccf.github.io",
+  base: "/primer",
   integrations: [mdx(), react(), sitemap()],
   vite: {
     plugins: [tailwindcss()],
