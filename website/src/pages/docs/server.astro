@@ -1,0 +1,145 @@
+---
+import DocsPage from "../../layouts/DocsPage.astro";
+---
+
+<DocsPage
+  title="Server & API"
+  section="Architecture"
+  description="FastAPI server, REST API endpoints, and authentication."
+>
+  <p>
+    The Primer server is a FastAPI application that receives session data, stores and indexes it,
+    and serves analytics to the dashboard and MCP sidecar.
+  </p>
+
+  <h2>Architecture</h2>
+
+  <pre><code>src/primer/server/
+├── app.py          # FastAPI application, router registration, middleware
+├── middleware.py   # Rate limiting (slowapi)
+├── routers/        # Endpoint definitions
+│   ├── health.py
+│   ├── teams.py
+│   ├── engineers.py
+│   ├── sessions.py
+│   ├── ingest.py
+│   ├── analytics.py
+│   ├── alert_configs.py
+│   └── admin.py
+└── services/       # Business logic
+    ├── ingest_service.py
+    ├── analytics_service.py
+    ├── synthesis_service.py
+    ├── alert_config_service.py
+    └── audit_service.py</code></pre>
+
+  <h2>Authentication</h2>
+
+  <p>Primer uses two authentication mechanisms:</p>
+
+  <p>
+    <strong>Admin auth</strong> — Pass <code>x-admin-key: &lt;your-admin-key&gt;</code> header.
+    Used for team management, engineer management, session queries, and analytics.
+  </p>
+
+  <p>
+    <strong>Engineer auth</strong> — API keys of the form <code>primer_&#123;urlsafe_base64&#125;</code>,
+    stored as bcrypt hashes. Pass in the JSON body for session ingest, or as
+    <code>x-api-key</code> header for facet upserts.
+  </p>
+
+  <h2>REST API</h2>
+
+  <p>Base URL: <code>http://localhost:8000</code>. All resource routes are under <code>/api/v1/</code>.</p>
+
+  <h3>Health</h3>
+
+  <pre><code>GET /health</code></pre>
+  <p>No authentication required. Returns <code>&#123;"status": "ok"&#125;</code>.</p>
+
+  <h3>Teams</h3>
+
+  <pre><code>POST   /api/v1/teams          # Create team (Admin)
+GET    /api/v1/teams          # List all teams (Admin)</code></pre>
+
+  <h3>Engineers</h3>
+
+  <pre><code>POST   /api/v1/engineers                          # Create engineer, returns API key (Admin)
+GET    /api/v1/engineers                          # List engineers (Admin)
+GET    /api/v1/engineers/{"{engineer_id}"}/sessions  # List engineer sessions (Admin)</code></pre>
+
+  <h3>Ingest</h3>
+
+  <pre><code>POST   /api/v1/ingest/session               # Ingest or update a session (API key in body)
+POST   /api/v1/ingest/bulk                  # Bulk ingest sessions (API key in body)
+POST   /api/v1/ingest/facets/{"{session_id}"}  # Upsert session facets (x-api-key header)</code></pre>
+
+  <h3>Sessions</h3>
+
+  <pre><code>GET    /api/v1/sessions              # List sessions with filters (Admin)
+GET    /api/v1/sessions/{"{session_id}"}  # Full session details (Admin)</code></pre>
+
+  <p>Session list accepts query params: <code>engineer_id</code>, <code>team_id</code>, <code>start_date</code>, <code>end_date</code>, <code>limit</code>, <code>offset</code>.</p>
+
+  <h3>Analytics</h3>
+
+  <p>All analytics endpoints accept optional <code>team_id</code>, <code>start_date</code>, and <code>end_date</code> query params.</p>
+
+  <pre><code>GET    /api/v1/analytics/overview         # Aggregate stats (Admin)
+GET    /api/v1/analytics/friction         # Friction points by frequency (Admin)
+GET    /api/v1/analytics/tools            # Tool usage rankings (Admin)
+GET    /api/v1/analytics/models           # Model usage by tokens (Admin)
+GET    /api/v1/analytics/recommendations  # Actionable recommendations (Admin)</code></pre>
+
+  <h3>Alert Configs</h3>
+
+  <pre><code>GET    /api/v1/alert-configs              # List alert configs (Admin)
+POST   /api/v1/alert-configs              # Create alert config (Admin)
+PUT    /api/v1/alert-configs/{"{id}"}        # Update alert config (Admin)
+DELETE /api/v1/alert-configs/{"{id}"}        # Delete alert config (Admin)</code></pre>
+
+  <h2>Error Responses</h2>
+
+  <table>
+    <thead>
+      <tr><th>Status</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>401</code></td><td>Invalid API key</td></tr>
+      <tr><td><code>403</code></td><td>Invalid admin key</td></tr>
+      <tr><td><code>404</code></td><td>Resource not found</td></tr>
+      <tr><td><code>422</code></td><td>Validation error (Pydantic)</td></tr>
+      <tr><td><code>429</code></td><td>Rate limit exceeded</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Data Model</h2>
+
+  <p>Primer uses 8 database tables:</p>
+
+  <ul>
+    <li><strong>teams</strong> — Engineering teams</li>
+    <li><strong>engineers</strong> — Individual engineers with bcrypt-hashed API keys</li>
+    <li><strong>sessions</strong> — One record per AI coding session with token counts, timing, and metadata</li>
+    <li><strong>session_facets</strong> — Qualitative analysis: goal, outcome, session type, friction</li>
+    <li><strong>tool_usages</strong> — Per-session tool call counts</li>
+    <li><strong>model_usages</strong> — Per-session model token usage</li>
+    <li><strong>daily_stats</strong> — Pre-aggregated per-engineer daily counts</li>
+    <li><strong>ingest_events</strong> — Audit log of all ingest operations</li>
+  </ul>
+
+  <h2>Running in Production</h2>
+
+  <p>Use multiple uvicorn workers behind a reverse proxy for production:</p>
+
+  <pre><code># Multiple workers
+uvicorn primer.server.app:app --host 0.0.0.0 --port 8000 --workers 4
+
+# Or via Gunicorn
+gunicorn primer.server.app:app -w 4 -k uvicorn.workers.UvicornWorker</code></pre>
+
+  <p>
+    See the <a href={`${import.meta.env.BASE_URL}docs/configuration/`}>Configuration</a> page for
+    all environment variables.
+  </p>
+</DocsPage>

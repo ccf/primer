@@ -1,0 +1,139 @@
+---
+import DocsPage from "../../layouts/DocsPage.astro";
+---
+
+<DocsPage
+  title="Team Setup"
+  section="Guides"
+  description="Register engineers, create teams, and assign roles."
+>
+  <p>
+    Primer organizes engineers into teams for analytics filtering and alert scoping. This guide
+    covers creating teams, registering engineers, and managing API keys.
+  </p>
+
+  <h2>Create a Team</h2>
+
+  <pre><code>curl -X POST http://localhost:8000/api/v1/teams \
+  -H "x-admin-key: your-admin-key" \
+  -H "Content-Type: application/json" \
+  -d '&#123;"name": "Backend"&#125;'</code></pre>
+
+  <p>Response:</p>
+
+  <pre><code>&#123;
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "Backend",
+  "created_at": "2025-01-15T10:30:00"
+&#125;</code></pre>
+
+  <p>Save the team <code>id</code> — you'll use it when creating engineers.</p>
+
+  <h2>Register an Engineer</h2>
+
+  <pre><code>curl -X POST http://localhost:8000/api/v1/engineers \
+  -H "x-admin-key: your-admin-key" \
+  -H "Content-Type: application/json" \
+  -d '&#123;
+    "name": "Alice",
+    "email": "alice@example.com",
+    "team_id": "550e8400-e29b-41d4-a716-446655440000"
+  &#125;'</code></pre>
+
+  <p>Response:</p>
+
+  <pre><code>&#123;
+  "engineer": &#123;
+    "id": "660e8400-e29b-41d4-a716-446655440001",
+    "name": "Alice",
+    "email": "alice@example.com",
+    "team_id": "550e8400-e29b-41d4-a716-446655440000",
+    "created_at": "2025-01-15T10:30:00"
+  &#125;,
+  "api_key": "primer_abc123..."
+&#125;</code></pre>
+
+  <p>
+    The <code>api_key</code> is shown only once. Share it with the engineer so they can
+    configure their hook and MCP sidecar.
+  </p>
+
+  <h2>Distribute API Keys</h2>
+
+  <p>Each engineer sets their API key in their environment:</p>
+
+  <pre><code>export PRIMER_SERVER_URL=https://your-primer-server.internal
+export PRIMER_API_KEY=primer_abc123...  # The key from registration</code></pre>
+
+  <p>Then install the hook:</p>
+
+  <pre><code>primer hook install
+# or: python scripts/install_hook.py</code></pre>
+
+  <h2>GitHub-Based Login</h2>
+
+  <p>
+    With GitHub OAuth configured, engineers can log in to the dashboard with their GitHub account.
+    Primer automatically links them to an existing engineer record by GitHub ID or email.
+  </p>
+
+  <p>To pre-provision a user from their GitHub username:</p>
+
+  <pre><code>python scripts/provision_user.py alice-github-username --team Backend</code></pre>
+
+  <p>
+    See the <a href={`${import.meta.env.BASE_URL}docs/github/`}>GitHub Integration</a> guide
+    for OAuth setup.
+  </p>
+
+  <h2>List Teams and Engineers</h2>
+
+  <pre><code># List all teams
+curl http://localhost:8000/api/v1/teams \
+  -H "x-admin-key: your-admin-key"
+
+# List all engineers
+curl http://localhost:8000/api/v1/engineers \
+  -H "x-admin-key: your-admin-key"
+
+# List sessions for a specific engineer
+curl "http://localhost:8000/api/v1/engineers/&lt;engineer-id&gt;/sessions" \
+  -H "x-admin-key: your-admin-key"</code></pre>
+
+  <h2>Dashboard Admin Panel</h2>
+
+  <p>
+    The dashboard's Admin section (accessible with the admin API key) provides a UI for:
+  </p>
+
+  <ul>
+    <li>Creating and listing teams and engineers</li>
+    <li>Configuring per-team alert thresholds</li>
+    <li>Viewing the audit log of admin actions</li>
+  </ul>
+
+  <h2>Filtering Analytics by Team</h2>
+
+  <p>
+    All analytics endpoints accept an optional <code>team_id</code> query parameter. Pass it to
+    scope any dashboard view or API call to a specific team:
+  </p>
+
+  <pre><code>curl "http://localhost:8000/api/v1/analytics/overview?team_id=550e8400..." \
+  -H "x-admin-key: your-admin-key"</code></pre>
+
+  <p>
+    The MCP <code>team_overview</code> and <code>friction_report</code> tools also accept a
+    <code>team_id</code> parameter.
+  </p>
+
+  <h2>Recommended Onboarding Flow</h2>
+
+  <ol>
+    <li>Create teams that match your org structure (Backend, Frontend, Platform, etc.)</li>
+    <li>Register each engineer and securely share their API key</li>
+    <li>Engineers install the hook with <code>primer hook install</code></li>
+    <li>Optionally register the MCP sidecar for in-editor analytics</li>
+    <li>After a few sessions, configure alert thresholds appropriate for your team</li>
+  </ol>
+</DocsPage>
