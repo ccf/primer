@@ -86,7 +86,7 @@ def _build_transcript_text(messages: list[dict]) -> str:
             if tool_calls:
                 for tc in tool_calls:
                     name = tc.get("name", "unknown")
-                    preview = tc.get("input_preview", "")
+                    preview = tc.get("input_preview") or ""
                     parts.append(f"[Tool: {name}({preview[:200]})]")
             if parts:
                 lines.append(f"Assistant: {' '.join(parts)}")
@@ -95,7 +95,7 @@ def _build_transcript_text(messages: list[dict]) -> str:
             if tool_results:
                 for tr in tool_results:
                     name = tr.get("name", "unknown")
-                    output = tr.get("output_preview", "")
+                    output = tr.get("output_preview") or ""
                     lines.append(f"[Result from {name}: {output[:200]}]")
 
     # Truncate to ~60k chars to stay within context limits
