@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from primer.common.config import settings
@@ -65,9 +65,12 @@ def backfill_facets(
 ):
     """Trigger LLM facet extraction for sessions that are missing facets."""
     if not settings.anthropic_api_key:
-        return {"error": "PRIMER_ANTHROPIC_API_KEY is not configured"}
+        raise HTTPException(status_code=422, detail="PRIMER_ANTHROPIC_API_KEY is not configured")
     if not settings.facet_extraction_enabled:
-        return {"error": "Facet extraction is disabled (set PRIMER_FACET_EXTRACTION_ENABLED=true)"}
+        raise HTTPException(
+            status_code=422,
+            detail="Facet extraction is disabled (set PRIMER_FACET_EXTRACTION_ENABLED=true)",
+        )
 
     from primer.server.services.facet_extraction_service import backfill_facets as _backfill
 
