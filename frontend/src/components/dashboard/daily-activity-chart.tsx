@@ -1,5 +1,7 @@
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ChartTooltip } from "@/components/charts/chart-tooltip"
+import { CHART_COLORS, AXIS_TICK_STYLE } from "@/lib/chart-colors"
 import type { DailyStatsResponse } from "@/types/api"
 import { format, parseISO } from "date-fns"
 
@@ -26,29 +28,29 @@ export function DailyActivityChart({ data }: DailyActivityChartProps) {
           <AreaChart data={chartData}>
             <defs>
               <linearGradient id="colorSessions" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                <stop offset="5%" stopColor={CHART_COLORS.primary} stopOpacity={0.2} />
+                <stop offset="95%" stopColor={CHART_COLORS.primary} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="colorMessages" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#22c55e" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                <stop offset="5%" stopColor={CHART_COLORS.secondary} stopOpacity={0.2} />
+                <stop offset="95%" stopColor={CHART_COLORS.secondary} stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-            <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-            <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-            <Tooltip />
+            <XAxis dataKey="date" tick={AXIS_TICK_STYLE} />
+            <YAxis allowDecimals={false} tick={AXIS_TICK_STYLE} />
+            <Tooltip content={<ChartTooltip />} />
             <Area
               type="monotone"
               dataKey="sessions"
-              stroke="#6366f1"
+              stroke={CHART_COLORS.primary}
               fill="url(#colorSessions)"
               strokeWidth={2}
             />
             <Area
               type="monotone"
               dataKey="messages"
-              stroke="#22c55e"
+              stroke={CHART_COLORS.secondary}
               fill="url(#colorMessages)"
               strokeWidth={2}
             />

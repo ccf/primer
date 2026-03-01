@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react"
+import { Users } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { getApiKey } from "@/lib/api"
 import {
@@ -9,6 +10,7 @@ import {
 } from "@/hooks/use-api-queries"
 import { EngineerLeaderboard } from "@/components/engineers/engineer-leaderboard"
 import { mergeEngineerData } from "@/components/engineers/merge-engineer-data"
+import { PageHeader } from "@/components/shared/page-header"
 import { TableSkeleton } from "@/components/shared/loading-skeleton"
 import { EmptyState } from "@/components/shared/empty-state"
 import type { DateRange } from "@/components/layout/date-range-picker"
@@ -48,7 +50,7 @@ export function EngineersPage({ teamId, dateRange }: EngineersPageProps) {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold">Engineers</h1>
+        <PageHeader icon={Users} title="Engineers" description="Leaderboard and benchmarks across your team" />
         <TableSkeleton />
       </div>
     )
@@ -56,7 +58,7 @@ export function EngineersPage({ teamId, dateRange }: EngineersPageProps) {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Engineers</h1>
+      <PageHeader icon={Users} title="Engineers" description="Leaderboard and benchmarks across your team" />
 
       {!data || data.engineers.length === 0 ? (
         <EmptyState message="No engineers found" />

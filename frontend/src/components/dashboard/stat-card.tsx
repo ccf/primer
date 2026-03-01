@@ -20,7 +20,7 @@ export function StatCard({ label, value, subtitle, icon: Icon, className, delta 
           <div>
             <p className="text-sm text-muted-foreground">{label}</p>
             <div className="mt-1 flex items-center gap-2">
-              <p className="text-2xl font-bold">{value}</p>
+              <p className="text-2xl font-display">{value}</p>
               {delta != null && delta.value !== 0 && (
                 <span
                   className={cn(

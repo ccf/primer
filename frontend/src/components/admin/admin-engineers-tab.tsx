@@ -106,7 +106,7 @@ export function AdminEngineersTab() {
       <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border bg-muted/50">
+            <tr className="border-b border-border bg-muted/60">
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Email</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Role</th>
@@ -116,7 +116,7 @@ export function AdminEngineersTab() {
           </thead>
           <tbody>
             {engineers?.map((eng) => (
-              <tr key={eng.id} className="border-b border-border last:border-0">
+              <tr key={eng.id} className="border-b border-border last:border-0 even:bg-muted/15 hover:bg-accent/50">
                 <td className="px-4 py-3 font-medium">{eng.display_name ?? eng.name}</td>
                 <td className="px-4 py-3 text-muted-foreground">{eng.email}</td>
                 <td className="px-4 py-3">

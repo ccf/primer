@@ -1,7 +1,9 @@
 import { useState } from "react"
+import { Settings } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { getApiKey } from "@/lib/api"
 import { EmptyState } from "@/components/shared/empty-state"
+import { PageHeader } from "@/components/shared/page-header"
 import { PageTabs } from "@/components/ui/page-tabs"
 import { AdminEngineersTab } from "@/components/admin/admin-engineers-tab"
 import { AdminTeamsTab } from "@/components/admin/admin-teams-tab"
@@ -33,7 +35,11 @@ export function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Admin</h1>
+      <PageHeader
+        icon={Settings}
+        title="Admin"
+        description="Manage engineers, teams, and system configuration"
+      />
 
       <PageTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 

@@ -3,6 +3,7 @@ import { useOverview, useTeam } from "@/hooks/use-api-queries"
 import { InlineStat } from "@/components/ui/inline-stat"
 import { PageTabs } from "@/components/ui/page-tabs"
 import { Button } from "@/components/ui/button"
+import { PageHeader } from "@/components/shared/page-header"
 import { OverviewTab } from "@/components/dashboard-v2/overview-tab"
 import { EngineersTab } from "@/components/dashboard-v2/engineers-tab"
 import { ProjectsTab } from "@/components/dashboard-v2/projects-tab"
@@ -13,7 +14,17 @@ import { CardSkeleton } from "@/components/shared/loading-skeleton"
 import { formatNumber, formatCost, formatPercent, formatDuration } from "@/lib/utils"
 import { exportToCsv } from "@/lib/csv-export"
 import { exportToPdf } from "@/lib/pdf-export"
-import { Download, FileText } from "lucide-react"
+import {
+  Download,
+  FileText,
+  LayoutDashboard,
+  Activity,
+  Users,
+  DollarSign,
+  Target,
+  Clock,
+  Heart,
+} from "lucide-react"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
 const tabs = [
@@ -89,42 +100,44 @@ export function DashboardPage({ teamId, dateRange }: DashboardPageProps) {
 
   if (!overview) return null
 
+  const kpiItems = [
+    { label: "Sessions", value: formatNumber(overview.total_sessions), icon: Activity },
+    { label: "Engineers", value: formatNumber(overview.total_engineers), icon: Users },
+    { label: "Cost", value: overview.estimated_cost != null ? formatCost(overview.estimated_cost) : "-", icon: DollarSign },
+    { label: "Success Rate", value: formatPercent(overview.success_rate), icon: Target },
+    { label: "Avg Duration", value: formatDuration(overview.avg_session_duration), icon: Clock },
+    { label: "Health Score", value: overview.avg_health_score != null ? overview.avg_health_score.toFixed(1) : "-", icon: Heart },
+  ]
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">{team?.name ?? "Organization"}</h1>
-          <p className="text-sm text-muted-foreground">
-            {formatNumber(overview.total_engineers)} engineers
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleExportCsv}>
-            <Download className="mr-1 h-4 w-4" />
-            CSV
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExportPdf}>
-            <FileText className="mr-1 h-4 w-4" />
-            PDF
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        icon={LayoutDashboard}
+        title={team?.name ?? "Organization"}
+        description={`${formatNumber(overview.total_engineers)} engineers`}
+      >
+        <Button variant="outline" size="sm" onClick={handleExportCsv}>
+          <Download className="mr-1 h-4 w-4" />
+          CSV
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleExportPdf}>
+          <FileText className="mr-1 h-4 w-4" />
+          PDF
+        </Button>
+      </PageHeader>
 
       {/* KPI row */}
-      <div className="flex gap-8 border-b border-border/60 pb-4">
-        <InlineStat label="Sessions" value={formatNumber(overview.total_sessions)} />
-        <InlineStat label="Engineers" value={formatNumber(overview.total_engineers)} />
-        <InlineStat
-          label="Cost"
-          value={overview.estimated_cost != null ? formatCost(overview.estimated_cost) : "-"}
-        />
-        <InlineStat label="Success Rate" value={formatPercent(overview.success_rate)} />
-        <InlineStat label="Avg Duration" value={formatDuration(overview.avg_session_duration)} />
-        <InlineStat
-          label="Health Score"
-          value={overview.avg_health_score != null ? overview.avg_health_score.toFixed(1) : "-"}
-        />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {kpiItems.map((item, i) => (
+          <div
+            key={item.label}
+            className="animate-stagger-in"
+            style={{ animationDelay: `${i * 50}ms` }}
+          >
+            <InlineStat label={item.label} value={item.value} icon={item.icon} />
+          </div>
+        ))}
       </div>
 
       {/* Tabs */}

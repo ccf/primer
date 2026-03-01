@@ -144,7 +144,7 @@ export function EngineerLeaderboard({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-muted/50">
+              <tr className="border-b border-border bg-muted/60">
                 {hasBenchmarks && (
                   <th className="w-8 px-2 py-2.5" />
                 )}
@@ -205,7 +205,7 @@ export function EngineerLeaderboard({
               {engineers.map((eng) => (
                 <Fragment key={eng.engineer_id}>
                   <tr
-                    className="cursor-pointer border-b border-border/40 last:border-0 hover:bg-muted/30"
+                    className="cursor-pointer border-b border-border/40 last:border-0 even:bg-muted/15 hover:bg-accent/50"
                     onMouseEnter={() => setHoveredId(eng.engineer_id)}
                     onMouseLeave={() => setHoveredId(null)}
                     onClick={() => navigate(`/engineers/${eng.engineer_id}`)}

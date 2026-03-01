@@ -1,7 +1,9 @@
+import { MonitorDot } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useFriction } from "@/hooks/use-api-queries"
 import { SessionBrowser } from "@/components/sessions/session-browser"
 import { FrictionList } from "@/components/analytics/friction-list"
+import { PageHeader } from "@/components/shared/page-header"
 import { ChartSkeleton } from "@/components/shared/loading-skeleton"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
@@ -19,9 +21,11 @@ export function SessionsPage({ teamId, dateRange }: SessionsPageProps) {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">
-        {role === "engineer" ? "My Sessions" : "Sessions"}
-      </h1>
+      <PageHeader
+        icon={MonitorDot}
+        title={role === "engineer" ? "My Sessions" : "Sessions"}
+        description="Browse and filter Claude Code sessions"
+      />
 
       <SessionBrowser
         teamId={teamId}

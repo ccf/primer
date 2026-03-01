@@ -13,8 +13,7 @@ import {
   LogOut,
   Sun,
   Moon,
-  ChevronsLeft,
-  ChevronsRight,
+  PanelLeft,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
@@ -133,7 +132,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
             title="Collapse sidebar"
           >
-            <ChevronsLeft className="h-4 w-4" />
+            <PanelLeft className="h-4 w-4" />
           </button>
         )}
       </div>
@@ -146,7 +145,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
             title="Expand sidebar"
           >
-            <ChevronsRight className="h-4 w-4" />
+            <PanelLeft className="h-4 w-4" />
           </button>
         </div>
       )}
@@ -163,7 +162,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 "flex items-center rounded-md text-sm font-medium transition-colors",
                 collapsed ? "justify-center px-0 py-2" : "gap-3 px-3 py-2",
                 isActive
-                  ? "border-l-3 border-primary bg-accent/60 text-primary"
+                  ? "border-l-3 border-primary bg-primary/8 text-primary font-semibold dark:bg-primary/12"
                   : "border-l-3 border-transparent text-muted-foreground hover:bg-accent hover:text-sidebar-foreground",
               )
             }
@@ -273,4 +272,3 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     </aside>
   )
 }
-

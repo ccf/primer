@@ -1,7 +1,7 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-
-const COLORS = ["#22c55e", "#f59e0b", "#ef4444", "#6366f1", "#8b5cf6"]
+import { ChartTooltip } from "@/components/charts/chart-tooltip"
+import { CHART_PALETTE } from "@/lib/chart-colors"
 
 interface OutcomeChartProps {
   data: Record<string, number>
@@ -30,10 +30,10 @@ export function OutcomeChart({ data }: OutcomeChartProps) {
               dataKey="value"
             >
               {chartData.map((_, i) => (
-                <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                <Cell key={i} fill={CHART_PALETTE[i % CHART_PALETTE.length]} />
               ))}
             </Pie>
-            <Tooltip />
+            <Tooltip content={<ChartTooltip />} />
             <Legend />
           </PieChart>
         </ResponsiveContainer>

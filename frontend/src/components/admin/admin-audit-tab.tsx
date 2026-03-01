@@ -85,7 +85,7 @@ function AdminActionsView() {
         <div className="rounded-xl border border-border/60">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-muted/50">
+              <tr className="border-b border-border bg-muted/60">
                 <th className="px-4 py-2 text-left font-medium">Time</th>
                 <th className="px-4 py-2 text-left font-medium">Actor</th>
                 <th className="px-4 py-2 text-left font-medium">Action</th>
@@ -95,7 +95,7 @@ function AdminActionsView() {
             </thead>
             <tbody>
               {logs.map((log) => (
-                <tr key={log.id} className="border-b border-border/40 last:border-0">
+                <tr key={log.id} className="border-b border-border/40 last:border-0 even:bg-muted/15 hover:bg-accent/50">
                   <td className="whitespace-nowrap px-4 py-2 text-muted-foreground">
                     {new Date(log.created_at).toLocaleString()}
                   </td>
@@ -174,7 +174,7 @@ function IngestEventsView() {
         <div className="overflow-x-auto rounded-xl border border-border/60">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-muted/50">
+              <tr className="border-b border-border bg-muted/60">
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Time</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Engineer</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
@@ -185,7 +185,7 @@ function IngestEventsView() {
             </thead>
             <tbody>
               {events?.map((evt) => (
-                <tr key={evt.id} className="border-b border-border/40 last:border-0">
+                <tr key={evt.id} className="border-b border-border/40 last:border-0 even:bg-muted/15 hover:bg-accent/50">
                   <td className="px-4 py-3 text-xs text-muted-foreground">
                     {format(parseISO(evt.created_at), "MMM d, HH:mm:ss")}
                   </td>

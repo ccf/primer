@@ -1,5 +1,7 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ChartTooltip } from "@/components/charts/chart-tooltip"
+import { CHART_COLORS, AXIS_TICK_STYLE } from "@/lib/chart-colors"
 import type { ModelRanking } from "@/types/api"
 import { formatTokens } from "@/lib/utils"
 
@@ -24,12 +26,12 @@ export function ModelUsageChart({ data }: ModelUsageChartProps) {
       <CardContent>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={chartData}>
-            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-            <YAxis tickFormatter={(v) => formatTokens(v as number)} tick={{ fontSize: 11 }} />
-            <Tooltip formatter={(v) => formatTokens(v as number)} />
+            <XAxis dataKey="name" tick={AXIS_TICK_STYLE} />
+            <YAxis tickFormatter={(v) => formatTokens(v as number)} tick={AXIS_TICK_STYLE} />
+            <Tooltip content={<ChartTooltip formatter={(v) => formatTokens(v)} />} />
             <Legend />
-            <Bar dataKey="input" fill="#6366f1" stackId="a" radius={[0, 0, 0, 0]} />
-            <Bar dataKey="output" fill="#a78bfa" stackId="a" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="input" fill={CHART_COLORS.primary} stackId="a" radius={[0, 0, 0, 0]} />
+            <Bar dataKey="output" fill={CHART_COLORS.quaternary} stackId="a" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

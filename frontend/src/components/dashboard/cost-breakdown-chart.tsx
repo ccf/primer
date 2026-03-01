@@ -1,5 +1,7 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ChartTooltip } from "@/components/charts/chart-tooltip"
+import { CHART_COLORS, AXIS_TICK_STYLE } from "@/lib/chart-colors"
 import type { ModelCostBreakdown } from "@/types/api"
 import { formatCost } from "@/lib/utils"
 
@@ -23,11 +25,11 @@ export function CostBreakdownChart({ data }: CostBreakdownChartProps) {
       <CardContent>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={chartData}>
-            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-            <YAxis tickFormatter={(v) => formatCost(v as number)} tick={{ fontSize: 11 }} />
-            <Tooltip formatter={(v) => formatCost(v as number)} />
+            <XAxis dataKey="name" tick={AXIS_TICK_STYLE} />
+            <YAxis tickFormatter={(v) => formatCost(v as number)} tick={AXIS_TICK_STYLE} />
+            <Tooltip content={<ChartTooltip formatter={(v) => formatCost(v)} />} />
             <Legend />
-            <Bar dataKey="cost" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="cost" fill={CHART_COLORS.tertiary} radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>
