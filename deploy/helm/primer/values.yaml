@@ -1,0 +1,79 @@
+# Primer Helm chart values
+
+server:
+  image:
+    repository: primer-server
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPU: 70
+  pdb:
+    enabled: true
+    minAvailable: 1
+  port: 8000
+
+frontend:
+  image:
+    repository: primer-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 2
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPU: 70
+  pdb:
+    enabled: true
+    minAvailable: 1
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: primer.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+database:
+  url: postgresql://primer:primer@postgres:5432/primer
+
+config:
+  logLevel: info
+  corsOrigins: '["https://primer.example.com"]'
+  baseUrl: https://primer.example.com
+
+secrets:
+  adminApiKey: change-me
+  jwtSecretKey: change-me
+  databaseUrl: ""  # Overrides database.url when set
+
+migration:
+  enabled: true
+  backoffLimit: 3
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
