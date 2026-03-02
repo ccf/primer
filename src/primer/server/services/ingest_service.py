@@ -67,6 +67,7 @@ def upsert_session(db: Session, engineer_id: str, payload: SessionIngestPayload)
         "cache_read_tokens",
         "cache_creation_tokens",
         "primary_model",
+        "billing_mode",
         "summary",
     ]:
         value = getattr(payload, field, None)

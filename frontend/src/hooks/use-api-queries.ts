@@ -7,9 +7,13 @@ import type {
   AlertThresholds,
   AuditLogResponse,
   BottleneckAnalytics,
+  BudgetStatus,
+  CacheAnalyticsResponse,
   ClaudePRComparisonResponse,
   ConfigOptimizationResponse,
   CostAnalytics,
+  CostForecastResponse,
+  CostModelingResponse,
   DailyStatsResponse,
   EngineerAnalytics,
   EngineerBenchmarkResponse,
@@ -525,5 +529,56 @@ export function useNarrative(
     enabled,
     staleTime: 5 * 60 * 1000,
     retry: 0,
+  })
+}
+
+// --- FinOps ---
+
+export function useCacheAnalytics(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["finops-cache", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<CacheAnalyticsResponse>(
+        `/api/v1/finops/cache${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useCostModeling(
+  teamId: string | null,
+  startDate?: string,
+  endDate?: string,
+) {
+  return useQuery({
+    queryKey: ["finops-cost-modeling", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<CostModelingResponse>(
+        `/api/v1/finops/cost-modeling${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useCostForecast(
+  teamId: string | null,
+  startDate?: string,
+  endDate?: string,
+  forecastDays = 30,
+) {
+  return useQuery({
+    queryKey: ["finops-forecast", teamId, startDate, endDate, forecastDays],
+    queryFn: () =>
+      apiFetch<CostForecastResponse>(
+        `/api/v1/finops/forecast${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate, forecast_days: forecastDays })}`,
+      ),
+  })
+}
+
+export function useBudgets(teamId: string | null) {
+  return useQuery({
+    queryKey: ["finops-budgets", teamId],
+    queryFn: () =>
+      apiFetch<BudgetStatus[]>(
+        `/api/v1/finops/budgets${buildParams({ team_id: teamId })}`,
+      ),
   })
 }

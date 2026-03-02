@@ -20,6 +20,7 @@ from primer.server.routers import (
     auth,
     engineers,
     explorer,
+    finops,
     health,
     ingest,
     notifications,
@@ -99,6 +100,7 @@ def create_app() -> FastAPI:
     app.include_router(admin.router)
     app.include_router(webhooks.router)
     app.include_router(explorer.router)
+    app.include_router(finops.router)
 
     if FRONTEND_DIST.is_dir():
         app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")

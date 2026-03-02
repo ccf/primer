@@ -58,6 +58,9 @@ def main() -> None:
 
         meta = SessionMetadata(session_id=session_id, project_path=cwd)
 
+    # Detect billing mode from environment
+    meta.billing_mode = "api_key" if os.environ.get("ANTHROPIC_API_KEY") else "subscription"
+
     # Capture git info (branch, remote, commits during session)
     if cwd:
         git_info = capture_git_info(cwd, meta.started_at)

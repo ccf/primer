@@ -96,6 +96,14 @@ MODEL_PRICING: dict[str, ModelPricing] = {
 
 _DEFAULT_PRICING_KEY = "claude-sonnet-4"
 
+# Claude subscription plan tiers for cost modeling
+PLAN_TIERS = [
+    {"name": "api_key", "label": "API Key", "monthly_cost": 0.0},
+    {"name": "pro", "label": "Claude Pro", "monthly_cost": 20.0},
+    {"name": "max_5x", "label": "Claude Max (5x)", "monthly_cost": 100.0},
+    {"name": "max_20x", "label": "Claude Max (20x)", "monthly_cost": 200.0},
+]
+
 
 def get_pricing(model_name: str) -> ModelPricing:
     """Return pricing for a model using longest prefix match, falling back to Sonnet 4."""

@@ -917,3 +917,100 @@ export interface NarrativeStatusResponse {
   available: boolean
   reason: string | null
 }
+
+// --- FinOps ---
+
+export interface ModelCacheBreakdown {
+  model_name: string
+  cache_read_tokens: number
+  cache_creation_tokens: number
+  input_tokens: number
+  cache_hit_rate: number | null
+  estimated_savings: number
+}
+
+export interface EngineerCacheEfficiency {
+  engineer_id: string
+  engineer_name: string
+  cache_hit_rate: number | null
+  estimated_savings: number
+  potential_additional_savings: number
+  total_cache_read_tokens: number
+  total_input_tokens: number
+}
+
+export interface CacheAnalyticsResponse {
+  total_cache_read_tokens: number
+  total_cache_creation_tokens: number
+  total_input_tokens: number
+  cache_hit_rate: number | null
+  cache_savings_estimate: number | null
+  daily_cache_trend: DailyCacheEntry[]
+  model_cache_breakdown: ModelCacheBreakdown[]
+  engineer_cache_breakdown: EngineerCacheEfficiency[]
+  total_potential_additional_savings: number
+}
+
+export interface PlanTier {
+  name: string
+  label: string
+  monthly_cost: number
+}
+
+export interface EngineerCostComparison {
+  engineer_id: string
+  engineer_name: string
+  monthly_api_cost: number
+  recommended_plan: string
+  recommended_plan_cost: number
+  savings_vs_api: number
+  current_billing_mode: string | null
+  daily_avg_cost: number
+}
+
+export interface PlanAllocationSummary {
+  plan: string
+  label: string
+  monthly_cost_per_seat: number
+  engineer_count: number
+  total_monthly_cost: number
+}
+
+export interface CostModelingResponse {
+  period_days: number
+  plan_tiers: PlanTier[]
+  engineers: EngineerCostComparison[]
+  allocation: PlanAllocationSummary[]
+  total_api_cost_monthly: number
+  total_optimal_cost_monthly: number
+  total_savings_monthly: number
+}
+
+export interface ForecastPoint {
+  date: string
+  projected_cost: number
+  upper_bound: number
+  lower_bound: number
+}
+
+export interface CostForecastResponse {
+  historical: DailyCostEntry[]
+  forecast: ForecastPoint[]
+  monthly_projection: number
+  trend_direction: string
+}
+
+export interface BudgetStatus {
+  id: string
+  name: string
+  team_id: string | null
+  team_name: string | null
+  amount: number
+  period: string
+  current_spend: number
+  burn_rate_daily: number
+  projected_end_of_period: number
+  alert_threshold_pct: number
+  pct_used: number
+  status: string
+}

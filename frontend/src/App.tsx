@@ -16,6 +16,7 @@ import { EngineersPage } from "@/pages/engineers"
 import { TeamsPage } from "@/pages/teams"
 import { TeamDetailPage } from "@/pages/team-detail"
 import { MaturityPage } from "@/pages/maturity"
+import { FinOpsPage } from "@/pages/finops"
 import { NarrativePage } from "@/pages/narrative"
 import { AdminPage } from "@/pages/admin"
 import { ExplorerPage } from "@/pages/explorer"
@@ -83,6 +84,7 @@ function AuthenticatedApp() {
           <Route path="/sessions/:id" element={<SessionDetailPage />} />
           <Route path="/engineers/:id" element={<EngineerProfileRoute dateRange={dateRange} />} />
           <Route path="/engineers" element={<EngineersPage teamId={teamId} dateRange={dateRange} />} />
+          <Route path="/finops" element={<FinOpsPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/maturity" element={<MaturityPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/teams" element={<TeamsPage />} />
           <Route path="/teams/:teamId" element={<TeamDetailRoute dateRange={dateRange} />} />
