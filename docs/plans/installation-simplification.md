@@ -4,22 +4,17 @@
 Primer currently requires ~8 manual steps across Python, Node.js, and shell. This plan introduces a `primer` CLI, a `curl | sh` installer for personal use, and enhanced Docker/Helm for enterprise.
 
 ## Current Pain Points
-- No single entry point or CLI — everything is `python -m`, `python scripts/`, or raw curl
-- No `[project.scripts]` in pyproject.toml
-- No daemonization (server runs in foreground terminal)
-- Frontend requires Node.js + separate dev server
-- Docker Compose is minimal (no frontend, no health checks)
-- No Helm chart
-- MCP registration and API key distribution are manual
+- ~~No single entry point or CLI — everything is `python -m`, `python scripts/`, or raw curl~~
+- ~~No `[project.scripts]` in pyproject.toml~~
+- ~~No daemonization (server runs in foreground terminal)~~
+- ~~Frontend requires Node.js + separate dev server~~
+- ~~Docker Compose is minimal (no frontend, no health checks)~~
+- ~~No Helm chart~~
+- ~~MCP registration and API key distribution are manual~~
 
-## 1. Unified `primer` CLI
+## 1. Unified `primer` CLI ✅
 
-### Entry Point
-```toml
-# pyproject.toml
-[project.scripts]
-primer = "primer.cli:main"
-```
+**Implemented** in `src/primer/cli/`. Entry point: `primer = "primer.cli.main:cli"` in pyproject.toml.
 
 ### Command Tree
 ```
@@ -37,9 +32,19 @@ primer mcp uninstall           # Remove MCP registration
 primer mcp serve               # Run MCP server (used by the registration)
 primer sync                    # Sync local sessions to server
 primer doctor                  # Diagnose issues (connectivity, hook, MCP)
-primer version                 # Show version
-primer configure [set|get]     # View/edit config
+primer --version               # Show version
+primer configure get KEY       # Get a config value
+primer configure set KEY VAL   # Set a config value
+primer configure list          # Show all config values
 ```
+
+### Key files
+- `src/primer/cli/main.py` — Click group, registers all commands
+- `src/primer/cli/config.py` — Config management (load_config_into_env, read/write config.toml)
+- `src/primer/cli/server_manager.py` — Platform-specific process management (launchd/systemd/pidfile)
+- `src/primer/cli/console.py` — Colored output helpers
+- `src/primer/cli/commands/` — Individual command modules
+- `src/primer/hook/installer.py` — Hook install/uninstall logic (refactored from scripts/)
 
 ### Config Precedence
 1. CLI flags → 2. Environment variables → 3. `~/.primer/config.toml` → 4. PrimerSettings defaults
@@ -49,46 +54,49 @@ primer configure [set|get]     # View/edit config
 ~/.primer/
   config.toml          # API keys, server URL, port
   primer.db            # SQLite database
-  frontend-dist/       # Pre-built React app
   logs/server.log      # Server output
-  server.pid           # PID file for background server
+  server.pid           # PID file for pidfile fallback
 ```
 
 ### Server Management
-- macOS: launchd plist at `~/Library/LaunchAgents/dev.primer.server.plist`
-- Linux: systemd user unit at `~/.config/systemd/user/primer.service`
-- Fallback: `nohup` + PID file
+- macOS: launchd plist at `~/Library/LaunchAgents/com.primer.server.plist`
+- Linux: systemd user unit at `~/.config/systemd/user/primer-server.service`
+- Fallback: Popen + PID file
 
-## 2. Personal Use: `curl | sh` Installer
+## 2. Personal Use: `curl | sh` Installer ✅
+
+**Implemented**: POSIX sh installer at `website/public/install.sh`, served at `https://ccf.github.io/primer/install.sh`.
 
 ```bash
-curl -fsSL https://primer.dev/install.sh | sh
+curl -fsSL https://ccf.github.io/primer/install.sh | sh
 ```
 
-### Steps
-1. **Detect environment**: OS, arch, Python 3.12+, pipx
-2. **Install package**: `pipx install primer` (or `pip install --user`)
-3. **Initialize**: `primer init` — creates ~/.primer/, runs Alembic, generates keys
-4. **Setup identity**: `primer setup --auto` — reads name/email from `git config`
-5. **Install hook**: `primer hook install` — writes to `~/.claude/settings.json`
-6. **Register MCP**: `primer mcp install` — adds MCP sidecar entry
-7. **Download frontend**: Pre-built tarball from GitHub release → `~/.primer/frontend-dist/`
-8. **Start server**: Create launchd plist or systemd unit, start service
-9. **Verify**: Health check + print summary with URLs and key location
+### Configurable env vars
+- `PRIMER_REPO_URL` — GitHub repo URL for forks
+- `PRIMER_VERSION` — git tag/branch (default: `main`)
+- `PRIMER_NO_COLOR` — disable colored output
+- `PRIMER_SKIP_FRONTEND` — skip frontend download
+- `PRIMER_SERVER_PORT` — override port (default: 8000)
 
-### Config File
-```toml
-[server]
-host = "127.0.0.1"
-port = 8000
-database_url = "sqlite:///~/.primer/primer.db"
-admin_api_key = "primer-admin-xxxxxxxx"
+### 10-step sequence
+1. **Detect environment** — OS (macOS/Linux) + arch via `uname`
+2. **Find Python 3.12+** — tries `python3`, `python`, `python3.13`, `python3.12` with version check
+3. **Find installer** — prefers pipx, falls back to pip with ensurepip bootstrap
+4. **Install primer** — `pipx install` or `pip install --user` (idempotent via upgrade fallback)
+5. **Initialize** — `primer init` (creates `~/.primer/`, config.toml, runs migrations)
+6. **Download frontend** — tarball from GitHub Releases → `~/.primer/frontend-dist/`; graceful skip
+7. **Start server** — `primer server start` with `/health` polling (30s timeout, curl/urllib fallback)
+8. **Register engineer** — pre-checks git config to avoid interactive prompts; `primer setup`
+9. **Install hook + MCP** — `primer hook install` + `primer mcp install` (idempotent)
+10. **Verify + summary** — `primer doctor`, prints server URL, config paths, MCP tools, uninstall steps
 
-[identity]
-api_key = "primer_xxxxxxxx"
-name = "Your Name"
-email = "you@example.com"
-```
+### Key design decisions
+- POSIX sh (`#!/bin/sh`) for maximum compatibility
+- `printf` (not `echo`) for portable escape handling
+- Colors gated on TTY check + `NO_COLOR`/`PRIMER_NO_COLOR`
+- Frontend downloaded before server start so `PRIMER_FRONTEND_DIST` is set in service config
+- Non-critical steps use `|| true` so `set -eu` doesn't abort
+- `--break-system-packages` auto-detected for PEP 668 systems
 
 ## 3. Enterprise: Docker Compose ✅
 
@@ -100,12 +108,6 @@ Key files:
 - `.env.docker.example` — minimal env template
 - `.dockerignore` — optimized build context
 - `Makefile` — `make up`, `make down`, `make dev`, etc.
-
-### Enterprise Setup Script
-```bash
-curl -fsSL https://primer.dev/enterprise-setup.sh | sh
-```
-Checks Docker, prompts for PostgreSQL, generates keys, writes .env, runs `docker compose up -d`.
 
 ## 4. Enterprise: Kubernetes / Helm ✅
 
@@ -124,41 +126,23 @@ Key files:
 - Ingress with TLS support
 - Migration job runs before server starts
 
-## 5. Code Changes Required
+## 5. Documentation
 
-### `pyproject.toml`
-- Add `[project.scripts]` entry
-- Use `tomllib` (stdlib in 3.12+) for config parsing
-
-### `src/primer/common/config.py`
-- Read `~/.primer/config.toml` as fallback
-- Add `data_dir` property
-
-### `src/primer/server/app.py`
-- Check `~/.primer/frontend-dist/` as fallback for static files
-- Log configuration on startup
-
-### `scripts/install_hook.py`
-- Refactor core logic into `src/primer/hook/installer.py`
-- Script becomes thin wrapper
-
-### `Dockerfile.server`
-- Add `HEALTHCHECK`
-- Use `primer server start --fg` as entry point
+Getting-started guide, deployment guide, and CLI reference for the docs website.
 
 ## Implementation Sequence
 
-| Phase | Work |
-|---|---|
-| **1** | `primer` CLI core — init, setup, server, hook, mcp, sync, doctor |
-| **2** | `install.sh` script — OS detection, pipx install, launchd/systemd |
-| **3** | ✅ Docker improvements — frontend Dockerfile, compose health checks, .env |
-| **4** | ✅ Helm chart — deployments, ingress, migration job, HPA |
-| **5** | Documentation — getting-started, deployment, CLI reference |
+| Phase | Status | Work |
+|-------|--------|------|
+| **1** | ✅ | `primer` CLI — init, setup, server, hook, mcp, sync, doctor, configure |
+| **2** | ✅ | `install.sh` — OS detection, pipx/pip install, auto-setup |
+| **3** | ✅ | Docker — unified Dockerfile, compose health checks, Makefile |
+| **4** | ✅ | Helm chart — deployments, ingress, migration job, HPA, PDB |
+| **5** |    | Documentation — getting-started, deployment, CLI reference |
 
 ## Risks
 - PyPI publication needed for `pipx install primer`
 - Pre-built frontend requires CI release pipeline
-- Port 8000 conflicts — auto-detect free port
-- Python 3.12+ requirement — document pyenv/brew install
+- Port 8000 conflicts — `primer init` could auto-detect free port
+- Python 3.12+ requirement — installer should document pyenv/brew
 - Database migrations on upgrade — `primer server start` should auto-migrate
