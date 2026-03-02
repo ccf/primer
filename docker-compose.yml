@@ -17,6 +17,9 @@ services:
     build: .
     ports:
       - "${PRIMER_PORT:-8000}:8000"
+    env_file:
+      - path: .env
+        required: false
     environment:
       PRIMER_DATABASE_URL: postgresql://primer:${POSTGRES_PASSWORD:-primer}@postgres:5432/primer
       PRIMER_ADMIN_API_KEY: ${PRIMER_ADMIN_API_KEY:-change-me-in-production}

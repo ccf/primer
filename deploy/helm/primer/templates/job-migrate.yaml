@@ -28,9 +28,7 @@ spec:
           image: "{{ .Values.server.image.repository }}:{{ .Values.server.image.tag }}"
           imagePullPolicy: {{ .Values.server.image.pullPolicy }}
           command: ["alembic", "upgrade", "head"]
-          envFrom:
-            - configMapRef:
-                name: {{ include "primer.fullname" . }}
-            - secretRef:
-                name: {{ include "primer.fullname" . }}
+          env:
+            - name: PRIMER_DATABASE_URL
+              value: {{ include "primer.databaseUrl" . | quote }}
 {{- end }}
