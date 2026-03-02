@@ -43,17 +43,27 @@ Running `primer init` again is safe. It will apply any pending migrations withou
 
 ## primer setup
 
-Interactive wizard that creates your engineer profile and configures the client.
+Register yourself as an engineer and save your API key.
 
 ```bash
-primer setup
+primer setup [--name NAME] [--email EMAIL] [--server-url URL]
 ```
 
-The wizard prompts for:
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--name` | `git config user.name` | Your display name in the dashboard |
+| `--email` | `git config user.email` | Used for identification and GitHub matching |
+| `--server-url` | `http://localhost:8000` | The Primer API server address |
 
-- **Name** — Your display name in the dashboard.
-- **Email** — Used for identification and GitHub account matching.
-- **Server URL** — The Primer API server address (defaults to `http://localhost:8000`).
+The command reads your name and email from `git config` automatically. If they aren't found, it prompts interactively. You can skip the prompts entirely by passing both flags:
+
+```bash
+# Auto-detects name/email from git config
+primer setup
+
+# Explicit values (no prompts)
+primer setup --name "Jane Doe" --email jane@example.com --server-url https://primer.internal
+```
 
 On completion, it creates your engineer account on the server and stores the API key in `~/.primer/config.toml`.
 
@@ -75,18 +85,18 @@ primer server start [--host HOST] [--port PORT] [--fg]
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--host` | `0.0.0.0` | Bind address |
+| `--host` | `127.0.0.1` | Bind address |
 | `--port` | `8000` | Bind port |
 | `--fg` | — | Run in foreground instead of daemonizing |
 
-By default, the server starts as a background daemon. Use `--fg` to run in the foreground, which is useful for development and debugging.
+The default host is `127.0.0.1` (localhost only). To accept external connections, pass `--host 0.0.0.0`. Use `--fg` to run in the foreground, which is useful for development, debugging, and Docker containers.
 
 ```bash
 # Start on the default port
 primer server start
 
-# Start on a custom port
-primer server start --port 9000
+# Start on a custom port, accessible externally
+primer server start --host 0.0.0.0 --port 9000
 
 # Run in the foreground with visible log output
 primer server start --fg
@@ -204,32 +214,82 @@ primer doctor
 ```
 
 ```text
-✓ Server reachable at http://localhost:8000
-✓ Hook installed in ~/.claude/settings.json
-✓ API key valid (engineer: jane-doe)
-✓ Database migrated (version: abc123)
-✓ 0 pending uploads
+✓ Data directory: ~/.primer
+✓ Config file: ~/.primer/config.toml
+✓ Database: ~/.primer/primer.db
+✓ Admin API key: primer-admin-...
+✓ API key: primer-eng-xxx...
+✓ Server running (PID 12345, launchd)
+✓ Server reachable: http://localhost:8000
+✓ Claude Code hook installed
+✓ MCP server registered
 ```
 
-The doctor checks:
+The doctor runs 9 checks:
 
-- **Server connectivity** — Can the CLI reach the Primer API.
-- **Hook installation** — Is the SessionEnd hook configured in Claude Code.
-- **API key validity** — Does the stored key authenticate successfully.
-- **Database status** — Are all migrations applied.
-- **Pending uploads** — Are there any failed session uploads waiting to sync.
+1. **Data directory** — `~/.primer/` exists.
+2. **Config file** — `config.toml` is present.
+3. **Database** — The SQLite file (or external database) is accessible.
+4. **Admin API key** — An admin key is configured.
+5. **Engineer API key** — Your personal API key is set.
+6. **Server running** — The background server process is active.
+7. **Server reachable** — The health endpoint responds.
+8. **Hook installed** — The SessionEnd hook is in Claude Code settings.
+9. **MCP registered** — The MCP sidecar is registered in Claude Code.
 
 If any check fails, the doctor provides actionable guidance on how to fix it.
 
 ## primer configure
 
-Update your Primer configuration interactively.
+Read and write Primer configuration values.
+
+### primer configure get
+
+Get a single configuration value:
 
 ```bash
-primer configure
+primer configure get server.port
+# server.port = 8000
+
+primer configure get server.url
+# server.url = http://localhost:8000
 ```
 
-Opens a guided wizard to update settings in `~/.primer/config.toml`. This is useful for changing the server URL, updating API keys, or modifying other settings without manually editing the config file.
+Sensitive values (API keys) are automatically masked in output.
+
+### primer configure set
+
+Set a configuration value:
+
+```bash
+primer configure set server.port 9000
+# ✓ server.port = 9000
+
+primer configure set server.url https://primer.internal
+# ✓ server.url = https://primer.internal
+```
+
+### primer configure list
+
+Show all configuration values:
+
+```bash
+primer configure list
+```
+
+```text
+[server]
+  url            = http://localhost:8000
+  port           = 8000
+  host           = 127.0.0.1
+
+[auth]
+  admin_api_key  = primer-admin-...
+  api_key        = primer-eng-xxx...
+
+[database]
+  url            = sqlite:///~/.primer/primer.db
+```
 
 See the [Configuration](../configuration/) page for a complete reference of all available settings.
 
@@ -323,4 +383,4 @@ cd frontend && npm run lint
 cd frontend && npx tsc -b --noEmit
 ```
 
-See the [Installation](../installation/) guide for initial frontend setup instructions.
+See the [Installation](../installation/) guide for initial setup instructions.

@@ -1,0 +1,257 @@
+---
+layout: ../../layouts/DocsPage.astro
+title: "Deployment"
+section: "Guides"
+description: "Deploy Primer with Docker Compose or Kubernetes."
+---
+import Callout from '../../components/docs/Callout.astro';
+
+## Choosing a Deployment Method
+
+| Scale | Method | Best for |
+|-------|--------|----------|
+| **Personal** | `primer` CLI | Single user, local machine |
+| **Team** | Docker Compose | Small to mid-size teams, single server |
+| **Enterprise** | Kubernetes (Helm) | Large orgs, HA, autoscaling |
+
+For personal use, the [Installation](../installation/) guide covers the CLI-based setup. This page covers Docker Compose and Kubernetes deployments.
+
+## Docker Compose
+
+Docker Compose runs the Primer API server, React dashboard, and PostgreSQL in a single `docker compose up` command.
+
+### Prerequisites
+
+- Docker 20.10+
+- Docker Compose v2
+
+### Quick Start
+
+```bash
+# 1. Copy the env template and edit secrets
+cp .env.docker.example .env
+
+# 2. Edit .env — at minimum, change these:
+#    POSTGRES_PASSWORD
+#    PRIMER_ADMIN_API_KEY
+#    PRIMER_JWT_SECRET_KEY
+
+# 3. Start everything
+make up
+```
+
+The `make up` command builds the images and starts all services. The API server is available at `http://localhost:8000` and the dashboard at `http://localhost:3000`.
+
+### Environment Variables
+
+The `.env` file controls the Docker deployment. Key variables:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `POSTGRES_PASSWORD` | Yes | PostgreSQL password |
+| `PRIMER_ADMIN_API_KEY` | Yes | Admin API key for management endpoints |
+| `PRIMER_JWT_SECRET_KEY` | Yes | JWT signing secret for dashboard auth |
+| `PRIMER_PORT` | No | Server port mapping (default: 8000) |
+| `PRIMER_GITHUB_CLIENT_ID` | No | GitHub OAuth app client ID |
+| `PRIMER_GITHUB_CLIENT_SECRET` | No | GitHub OAuth app client secret |
+| `PRIMER_ANTHROPIC_API_KEY` | No | Anthropic key for narrative insights |
+| `PRIMER_SLACK_WEBHOOK_URL` | No | Slack webhook for alert notifications |
+
+<Callout type="important" title="Change default secrets">
+The `.env.docker.example` ships with placeholder values. Always change `POSTGRES_PASSWORD`, `PRIMER_ADMIN_API_KEY`, and `PRIMER_JWT_SECRET_KEY` before running in any shared environment.
+</Callout>
+
+### Health Checks and Logs
+
+```bash
+# Check service health
+docker compose ps
+
+# Tail logs from all services
+make logs
+
+# Tail logs from a specific service
+docker compose logs -f primer
+
+# Stop all services
+make down
+
+# Stop and remove volumes (deletes database)
+make clean
+```
+
+### Connecting the CLI
+
+After the Docker stack is running, connect individual engineers' CLI installations to the shared server:
+
+```bash
+# Point the CLI at the Docker host
+primer configure set server.url http://your-server:8000
+
+# Register and save your API key
+primer setup
+
+# Install the Claude Code hook
+primer hook install
+```
+
+## Kubernetes (Helm)
+
+The Helm chart deploys separate server and frontend services with autoscaling, pod disruption budgets, and automated database migrations.
+
+### Prerequisites
+
+- kubectl configured for your cluster
+- Helm 3.x
+- A container registry accessible from your cluster
+
+### Build and Push Images
+
+Primer ships two Dockerfiles:
+
+```bash
+# API server (multi-stage: frontend build + Python runtime)
+docker build -t your-registry/primer-server:latest .
+
+# Frontend (nginx, for separate frontend deployment in K8s)
+docker build -f Dockerfile.frontend -t your-registry/primer-frontend:latest .
+
+# Push to your registry
+docker push your-registry/primer-server:latest
+docker push your-registry/primer-frontend:latest
+```
+
+### Install the Chart
+
+```bash
+helm install primer deploy/helm/primer \
+  --set server.image.repository=your-registry/primer-server \
+  --set frontend.image.repository=your-registry/primer-frontend \
+  --set secrets.adminApiKey=your-admin-key \
+  --set secrets.jwtSecretKey=your-jwt-secret \
+  --set database.url=postgresql://user:pass@db-host:5432/primer
+```
+
+Or create a `values-production.yaml` with your overrides:
+
+```bash
+helm install primer deploy/helm/primer -f values-production.yaml
+```
+
+### Key Configuration
+
+The chart's `values.yaml` supports:
+
+| Section | Key settings |
+|---------|-------------|
+| **server** | `replicas: 2`, autoscaling (2–10 pods at 70% CPU), resource limits |
+| **frontend** | `replicas: 2`, autoscaling (2–5 pods at 70% CPU), resource limits |
+| **ingress** | Hostname, TLS, annotation-based config |
+| **database** | PostgreSQL connection URL |
+| **secrets** | Admin key, JWT secret, optional database URL override |
+| **migration** | Pre-install/pre-upgrade Job (enabled by default) |
+
+<Callout type="note" title="External PostgreSQL required">
+The Helm chart does not include a PostgreSQL deployment. Use a managed database service (RDS, Cloud SQL, Azure Database) or deploy PostgreSQL separately. Set the connection string via `database.url` or `secrets.databaseUrl`.
+</Callout>
+
+### Autoscaling
+
+Enable horizontal pod autoscaling:
+
+```yaml
+# values-production.yaml
+server:
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPU: 70
+
+frontend:
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPU: 70
+```
+
+### Ingress and TLS
+
+```yaml
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: primer.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: primer-tls
+      hosts:
+        - primer.example.com
+```
+
+### Database Migrations
+
+Migrations run automatically as a Kubernetes Job before each install and upgrade (via Helm pre-install/pre-upgrade hooks). The job uses the same server image and database connection string.
+
+To disable automatic migrations:
+
+```yaml
+migration:
+  enabled: false
+```
+
+### Useful Commands
+
+```bash
+# Render templates locally for review
+make helm-template
+
+# Upgrade an existing release
+make helm-upgrade
+
+# Check pod status
+kubectl get pods -l app.kubernetes.io/name=primer
+```
+
+## Production Hardening
+
+Regardless of deployment method, consider these for production:
+
+### Use PostgreSQL
+
+SQLite works for single-user and development, but PostgreSQL is required for concurrent access. Set `PRIMER_DATABASE_URL` or the Helm `database.url` to a PostgreSQL connection string.
+
+### Reverse Proxy and TLS
+
+Put the API server behind a reverse proxy (nginx, Caddy, or a cloud load balancer) for TLS termination. The Helm chart supports Ingress with TLS directly.
+
+### Multiple Workers
+
+For higher throughput, run multiple uvicorn workers behind gunicorn:
+
+```bash
+gunicorn primer.server.app:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+```
+
+In Docker, this is configured in the Dockerfile entrypoint. In Kubernetes, increase `server.replicas` or enable autoscaling.
+
+### Backups
+
+- **PostgreSQL**: Use `pg_dump` or your cloud provider's automated backups.
+- **SQLite**: Copy `~/.primer/primer.db` to a backup location. Stop the server first to avoid corruption.
+
+### Monitoring
+
+The `/health` endpoint returns `{"status": "ok"}` and can be used with any monitoring tool. Docker Compose includes health checks; the Helm chart configures liveness and readiness probes.
+
+## Next Steps
+
+- **[Configuration](../configuration/)** — Full reference for all server, database, and auth settings.
+- **[Server & API](../server/)** — REST API documentation and authentication details.
+- **[Team Setup](../teams/)** — Register engineers and create teams after deployment.

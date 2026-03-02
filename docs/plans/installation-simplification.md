@@ -126,9 +126,9 @@ Key files:
 - Ingress with TLS support
 - Migration job runs before server starts
 
-## 5. Documentation
+## 5. Documentation ✅
 
-Getting-started guide, deployment guide, and CLI reference for the docs website.
+**Implemented**: Updated Installation guide (added `curl | sh` quick install, restructured manual/source sections), fixed CLI Reference (configure subcommands, setup git auto-detect, doctor 9-check output, server default host), created new Deployment guide (Docker Compose + Kubernetes/Helm + production hardening), added Deployment to sidebar navigation and docs index.
 
 ## Implementation Sequence
 
@@ -138,7 +138,7 @@ Getting-started guide, deployment guide, and CLI reference for the docs website.
 | **2** | ✅ | `install.sh` — OS detection, pipx/pip install, auto-setup |
 | **3** | ✅ | Docker — unified Dockerfile, compose health checks, Makefile |
 | **4** | ✅ | Helm chart — deployments, ingress, migration job, HPA, PDB |
-| **5** |    | Documentation — getting-started, deployment, CLI reference |
+| **5** | ✅ | Documentation — installation, deployment, CLI reference updates |
 
 ## Risks
 - PyPI publication needed for `pipx install primer`

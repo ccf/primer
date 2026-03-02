@@ -6,28 +6,42 @@ description: "Install Primer and get up and running in minutes."
 ---
 import Callout from '../../components/docs/Callout.astro';
 
+## Quick Install
+
+The fastest way to get Primer running is the one-line installer:
+
 ```bash
-pip install primer-io
-primer init
-primer server start
+curl -fsSL https://ccf.github.io/primer/install.sh | sh
 ```
+
+This script detects your OS, installs the `primer` CLI (via pipx or pip), initializes the database, starts the server, registers your engineer profile, and installs the Claude Code hook — all in one step.
+
+<Callout type="tip" title="Customize the installer">
+The installer accepts environment variables for non-interactive use:
+
+| Variable | Description |
+|----------|-------------|
+| `PRIMER_VERSION` | Git tag or branch to install (default: `main`) |
+| `PRIMER_SERVER_PORT` | Override the default port 8000 |
+| `PRIMER_SKIP_FRONTEND` | Skip frontend download |
+| `PRIMER_NO_COLOR` | Disable colored output |
+| `PRIMER_REPO_URL` | GitHub repo URL (for forks) |
+</Callout>
 
 ## Prerequisites
 
-Before installing Primer, make sure you have the following:
+If you prefer a manual installation, you need:
 
-- **Python 3.12+** — Primer uses modern Python syntax and requires 3.12 or later.
-- **Node.js 20+** — Required for the React dashboard. Not needed if you only use the API.
+- **Python 3.12+** — Primer uses modern Python syntax.
 - **Claude Code** — A working Claude Code installation. Primer captures session data via Claude Code's hook system.
 
-Verify your versions:
+Verify your Python version:
 
 ```bash
 python --version   # Python 3.12.0+
-node --version     # v20.0.0+
 ```
 
-## Install Primer
+## Manual Install
 
 Install from PyPI:
 
@@ -35,7 +49,22 @@ Install from PyPI:
 pip install primer-io
 ```
 
-Or install from source for development:
+Then initialize and start:
+
+```bash
+primer init
+primer server start
+```
+
+`primer init` creates the `~/.primer/` directory, generates an admin API key, and runs database migrations. `primer server start` launches the API server in the background.
+
+<Callout type="tip" title="Custom database">
+By default, Primer uses SQLite. For team deployments with concurrent users, set `PRIMER_DATABASE_URL` to a PostgreSQL connection string before running `primer init`. See [Configuration](../configuration/) for details.
+</Callout>
+
+## Install from Source
+
+For development or contributing:
 
 ```bash
 git clone https://github.com/ccf/primer
@@ -45,65 +74,19 @@ pip install -e ".[dev]"
 
 The `[dev]` extra includes testing tools (pytest, coverage), linting (ruff, bandit), and other development dependencies.
 
-Then initialize Primer:
-
-```bash
-primer init
-```
-
-This command:
-
-1. Creates the `~/.primer/` directory for local configuration.
-2. Generates a random admin API key and writes it to `config.toml`.
-3. Runs database migrations to set up the SQLite database.
-
-```text
-✓ Created ~/.primer/
-✓ Generated admin key: primer-admin-xxxxx
-✓ Database migrations applied
-Primer is ready. Run `primer server start` to launch the API.
-```
-
-<Callout type="tip" title="Custom database">
-By default, Primer uses SQLite. For team deployments with concurrent users, set `PRIMER_DATABASE_URL` to a PostgreSQL connection string before running `primer init`. See [Configuration](../configuration/) for details.
-</Callout>
-
-## Start the Server
-
-```bash
-primer server start
-```
-
-The server starts as a background process on port 8000 by default. Verify it is running:
-
-```bash
-curl http://localhost:8000/health
-```
-
-```json
-{"status": "ok"}
-```
-
-To run in the foreground (useful for development or debugging):
-
-```bash
-primer server start --fg
-```
-
-See the [CLI Reference](../cli/) for additional server commands like `primer server stop`, `primer server status`, and `primer server logs`.
-
 ## Set Up Your Engineer Profile
 
 ```bash
 primer setup
 ```
 
-This interactive wizard walks you through:
+This reads your name and email from `git config` automatically. If they aren't set, it prompts you. You can also pass them directly:
 
-1. Setting your name and email.
-2. Specifying the Primer server URL (defaults to `http://localhost:8000`).
-3. Creating your engineer account on the server.
-4. Storing your API key locally in `~/.primer/config.toml`.
+```bash
+primer setup --name "Jane Doe" --email jane@example.com
+```
+
+On completion, it creates your engineer account on the server and saves your API key to `~/.primer/config.toml`.
 
 <Callout type="important" title="Save your API key">
 Your API key is shown only once during setup. Copy it before closing the terminal. If you lose it, an admin will need to regenerate it for you.
@@ -117,7 +100,7 @@ The SessionEnd hook automatically uploads session data after each Claude Code se
 primer hook install
 ```
 
-This adds a `SessionEnd` entry to `~/.claude/settings.json` that points to the Primer ingest endpoint.
+This adds a `SessionEnd` entry to `~/.claude/settings.json` that triggers the Primer ingest process when a Claude Code session ends.
 
 Verify the hook is installed and the server is reachable:
 
@@ -125,27 +108,15 @@ Verify the hook is installed and the server is reachable:
 primer hook status
 ```
 
-After your next Claude Code session ends, the transcript, tool usage, model usage, and other session metadata will be uploaded automatically. No manual action is required.
+After your next Claude Code session ends, the transcript, tool usage, model usage, and other session metadata will be uploaded automatically.
 
 <Callout type="note" title="What gets uploaded?">
 Primer captures session duration, token counts, model usage, tool call counts, friction events (errors, retries), and git commit metadata. Full transcript content is included for synthesis but can be disabled in the configuration.
 </Callout>
 
-## Run the Dashboard (Optional)
+## Docker
 
-The React dashboard provides visualizations for usage trends, cost tracking, team comparisons, and more.
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Open `http://localhost:5173` in your browser. For development, use the admin API key to log in -- expand "Admin API Key" on the login page and enter the key generated during `primer init`.
-
-<Callout type="tip" title="Production builds">
-For production, run `npm run build` to generate a static build that can be served by any web server or CDN. The dashboard communicates with the Primer API server over REST.
-</Callout>
+For team or production deployments, Primer ships with Docker Compose and Helm charts. See the [Deployment](../deployment/) guide for Docker Compose quick start, Kubernetes setup, and production hardening advice.
 
 ## Seed Sample Data (Optional)
 
@@ -161,22 +132,21 @@ This creates:
 - **8 engineers** with varied usage personas (heavy users, occasional users, new adopters).
 - **~90 days of session history** including transcripts, tool usage breakdowns, model usage, friction events, and git commit metadata.
 
-The seed data provides a representative view of what Primer looks like at scale, making it useful for demos and for exploring dashboard features before onboarding your team.
-
 ## Enable MCP Sidecar (Optional)
 
-The MCP (Model Context Protocol) sidecar gives Claude direct access to your team's usage data during coding sessions. Engineers can ask Claude questions like "how's my team doing this week?" or "what friction patterns are common?" without leaving their editor.
+The MCP sidecar gives Claude direct access to your team's usage data during coding sessions. Engineers can ask Claude questions like "how's my team doing this week?" without leaving their editor.
 
 See the [MCP Sidecar](../mcp/) guide for setup instructions.
 
 ## Connect GitHub (Optional)
 
-Link Claude Code sessions to pull requests for AI contribution tracking and readiness scoring. When enabled, Primer correlates git commits made during sessions with GitHub PRs and calculates what percentage of each PR was AI-assisted.
+Link Claude Code sessions to pull requests for AI contribution tracking and readiness scoring.
 
 See the [GitHub Integration](../github/) guide for setup steps.
 
 ## Next Steps
 
 - **[Configuration](../configuration/)** — Customize the server, database, authentication, and integrations.
+- **[CLI Reference](../cli/)** — Full reference for all `primer` commands.
 - **[Team Setup](../teams/)** — Register engineers, create teams, and assign roles.
-- **[Alert Thresholds](../alerts/)** — Set up cost spikes, usage drops, and friction alerts for your team.
+- **[Deployment](../deployment/)** — Docker Compose, Kubernetes, and production hardening.
