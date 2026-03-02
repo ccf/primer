@@ -1,0 +1,14 @@
+{{- if .Values.server.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "primer.fullname" . }}-server
+  labels:
+    {{- include "primer.labels" . | nindent 4 }}
+    {{- include "primer.server.selectorLabels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.server.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "primer.server.selectorLabels" . | nindent 6 }}
+{{- end }}

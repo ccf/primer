@@ -1,32 +1,38 @@
 services:
-  db:
+  postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: primer
-      POSTGRES_PASSWORD: primer
       POSTGRES_DB: primer
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: primer
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-primer}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U primer"]
-      interval: 2s
-      timeout: 5s
-      retries: 10
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
-  server:
-    build:
-      context: .
-      dockerfile: Dockerfile.server
+  primer:
+    build: .
     ports:
-      - "8000:8000"
+      - "${PRIMER_PORT:-8000}:8000"
     environment:
-      PRIMER_DATABASE_URL: postgresql://primer:primer@db:5432/primer
-      PRIMER_ADMIN_API_KEY: ${PRIMER_ADMIN_API_KEY:-primer-admin-dev-key}
+      PRIMER_DATABASE_URL: postgresql://primer:${POSTGRES_PASSWORD:-primer}@postgres:5432/primer
+      PRIMER_ADMIN_API_KEY: ${PRIMER_ADMIN_API_KEY:-change-me-in-production}
+      PRIMER_JWT_SECRET_KEY: ${PRIMER_JWT_SECRET_KEY:-change-me-in-production}
+      PRIMER_CORS_ORIGINS: '["http://localhost:${PRIMER_PORT:-8000}"]'
+      PRIMER_BASE_URL: http://localhost:${PRIMER_PORT:-8000}
+      PRIMER_GITHUB_REDIRECT_URI: http://localhost:${PRIMER_PORT:-8000}/auth/callback
     depends_on:
-      db:
+      postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
 volumes:
   pgdata:

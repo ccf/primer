@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import pathlib
 from contextlib import asynccontextmanager
 
@@ -29,7 +30,11 @@ from primer.server.routers import (
 
 logger = logging.getLogger(__name__)
 
-FRONTEND_DIST = pathlib.Path(__file__).resolve().parent.parent.parent.parent / "frontend" / "dist"
+FRONTEND_DIST = (
+    pathlib.Path(os.environ["PRIMER_FRONTEND_DIST"])
+    if os.environ.get("PRIMER_FRONTEND_DIST")
+    else pathlib.Path(__file__).resolve().parent.parent.parent.parent / "frontend" / "dist"
+)
 
 
 async def _narrative_refresh_loop() -> None:

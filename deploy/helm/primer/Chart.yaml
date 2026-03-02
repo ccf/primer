@@ -1,0 +1,11 @@
+apiVersion: v2
+name: primer
+description: Aggregate Claude Code usage insights across an engineering organization
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - claude-code
+  - developer-insights
+  - engineering-analytics
+home: https://github.com/anthropics/primer

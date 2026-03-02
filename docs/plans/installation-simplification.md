@@ -90,16 +90,16 @@ name = "Your Name"
 email = "you@example.com"
 ```
 
-## 3. Enterprise: Docker Compose
+## 3. Enterprise: Docker Compose ✅
 
-### New `Dockerfile.frontend`
-Multi-stage: `node:20-alpine` build → `nginx:alpine` serve
+**Implemented**: Unified multi-stage `Dockerfile` (frontend build + Python runtime), rewritten `docker-compose.yml` with PostgreSQL health checks, health probes, `PRIMER_FRONTEND_DIST` env var support, and `.env.docker.example` template. Single `make up` to start everything.
 
-### Enhanced `docker-compose.yml`
-- PostgreSQL with health check
-- Server with health check + required env var validation (`${VAR:?message}`)
-- Frontend container (nginx)
-- `.env.docker.example` template
+Key files:
+- `Dockerfile` — unified multi-stage build (frontend + backend in one image)
+- `docker-compose.yml` — postgres + primer services with health checks
+- `.env.docker.example` — minimal env template
+- `.dockerignore` — optimized build context
+- `Makefile` — `make up`, `make down`, `make dev`, etc.
 
 ### Enterprise Setup Script
 ```bash
@@ -107,26 +107,21 @@ curl -fsSL https://primer.dev/enterprise-setup.sh | sh
 ```
 Checks Docker, prompts for PostgreSQL, generates keys, writes .env, runs `docker compose up -d`.
 
-## 4. Enterprise: Kubernetes / Helm
+## 4. Enterprise: Kubernetes / Helm ✅
 
-### Chart Structure
-```
-deploy/helm/primer/
-  Chart.yaml, values.yaml
-  templates/
-    deployment-server.yaml    # With HPA
-    deployment-frontend.yaml
-    service-*.yaml
-    ingress.yaml              # With TLS
-    configmap.yaml, secret.yaml
-    migration-job.yaml        # Helm pre-install/pre-upgrade hook
-    hpa.yaml, pdb.yaml
-```
+**Implemented**: Production-ready Helm chart at `deploy/helm/primer/` with separate server/frontend deployments, HPA, PDB, Ingress, ConfigMap/Secret, and pre-install/pre-upgrade migration Job. Separate `Dockerfile.frontend` (nginx) for Kubernetes deployments.
+
+Key files:
+- `deploy/helm/primer/` — full Helm chart (Chart.yaml, values.yaml, 14 templates)
+- `Dockerfile.frontend` — nginx-based frontend for K8s
+- `deploy/nginx/default.conf.template` — nginx config with API proxy + SPA fallback
 
 ### Key values.yaml
 - Server: 2 replicas, autoscaling 2-10 at 70% CPU
-- External PostgreSQL recommended (with `existingSecret` support)
-- Ingress with TLS
+- Frontend: 2 replicas, autoscaling 2-5 at 70% CPU
+- PodDisruptionBudgets for both components
+- External PostgreSQL recommended
+- Ingress with TLS support
 - Migration job runs before server starts
 
 ## 5. Code Changes Required
@@ -157,8 +152,8 @@ deploy/helm/primer/
 |---|---|
 | **1** | `primer` CLI core — init, setup, server, hook, mcp, sync, doctor |
 | **2** | `install.sh` script — OS detection, pipx install, launchd/systemd |
-| **3** | Docker improvements — frontend Dockerfile, compose health checks, .env |
-| **4** | Helm chart — deployments, ingress, migration job, HPA |
+| **3** | ✅ Docker improvements — frontend Dockerfile, compose health checks, .env |
+| **4** | ✅ Helm chart — deployments, ingress, migration job, HPA |
 | **5** | Documentation — getting-started, deployment, CLI reference |
 
 ## Risks

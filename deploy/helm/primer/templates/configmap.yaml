@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "primer.fullname" . }}
+  labels:
+    {{- include "primer.labels" . | nindent 4 }}
+data:
+  PRIMER_LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  PRIMER_CORS_ORIGINS: {{ .Values.config.corsOrigins | quote }}
+  PRIMER_BASE_URL: {{ .Values.config.baseUrl | quote }}
+  PRIMER_SERVER_HOST: "0.0.0.0"
+  PRIMER_SERVER_PORT: {{ .Values.server.port | quote }}

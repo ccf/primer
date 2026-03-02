@@ -17,6 +17,7 @@ coverage.xml
 .env
 .env.*
 !.env.example
+!.env.docker.example
 *.pem
 .github-app-key.pem
 .DS_Store
@@ -25,3 +26,6 @@ site/
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/
+
+# Docker
+.env.docker

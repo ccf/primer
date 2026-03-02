@@ -1,0 +1,21 @@
+Primer has been deployed!
+
+{{- if .Values.ingress.enabled }}
+Access the dashboard at:
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- else }}
+
+Get the application URL by running:
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/component=frontend,app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  kubectl port-forward $POD_NAME 8080:{{ .Values.frontend.port }}
+
+Then visit http://localhost:8080
+{{- end }}
+
+API server is available internally at:
+  {{ include "primer.fullname" . }}-server:{{ .Values.server.port }}
+
+To check migration status:
+  kubectl get jobs -l "app.kubernetes.io/component=migration,app.kubernetes.io/instance={{ .Release.Name }}"

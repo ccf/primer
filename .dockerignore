@@ -1,0 +1,61 @@
+# Version control
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.venv/
+venv/
+
+# Node
+frontend/node_modules/
+frontend/coverage/
+
+# Environment
+.env
+.env.*
+!.env.docker.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Build artifacts
+dist/
+build/
+site/
+
+# Tests & scripts
+tests/
+scripts/
+
+# Documentation & branding
+docs/
+website/
+brand/
+*.md
+!alembic/**
+
+# Tool directories
+.claude/
+.playwright-mcp/
+.serena/
+
+# Images
+*.png
+*.jpg
+*.jpeg
+
+# macOS
+.DS_Store
+
+# Secrets
+*.pem
