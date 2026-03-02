@@ -324,8 +324,11 @@ elif [ "$healthy" != 1 ]; then
   warn "Server not reachable — skipping registration"
   info "Start the server and run: primer setup"
 else
-  primer setup 2>/dev/null || warn "Registration failed — run 'primer setup' manually"
-  ok "Engineer registered"
+  if primer setup 2>/dev/null; then
+    ok "Engineer registered"
+  else
+    warn "Registration failed — run 'primer setup' manually"
+  fi
 fi
 
 # ---------------------------------------------------------------------------
