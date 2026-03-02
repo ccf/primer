@@ -7,12 +7,12 @@
 </p>
 
 <p align="center">
-  <b>AI engineering analytics for Claude Code teams.</b>
+  <b>See how your team uses AI coding tools.</b>
 </p>
 
 <p align="center">
-  <a href="docs/getting-started.md">Get Started</a> &middot;
-  <a href="docs/api.md">API Docs</a> &middot;
+  <a href="https://ccf.github.io/primer/docs/installation/">Get Started</a> &middot;
+  <a href="https://ccf.github.io/primer/docs/">Docs</a> &middot;
   <a href="ROADMAP.md">Roadmap</a> &middot;
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
@@ -26,98 +26,88 @@
 
 ---
 
-<!-- TODO: Replace with an actual dashboard screenshot or animated GIF (1280x720+) -->
-
 <p align="center">
-  <img src="docs/images/hero.svg" alt="Primer dashboard showing team analytics, cost tracking, and engineer profiles" width="100%">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/dashboard.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/dashboard-light.png">
+    <img src="docs/images/dashboard-light.png" alt="Primer dashboard showing team analytics, cost tracking, and engineer profiles" width="100%">
+  </picture>
 </p>
 
 ---
 
-Primer is a self-hosted analytics platform that turns [Claude Code](https://docs.anthropic.com/en/docs/claude-code) session data into actionable insights for engineering teams. It shows where AI assistance accelerates work, where engineers hit friction, and what it costs — so teams can make informed decisions about AI adoption, training, and tooling.
+Primer is a self-hosted, open-source analytics platform for AI coding tools. It captures session data from [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), and [Gemini CLI](https://github.com/google-gemini/gemini-cli) — then turns it into dashboards, cost reports, and actionable insights for your engineering team. Claude Code has the deepest integration today; Codex CLI and Gemini CLI support is in early access.
+
+Your data stays on your infrastructure. No telemetry leaves your network.
 
 ## Features
 
-- **Team Dashboard** — Session volume, token usage, cost trends, and activity heatmaps across your org with previous-period comparisons
+- **Team Dashboard** — Session volume, token usage, cost trends, and activity heatmaps with period-over-period comparisons
 - **Cost Analysis** — Per-model spend tracking with daily cost charts, model breakdowns, and budget visibility
 - **Engineer Profiles** — Personal trajectory dashboards with weekly sparklines, strengths, friction breakdown, and peer benchmarking
 - **Friction Detection** — Surface where engineers struggle: tool errors, permission blocks, timeouts, and context limits
 - **Anomaly Alerts** — Automatic detection of cost spikes, usage drops, and success rate degradation with configurable thresholds
 - **AI Maturity Scoring** — Tool leverage scores, category usage, project AI-readiness checks, and agent/skill analytics
 - **Session Browser** — Full-text search with outcome, type, and model filters plus transcript viewer with message-level detail
+- **Multi-Agent Support** — Collect sessions from Claude Code, Codex CLI, and Gemini CLI in a single dashboard
 - **GitHub Integration** — OAuth SSO, pull request sync, commit correlation, and repository AI-readiness scoring
 - **MCP Sidecar** — Claude queries your team's own usage patterns mid-session: stats, friction reports, recommendations
 - **Role-Based Access** — Engineers see their profile; leadership sees the org dashboard; admins manage teams and thresholds
-- **Dark Mode** — Light, dark, and system-preference themes
-- **Export** — CSV and PDF export from any view
 
 ## Quickstart
 
-```bash
-pip install -e ".[dev]"       # Install dependencies
-alembic upgrade head           # Initialize database
-uvicorn primer.server.app:app --reload  # Start API server
-```
+**One-liner install:**
 
 ```bash
-cd frontend && npm install && npm run dev  # Start dashboard
+curl -fsSL https://ccf.github.io/primer/install.sh | sh
 ```
 
-Visit `http://localhost:5173`. Run `python scripts/seed_data.py` to populate sample data.
+**Or install manually:**
 
-See the [Getting Started](docs/getting-started.md) guide for GitHub integration, hook setup, and production deployment.
+```bash
+pip install primer-io            # Install
+primer init                      # Initialize database and config
+primer server start              # Start API + dashboard
+primer hook install              # Register the SessionEnd hook
+```
+
+**Docker:**
+
+```bash
+cp .env.docker.example .env && make up
+```
+
+See the [Installation guide](https://ccf.github.io/primer/docs/installation/) for full setup details, GitHub integration, and production configuration.
 
 ## How It Works
 
-Primer has four components that work together:
-
 ```
-Claude Code ──SessionEnd Hook──▶ Primer API ◀──MCP Sidecar
-                                     │
-                                     ▼
-                              PostgreSQL / SQLite
-                                     │
-                                     ▼
-                              React Dashboard
+AI Coding Tools ──SessionEnd Hook──▶ Primer API ◀──MCP Sidecar
+ (Claude Code,                           │
+  Codex CLI,                             ▼
+  Gemini CLI)                    PostgreSQL / SQLite
+                                         │
+                                         ▼
+                                  React Dashboard
 ```
 
-1. **SessionEnd Hook** — Automatically uploads session transcripts after each Claude Code session
+1. **SessionEnd Hook** — Automatically uploads session transcripts after each AI coding session
 2. **REST API** — FastAPI service that stores sessions, computes analytics, and serves the dashboard
 3. **Dashboard** — React + Tailwind CSS frontend with role-based views and real-time filtering
 4. **MCP Sidecar** — Lets Claude query your team's data during conversations
 
-## Install the Hook
-
-```bash
-export PRIMER_SERVER_URL=http://localhost:8000
-export PRIMER_API_KEY=primer_...       # Your engineer API key
-python scripts/install_hook.py
-```
-
-This adds a `SessionEnd` hook to `~/.claude/settings.json`. Sessions are uploaded automatically after every Claude Code conversation.
-
-## Add the MCP Server
-
-Register Primer as an MCP server so Claude can query your team's patterns mid-session:
-
-```bash
-export PRIMER_SERVER_URL=http://localhost:8000
-export PRIMER_ADMIN_API_KEY=your-admin-key
-python -m primer.mcp.server
-```
-
-Tools: `sync` &middot; `my_stats` &middot; `team_overview` &middot; `friction_report` &middot; `recommendations`
-
 ## Documentation
 
-| Guide | Description |
-|-------|-------------|
-| **[Getting Started](docs/getting-started.md)** | Installation, setup, first dashboard |
-| **[GitHub Integration](docs/github-integration.md)** | OAuth login, GitHub App for PR sync |
-| **[Configuration](docs/configuration.md)** | All environment variables and options |
-| **[API Reference](docs/api.md)** | Endpoints, authentication, request/response schemas |
-| **[Architecture](docs/architecture.md)** | System design, data model, request flows |
-| **[Deployment](docs/deployment.md)** | Docker Compose, PostgreSQL, scaling |
+| | Guide | Description |
+|-|-------|-------------|
+| **Getting Started** | [Installation](https://ccf.github.io/primer/docs/installation/) | Install, configure, first dashboard |
+| | [Configuration](https://ccf.github.io/primer/docs/configuration/) | Environment variables and options |
+| | [CLI Reference](https://ccf.github.io/primer/docs/cli-reference/) | All `primer` commands |
+| **Architecture** | [Architecture](https://ccf.github.io/primer/docs/architecture/) | System design, data model, request flows |
+| | [API Reference](https://ccf.github.io/primer/docs/api/) | Endpoints, auth, request/response schemas |
+| **Guides** | [GitHub Integration](https://ccf.github.io/primer/docs/github-integration/) | OAuth login, GitHub App for PR sync |
+| | [Deployment](https://ccf.github.io/primer/docs/deployment/) | Docker Compose, Helm, PostgreSQL, scaling |
+| | [MCP Sidecar](https://ccf.github.io/primer/docs/mcp/) | Mid-session stats, friction reports, recommendations |
 
 ## About the Name
 
