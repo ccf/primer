@@ -74,3 +74,15 @@
 - [ ] **Performance measurement views** — leadership-oriented scorecards combining productivity, quality, cost efficiency, and adoption metrics per engineer
 - [ ] **Claude vs non-Claude PR comparison** — activate the existing stub with real PR data; side-by-side metrics for AI-assisted vs unassisted pull requests
 - [ ] **GitHub integration setup** — connect to real GitHub repos for PR data, avatars, repository metadata, and AI-readiness scoring
+
+## Tier 8 — FinOps
+
+Dedicated cost management panel (separate from the main dashboard) with deep financial analytics for AI coding tool spend.
+
+- [ ] **FinOps panel** — move cost-related views (daily cost chart, model cost breakdown, per-session cost) out of the main dashboard into a dedicated left-nav section
+- [ ] **Cache efficiency analytics** — surface prompt cache hit rates, cache read/write token ratios, and estimated savings from caching per model and per engineer
+- [ ] **Billing mode detection** — identify whether sessions are from subscription plans (Max, Team, Enterprise) or API-key usage based on session metadata, model availability, or header signals
+- [ ] **Subscription vs. API cost modeling** — financial model comparing actual token-based API spend against equivalent subscription cost (seats x plan price), showing net savings or overspend per engineer and team
+- [ ] **Break-even analysis** — calculate the usage threshold where API-key billing becomes cheaper than a subscription seat, with per-engineer recommendations
+- [ ] **Cost forecasting** — project future spend based on trailing usage trends, with scenario modeling for team growth and usage changes
+- [ ] **Budget tracking** — set monthly/quarterly budgets per team with burn-rate alerts and projected overrun warnings
