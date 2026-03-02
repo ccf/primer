@@ -60,6 +60,7 @@ class SessionMetadata:
     cache_read_tokens: int = 0
     cache_creation_tokens: int = 0
     primary_model: str = ""
+    billing_mode: str = ""
     first_prompt: str = ""
     summary: str = ""
     tool_counts: dict[str, int] = field(default_factory=dict)
@@ -90,6 +91,7 @@ class SessionMetadata:
             "cache_read_tokens": self.cache_read_tokens,
             "cache_creation_tokens": self.cache_creation_tokens,
             "primary_model": self.primary_model or None,
+            "billing_mode": self.billing_mode or None,
             "first_prompt": self.first_prompt[:500] if self.first_prompt else None,
             "summary": self.summary or None,
             "tool_usages": [

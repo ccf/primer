@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiFetch } from "@/lib/api"
-import type { AlertConfigResponse, NarrativeResponse } from "@/types/api"
+import type { AlertConfigResponse, BudgetStatus, NarrativeResponse } from "@/types/api"
 
 export function useAcknowledgeAlert() {
   const qc = useQueryClient()
@@ -148,5 +148,55 @@ export function useRefreshNarrative() {
       return apiFetch<NarrativeResponse>(`/api/v1/analytics/narrative?${sp.toString()}`)
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["narrative"] }),
+  })
+}
+
+// --- FinOps Budgets ---
+
+export function useCreateBudget() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: {
+      team_id?: string | null
+      name: string
+      amount: number
+      period?: string
+      alert_threshold_pct?: number
+    }) =>
+      apiFetch<BudgetStatus>("/api/v1/finops/budgets", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["finops-budgets"] }),
+  })
+}
+
+export function useUpdateBudget() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...payload
+    }: {
+      id: string
+      name?: string
+      amount?: number
+      period?: string
+      alert_threshold_pct?: number
+    }) =>
+      apiFetch<BudgetStatus>(`/api/v1/finops/budgets/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["finops-budgets"] }),
+  })
+}
+
+export function useDeleteBudget() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<void>(`/api/v1/finops/budgets/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["finops-budgets"] }),
   })
 }

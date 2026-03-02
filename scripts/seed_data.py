@@ -1489,6 +1489,76 @@ def main():
     print(f"  codex_cli:   {agent_type_totals['codex_cli']}")
     print(f"  gemini_cli:  {agent_type_totals['gemini_cli']}")
 
+    # ── Seed FinOps budgets (idempotent) ──────────────────────────────
+    seed_budgets(teams)
+
+
+def seed_budgets(teams: list[dict]) -> None:
+    """Create sample budgets. Skips any that already exist (matched by name)."""
+    # Fetch existing budget names so we can skip duplicates
+    r = httpx.get(f"{SERVER_URL}/api/v1/finops/budgets", headers=ADMIN_HEADERS)
+    existing_names: set[str] = set()
+    if r.status_code == 200:
+        existing_names = {b["name"] for b in r.json()}
+
+    team_by_name = {t["name"]: t["id"] for t in teams}
+
+    budget_defs = [
+        # Org-wide budgets (no team_id)
+        {
+            "name": "Org Monthly API Budget",
+            "amount": 5000.0,
+            "period": "monthly",
+            "alert_threshold_pct": 80,
+        },
+        {
+            "name": "Org Quarterly API Budget",
+            "amount": 12000.0,
+            "period": "quarterly",
+            "alert_threshold_pct": 75,
+        },
+        # Per-team budgets
+        {
+            "name": "Platform Team Monthly",
+            "team_id": team_by_name.get("Platform"),
+            "amount": 2000.0,
+            "period": "monthly",
+            "alert_threshold_pct": 85,
+        },
+        {
+            "name": "Backend Team Monthly",
+            "team_id": team_by_name.get("Backend"),
+            "amount": 1800.0,
+            "period": "monthly",
+            "alert_threshold_pct": 80,
+        },
+        {
+            "name": "Frontend Team Monthly",
+            "team_id": team_by_name.get("Frontend"),
+            "amount": 1200.0,
+            "period": "monthly",
+            "alert_threshold_pct": 90,
+        },
+    ]
+
+    created = 0
+    for bdef in budget_defs:
+        if bdef["name"] in existing_names:
+            print(f"Budget '{bdef['name']}' already exists — skipping")
+            continue
+        r = httpx.post(
+            f"{SERVER_URL}/api/v1/finops/budgets",
+            json=bdef,
+            headers=ADMIN_HEADERS,
+        )
+        if r.status_code == 201:
+            created += 1
+            print(f"Created budget: {bdef['name']} (${bdef['amount']:.0f}/{bdef['period']})")
+        else:
+            print(f"Failed to create budget '{bdef['name']}': {r.status_code} {r.text}")
+
+    print(f"\nBudgets: {created} created, {len(existing_names)} already existed")
+
 
 if __name__ == "__main__":
     main()

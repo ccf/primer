@@ -9,6 +9,7 @@ from primer.common.models import (  # noqa: F401 — ensure all models are regis
     Alert,
     AlertConfig,
     AuditLog,
+    Budget,
     DailyStats,
     Engineer,
     GitRepository,

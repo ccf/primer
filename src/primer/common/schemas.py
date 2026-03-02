@@ -192,6 +192,7 @@ class SessionIngestPayload(BaseModel):
     cache_read_tokens: int = 0
     cache_creation_tokens: int = 0
     primary_model: str | None = None
+    billing_mode: str | None = None
     first_prompt: str | None = None
     summary: str | None = None
     facets: SessionFacetsPayload | None = None
@@ -1178,3 +1179,127 @@ class NarrativeResponse(BaseModel):
 class NarrativeStatusResponse(BaseModel):
     available: bool
     reason: str | None = None
+
+
+# --- FinOps: Cache Analytics ---
+
+
+class ModelCacheBreakdown(BaseModel):
+    model_name: str
+    cache_read_tokens: int
+    cache_creation_tokens: int
+    input_tokens: int
+    cache_hit_rate: float | None
+    estimated_savings: float
+
+
+class EngineerCacheEfficiency(BaseModel):
+    engineer_id: str
+    engineer_name: str
+    cache_hit_rate: float | None
+    estimated_savings: float
+    potential_additional_savings: float
+    total_cache_read_tokens: int
+    total_input_tokens: int
+
+
+class CacheAnalyticsResponse(BaseModel):
+    total_cache_read_tokens: int
+    total_cache_creation_tokens: int
+    total_input_tokens: int
+    cache_hit_rate: float | None
+    cache_savings_estimate: float | None
+    daily_cache_trend: list[DailyCacheEntry] = []
+    model_cache_breakdown: list[ModelCacheBreakdown] = []
+    engineer_cache_breakdown: list[EngineerCacheEfficiency] = []
+    total_potential_additional_savings: float = 0.0
+
+
+# --- FinOps: Cost Modeling ---
+
+
+class PlanTier(BaseModel):
+    name: str  # "api_key", "pro", "max_5x", "max_20x"
+    label: str
+    monthly_cost: float
+
+
+class EngineerCostComparison(BaseModel):
+    engineer_id: str
+    engineer_name: str
+    monthly_api_cost: float
+    recommended_plan: str  # tier name
+    recommended_plan_cost: float
+    savings_vs_api: float  # positive = subscription saves money
+    current_billing_mode: str | None
+    daily_avg_cost: float
+
+
+class PlanAllocationSummary(BaseModel):
+    plan: str  # tier name
+    label: str
+    monthly_cost_per_seat: float
+    engineer_count: int
+    total_monthly_cost: float
+
+
+class CostModelingResponse(BaseModel):
+    period_days: int
+    plan_tiers: list[PlanTier]
+    engineers: list[EngineerCostComparison]
+    allocation: list[PlanAllocationSummary]
+    total_api_cost_monthly: float
+    total_optimal_cost_monthly: float
+    total_savings_monthly: float
+
+
+# --- FinOps: Forecasting ---
+
+
+class ForecastPoint(BaseModel):
+    date: str
+    projected_cost: float
+    upper_bound: float
+    lower_bound: float
+
+
+class CostForecastResponse(BaseModel):
+    historical: list[DailyCostEntry] = []
+    forecast: list[ForecastPoint] = []
+    monthly_projection: float
+    trend_direction: str
+
+
+# --- FinOps: Budgets ---
+
+
+class BudgetCreate(BaseModel):
+    team_id: str | None = None
+    name: str
+    amount: float
+    period: str = "monthly"
+    alert_threshold_pct: int = 80
+
+
+class BudgetUpdate(BaseModel):
+    name: str | None = None
+    amount: float | None = None
+    period: str | None = None
+    alert_threshold_pct: int | None = None
+
+
+class BudgetStatus(BaseModel):
+    id: str
+    name: str
+    team_id: str | None
+    team_name: str | None = None
+    amount: float
+    period: str
+    current_spend: float
+    burn_rate_daily: float
+    projected_end_of_period: float
+    alert_threshold_pct: int
+    pct_used: float
+    status: str  # "on_track" | "warning" | "over_budget"
+
+    model_config = {"from_attributes": True}

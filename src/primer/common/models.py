@@ -109,6 +109,7 @@ class Session(Base):
     cache_read_tokens: Mapped[int] = mapped_column(Integer, default=0)
     cache_creation_tokens: Mapped[int] = mapped_column(Integer, default=0)
     primary_model: Mapped[str | None] = mapped_column(String(100))
+    billing_mode: Mapped[str | None] = mapped_column(String(30), nullable=True)
     first_prompt: Mapped[str | None] = mapped_column(String(500))
     summary: Mapped[str | None] = mapped_column(Text)
     has_facets: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -373,3 +374,18 @@ class SessionCommit(Base):
 
     session: Mapped["Session"] = relationship(back_populates="commits")
     pull_request: Mapped[PullRequest | None] = relationship(back_populates="commits")
+
+
+class Budget(Base):
+    __tablename__ = "budgets"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    team_id: Mapped[str | None] = mapped_column(ForeignKey("teams.id"), nullable=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    period: Mapped[str] = mapped_column(String(20), nullable=False)  # "monthly" | "quarterly"
+    alert_threshold_pct: Mapped[int] = mapped_column(Integer, default=80)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
