@@ -43,7 +43,7 @@ Your data stays on your infrastructure. No telemetry leaves your network.
 ## Features
 
 - **Team Dashboard** — Session volume, token usage, cost trends, and activity heatmaps with period-over-period comparisons
-- **Cost Analysis** — Per-model spend tracking with daily cost charts, model breakdowns, and budget visibility
+- **Cost Analysis & FinOps** — Per-model spend tracking, cache savings analysis, subscription vs API cost modeling, 30-day cost forecasting, and budget management with burn-rate alerts
 - **Engineer Profiles** — Personal trajectory dashboards with weekly sparklines, strengths, friction breakdown, and peer benchmarking
 - **Friction Detection** — Surface where engineers struggle: tool errors, permission blocks, timeouts, and context limits
 - **Anomaly Alerts** — Automatic detection of cost spikes, usage drops, and success rate degradation with configurable thresholds
