@@ -1,13 +1,16 @@
 """primer sync — sync local session history to the server."""
 
 import os
+import time
 
 import click
 
 
 @click.command("sync")
-def sync() -> None:
-    """Sync local Claude Code sessions to the Primer server."""
+@click.option("--watch", is_flag=True, help="Continuously sync on an interval.")
+@click.option("--interval", default=60, type=int, help="Seconds between sync checks (--watch).")
+def sync(watch: bool, interval: int) -> None:
+    """Sync local AI coding sessions to the Primer server."""
     from primer.cli import console
     from primer.cli.config import get_value
     from primer.mcp.sync import sync_sessions
@@ -21,8 +24,22 @@ def sync() -> None:
         console.error("No API key configured. Run: primer setup")
         return
 
+    if watch:
+        console.info(f"Watching for new sessions every {interval}s (Ctrl+C to stop)...")
+        try:
+            while True:
+                _run_sync(console, server_url, api_key, sync_sessions)
+                time.sleep(interval)
+        except KeyboardInterrupt:
+            console.info("Watch stopped.")
+    else:
+        _run_sync(console, server_url, api_key, sync_sessions)
+
+
+def _run_sync(console, server_url: str, api_key: str, sync_fn) -> None:
+    """Execute a single sync cycle and print results."""
     console.info("Syncing sessions...")
-    result = sync_sessions(server_url, api_key)
+    result = sync_fn(server_url, api_key)
 
     console.kvp("Local sessions", str(result.get("local_count", 0)))
     console.kvp("Already synced", str(result.get("already_synced", 0)))
