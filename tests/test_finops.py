@@ -746,6 +746,60 @@ class TestCostForecast:
         data = r.json()
         assert len(data["forecast"]) == 7
 
+    def test_monthly_projection_extrapolates_short_forecast(
+        self, client, db_session, admin_headers
+    ):
+        """When forecast_days < 30, monthly_projection should extrapolate to 30 days."""
+        team = Team(name="Short FC Team")
+        db_session.add(team)
+        db_session.flush()
+        _eng, key = _make_engineer(db_session, team, name="Short FC Eng")
+
+        now = datetime.utcnow()
+        for i in range(5):
+            _ingest_session(
+                client,
+                key,
+                started_at=(now - timedelta(days=5 - i)).isoformat(),
+                model_usages=[
+                    {
+                        "model_name": "claude-sonnet-4-5-20250929",
+                        "input_tokens": 1000,
+                        "output_tokens": 500,
+                        "cache_read_tokens": 0,
+                        "cache_creation_tokens": 0,
+                    }
+                ],
+            )
+
+        # Get forecast with only 7 days
+        r7 = client.get(
+            "/api/v1/finops/forecast",
+            headers=admin_headers,
+            params={"team_id": team.id, "forecast_days": 7},
+        )
+        # Get forecast with default 30 days
+        r30 = client.get(
+            "/api/v1/finops/forecast",
+            headers=admin_headers,
+            params={"team_id": team.id, "forecast_days": 30},
+        )
+        assert r7.status_code == 200
+        assert r30.status_code == 200
+        d7 = r7.json()
+        d30 = r30.json()
+
+        # 7-day forecast should still produce a ~30-day monthly_projection
+        # It won't be exactly equal to the 30-day one due to extrapolation,
+        # but it should be in the same ballpark (not 7/30ths of it)
+        assert d7["monthly_projection"] > 0
+        assert d30["monthly_projection"] > 0
+        # The 7-day extrapolated should be roughly close to 30-day (within 50%)
+        ratio = d7["monthly_projection"] / d30["monthly_projection"]
+        assert 0.5 < ratio < 2.0, (
+            f"ratio={ratio}, 7d={d7['monthly_projection']}, 30d={d30['monthly_projection']}"
+        )
+
     def test_session_counts_in_historical(self, client, db_session, admin_headers):
         """Historical entries should have accurate session counts."""
         team = Team(name="SC Team")
