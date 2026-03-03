@@ -33,7 +33,7 @@ The installer accepts environment variables for non-interactive use:
 If you prefer a manual installation, you need:
 
 - **Python 3.12+** — Primer uses modern Python syntax.
-- **Claude Code** — A working Claude Code installation. Primer captures session data via Claude Code's hook system.
+- **An AI coding agent** — Claude Code, Gemini CLI, or Codex CLI. Primer captures session data via each agent's hook system (or `primer sync` for agents without hooks).
 
 Verify your Python version:
 
@@ -94,7 +94,9 @@ Your API key is shown only once during setup. Copy it before closing the termina
 
 ## Install the Hook
 
-The SessionEnd hook automatically uploads session data after each Claude Code session completes.
+Primer captures session data via hooks that fire when an AI coding session ends. Install the hook for your agent:
+
+### Claude Code (default)
 
 ```bash
 primer hook install
@@ -102,13 +104,34 @@ primer hook install
 
 This adds a `SessionEnd` entry to `~/.claude/settings.json` that triggers the Primer ingest process when a Claude Code session ends.
 
-Verify the hook is installed and the server is reachable:
+### Gemini CLI
 
 ```bash
-primer hook status
+primer hook install --agent gemini
 ```
 
-After your next Claude Code session ends, the transcript, tool usage, model usage, and other session metadata will be uploaded automatically.
+This adds an exit hook to `~/.gemini/settings.json` using Gemini's matcher-wrapped hook format.
+
+### Codex CLI
+
+Codex CLI doesn't have a SessionEnd hook. Use `primer sync` to upload sessions:
+
+```bash
+primer sync                        # One-time sync
+primer sync --watch --interval 60  # Continuous watch mode
+```
+
+### Verify Installation
+
+Check hook status for a specific agent or all agents at once:
+
+```bash
+primer hook status                # Claude (default)
+primer hook status --agent gemini # Gemini
+primer hook list                  # All agents
+```
+
+After your next session ends, the transcript, tool usage, model usage, and other session metadata will be uploaded automatically.
 
 <Callout type="note" title="What gets uploaded?">
 Primer captures session duration, token counts, model usage, tool call counts, friction events (errors, retries), and git commit metadata. Full transcript content is included for synthesis but can be disabled in the configuration.

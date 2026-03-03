@@ -8,29 +8,30 @@ import Callout from '../../components/docs/Callout.astro';
 
 ## Overview
 
-The SessionEnd hook is the data collection layer of Primer. It runs automatically at the end of each Claude Code, Codex CLI, or Gemini CLI session, extracts metadata from the transcript, and uploads it to your Primer server. Zero configuration after installation -- it captures every session silently in the background.
+The SessionEnd hook is the data collection layer of Primer. It runs automatically at the end of each AI coding session, extracts metadata from the transcript, and uploads it to your Primer server. Zero configuration after installation -- it captures every session silently in the background.
 
 ## How It Works
 
-When a Claude Code session ends, the hook:
+When a session ends, the hook:
 
-1. **Reads the transcript** -- The JSONL file in `~/.claude/projects/` containing every message, tool call, and metadata block from the session.
-2. **Parses structured data** -- Extracts token counts, tool usage, model names, timing, git context, and session metadata from the raw transcript.
-3. **Loads facets** -- Checks `~/.claude/usage-data/facets/` for qualitative analysis data (goal, outcome, friction) if available.
-4. **Uploads to the server** -- POSTs the extracted `SessionMetadata` payload to `/api/v1/ingest/session`.
-5. **Fails silently** -- If the server is unreachable, the hook exits without error. Use `primer sync` to recover missed sessions later.
+1. **Reads the transcript** -- The session file containing every message, tool call, and metadata block from the session.
+2. **Selects the right extractor** -- Based on the `--agent` flag, dispatches to the appropriate parser (Claude Code JSONL, Gemini CLI JSON, etc.).
+3. **Parses structured data** -- Extracts token counts, tool usage, model names, timing, git context, and session metadata from the raw transcript.
+4. **Loads facets** -- For Claude Code sessions, checks `~/.claude/usage-data/facets/` for qualitative analysis data (goal, outcome, friction) if available.
+5. **Uploads to the server** -- POSTs the extracted `SessionMetadata` payload to `/api/v1/ingest/session`.
+6. **Fails silently** -- If the server is unreachable, the hook exits without error. Use `primer sync` to recover missed sessions later.
 
 The entire process completes in under a second and never blocks your terminal.
 
 ## Supported Agents
 
-Primer supports multiple AI coding tools through agent-specific extraction logic. The hook automatically detects the agent type and uses the appropriate parser.
+Primer supports multiple AI coding tools through agent-specific extraction logic and hook installation.
 
-| Agent | Format | Notes |
-|-------|--------|-------|
-| Claude Code | JSONL transcript | Full support including tool use blocks, per-model token counts, and cache metrics |
-| Codex CLI | OpenAI-compatible format | Conversation format extraction with tool call mapping |
-| Gemini CLI | Gemini conversation format | Basic session metadata extraction |
+| Agent | Hook Support | Collection Method | Config File |
+|-------|-------------|-------------------|-------------|
+| Claude Code | SessionEnd hook | Real-time | `~/.claude/settings.json` |
+| Gemini CLI | SessionEnd hook | Real-time | `~/.gemini/settings.json` |
+| Codex CLI | No SessionEnd hook | `primer sync` (manual/watch) | N/A |
 
 All agents upload to the same `/api/v1/ingest/session` endpoint. The `agent_type` field on each session record identifies the source, allowing you to filter and compare across tools in the dashboard.
 
@@ -115,13 +116,80 @@ Git commit data powers the [GitHub Integration](../github/) features, linking se
 
 ## Installation
 
-The recommended way to install the hook is through the CLI:
+### Claude Code
+
+The default agent. Install with the CLI:
 
 ```bash
 primer hook install
 ```
 
-This requires a working Primer setup. If you haven't run `primer setup` yet, do that first -- see [Installation](../installation/).
+This adds a `SessionEnd` hook entry to `~/.claude/settings.json`.
+
+#### What Gets Written (Claude Code)
+
+```json
+{
+  "hooks": {
+    "SessionEnd": [
+      {
+        "command": "python -m primer.hook.session_end",
+        "timeout": 10000
+      }
+    ]
+  }
+}
+```
+
+### Gemini CLI
+
+Install the hook for Gemini CLI:
+
+```bash
+primer hook install --agent gemini
+```
+
+This adds an exit hook entry to `~/.gemini/settings.json`.
+
+#### What Gets Written (Gemini CLI)
+
+```json
+{
+  "hooks": [
+    {
+      "matcher": "exit",
+      "hooks": [
+        {
+          "name": "primer-hook",
+          "type": "command",
+          "command": "python -m primer.hook.session_end --agent gemini"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Codex CLI
+
+Codex CLI does not have a SessionEnd hook system. Use `primer sync` to upload sessions manually, or run it in watch mode for continuous collection:
+
+```bash
+# One-time sync
+primer sync
+
+# Continuous watch mode (syncs every 60 seconds)
+primer sync --watch
+
+# Custom interval
+primer sync --watch --interval 30
+```
+
+Press `Ctrl+C` to stop watch mode.
+
+<Callout type="note" title="Existing hooks preserved">
+The installer appends to your existing hooks configuration. Any other hooks you have configured are not affected.
+</Callout>
 
 ### Manual Installation
 
@@ -130,51 +198,32 @@ If you prefer manual setup, set your environment variables and run the install s
 ```bash
 export PRIMER_SERVER_URL=http://your-primer-server:8000
 export PRIMER_API_KEY=primer_...
+
+# Claude Code (default)
 python scripts/install_hook.py
+
+# Gemini CLI
+python scripts/install_hook.py --agent gemini
 ```
-
-### What Gets Written
-
-The installer adds a `SessionEnd` hook entry to `~/.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "SessionEnd": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python -m primer.hook.extractor"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-The empty `matcher` means the hook runs for every session regardless of project. The `command` type runs the extractor as a subprocess after each session ends.
-
-<Callout type="note" title="Existing hooks preserved">
-The installer appends to your existing hooks configuration. Any other `SessionEnd` hooks you have configured are not affected.
-</Callout>
 
 ## Verification
 
-Check the hook is registered:
+Check hook status for a specific agent:
 
 ```bash
-primer hook status
+primer hook status                # Claude (default)
+primer hook status --agent gemini # Gemini
 ```
 
-This verifies:
-- The hook entry exists in `~/.claude/settings.json`.
-- The Primer server is reachable.
-- Your API key is valid.
+Check all agents at once:
 
-After completing a Claude Code session, verify the data was uploaded:
+```bash
+primer hook list
+```
+
+This shows the installation status for every supported agent.
+
+After completing a session, verify the data was uploaded:
 
 ```bash
 curl http://localhost:8000/api/v1/sessions \
@@ -185,7 +234,7 @@ You should see your session with token counts, tool usage, and timing data popul
 
 ## Offline Resilience
 
-If the Primer server is unreachable when a session ends, the hook exits silently without disrupting your workflow. No error messages are shown, and Claude Code behaves normally.
+If the Primer server is unreachable when a session ends, the hook exits silently without disrupting your workflow. No error messages are shown, and your agent behaves normally.
 
 <Callout type="note" title="Timeout">
 The hook has a 10-second timeout. If your server is slow or unreachable, the hook gives up quickly so it never blocks your terminal.
@@ -199,7 +248,13 @@ Use `primer sync` to backfill any sessions that were missed due to server downti
 primer sync
 ```
 
-This scans your local Claude Code transcript directory, identifies sessions not yet on the server, and uploads them in bulk.
+This scans your local transcript directories for all supported agents, identifies sessions not yet on the server, and uploads them in bulk.
+
+For continuous recovery, use watch mode:
+
+```bash
+primer sync --watch --interval 60
+```
 
 You can also sync from within Claude Code using the MCP sidecar:
 
@@ -216,13 +271,14 @@ Claude calls the `sync` MCP tool, which performs the same backfill operation. Se
 Verify the hook exists in your settings:
 
 ```bash
-primer hook status
+primer hook status                # Claude
+primer hook status --agent gemini # Gemini
 ```
 
-If it reports "not installed", re-run `primer hook install`. Also check that `python -m primer.hook.extractor` runs without import errors:
+If it reports "not installed", re-run the install command for that agent. Also check that the session_end module runs without import errors:
 
 ```bash
-python -m primer.hook.extractor --help
+python -m primer.hook.session_end --help
 ```
 
 ### Sessions not appearing
@@ -235,14 +291,15 @@ If the hook fires but sessions don't appear on the server:
 
 ### Token counts are zero
 
-Some older Claude Code versions don't include usage data in the transcript. Update to the latest version of Claude Code for full token tracking.
+Some older agent versions don't include usage data in the transcript. Update to the latest version of your agent for full token tracking.
 
 ## Uninstalling
 
 ```bash
-primer hook uninstall
+primer hook uninstall                # Claude (default)
+primer hook uninstall --agent gemini # Gemini
 ```
 
-This removes the `SessionEnd` entry from `~/.claude/settings.json`. Your existing session data on the Primer server is not affected -- only future sessions stop being captured.
+This removes the hook entry from the agent's settings file. Your existing session data on the Primer server is not affected -- only future sessions stop being captured.
 
-To re-enable later, run `primer hook install` again.
+To re-enable later, run the install command again.
