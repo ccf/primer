@@ -90,6 +90,19 @@ PERSONAS = {
         "token_scale": 0.6,
         "duration_range": (60, 2400),
     },
+    "ramping_up": {
+        "sessions_per_day": (1, 4),
+        "weekend_factor": 0.05,
+        "model_weights": {
+            "claude-sonnet-4-5-20250929": 70,
+            "claude-opus-4-20250514": 15,
+            "claude-haiku-4-5-20251001": 15,
+        },
+        "outcome_weights": {"success": 55, "partial": 25, "failure": 12, "abandoned": 8},
+        "tool_bias": ["Read", "Edit", "Bash", "Grep", "Glob", "Task:explore", "Skill:commit"],
+        "token_scale": 0.85,
+        "duration_range": (60, 2700),
+    },
 }
 
 # ── Agent type config (models, tools, versions per CLI) ───────────
@@ -121,6 +134,7 @@ AGENT_TYPE_CONFIG = {
             "moderate": {"o3": 30, "o4-mini": 35, "codex-mini": 20, "gpt-4.1": 15},
             "occasional": {"o4-mini": 45, "codex-mini": 30, "gpt-4.1": 25},
             "new_hire": {"o4-mini": 40, "gpt-4.1": 35, "codex-mini": 25},
+            "ramping_up": {"o3": 25, "o4-mini": 35, "codex-mini": 25, "gpt-4.1": 15},
         },
         "tools": [
             "exec_command",
@@ -138,6 +152,11 @@ AGENT_TYPE_CONFIG = {
             "moderate": {"gemini-2.5-pro": 40, "gemini-2.5-flash": 40, "gemini-2.0-flash": 20},
             "occasional": {"gemini-2.5-flash": 50, "gemini-2.0-flash": 35, "gemini-2.5-pro": 15},
             "new_hire": {"gemini-2.5-flash": 55, "gemini-2.0-flash": 30, "gemini-2.5-pro": 15},
+            "ramping_up": {
+                "gemini-2.5-pro": 30,
+                "gemini-2.5-flash": 45,
+                "gemini-2.0-flash": 25,
+            },
         },
         "tools": [
             "readFile",
@@ -154,7 +173,17 @@ AGENT_TYPE_CONFIG = {
 }
 
 # (name, email, team_idx, role, github_user, github_id, persona, agent_mix)
+# Platform (0): Alice(admin,power), Marcus(lead,moderate), Priya(power), Jake(moderate,codex-heavy),
+#               Yuki(new_hire)
+# Backend  (1): Bob(lead,moderate), Carol(power), Dan(moderate,claude-only), Nina(occasional),
+#               Raj(new_hire)
+# Frontend (2): Eve(lead,moderate), Frank(power,codex-heavy), Lily(ramping_up),
+#               Oscar(new_hire,gemini-heavy)
+# Mobile   (3): Grace(lead,moderate), Hiro(occasional,mixed), Sofia(moderate)
+# Data     (4): James(lead,power), Aisha(power), Chris(moderate,mixed), Mia(occasional)
+# DevEx    (5): Kenji(lead,moderate), Fatima(ramping_up), Liam(ramping_up), Zara(new_hire)
 ENGINEERS = [
+    # ── Platform (team_idx=0) ──────────────────────────────────────
     (
         "Alice Chen",
         "alice@example.com",
@@ -166,12 +195,53 @@ ENGINEERS = [
         {"claude_code": 65, "codex_cli": 20, "gemini_cli": 15},
     ),
     (
-        "Bob Smith",
-        "bob@example.com",
+        "Marcus Rivera",
+        "marcus@example.com",
         0,
         "team_lead",
-        "bobsmith",
+        "marcusrivera",
         1002,
+        "moderate",
+        {"claude_code": 70, "codex_cli": 20, "gemini_cli": 10},
+    ),
+    (
+        "Priya Sharma",
+        "priya@example.com",
+        0,
+        "engineer",
+        "priyasharma",
+        1003,
+        "power_user",
+        {"claude_code": 60, "codex_cli": 25, "gemini_cli": 15},
+    ),
+    (
+        "Jake Thompson",
+        "jake@example.com",
+        0,
+        "engineer",
+        "jakethompson",
+        1004,
+        "moderate",
+        {"claude_code": 45, "codex_cli": 50, "gemini_cli": 5},
+    ),
+    (
+        "Yuki Sato",
+        "yuki@example.com",
+        0,
+        "engineer",
+        "yukisato",
+        1005,
+        "new_hire",
+        {"claude_code": 80, "codex_cli": 10, "gemini_cli": 10},
+    ),
+    # ── Backend (team_idx=1) ───────────────────────────────────────
+    (
+        "Bob Smith",
+        "bob@example.com",
+        1,
+        "team_lead",
+        "bobsmith",
+        1006,
         "moderate",
         {"claude_code": 75, "codex_cli": 15, "gemini_cli": 10},
     ),
@@ -179,9 +249,9 @@ ENGINEERS = [
         "Carol Davis",
         "carol@example.com",
         1,
-        "team_lead",
+        "engineer",
         "caroldavis",
-        1003,
+        1007,
         "power_user",
         {"claude_code": 70, "codex_cli": 20, "gemini_cli": 10},
     ),
@@ -191,49 +261,183 @@ ENGINEERS = [
         1,
         "engineer",
         "danwilson",
-        1004,
+        1008,
         "moderate",
         {"claude_code": 100},
     ),
     (
+        "Nina Patel",
+        "nina@example.com",
+        1,
+        "engineer",
+        "ninapatel",
+        1009,
+        "occasional",
+        {"claude_code": 75, "codex_cli": 15, "gemini_cli": 10},
+    ),
+    (
+        "Raj Krishnan",
+        "raj@example.com",
+        1,
+        "engineer",
+        "rajkrishnan",
+        1010,
+        "new_hire",
+        {"claude_code": 85, "codex_cli": 10, "gemini_cli": 5},
+    ),
+    # ── Frontend (team_idx=2) ──────────────────────────────────────
+    (
         "Eve Martinez",
         "eve@example.com",
         2,
-        "engineer",
+        "team_lead",
         "evemartinez",
-        1005,
-        "occasional",
+        1011,
+        "moderate",
         {"claude_code": 70, "gemini_cli": 30},
     ),
     (
         "Frank Lee",
         "frank@example.com",
-        0,
+        2,
         "engineer",
         "franklee",
-        1006,
-        "moderate",
-        {"claude_code": 60, "codex_cli": 40},
+        1012,
+        "power_user",
+        {"claude_code": 45, "codex_cli": 45, "gemini_cli": 10},
     ),
+    (
+        "Lily Zhang",
+        "lily@example.com",
+        2,
+        "engineer",
+        "lilyzhang",
+        1013,
+        "ramping_up",
+        {"claude_code": 75, "codex_cli": 15, "gemini_cli": 10},
+    ),
+    (
+        "Oscar Mendez",
+        "oscar@example.com",
+        2,
+        "engineer",
+        "oscarmendez",
+        1014,
+        "new_hire",
+        {"claude_code": 35, "codex_cli": 15, "gemini_cli": 50},
+    ),
+    # ── Mobile (team_idx=3) ────────────────────────────────────────
     (
         "Grace Kim",
         "grace@example.com",
-        1,
-        "engineer",
+        3,
+        "team_lead",
         "gracekim",
-        1007,
-        "new_hire",
-        {"claude_code": 80, "codex_cli": 10, "gemini_cli": 10},
+        1015,
+        "moderate",
+        {"claude_code": 70, "codex_cli": 15, "gemini_cli": 15},
     ),
     (
         "Hiro Tanaka",
         "hiro@example.com",
-        2,
+        3,
         "engineer",
         "hirotanaka",
-        1008,
+        1016,
         "occasional",
+        {"claude_code": 34, "codex_cli": 33, "gemini_cli": 33},
+    ),
+    (
+        "Sofia Rossi",
+        "sofia@example.com",
+        3,
+        "engineer",
+        "sofiarossi",
+        1017,
+        "moderate",
+        {"claude_code": 65, "codex_cli": 20, "gemini_cli": 15},
+    ),
+    # ── Data (team_idx=4) ──────────────────────────────────────────
+    (
+        "James O'Brien",
+        "james@example.com",
+        4,
+        "team_lead",
+        "jamesobrien",
+        1018,
+        "power_user",
+        {"claude_code": 60, "codex_cli": 25, "gemini_cli": 15},
+    ),
+    (
+        "Aisha Mohammed",
+        "aisha@example.com",
+        4,
+        "engineer",
+        "aishamohammed",
+        1019,
+        "power_user",
+        {"claude_code": 65, "codex_cli": 20, "gemini_cli": 15},
+    ),
+    (
+        "Chris Nguyen",
+        "chris@example.com",
+        4,
+        "engineer",
+        "chrisnguyen",
+        1020,
+        "moderate",
         {"claude_code": 50, "codex_cli": 25, "gemini_cli": 25},
+    ),
+    (
+        "Mia Johnson",
+        "mia@example.com",
+        4,
+        "engineer",
+        "miajohnson",
+        1021,
+        "occasional",
+        {"claude_code": 70, "codex_cli": 20, "gemini_cli": 10},
+    ),
+    # ── DevEx (team_idx=5) ─────────────────────────────────────────
+    (
+        "Kenji Watanabe",
+        "kenji@example.com",
+        5,
+        "team_lead",
+        "kenjiwatanabe",
+        1022,
+        "moderate",
+        {"claude_code": 70, "codex_cli": 20, "gemini_cli": 10},
+    ),
+    (
+        "Fatima Al-Rashid",
+        "fatima@example.com",
+        5,
+        "engineer",
+        "fatimaalrashid",
+        1023,
+        "ramping_up",
+        {"claude_code": 75, "codex_cli": 15, "gemini_cli": 10},
+    ),
+    (
+        "Liam O'Connor",
+        "liam@example.com",
+        5,
+        "engineer",
+        "liamoconnor",
+        1024,
+        "ramping_up",
+        {"claude_code": 70, "codex_cli": 20, "gemini_cli": 10},
+    ),
+    (
+        "Zara Ahmed",
+        "zara@example.com",
+        5,
+        "engineer",
+        "zaraahmed",
+        1025,
+        "new_hire",
+        {"claude_code": 80, "codex_cli": 10, "gemini_cli": 10},
     ),
 ]
 
@@ -330,6 +534,36 @@ PROJECTS = {
             "WebSearch": 3,
         },
         "outcome_bias": {"success": -3, "partial": 3, "failure": 3, "abandoned": 0},
+    },
+    "infra-config": {
+        "tool_weights": {
+            "Read": 15,
+            "Edit": 10,
+            "Write": 5,
+            "Bash": 35,
+            "Grep": 20,
+            "Glob": 5,
+            "Task:explore": 5,
+            "Skill:commit": 5,
+            "EnterPlanMode": 4,
+        },
+        "outcome_bias": {"success": 5, "partial": 0, "failure": -3, "abandoned": 0},
+    },
+    "ml-pipeline": {
+        "tool_weights": {
+            "Read": 15,
+            "Edit": 10,
+            "Write": 25,
+            "Bash": 25,
+            "Grep": 5,
+            "Glob": 5,
+            "Task:explore": 3,
+            "Task:python-pro": 8,
+            "Skill:commit": 4,
+            "EnterPlanMode": 3,
+            "AskUserQuestion": 3,
+        },
+        "outcome_bias": {"success": -5, "partial": 5, "failure": 5, "abandoned": 0},
     },
 }
 
@@ -549,6 +783,8 @@ GIT_REPOS = {
     "shared-lib": "https://github.com/acme-corp/shared-lib.git",
     "data-pipeline": "https://github.com/acme-corp/data-pipeline.git",
     "mobile-app": "https://github.com/acme-corp/mobile-app.git",
+    "infra-config": "https://github.com/acme-corp/infra-config.git",
+    "ml-pipeline": "https://github.com/acme-corp/ml-pipeline.git",
 }
 
 COMMIT_MESSAGES = {
@@ -578,13 +814,30 @@ COMMIT_MESSAGES = {
 
 COMMIT_AUTHORS = {
     "Alice Chen": "alice@example.com",
+    "Marcus Rivera": "marcus@example.com",
+    "Priya Sharma": "priya@example.com",
+    "Jake Thompson": "jake@example.com",
+    "Yuki Sato": "yuki@example.com",
     "Bob Smith": "bob@example.com",
     "Carol Davis": "carol@example.com",
     "Dan Wilson": "dan@example.com",
+    "Nina Patel": "nina@example.com",
+    "Raj Krishnan": "raj@example.com",
     "Eve Martinez": "eve@example.com",
     "Frank Lee": "frank@example.com",
+    "Lily Zhang": "lily@example.com",
+    "Oscar Mendez": "oscar@example.com",
     "Grace Kim": "grace@example.com",
     "Hiro Tanaka": "hiro@example.com",
+    "Sofia Rossi": "sofia@example.com",
+    "James O'Brien": "james@example.com",
+    "Aisha Mohammed": "aisha@example.com",
+    "Chris Nguyen": "chris@example.com",
+    "Mia Johnson": "mia@example.com",
+    "Kenji Watanabe": "kenji@example.com",
+    "Fatima Al-Rashid": "fatima@example.com",
+    "Liam O'Connor": "liam@example.com",
+    "Zara Ahmed": "zara@example.com",
 }
 
 
@@ -819,6 +1072,20 @@ CODEX_PROJECT_TOOL_WEIGHTS = {
         "file_write": 30,
         "function_call": 20,
     },
+    "infra-config": {
+        "exec_command": 35,
+        "shell": 25,
+        "file_read": 15,
+        "file_write": 15,
+        "function_call": 10,
+    },
+    "ml-pipeline": {
+        "exec_command": 25,
+        "shell": 15,
+        "file_read": 15,
+        "file_write": 30,
+        "function_call": 15,
+    },
 }
 
 GEMINI_PROJECT_TOOL_WEIGHTS = {
@@ -874,6 +1141,24 @@ GEMINI_PROJECT_TOOL_WEIGHTS = {
         "runShell": 15,
         "searchWeb": 10,
         "listFiles": 10,
+        "grepSearch": 10,
+    },
+    "infra-config": {
+        "readFile": 10,
+        "writeFile": 10,
+        "editFile": 10,
+        "runShell": 35,
+        "searchWeb": 5,
+        "listFiles": 15,
+        "grepSearch": 15,
+    },
+    "ml-pipeline": {
+        "readFile": 15,
+        "writeFile": 20,
+        "editFile": 15,
+        "runShell": 25,
+        "searchWeb": 10,
+        "listFiles": 5,
         "grepSearch": 10,
     },
 }
@@ -1112,7 +1397,7 @@ def main():
 
     # Create or fetch teams
     teams = []
-    team_names = ["Platform", "Backend", "Frontend"]
+    team_names = ["Platform", "Backend", "Frontend", "Mobile", "Data", "DevEx"]
     for name in team_names:
         r = httpx.post(f"{SERVER_URL}/api/v1/teams", json={"name": name}, headers=ADMIN_HEADERS)
         if r.status_code == 200:
@@ -1538,6 +1823,27 @@ def seed_budgets(teams: list[dict]) -> None:
             "amount": 1200.0,
             "period": "monthly",
             "alert_threshold_pct": 90,
+        },
+        {
+            "name": "Mobile Team Monthly",
+            "team_id": team_by_name.get("Mobile"),
+            "amount": 800.0,
+            "period": "monthly",
+            "alert_threshold_pct": 85,
+        },
+        {
+            "name": "Data Team Monthly",
+            "team_id": team_by_name.get("Data"),
+            "amount": 2500.0,
+            "period": "monthly",
+            "alert_threshold_pct": 75,
+        },
+        {
+            "name": "DevEx Team Monthly",
+            "team_id": team_by_name.get("DevEx"),
+            "amount": 1500.0,
+            "period": "monthly",
+            "alert_threshold_pct": 80,
         },
     ]
 
