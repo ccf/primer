@@ -34,7 +34,7 @@ def get_audit_logs(
     actor_id: str | None = None,
     limit: int = 100,
     offset: int = 0,
-) -> list[AuditLog]:
+) -> tuple[list[AuditLog], int]:
     q = db.query(AuditLog)
     if resource_type:
         q = q.filter(AuditLog.resource_type == resource_type)
@@ -42,4 +42,6 @@ def get_audit_logs(
         q = q.filter(AuditLog.action == action)
     if actor_id:
         q = q.filter(AuditLog.actor_id == actor_id)
-    return q.order_by(AuditLog.created_at.desc()).offset(offset).limit(limit).all()
+    total_count = q.count()
+    items = q.order_by(AuditLog.created_at.desc()).offset(offset).limit(limit).all()
+    return items, total_count

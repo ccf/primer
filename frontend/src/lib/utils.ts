@@ -43,10 +43,38 @@ export function timeAgo(dateStr: string): string {
 }
 
 const MODEL_PRICING: Record<string, { input: number; output: number; cacheRead: number; cacheCreate: number }> = {
+  // Anthropic (Claude Code)
+  "claude-opus-4-6": { input: 5 / 1e6, output: 25 / 1e6, cacheRead: 0.5 / 1e6, cacheCreate: 6.25 / 1e6 },
+  "claude-opus-4-5": { input: 5 / 1e6, output: 25 / 1e6, cacheRead: 0.5 / 1e6, cacheCreate: 6.25 / 1e6 },
   "claude-opus-4": { input: 15 / 1e6, output: 75 / 1e6, cacheRead: 1.5 / 1e6, cacheCreate: 18.75 / 1e6 },
   "claude-sonnet-4": { input: 3 / 1e6, output: 15 / 1e6, cacheRead: 0.3 / 1e6, cacheCreate: 3.75 / 1e6 },
   "claude-sonnet-3.5": { input: 3 / 1e6, output: 15 / 1e6, cacheRead: 0.3 / 1e6, cacheCreate: 3.75 / 1e6 },
+  "claude-haiku-4-5": { input: 1 / 1e6, output: 5 / 1e6, cacheRead: 0.1 / 1e6, cacheCreate: 1.25 / 1e6 },
   "claude-haiku-3.5": { input: 0.8 / 1e6, output: 4 / 1e6, cacheRead: 0.08 / 1e6, cacheCreate: 1 / 1e6 },
+  // OpenAI (Codex CLI)
+  "gpt-5.3-codex": { input: 1.75 / 1e6, output: 14 / 1e6, cacheRead: 0.4375 / 1e6, cacheCreate: 1.75 / 1e6 },
+  "gpt-5.2": { input: 1.75 / 1e6, output: 14 / 1e6, cacheRead: 0.4375 / 1e6, cacheCreate: 1.75 / 1e6 },
+  "gpt-5-mini": { input: 0.25 / 1e6, output: 2 / 1e6, cacheRead: 0.0625 / 1e6, cacheCreate: 0.25 / 1e6 },
+  "gpt-5": { input: 1.25 / 1e6, output: 10 / 1e6, cacheRead: 0.3125 / 1e6, cacheCreate: 1.25 / 1e6 },
+  "gpt-4o-mini": { input: 0.15 / 1e6, output: 0.6 / 1e6, cacheRead: 0.0375 / 1e6, cacheCreate: 0.15 / 1e6 },
+  "gpt-4o": { input: 2.5 / 1e6, output: 10 / 1e6, cacheRead: 0.625 / 1e6, cacheCreate: 2.5 / 1e6 },
+  "gpt-4.1": { input: 2 / 1e6, output: 8 / 1e6, cacheRead: 0.5 / 1e6, cacheCreate: 2 / 1e6 },
+  "gpt-4.1-mini": { input: 0.4 / 1e6, output: 1.6 / 1e6, cacheRead: 0.1 / 1e6, cacheCreate: 0.4 / 1e6 },
+  "gpt-4.1-nano": { input: 0.1 / 1e6, output: 0.4 / 1e6, cacheRead: 0.025 / 1e6, cacheCreate: 0.1 / 1e6 },
+  "o3-mini": { input: 1.1 / 1e6, output: 4.4 / 1e6, cacheRead: 0.275 / 1e6, cacheCreate: 1.1 / 1e6 },
+  "o3": { input: 2 / 1e6, output: 8 / 1e6, cacheRead: 0.5 / 1e6, cacheCreate: 2 / 1e6 },
+  "o4-mini": { input: 1.1 / 1e6, output: 4.4 / 1e6, cacheRead: 0.275 / 1e6, cacheCreate: 1.1 / 1e6 },
+  "o1-mini": { input: 1.1 / 1e6, output: 4.4 / 1e6, cacheRead: 0.275 / 1e6, cacheCreate: 1.1 / 1e6 },
+  "o1": { input: 15 / 1e6, output: 60 / 1e6, cacheRead: 3.75 / 1e6, cacheCreate: 15 / 1e6 },
+  "codex-mini": { input: 1.5 / 1e6, output: 6 / 1e6, cacheRead: 0.375 / 1e6, cacheCreate: 1.5 / 1e6 },
+  // Google (Gemini CLI)
+  "gemini-3.1-pro": { input: 2 / 1e6, output: 12 / 1e6, cacheRead: 0.5 / 1e6, cacheCreate: 2 / 1e6 },
+  "gemini-3.0-pro": { input: 2 / 1e6, output: 12 / 1e6, cacheRead: 0.5 / 1e6, cacheCreate: 2 / 1e6 },
+  "gemini-2.5-pro": { input: 1.25 / 1e6, output: 10 / 1e6, cacheRead: 0.3125 / 1e6, cacheCreate: 1.25 / 1e6 },
+  "gemini-2.5-flash": { input: 0.3 / 1e6, output: 2.5 / 1e6, cacheRead: 0.075 / 1e6, cacheCreate: 0.3 / 1e6 },
+  "gemini-2.0-flash": { input: 0.1 / 1e6, output: 0.4 / 1e6, cacheRead: 0.025 / 1e6, cacheCreate: 0.1 / 1e6 },
+  "gemini-1.5-pro": { input: 1.25 / 1e6, output: 5 / 1e6, cacheRead: 0.3125 / 1e6, cacheCreate: 1.25 / 1e6 },
+  "gemini-1.5-flash": { input: 0.075 / 1e6, output: 0.3 / 1e6, cacheRead: 0.01875 / 1e6, cacheCreate: 0.075 / 1e6 },
 }
 
 export function getModelPricing(modelName: string) {

@@ -35,7 +35,7 @@ export function ProfileOverviewTab({ engineerId, teamId, startDate, endDate }: P
         {loadingSessions ? (
           <CardSkeleton />
         ) : (
-          <RecentSessionsList sessions={sessions ?? []} />
+          <RecentSessionsList sessions={sessions?.items ?? []} />
         )}
       </div>
 

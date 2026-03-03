@@ -3,6 +3,14 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+
+class PaginatedResponse[T](BaseModel):
+    items: list[T]
+    total_count: int
+    limit: int
+    offset: int
+
+
 AgentType = Literal["claude_code", "codex_cli", "gemini_cli"]
 
 # --- Team ---

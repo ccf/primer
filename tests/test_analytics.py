@@ -221,7 +221,7 @@ def test_sessions_list(client, engineer_with_key, admin_headers):
 
     r = client.get("/api/v1/sessions", headers=admin_headers)
     assert r.status_code == 200
-    data = r.json()
+    data = r.json()["items"]
     assert any(s["id"] == sid for s in data)
 
 
@@ -519,6 +519,6 @@ def test_sessions_filter_by_project(client, engineer_with_key, admin_headers):
         headers=admin_headers,
     )
     assert r.status_code == 200
-    data = r.json()
+    data = r.json()["items"]
     assert len(data) >= 1
     assert all(s["project_name"] == "filter-proj-a" for s in data)

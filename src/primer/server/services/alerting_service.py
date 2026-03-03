@@ -341,6 +341,7 @@ def get_alerts(
     acknowledged: bool | None = None,
     dismissed: bool = False,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[Alert]:
     q = db.query(Alert).filter(Alert.dismissed == dismissed)
     if team_id:
@@ -352,7 +353,7 @@ def get_alerts(
             q = q.filter(Alert.acknowledged_at.isnot(None))
         else:
             q = q.filter(Alert.acknowledged_at.is_(None))
-    return q.order_by(Alert.detected_at.desc()).limit(limit).all()
+    return q.order_by(Alert.detected_at.desc()).offset(offset).limit(limit).all()
 
 
 def acknowledge_alert(db: Session, alert_id: str) -> Alert | None:

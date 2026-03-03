@@ -5,7 +5,12 @@ from primer.common.config import settings
 from primer.common.database import get_db
 from primer.common.models import Engineer, IngestEvent, Team
 from primer.common.models import Session as SessionModel
-from primer.common.schemas import AuditLogResponse, IngestEventResponse, SystemStats
+from primer.common.schemas import (
+    AuditLogResponse,
+    IngestEventResponse,
+    PaginatedResponse,
+    SystemStats,
+)
 from primer.server.deps import AuthContext, require_role
 from primer.server.services import audit_service
 
@@ -39,7 +44,7 @@ def system_stats(
     )
 
 
-@router.get("/ingest-events", response_model=list[IngestEventResponse])
+@router.get("/ingest-events", response_model=PaginatedResponse[IngestEventResponse])
 def list_ingest_events(
     engineer_id: str | None = None,
     status: str | None = None,
@@ -54,7 +59,9 @@ def list_ingest_events(
     if status:
         q = q.filter(IngestEvent.status == status)
     q = q.order_by(IngestEvent.created_at.desc())
-    return q.offset(offset).limit(limit).all()
+    total_count = q.count()
+    items = q.offset(offset).limit(limit).all()
+    return PaginatedResponse(items=items, total_count=total_count, limit=limit, offset=offset)
 
 
 @router.post("/backfill-facets")
@@ -78,7 +85,7 @@ def backfill_facets(
     return {"status": "started", "limit": limit}
 
 
-@router.get("/audit-logs", response_model=list[AuditLogResponse])
+@router.get("/audit-logs", response_model=PaginatedResponse[AuditLogResponse])
 def list_audit_logs(
     resource_type: str | None = None,
     action: str | None = None,
@@ -88,7 +95,7 @@ def list_audit_logs(
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(require_role("admin")),
 ):
-    return audit_service.get_audit_logs(
+    items, total_count = audit_service.get_audit_logs(
         db,
         resource_type=resource_type,
         action=action,
@@ -96,3 +103,4 @@ def list_audit_logs(
         limit=limit,
         offset=offset,
     )
+    return PaginatedResponse(items=items, total_count=total_count, limit=limit, offset=offset)

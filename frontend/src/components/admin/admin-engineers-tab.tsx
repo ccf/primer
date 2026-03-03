@@ -20,6 +20,7 @@ export function AdminEngineersTab() {
   const createEng = useCreateEngineer()
 
   const [showCreate, setShowCreate] = useState(false)
+  const [search, setSearch] = useState("")
   const [newName, setNewName] = useState("")
   const [newEmail, setNewEmail] = useState("")
   const [newTeamId, setNewTeamId] = useState("")
@@ -46,16 +47,41 @@ export function AdminEngineersTab() {
     setRotatedKey((prev) => ({ ...prev, [engineerId]: result.api_key }))
   }
 
+  const allEngineers = engineers ?? []
+  const filteredEngineers = search
+    ? allEngineers.filter((eng) => {
+        const q = search.toLowerCase()
+        return (
+          eng.name.toLowerCase().includes(q) ||
+          (eng.display_name?.toLowerCase().includes(q) ?? false) ||
+          eng.email.toLowerCase().includes(q)
+        )
+      })
+    : allEngineers
+
+  const countLabel = search
+    ? `Engineers (${filteredEngineers.length} of ${allEngineers.length})`
+    : `Engineers (${allEngineers.length})`
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Engineers ({engineers?.length ?? 0})</h3>
-        <button
-          onClick={() => setShowCreate(!showCreate)}
-          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          {showCreate ? "Cancel" : "Create Engineer"}
-        </button>
+        <h3 className="text-lg font-semibold">{countLabel}</h3>
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            placeholder="Search engineers..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-9 w-64 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          />
+          <button
+            onClick={() => setShowCreate(!showCreate)}
+            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            {showCreate ? "Cancel" : "Create Engineer"}
+          </button>
+        </div>
       </div>
 
       {showCreate && (
@@ -115,7 +141,7 @@ export function AdminEngineersTab() {
             </tr>
           </thead>
           <tbody>
-            {engineers?.map((eng) => (
+            {filteredEngineers.map((eng) => (
               <tr key={eng.id} className="border-b border-border last:border-0 even:bg-muted/15 hover:bg-accent/50">
                 <td className="px-4 py-3 font-medium">{eng.display_name ?? eng.name}</td>
                 <td className="px-4 py-3 text-muted-foreground">{eng.email}</td>

@@ -28,7 +28,7 @@ def _make_mock_extractor(meta=None):
 def test_get_server_session_ids_success(mock_get):
     mock_resp = MagicMock()
     mock_resp.status_code = 200
-    mock_resp.json.return_value = [{"id": "s1"}, {"id": "s2"}]
+    mock_resp.json.return_value = {"items": [{"id": "s1"}, {"id": "s2"}]}
     mock_get.return_value = mock_resp
 
     from primer.mcp.sync import get_server_session_ids
