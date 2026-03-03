@@ -83,7 +83,7 @@ def test_list_sessions_filter_engineer(client, engineer_with_key, admin_headers)
         params={"engineer_id": eng.id},
     )
     assert r.status_code == 200
-    data = r.json()
+    data = r.json()["items"]
     assert len(data) >= 1
     assert all(s["engineer_id"] == eng.id for s in data)
 
@@ -153,7 +153,7 @@ def test_sessions_search(client, engineer_with_key, admin_headers):
         params={"search": "authentication"},
     )
     assert r.status_code == 200
-    data = r.json()
+    data = r.json()["items"]
     assert len(data) >= 1
     assert any("authentication" in (s["first_prompt"] or "").lower() for s in data)
 
@@ -172,7 +172,7 @@ def test_sessions_filter_outcome(client, engineer_with_key, admin_headers):
         params={"outcome": "success"},
     )
     assert r.status_code == 200
-    assert len(r.json()) >= 1
+    assert len(r.json()["items"]) >= 1
 
 
 def test_sessions_filter_session_type(client, engineer_with_key, admin_headers):
@@ -189,7 +189,7 @@ def test_sessions_filter_session_type(client, engineer_with_key, admin_headers):
         params={"session_type": "debugging"},
     )
     assert r.status_code == 200
-    assert len(r.json()) >= 1
+    assert len(r.json()["items"]) >= 1
 
 
 def test_sessions_filter_model(client, engineer_with_key, admin_headers):
@@ -206,7 +206,7 @@ def test_sessions_filter_model(client, engineer_with_key, admin_headers):
         params={"primary_model": "claude-sonnet-4-5-20250929"},
     )
     assert r.status_code == 200
-    assert len(r.json()) >= 1
+    assert len(r.json()["items"]) >= 1
 
 
 def test_get_team_by_id(client, engineer_with_key, admin_headers):

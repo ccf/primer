@@ -10,8 +10,22 @@ class ModelPricing:
 
 
 # Prices per token (derived from published per-MTok pricing)
+# Cache conventions: Anthropic cache_read=0.1x input, cache_creation=1.25x input (5m writes)
+#                    OpenAI/Google cache_read=0.25x input, cache_creation=1x input
 MODEL_PRICING: dict[str, ModelPricing] = {
     # --- Anthropic (Claude Code) ---
+    "claude-opus-4-6": ModelPricing(
+        input_per_token=5.0 / 1_000_000,
+        output_per_token=25.0 / 1_000_000,
+        cache_read_per_token=0.50 / 1_000_000,
+        cache_creation_per_token=6.25 / 1_000_000,
+    ),
+    "claude-opus-4-5": ModelPricing(
+        input_per_token=5.0 / 1_000_000,
+        output_per_token=25.0 / 1_000_000,
+        cache_read_per_token=0.50 / 1_000_000,
+        cache_creation_per_token=6.25 / 1_000_000,
+    ),
     "claude-opus-4": ModelPricing(
         input_per_token=15.0 / 1_000_000,
         output_per_token=75.0 / 1_000_000,
@@ -30,6 +44,12 @@ MODEL_PRICING: dict[str, ModelPricing] = {
         cache_read_per_token=0.30 / 1_000_000,
         cache_creation_per_token=3.75 / 1_000_000,
     ),
+    "claude-haiku-4-5": ModelPricing(
+        input_per_token=1.0 / 1_000_000,
+        output_per_token=5.0 / 1_000_000,
+        cache_read_per_token=0.10 / 1_000_000,
+        cache_creation_per_token=1.25 / 1_000_000,
+    ),
     "claude-haiku-3.5": ModelPricing(
         input_per_token=0.80 / 1_000_000,
         output_per_token=4.0 / 1_000_000,
@@ -37,6 +57,42 @@ MODEL_PRICING: dict[str, ModelPricing] = {
         cache_creation_per_token=1.0 / 1_000_000,
     ),
     # --- OpenAI (Codex CLI) ---
+    "gpt-5.3-codex": ModelPricing(
+        input_per_token=1.75 / 1_000_000,
+        output_per_token=14.0 / 1_000_000,
+        cache_read_per_token=0.4375 / 1_000_000,
+        cache_creation_per_token=1.75 / 1_000_000,
+    ),
+    "gpt-5.2": ModelPricing(
+        input_per_token=1.75 / 1_000_000,
+        output_per_token=14.0 / 1_000_000,
+        cache_read_per_token=0.4375 / 1_000_000,
+        cache_creation_per_token=1.75 / 1_000_000,
+    ),
+    "gpt-5-mini": ModelPricing(
+        input_per_token=0.25 / 1_000_000,
+        output_per_token=2.0 / 1_000_000,
+        cache_read_per_token=0.0625 / 1_000_000,
+        cache_creation_per_token=0.25 / 1_000_000,
+    ),
+    "gpt-5": ModelPricing(
+        input_per_token=1.25 / 1_000_000,
+        output_per_token=10.0 / 1_000_000,
+        cache_read_per_token=0.3125 / 1_000_000,
+        cache_creation_per_token=1.25 / 1_000_000,
+    ),
+    "gpt-4o-mini": ModelPricing(
+        input_per_token=0.15 / 1_000_000,
+        output_per_token=0.60 / 1_000_000,
+        cache_read_per_token=0.0375 / 1_000_000,
+        cache_creation_per_token=0.15 / 1_000_000,
+    ),
+    "gpt-4o": ModelPricing(
+        input_per_token=2.50 / 1_000_000,
+        output_per_token=10.0 / 1_000_000,
+        cache_read_per_token=0.625 / 1_000_000,
+        cache_creation_per_token=2.50 / 1_000_000,
+    ),
     "gpt-4.1": ModelPricing(
         input_per_token=2.0 / 1_000_000,
         output_per_token=8.0 / 1_000_000,
@@ -55,6 +111,12 @@ MODEL_PRICING: dict[str, ModelPricing] = {
         cache_read_per_token=0.025 / 1_000_000,
         cache_creation_per_token=0.10 / 1_000_000,
     ),
+    "o3-mini": ModelPricing(
+        input_per_token=1.10 / 1_000_000,
+        output_per_token=4.40 / 1_000_000,
+        cache_read_per_token=0.275 / 1_000_000,
+        cache_creation_per_token=1.10 / 1_000_000,
+    ),
     "o3": ModelPricing(
         input_per_token=2.0 / 1_000_000,
         output_per_token=8.0 / 1_000_000,
@@ -67,6 +129,18 @@ MODEL_PRICING: dict[str, ModelPricing] = {
         cache_read_per_token=0.275 / 1_000_000,
         cache_creation_per_token=1.10 / 1_000_000,
     ),
+    "o1-mini": ModelPricing(
+        input_per_token=1.10 / 1_000_000,
+        output_per_token=4.40 / 1_000_000,
+        cache_read_per_token=0.275 / 1_000_000,
+        cache_creation_per_token=1.10 / 1_000_000,
+    ),
+    "o1": ModelPricing(
+        input_per_token=15.0 / 1_000_000,
+        output_per_token=60.0 / 1_000_000,
+        cache_read_per_token=3.75 / 1_000_000,
+        cache_creation_per_token=15.0 / 1_000_000,
+    ),
     "codex-mini": ModelPricing(
         input_per_token=1.50 / 1_000_000,
         output_per_token=6.0 / 1_000_000,
@@ -74,6 +148,18 @@ MODEL_PRICING: dict[str, ModelPricing] = {
         cache_creation_per_token=1.50 / 1_000_000,
     ),
     # --- Google (Gemini CLI) ---
+    "gemini-3.1-pro": ModelPricing(
+        input_per_token=2.0 / 1_000_000,
+        output_per_token=12.0 / 1_000_000,
+        cache_read_per_token=0.50 / 1_000_000,
+        cache_creation_per_token=2.0 / 1_000_000,
+    ),
+    "gemini-3.0-pro": ModelPricing(
+        input_per_token=2.0 / 1_000_000,
+        output_per_token=12.0 / 1_000_000,
+        cache_read_per_token=0.50 / 1_000_000,
+        cache_creation_per_token=2.0 / 1_000_000,
+    ),
     "gemini-2.5-pro": ModelPricing(
         input_per_token=1.25 / 1_000_000,
         output_per_token=10.0 / 1_000_000,
@@ -81,16 +167,28 @@ MODEL_PRICING: dict[str, ModelPricing] = {
         cache_creation_per_token=1.25 / 1_000_000,
     ),
     "gemini-2.5-flash": ModelPricing(
-        input_per_token=0.15 / 1_000_000,
-        output_per_token=0.60 / 1_000_000,
-        cache_read_per_token=0.0375 / 1_000_000,
-        cache_creation_per_token=0.15 / 1_000_000,
+        input_per_token=0.30 / 1_000_000,
+        output_per_token=2.50 / 1_000_000,
+        cache_read_per_token=0.075 / 1_000_000,
+        cache_creation_per_token=0.30 / 1_000_000,
     ),
     "gemini-2.0-flash": ModelPricing(
         input_per_token=0.10 / 1_000_000,
         output_per_token=0.40 / 1_000_000,
         cache_read_per_token=0.025 / 1_000_000,
         cache_creation_per_token=0.10 / 1_000_000,
+    ),
+    "gemini-1.5-pro": ModelPricing(
+        input_per_token=1.25 / 1_000_000,
+        output_per_token=5.0 / 1_000_000,
+        cache_read_per_token=0.3125 / 1_000_000,
+        cache_creation_per_token=1.25 / 1_000_000,
+    ),
+    "gemini-1.5-flash": ModelPricing(
+        input_per_token=0.075 / 1_000_000,
+        output_per_token=0.30 / 1_000_000,
+        cache_read_per_token=0.01875 / 1_000_000,
+        cache_creation_per_token=0.075 / 1_000_000,
     ),
 }
 

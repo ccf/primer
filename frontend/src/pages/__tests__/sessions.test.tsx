@@ -94,7 +94,7 @@ describe("SessionsPage", () => {
   })
 
   it("shows empty state when no sessions", () => {
-    mockUseSessions.mockReturnValue({ data: [], isLoading: false } as unknown as ReturnType<
+    mockUseSessions.mockReturnValue({ data: { items: [], total_count: 0, limit: 50, offset: 0 }, isLoading: false } as unknown as ReturnType<
       typeof useSessions
     >)
     renderPage()
@@ -103,7 +103,7 @@ describe("SessionsPage", () => {
 
   it("renders session table when data is present", () => {
     mockUseSessions.mockReturnValue({
-      data: [mockSession],
+      data: { items: [mockSession], total_count: 1, limit: 50, offset: 0 },
       isLoading: false,
     } as unknown as ReturnType<typeof useSessions>)
     renderPage()
@@ -112,7 +112,7 @@ describe("SessionsPage", () => {
 
   it("renders pagination showing range", () => {
     mockUseSessions.mockReturnValue({
-      data: [mockSession],
+      data: { items: [mockSession], total_count: 1, limit: 50, offset: 0 },
       isLoading: false,
     } as unknown as ReturnType<typeof useSessions>)
     renderPage()
@@ -121,16 +121,16 @@ describe("SessionsPage", () => {
 
   it("Previous button is disabled on first page", () => {
     mockUseSessions.mockReturnValue({
-      data: [mockSession],
+      data: { items: [mockSession], total_count: 1, limit: 50, offset: 0 },
       isLoading: false,
     } as unknown as ReturnType<typeof useSessions>)
     renderPage()
-    expect(screen.getByRole("button", { name: /previous/i })).toBeDisabled()
+    expect(screen.getByRole("button", { name: /prev/i })).toBeDisabled()
   })
 
   it("Next button is disabled when results < PAGE_SIZE", () => {
     mockUseSessions.mockReturnValue({
-      data: [mockSession],
+      data: { items: [mockSession], total_count: 1, limit: 50, offset: 0 },
       isLoading: false,
     } as unknown as ReturnType<typeof useSessions>)
     renderPage()
@@ -139,7 +139,7 @@ describe("SessionsPage", () => {
 
   it("renders friction list when friction data present", () => {
     mockUseSessions.mockReturnValue({
-      data: [mockSession],
+      data: { items: [mockSession], total_count: 1, limit: 50, offset: 0 },
       isLoading: false,
     } as unknown as ReturnType<typeof useSessions>)
     mockUseFriction.mockReturnValue({
@@ -153,7 +153,7 @@ describe("SessionsPage", () => {
 
   it("shows loading skeleton for friction when loadingFriction is true", () => {
     mockUseSessions.mockReturnValue({
-      data: [mockSession],
+      data: { items: [mockSession], total_count: 1, limit: 50, offset: 0 },
       isLoading: false,
     } as unknown as ReturnType<typeof useSessions>)
     mockUseFriction.mockReturnValue({

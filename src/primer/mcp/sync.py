@@ -23,7 +23,7 @@ def get_server_session_ids(server_url: str, api_key: str) -> set[str]:
     if resp.status_code != 200:
         logger.warning(f"Failed to fetch server sessions: {resp.status_code}")
         return set()
-    return {s["id"] for s in resp.json()}
+    return {s["id"] for s in resp.json()["items"]}
 
 
 def sync_sessions(server_url: str, api_key: str) -> dict:

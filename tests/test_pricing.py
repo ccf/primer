@@ -25,6 +25,39 @@ def test_fallback_to_sonnet():
     assert pricing is MODEL_PRICING["claude-sonnet-4"]
 
 
+def test_opus_4_5_match():
+    pricing = get_pricing("claude-opus-4-5-20251101")
+    assert pricing is MODEL_PRICING["claude-opus-4-5"]
+    assert abs(pricing.input_per_token * 1_000_000 - 5.0) < 0.001
+
+
+def test_opus_4_6_match():
+    pricing = get_pricing("claude-opus-4-6-20260210")
+    assert pricing is MODEL_PRICING["claude-opus-4-6"]
+    assert abs(pricing.input_per_token * 1_000_000 - 5.0) < 0.001
+
+
+def test_haiku_4_5_match():
+    pricing = get_pricing("claude-haiku-4-5-20260115")
+    assert pricing is MODEL_PRICING["claude-haiku-4-5"]
+    assert abs(pricing.input_per_token * 1_000_000 - 1.0) < 0.001
+
+
+def test_gpt5_match():
+    pricing = get_pricing("gpt-5-2025")
+    assert pricing is MODEL_PRICING["gpt-5"]
+
+
+def test_gpt5_2_match():
+    pricing = get_pricing("gpt-5.2-2025")
+    assert pricing is MODEL_PRICING["gpt-5.2"]
+
+
+def test_gemini_3_1_pro_match():
+    pricing = get_pricing("gemini-3.1-pro-preview-0219")
+    assert pricing is MODEL_PRICING["gemini-3.1-pro"]
+
+
 def test_estimate_cost_opus():
     cost = estimate_cost(
         "claude-opus-4-20250514",
@@ -32,6 +65,15 @@ def test_estimate_cost_opus():
         output_tokens=1_000_000,
     )
     assert abs(cost - 90.0) < 0.01  # $15 input + $75 output
+
+
+def test_estimate_cost_opus_4_5():
+    cost = estimate_cost(
+        "claude-opus-4-5-20251101",
+        input_tokens=1_000_000,
+        output_tokens=1_000_000,
+    )
+    assert abs(cost - 30.0) < 0.01  # $5 input + $25 output
 
 
 def test_estimate_cost_sonnet():

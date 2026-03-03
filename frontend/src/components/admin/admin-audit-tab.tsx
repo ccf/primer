@@ -5,6 +5,7 @@ import { useIngestEvents, useEngineers, useAuditLogs } from "@/hooks/use-api-que
 import { Badge } from "@/components/ui/badge"
 import { TableSkeleton } from "@/components/shared/loading-skeleton"
 import { EmptyState } from "@/components/shared/empty-state"
+import { PaginationControls } from "@/components/shared/pagination-controls"
 
 const RESOURCE_TYPES = ["", "engineer", "team", "alert_config"]
 const ACTIONS = ["", "create", "update", "deactivate", "rotate_key", "delete"]
@@ -45,12 +46,18 @@ export function AdminAuditTab() {
 function AdminActionsView() {
   const [resourceType, setResourceType] = useState("")
   const [action, setAction] = useState("")
+  const [offset, setOffset] = useState(0)
+
+  const PAGE_SIZE = 100
 
   const { data: logs, isLoading } = useAuditLogs({
     resource_type: resourceType || undefined,
     action: action || undefined,
-    limit: 100,
+    limit: PAGE_SIZE,
+    offset,
   })
+
+  const items = logs?.items ?? []
 
   return (
     <div className="space-y-4">
@@ -58,7 +65,7 @@ function AdminActionsView() {
         <select
           className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
           value={resourceType}
-          onChange={(e) => setResourceType(e.target.value)}
+          onChange={(e) => { setResourceType(e.target.value); setOffset(0) }}
         >
           <option value="">All resources</option>
           {RESOURCE_TYPES.filter(Boolean).map((t) => (
@@ -68,7 +75,7 @@ function AdminActionsView() {
         <select
           className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
           value={action}
-          onChange={(e) => setAction(e.target.value)}
+          onChange={(e) => { setAction(e.target.value); setOffset(0) }}
         >
           <option value="">All actions</option>
           {ACTIONS.filter(Boolean).map((a) => (
@@ -79,51 +86,60 @@ function AdminActionsView() {
 
       {isLoading ? (
         <TableSkeleton />
-      ) : !logs || logs.length === 0 ? (
+      ) : !logs || items.length === 0 ? (
         <EmptyState message="No audit logs found" />
       ) : (
-        <div className="rounded-xl border border-border/60">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/60">
-                <th className="px-4 py-2 text-left font-medium">Time</th>
-                <th className="px-4 py-2 text-left font-medium">Actor</th>
-                <th className="px-4 py-2 text-left font-medium">Action</th>
-                <th className="px-4 py-2 text-left font-medium">Resource</th>
-                <th className="px-4 py-2 text-left font-medium">Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              {logs.map((log) => (
-                <tr key={log.id} className="border-b border-border/40 last:border-0 even:bg-muted/15 hover:bg-accent/50">
-                  <td className="whitespace-nowrap px-4 py-2 text-muted-foreground">
-                    {new Date(log.created_at).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2">
-                    <span className="inline-flex items-center gap-1">
-                      <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{log.actor_role}</span>
-                      {log.actor_id ? <span className="truncate text-xs text-muted-foreground">{log.actor_id.slice(0, 8)}</span> : <span className="text-xs text-muted-foreground">system</span>}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2">
-                    <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                      {log.action}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2">
-                    <span className="text-xs">
-                      {log.resource_type}
-                      {log.resource_id && <span className="text-muted-foreground"> ({log.resource_id.slice(0, 8)})</span>}
-                    </span>
-                  </td>
-                  <td className="max-w-xs truncate px-4 py-2 text-xs text-muted-foreground">
-                    {log.details ? JSON.stringify(log.details) : "-"}
-                  </td>
+        <>
+          <div className="rounded-xl border border-border/60">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/60">
+                  <th className="px-4 py-2 text-left font-medium">Time</th>
+                  <th className="px-4 py-2 text-left font-medium">Actor</th>
+                  <th className="px-4 py-2 text-left font-medium">Action</th>
+                  <th className="px-4 py-2 text-left font-medium">Resource</th>
+                  <th className="px-4 py-2 text-left font-medium">Details</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {items.map((log) => (
+                  <tr key={log.id} className="border-b border-border/40 last:border-0 even:bg-muted/15 hover:bg-accent/50">
+                    <td className="whitespace-nowrap px-4 py-2 text-muted-foreground">
+                      {new Date(log.created_at).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2">
+                      <span className="inline-flex items-center gap-1">
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{log.actor_role}</span>
+                        {log.actor_id ? <span className="truncate text-xs text-muted-foreground">{log.actor_id.slice(0, 8)}</span> : <span className="text-xs text-muted-foreground">system</span>}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2">
+                      <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                        {log.action}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2">
+                      <span className="text-xs">
+                        {log.resource_type}
+                        {log.resource_id && <span className="text-muted-foreground"> ({log.resource_id.slice(0, 8)})</span>}
+                      </span>
+                    </td>
+                    <td className="max-w-xs truncate px-4 py-2 text-xs text-muted-foreground">
+                      {log.details ? JSON.stringify(log.details) : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <PaginationControls
+            offset={offset}
+            pageSize={PAGE_SIZE}
+            totalCount={logs.total_count}
+            onPrev={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+            onNext={() => setOffset(offset + PAGE_SIZE)}
+          />
+        </>
       )}
     </div>
   )
@@ -132,14 +148,19 @@ function AdminActionsView() {
 function IngestEventsView() {
   const [engineerFilter, setEngineerFilter] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
+  const [offset, setOffset] = useState(0)
+
+  const PAGE_SIZE = 100
 
   const { data: engineers } = useEngineers()
   const { data: events, isLoading } = useIngestEvents({
     engineerId: engineerFilter || undefined,
     status: statusFilter || undefined,
-    limit: 100,
+    limit: PAGE_SIZE,
+    offset,
   })
 
+  const items = events?.items ?? []
   const engineerMap = new Map(engineers?.map((e) => [e.id, e.display_name ?? e.name]) ?? [])
 
   return (
@@ -147,7 +168,7 @@ function IngestEventsView() {
       <div className="flex gap-3">
         <select
           value={engineerFilter}
-          onChange={(e) => setEngineerFilter(e.target.value)}
+          onChange={(e) => { setEngineerFilter(e.target.value); setOffset(0) }}
           className="h-9 rounded-md border border-input bg-background px-3 text-sm"
         >
           <option value="">All engineers</option>
@@ -159,7 +180,7 @@ function IngestEventsView() {
         </select>
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => { setStatusFilter(e.target.value); setOffset(0) }}
           className="h-9 rounded-md border border-input bg-background px-3 text-sm"
         >
           <option value="">All statuses</option>
@@ -170,52 +191,56 @@ function IngestEventsView() {
 
       {isLoading ? (
         <TableSkeleton />
+      ) : !events || items.length === 0 ? (
+        <EmptyState message="No ingest events found" />
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-border/60">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/60">
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Time</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Engineer</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Session</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Error</th>
-              </tr>
-            </thead>
-            <tbody>
-              {events?.map((evt) => (
-                <tr key={evt.id} className="border-b border-border/40 last:border-0 even:bg-muted/15 hover:bg-accent/50">
-                  <td className="px-4 py-3 text-xs text-muted-foreground">
-                    {format(parseISO(evt.created_at), "MMM d, HH:mm:ss")}
-                  </td>
-                  <td className="px-4 py-3">
-                    {engineerMap.get(evt.engineer_id) ?? evt.engineer_id.slice(0, 8)}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs">{evt.event_type}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                    {evt.session_id?.slice(0, 8) ?? "-"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge variant={evt.status === "ok" ? "success" : "destructive"}>
-                      {evt.status}
-                    </Badge>
-                  </td>
-                  <td className="max-w-48 truncate px-4 py-3 text-xs text-muted-foreground">
-                    {evt.error_message ?? "-"}
-                  </td>
+        <>
+          <div className="overflow-x-auto rounded-xl border border-border/60">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/60">
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Time</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Engineer</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Session</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Error</th>
                 </tr>
-              ))}
-              {events?.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                    No ingest events found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {items.map((evt) => (
+                  <tr key={evt.id} className="border-b border-border/40 last:border-0 even:bg-muted/15 hover:bg-accent/50">
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                      {format(parseISO(evt.created_at), "MMM d, HH:mm:ss")}
+                    </td>
+                    <td className="px-4 py-3">
+                      {engineerMap.get(evt.engineer_id) ?? evt.engineer_id.slice(0, 8)}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs">{evt.event_type}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                      {evt.session_id?.slice(0, 8) ?? "-"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant={evt.status === "ok" ? "success" : "destructive"}>
+                        {evt.status}
+                      </Badge>
+                    </td>
+                    <td className="max-w-48 truncate px-4 py-3 text-xs text-muted-foreground">
+                      {evt.error_message ?? "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <PaginationControls
+            offset={offset}
+            pageSize={PAGE_SIZE}
+            totalCount={events.total_count}
+            onPrev={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+            onNext={() => setOffset(offset + PAGE_SIZE)}
+          />
+        </>
       )}
     </div>
   )

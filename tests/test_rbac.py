@@ -117,7 +117,7 @@ def test_engineer_sees_only_own_sessions(client, db_session, regular_engineer, o
 
     r = client.get("/api/v1/sessions", cookies=_jwt_cookie(eng))
     assert r.status_code == 200
-    data = r.json()
+    data = r.json()["items"]
     assert all(s["engineer_id"] == eng.id for s in data)
     assert len(data) >= 1
 
@@ -132,7 +132,7 @@ def test_team_lead_sees_team_sessions(
 
     r = client.get("/api/v1/sessions", cookies=_jwt_cookie(team_lead_engineer))
     assert r.status_code == 200
-    data = r.json()
+    data = r.json()["items"]
     # Should see team_a sessions (eng + team_lead), not team_b
     assert len(data) >= 2
     for s in data:
@@ -149,7 +149,7 @@ def test_admin_sees_all_sessions(
 
     r = client.get("/api/v1/sessions", cookies=_jwt_cookie(admin_engineer))
     assert r.status_code == 200
-    data = r.json()
+    data = r.json()["items"]
     engineer_ids = {s["engineer_id"] for s in data}
     assert eng.id in engineer_ids
     assert other_team_engineer.id in engineer_ids

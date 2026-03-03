@@ -7,10 +7,11 @@ import { SessionSearchBar, ActiveFilterChips } from "@/components/sessions/sessi
 import { TableSkeleton } from "@/components/shared/loading-skeleton"
 import { EmptyState } from "@/components/shared/empty-state"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, Download, FileText, X } from "lucide-react"
+import { Download, FileText, X } from "lucide-react"
 import { useKeyboardNavigation } from "@/hooks/use-keyboard-navigation"
 import { exportToCsv } from "@/lib/csv-export"
 import { exportToPdf } from "@/lib/pdf-export"
+import { PaginationControls } from "@/components/shared/pagination-controls"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
 interface SessionBrowserProps {
@@ -74,9 +75,11 @@ export function SessionBrowser({
     offset,
   })
 
+  const items = sessions?.items ?? []
+
   const { selectedIndex } = useKeyboardNavigation({
-    items: sessions ?? [],
-    enabled: !loadingSessions && !!sessions && sessions.length > 0,
+    items,
+    enabled: !loadingSessions && items.length > 0,
   })
 
   const handleSearchChange = useCallback(
@@ -108,7 +111,7 @@ export function SessionBrowser({
 
   const sessionExportHeaders = ["ID", "Engineer", "Project", "Started", "Duration (s)", "Messages", "Tool Calls", "Model", "Tokens In", "Tokens Out"]
   const sessionExportRows = () =>
-    (sessions ?? []).map((s) => [
+    items.map((s) => [
       s.id,
       s.engineer_id,
       s.project_name ?? "",
@@ -122,12 +125,12 @@ export function SessionBrowser({
     ])
 
   const handleExport = () => {
-    if (!sessions) return
+    if (items.length === 0) return
     exportToCsv("sessions.csv", sessionExportHeaders, sessionExportRows())
   }
 
   const handleExportPdf = () => {
-    if (!sessions) return
+    if (items.length === 0) return
     exportToPdf("sessions.pdf", "Sessions Report", sessionExportHeaders, sessionExportRows())
   }
 
@@ -141,7 +144,7 @@ export function SessionBrowser({
       <div className="flex items-center justify-between">
         <div />
         <div className="flex items-center gap-2">
-          {sessions && sessions.length > 0 && (
+          {items.length > 0 && (
             <>
               <Button variant="outline" size="sm" onClick={handleExport}>
                 <Download className="mr-1 h-4 w-4" />
@@ -191,39 +194,21 @@ export function SessionBrowser({
 
       {loadingSessions ? (
         <TableSkeleton />
-      ) : !sessions || sessions.length === 0 ? (
+      ) : !sessions || items.length === 0 ? (
         <EmptyState message="No sessions found" />
       ) : (
         <>
-          <SessionTable sessions={sessions} selectedIndex={selectedIndex} />
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              Showing {offset + 1}–{offset + sessions.length}
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={offset === 0}
-                onClick={() => {
-                  const prev = Math.max(0, offset - PAGE_SIZE)
-                  updateParam("offset", prev ? String(prev) : "")
-                }}
-              >
-                <ChevronLeft className="mr-1 h-4 w-4" />
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={sessions.length < PAGE_SIZE}
-                onClick={() => updateParam("offset", String(offset + PAGE_SIZE))}
-              >
-                Next
-                <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+          <SessionTable sessions={items} selectedIndex={selectedIndex} />
+          <PaginationControls
+            offset={offset}
+            pageSize={PAGE_SIZE}
+            totalCount={sessions.total_count}
+            onPrev={() => {
+              const prev = Math.max(0, offset - PAGE_SIZE)
+              updateParam("offset", prev ? String(prev) : "")
+            }}
+            onNext={() => updateParam("offset", String(offset + PAGE_SIZE))}
+          />
         </>
       )}
     </div>

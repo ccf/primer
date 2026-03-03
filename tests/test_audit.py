@@ -11,7 +11,7 @@ def test_create_engineer_audit(client, admin_headers):
         headers=admin_headers,
     )
     assert resp.status_code == 200
-    logs = resp.json()
+    logs = resp.json()["items"]
     assert any(log["action"] == "create" and log["resource_type"] == "engineer" for log in logs)
 
 
@@ -42,7 +42,7 @@ def test_update_engineer_audit(client, admin_headers, db_session):
         headers=admin_headers,
     )
     assert resp.status_code == 200
-    logs = resp.json()
+    logs = resp.json()["items"]
     assert any(log["action"] == "update" and log["resource_type"] == "engineer" for log in logs)
 
 
@@ -59,7 +59,7 @@ def test_create_team_audit(client, admin_headers):
         headers=admin_headers,
     )
     assert resp.status_code == 200
-    logs = resp.json()
+    logs = resp.json()["items"]
     assert any(log["action"] == "create" and log["resource_type"] == "team" for log in logs)
 
 
@@ -89,7 +89,7 @@ def test_alert_config_audit(client, admin_headers):
         headers=admin_headers,
     )
     assert resp.status_code == 200
-    logs = resp.json()
+    logs = resp.json()["items"]
     actions = [log["action"] for log in logs]
     assert "create" in actions
     assert "update" in actions
@@ -103,7 +103,7 @@ def test_audit_filter_by_resource_type(client, admin_headers):
         headers=admin_headers,
     )
     assert resp.status_code == 200
-    for log in resp.json():
+    for log in resp.json()["items"]:
         assert log["resource_type"] == "team"
 
 
@@ -114,7 +114,7 @@ def test_audit_filter_by_action(client, admin_headers):
         headers=admin_headers,
     )
     assert resp.status_code == 200
-    for log in resp.json():
+    for log in resp.json()["items"]:
         assert log["action"] == "create"
 
 

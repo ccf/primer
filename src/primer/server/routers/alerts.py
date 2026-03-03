@@ -24,6 +24,7 @@ def list_alerts(
     acknowledged: bool | None = None,
     dismissed: bool = False,
     limit: int = Query(default=50, le=200),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(get_auth_context),
 ):
@@ -44,6 +45,7 @@ def list_alerts(
         acknowledged=acknowledged,
         dismissed=dismissed,
         limit=limit,
+        offset=offset,
     )
     return alerts
 

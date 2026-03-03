@@ -8,6 +8,7 @@ from primer.common.database import get_db
 from primer.common.models import Engineer, SessionFacets, SessionMessage
 from primer.common.models import Session as SessionModel
 from primer.common.schemas import (
+    PaginatedResponse,
     SessionDetailResponse,
     SessionMessageResponse,
     SessionResponse,
@@ -18,7 +19,7 @@ from primer.server.deps import AuthContext, get_auth_context
 router = APIRouter(prefix="/api/v1/sessions", tags=["sessions"])
 
 
-@router.get("", response_model=list[SessionResponse])
+@router.get("", response_model=PaginatedResponse[SessionResponse])
 def list_sessions(
     engineer_id: str | None = None,
     team_id: str | None = None,
@@ -31,7 +32,7 @@ def list_sessions(
     start_date: datetime | None = None,
     end_date: datetime | None = None,
     limit: int = Query(default=100, le=1000),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(get_auth_context),
 ):
@@ -73,7 +74,10 @@ def list_sessions(
         q = q.filter(SessionModel.started_at >= start_date)
     if end_date:
         q = q.filter(SessionModel.started_at <= end_date)
-    return q.order_by(SessionModel.started_at.desc()).offset(offset).limit(limit).all()
+
+    total_count = q.count()
+    items = q.order_by(SessionModel.started_at.desc()).offset(offset).limit(limit).all()
+    return PaginatedResponse(items=items, total_count=total_count, limit=limit, offset=offset)
 
 
 @router.get("/{session_id}", response_model=SessionDetailResponse)

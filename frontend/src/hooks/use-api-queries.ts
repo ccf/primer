@@ -28,6 +28,7 @@ import type {
   NarrativeStatusResponse,
   OnboardingAccelerationResponse,
   OverviewStats,
+  PaginatedResponse,
   PatternSharingResponse,
   PersonalizedTipsResponse,
   ProductivityMetrics,
@@ -186,7 +187,7 @@ export function useSessions(params: {
   })
   return useQuery({
     queryKey: ["sessions", params],
-    queryFn: () => apiFetch<SessionResponse[]>(`/api/v1/sessions${qs}`),
+    queryFn: () => apiFetch<PaginatedResponse<SessionResponse>>(`/api/v1/sessions${qs}`),
   })
 }
 
@@ -302,7 +303,7 @@ export function useIngestEvents(params?: { engineerId?: string; status?: string;
       if (params?.limit) sp.set("limit", String(params.limit))
       if (params?.offset) sp.set("offset", String(params.offset))
       const qs = sp.toString()
-      return apiFetch<IngestEventResponse[]>(`/api/v1/admin/ingest-events${qs ? `?${qs}` : ""}`)
+      return apiFetch<PaginatedResponse<IngestEventResponse>>(`/api/v1/admin/ingest-events${qs ? `?${qs}` : ""}`)
     },
   })
 }
@@ -368,7 +369,7 @@ export function useAuditLogs(params?: {
   return useQuery({
     queryKey: ["audit-logs", params],
     queryFn: () =>
-      apiFetch<AuditLogResponse[]>(
+      apiFetch<PaginatedResponse<AuditLogResponse>>(
         `/api/v1/admin/audit-logs${buildParams(params ?? {})}`,
       ),
   })

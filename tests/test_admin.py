@@ -47,7 +47,7 @@ def test_ingest_events(client, admin_headers, engineer_with_key):
 
     r = client.get("/api/v1/admin/ingest-events", headers=admin_headers)
     assert r.status_code == 200
-    data = r.json()
+    data = r.json()["items"]
     assert len(data) >= 1
     assert data[0]["status"] == "ok"
 
@@ -58,7 +58,7 @@ def test_ingest_events_filter_by_engineer(client, admin_headers, engineer_with_k
 
     r = client.get(f"/api/v1/admin/ingest-events?engineer_id={eng.id}", headers=admin_headers)
     assert r.status_code == 200
-    data = r.json()
+    data = r.json()["items"]
     assert all(e["engineer_id"] == eng.id for e in data)
 
 
