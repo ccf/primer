@@ -1,0 +1,204 @@
+---
+layout: ../../layouts/DocsPage.astro
+title: "FinOps & Cost Management"
+section: "Guides"
+description: "Track cache savings, model cost modeling, forecasting, and budget alerts for your AI coding tools."
+---
+import Callout from '../../components/docs/Callout.astro';
+
+## Overview
+
+The FinOps module helps engineering leaders understand and optimize AI coding tool costs. It covers four areas:
+
+1. **Cache Analytics** — measure prompt caching efficiency and savings per model and engineer
+2. **Cost Modeling** — compare API-key billing vs subscription plans to find the cheapest option per engineer
+3. **Forecasting** — project future spend using linear regression on historical daily costs
+4. **Budgets** — set monthly or quarterly spend limits with automatic status tracking
+
+All endpoints live under `/api/v1/finops/` and respect role-based access control.
+
+## Cache Analytics
+
+The cache analytics endpoint aggregates prompt cache usage across your organization and computes savings using per-model pricing deltas.
+
+```bash
+curl http://localhost:8000/api/v1/finops/cache \
+  -H "x-admin-key: your-admin-key"
+```
+
+**Key metrics returned:**
+
+| Field | Description |
+|-------|-------------|
+| `cache_hit_rate` | Ratio of cache read tokens to total input tokens |
+| `cache_savings_estimate` | Dollar savings from cached vs uncached input pricing |
+| `model_cache_breakdown` | Per-model cache tokens, hit rates, and savings |
+| `engineer_cache_breakdown` | Per-engineer hit rates, savings, and potential upside |
+| `total_potential_additional_savings` | Estimated savings if below-average engineers matched the team average |
+
+The per-engineer breakdown identifies engineers with low cache hit rates and estimates how much the team could save if they improved to the team average. This is useful for targeted coaching.
+
+<Callout type="tip" title="Improving cache hit rates">
+Cache hit rates improve when engineers reuse conversation context effectively — longer sessions with incremental edits cache better than many short sessions. The per-engineer breakdown helps identify who might benefit from workflow adjustments.
+</Callout>
+
+### Scoping
+
+All FinOps endpoints support optional query parameters for filtering:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `team_id` | string | Filter to a specific team (admin only) |
+| `start_date` | datetime | Start of date range |
+| `end_date` | datetime | End of date range |
+
+Team leads automatically see only their team's data. Engineers see only their own data.
+
+## Cost Modeling
+
+Compares each engineer's actual API spend against Claude subscription plan tiers to find the optimal allocation.
+
+```bash
+curl http://localhost:8000/api/v1/finops/cost-modeling \
+  -H "x-admin-key: your-admin-key"
+```
+
+<Callout type="note" title="Access control">
+Cost modeling requires `admin` or `team_lead` role. Regular engineers cannot access this endpoint.
+</Callout>
+
+**Plan tiers evaluated:**
+
+| Plan | Monthly Cost | Best For |
+|------|-------------|----------|
+| API Key | $0 (pay per token) | Light users spending under $20/mo |
+| Claude Pro | $20/mo | Moderate users ($20–100/mo API equivalent) |
+| Claude Max 5x | $100/mo | Heavy users ($100–200/mo API equivalent) |
+| Claude Max 20x | $200/mo | Power users spending over $200/mo |
+
+The response includes per-engineer recommendations, an allocation summary showing how many engineers belong to each tier, and the total monthly savings from switching to optimal plans.
+
+**Response fields:**
+
+| Field | Description |
+|-------|-------------|
+| `engineers[]` | Per-engineer: monthly API cost, recommended plan, savings |
+| `allocation[]` | How many engineers per tier and total tier cost |
+| `total_api_cost_monthly` | What the org currently spends on API billing |
+| `total_optimal_cost_monthly` | What the org would spend with optimal plan assignment |
+| `total_savings_monthly` | Difference between API and optimal |
+
+## Forecasting
+
+Projects future daily costs using linear regression on historical spending data.
+
+```bash
+curl "http://localhost:8000/api/v1/finops/forecast?forecast_days=30" \
+  -H "x-admin-key: your-admin-key"
+```
+
+The `forecast_days` parameter controls how far ahead to project (1–365 days, default 30). The response includes:
+
+| Field | Description |
+|-------|-------------|
+| `historical[]` | Daily cost and session count for the observed period |
+| `forecast[]` | Projected daily cost with upper/lower confidence bounds |
+| `monthly_projection` | Estimated total spend for the next 30 days |
+| `trend_direction` | `"increasing"`, `"decreasing"`, or `"stable"` |
+
+The confidence band is derived from the residual standard deviation of the linear fit. A wider band means higher day-to-day cost variance.
+
+<Callout type="note" title="Minimum data requirement">
+Forecasting requires at least 2 days of historical data to fit a regression line. With fewer data points, the endpoint returns historical data only with no forecast.
+</Callout>
+
+## Budgets
+
+Create monthly or quarterly spend budgets per team or org-wide. Primer tracks actual spend against the budget and computes status automatically.
+
+### Create a budget
+
+```bash
+curl -X POST http://localhost:8000/api/v1/finops/budgets \
+  -H "x-admin-key: your-admin-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "team_id": "550e8400-e29b-41d4-a716-446655440000",
+    "name": "Backend Team Monthly",
+    "amount": 2000.00,
+    "period": "monthly",
+    "alert_threshold_pct": 80
+  }'
+```
+
+Omit `team_id` to create an org-wide budget that tracks total spend across all teams.
+
+### List budgets
+
+```bash
+curl http://localhost:8000/api/v1/finops/budgets \
+  -H "x-admin-key: your-admin-key"
+```
+
+Each budget in the response includes computed status fields:
+
+| Field | Description |
+|-------|-------------|
+| `current_spend` | Actual spend so far in the current period |
+| `burn_rate_daily` | Average daily spend rate |
+| `projected_end_of_period` | Projected total spend by period end |
+| `pct_used` | Percentage of budget consumed |
+| `status` | `"on_track"`, `"warning"`, or `"over_budget"` |
+
+The `status` transitions:
+- **on_track** — spend is below the alert threshold
+- **warning** — spend exceeds `alert_threshold_pct` but is under 100%
+- **over_budget** — spend exceeds the budget amount
+
+### Update a budget
+
+```bash
+curl -X PATCH http://localhost:8000/api/v1/finops/budgets/<budget-id> \
+  -H "x-admin-key: your-admin-key" \
+  -H "Content-Type: application/json" \
+  -d '{"amount": 2500.00}'
+```
+
+### Delete a budget
+
+```bash
+curl -X DELETE http://localhost:8000/api/v1/finops/budgets/<budget-id> \
+  -H "x-admin-key: your-admin-key"
+```
+
+<Callout type="warning" title="Team lead permissions">
+Team leads can create, update, and delete budgets for their own team only. Attempting to modify another team's budget returns a 403 error.
+</Callout>
+
+## Dashboard
+
+The FinOps page in the Primer dashboard provides five tabs:
+
+| Tab | Content |
+|-----|---------|
+| **Overview** | Total spend, cost per session, cost per success, cache savings KPIs |
+| **Cache** | Savings by model chart, daily savings trend, per-engineer efficiency table |
+| **Modeling** | Per-engineer plan recommendations, allocation summary, total savings |
+| **Forecast** | Historical cost chart with projected trend line and confidence band |
+| **Budgets** | Budget cards with progress bars, burn rates, and status indicators |
+
+Navigate to **FinOps** in the sidebar or click "View FinOps" from the main dashboard overview.
+
+## Pricing
+
+Cost calculations use per-model token pricing with longest-prefix matching. Primer ships with pricing for:
+
+- **Anthropic**: Claude Opus 4, Sonnet 4, Sonnet 3.5, Haiku 3.5
+- **OpenAI**: GPT-4.1, GPT-4.1 Mini, GPT-4.1 Nano, o3, o4-mini, Codex Mini
+- **Google**: Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.0 Flash
+
+Each model has four price points: input, output, cache read, and cache creation tokens. To update pricing for new models, edit `MODEL_PRICING` in `src/primer/common/pricing.py` (backend) and `frontend/src/lib/utils.ts` (frontend).
+
+<Callout type="tip" title="Unknown models">
+If a session uses a model not in the pricing table, Primer falls back to Claude Sonnet 4 pricing. Add new model entries as they become available to ensure accurate cost tracking.
+</Callout>
