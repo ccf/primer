@@ -15,7 +15,7 @@ import { ChartTooltip } from "@/components/charts/chart-tooltip"
 import { CHART_COLORS, CHART_PALETTE, AXIS_TICK_STYLE } from "@/lib/chart-colors"
 import { useCacheAnalytics } from "@/hooks/use-api-queries"
 import { CardSkeleton, ChartSkeleton, TableSkeleton } from "@/components/shared/loading-skeleton"
-import { formatCost, formatPercent } from "@/lib/utils"
+import { formatCost, formatPercent, getModelPricing } from "@/lib/utils"
 import { format, parseISO } from "date-fns"
 
 interface CacheTabProps {
@@ -62,28 +62,14 @@ export function CacheTab({ teamId, startDate, endDate }: CacheTabProps) {
     }))
 
   // Effective discount: what % cheaper is the total bill thanks to caching
-  // Best approximation without full cost data: savings / (savings / discount_depth)
-  // where discount_depth is the average savings-per-cached-token / input-price-per-token
-  // Simpler: show cache_savings / (some total), but we lack total spend in this response.
-  // Use a practical formula: savings relative to what would have been spent on those tokens
-  // This is equivalent to: avg(1 - cache_read_price/input_price) across models
-  // Which is always ~90% for Opus, ~90% for Sonnet. So just show hit_rate * avg_discount_depth.
-  // Actually let's compute it from model data properly:
+  // Compute what the cached tokens would have cost at full input price per model.
+  // would_have_cost = cache_read_tokens * input_price_per_token (per model)
+  // effective_discount = total_savings / total_would_have_cost
   let totalWouldHaveCost = 0
   for (const m of data.model_cache_breakdown) {
-    if (m.cache_read_tokens > 0 && m.estimated_savings > 0) {
-      // savings = cr * (input_price - cache_price)
-      // would_have = cr * input_price = savings + cr * cache_price
-      // savings / would_have = (input_price - cache_price) / input_price
-      // would_have = savings / (1 - cache_price/input_price)
-      // For Claude models cache is 10% of input, so would_have ≈ savings / 0.9
-      // But let's be precise: would_have = savings * cr / cr (cancel out) -- we need ratio
-      // Actually: would_have = savings + actual_cache_cost
-      // actual_cache_cost = would_have - savings
-      // We know: savings/would_have = 1 - cache_price/input_price
-      // For all Claude models: cache_read = input/10, so ratio = 0.9
-      // would_have = savings / 0.9 -- this is a very close approximation
-      totalWouldHaveCost += m.estimated_savings / 0.9
+    if (m.cache_read_tokens > 0) {
+      const p = getModelPricing(m.model_name)
+      totalWouldHaveCost += m.cache_read_tokens * p.input
     }
   }
   const effectiveDiscount = totalWouldHaveCost > 0 ? totalSavings / totalWouldHaveCost : null

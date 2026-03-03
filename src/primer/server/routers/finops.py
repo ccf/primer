@@ -18,6 +18,7 @@ from primer.server.deps import AuthContext, get_auth_context, require_role
 from primer.server.services.finops_service import (
     create_budget,
     delete_budget,
+    get_budget,
     get_cache_analytics,
     get_cost_forecast,
     get_cost_modeling,
@@ -104,8 +105,12 @@ def budgets_list(
 def budgets_create(
     payload: BudgetCreate,
     db: Session = Depends(get_db),
-    _auth: AuthContext = Depends(require_role("admin", "team_lead")),
+    auth: AuthContext = Depends(require_role("admin", "team_lead")),
 ):
+    if auth.role == "team_lead":
+        if payload.team_id and payload.team_id != auth.team_id:
+            raise HTTPException(status_code=403, detail="Cannot create budgets for other teams")
+        payload.team_id = auth.team_id
     result = create_budget(db, payload)
     db.commit()
     return result
@@ -116,8 +121,12 @@ def budgets_update(
     budget_id: str,
     payload: BudgetUpdate,
     db: Session = Depends(get_db),
-    _auth: AuthContext = Depends(require_role("admin", "team_lead")),
+    auth: AuthContext = Depends(require_role("admin", "team_lead")),
 ):
+    if auth.role == "team_lead":
+        budget = get_budget(db, budget_id)
+        if not budget or budget.team_id != auth.team_id:
+            raise HTTPException(status_code=403, detail="Cannot modify budgets for other teams")
     result = update_budget(db, budget_id, payload)
     if not result:
         raise HTTPException(status_code=404, detail="Budget not found")
@@ -129,8 +138,12 @@ def budgets_update(
 def budgets_delete(
     budget_id: str,
     db: Session = Depends(get_db),
-    _auth: AuthContext = Depends(require_role("admin", "team_lead")),
+    auth: AuthContext = Depends(require_role("admin", "team_lead")),
 ):
+    if auth.role == "team_lead":
+        budget = get_budget(db, budget_id)
+        if not budget or budget.team_id != auth.team_id:
+            raise HTTPException(status_code=403, detail="Cannot delete budgets for other teams")
     if not delete_budget(db, budget_id):
         raise HTTPException(status_code=404, detail="Budget not found")
     db.commit()
