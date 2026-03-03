@@ -3,7 +3,7 @@ import { DailyCostChart } from "@/components/dashboard/daily-cost-chart"
 import { CostBreakdownChart } from "@/components/dashboard/cost-breakdown-chart"
 import { ProductivitySection } from "@/components/dashboard/productivity-section"
 import { CardSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleton"
-import { formatCost } from "@/lib/utils"
+import { formatCost, getModelPricing } from "@/lib/utils"
 
 interface OverviewTabProps {
   teamId: string | null
@@ -37,9 +37,8 @@ export function OverviewTab({ teamId, startDate, endDate }: OverviewTabProps) {
 
   const cacheSavings =
     costData.model_breakdown.reduce((sum, m) => {
-      const readRate = 0.3 / 1e6
-      const inputRate = 3 / 1e6
-      return sum + m.cache_read_tokens * (inputRate - readRate)
+      const p = getModelPricing(m.model_name)
+      return sum + m.cache_read_tokens * (p.input - p.cacheRead)
     }, 0)
 
   const kpis = [

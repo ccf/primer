@@ -49,7 +49,7 @@ const MODEL_PRICING: Record<string, { input: number; output: number; cacheRead: 
   "claude-haiku-3.5": { input: 0.8 / 1e6, output: 4 / 1e6, cacheRead: 0.08 / 1e6, cacheCreate: 1 / 1e6 },
 }
 
-function getModelPricing(modelName: string) {
+export function getModelPricing(modelName: string) {
   let bestKey = ""
   for (const prefix of Object.keys(MODEL_PRICING)) {
     if (modelName.startsWith(prefix) && prefix.length > bestKey.length) {

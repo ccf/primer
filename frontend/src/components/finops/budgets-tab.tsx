@@ -135,8 +135,8 @@ export function BudgetsTab({ teamId }: BudgetsTabProps) {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {data.map((budget) => {
-          const pctUsed = Math.min(budget.pct_used * 100, 100)
-          const pctDisplay = (budget.pct_used * 100).toFixed(0)
+          const pctUsed = Math.min(budget.pct_used, 100)
+          const pctDisplay = budget.pct_used.toFixed(0)
           return (
             <Card key={budget.id}>
               <CardHeader className="pb-3">
