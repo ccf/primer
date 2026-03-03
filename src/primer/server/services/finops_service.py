@@ -526,7 +526,14 @@ def get_cost_forecast(
             )
         )
 
-    monthly_projection = sum(fp.projected_cost for fp in forecast_points[:30])
+    # Extrapolate to 30 days even if forecast_days < 30
+    if forecast_days >= 30:
+        monthly_projection = sum(fp.projected_cost for fp in forecast_points[:30])
+    elif forecast_points:
+        avg_daily = sum(fp.projected_cost for fp in forecast_points) / len(forecast_points)
+        monthly_projection = avg_daily * 30
+    else:
+        monthly_projection = 0.0
 
     return CostForecastResponse(
         historical=historical,
