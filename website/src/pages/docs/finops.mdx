@@ -193,9 +193,9 @@ Navigate to **FinOps** in the sidebar or click "View FinOps" from the main dashb
 
 Cost calculations use per-model token pricing with longest-prefix matching. Primer ships with pricing for:
 
-- **Anthropic**: Claude Opus 4, Sonnet 4, Sonnet 3.5, Haiku 3.5
-- **OpenAI**: GPT-4.1, GPT-4.1 Mini, GPT-4.1 Nano, o3, o4-mini, Codex Mini
-- **Google**: Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.0 Flash
+- **Anthropic**: Claude Opus 4.6, Opus 4.5, Opus 4, Sonnet 4 (covers 4/4.5/4.6), Sonnet 3.5, Haiku 4.5, Haiku 3.5
+- **OpenAI**: GPT-5.3 Codex, GPT-5.2, GPT-5, GPT-5 Mini, GPT-4o, GPT-4o Mini, GPT-4.1, GPT-4.1 Mini, GPT-4.1 Nano, o3, o3-mini, o4-mini, o1, o1-mini, Codex Mini
+- **Google**: Gemini 3.1 Pro, Gemini 3.0 Pro, Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.0 Flash, Gemini 1.5 Pro, Gemini 1.5 Flash
 
 Each model has four price points: input, output, cache read, and cache creation tokens. To update pricing for new models, edit `MODEL_PRICING` in `src/primer/common/pricing.py` (backend) and `frontend/src/lib/utils.ts` (frontend).
 
