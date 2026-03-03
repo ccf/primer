@@ -329,12 +329,15 @@ def get_cost_modeling(
         monthly_api = api_cost * 30 / period_days
         daily_avg = api_cost / period_days
 
-        # Find cheapest option: API (pay what you use) vs a plan tier
+        # Find best plan: the highest tier still cheaper than API cost.
+        # paid_tiers is sorted ascending (pro $20, max_5x $100, max_20x $200).
+        # We want the most expensive tier that's still below the engineer's monthly
+        # API spend — higher tiers offer more capacity for the price.
         best_plan = "api_key"
         best_cost = monthly_api
 
         for tier in paid_tiers:
-            if tier["monthly_cost"] < monthly_api and tier["monthly_cost"] < best_cost:
+            if tier["monthly_cost"] < monthly_api:
                 best_plan = tier["name"]
                 best_cost = tier["monthly_cost"]
 
@@ -427,14 +430,40 @@ def get_cost_forecast(
         q = q.filter(SessionModel.started_at <= end_date)
     q = q.group_by(func.date(SessionModel.started_at), ModelUsage.model_name)
 
-    # Aggregate per-day costs
-    daily_map: dict[str, tuple[float, int]] = {}
-    for d, model, inp, out, cr, cc, sc in q.all():
+    # Aggregate per-day costs from per-model rows
+    daily_costs: dict[str, float] = {}
+    for d, model, inp, out, cr, cc, _sc in q.all():
         inp, out, cr, cc = inp or 0, out or 0, cr or 0, cc or 0
         cost = estimate_cost(model, inp, out, cr, cc)
         day_key = str(d)
-        prev_cost, prev_sc = daily_map.get(day_key, (0.0, 0))
-        daily_map[day_key] = (prev_cost + cost, max(prev_sc, sc or 0))
+        daily_costs[day_key] = daily_costs.get(day_key, 0.0) + cost
+
+    # For session count per day, run a simpler aggregation from the already-fetched data.
+    # Since we can't deduplicate perfectly from grouped rows, we fall back to a
+    # separate lightweight query for per-day distinct session counts.
+    sc_q = db.query(
+        func.date(SessionModel.started_at).label("date"),
+        func.count(func.distinct(SessionModel.id)).label("sc"),
+    ).filter(SessionModel.started_at.isnot(None))
+    if engineer_id:
+        sc_q = sc_q.filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
+        sc_q = sc_q.join(Engineer, Engineer.id == SessionModel.engineer_id).filter(
+            Engineer.team_id == team_id
+        )
+    if start_date:
+        sc_q = sc_q.filter(SessionModel.started_at >= start_date)
+    if end_date:
+        sc_q = sc_q.filter(SessionModel.started_at <= end_date)
+    sc_q = sc_q.group_by(func.date(SessionModel.started_at))
+
+    daily_sc: dict[str, int] = {}
+    for d, sc in sc_q.all():
+        daily_sc[str(d)] = sc or 0
+
+    daily_map: dict[str, tuple[float, int]] = {}
+    for day_key, cost in daily_costs.items():
+        daily_map[day_key] = (cost, daily_sc.get(day_key, 0))
 
     # Sort by date
     sorted_days = sorted(daily_map.items())
@@ -527,6 +556,11 @@ def list_budgets(
         status = _compute_budget_status(db, b)
         results.append(status)
     return results
+
+
+def get_budget(db: Session, budget_id: str) -> Budget | None:
+    """Fetch a single budget by ID."""
+    return db.query(Budget).filter(Budget.id == budget_id).first()
 
 
 def create_budget(db: Session, payload: BudgetCreate) -> BudgetStatus:
