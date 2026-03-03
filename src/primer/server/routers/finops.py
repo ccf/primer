@@ -59,7 +59,7 @@ def cost_modeling(
     start_date: datetime | None = None,
     end_date: datetime | None = None,
     db: Session = Depends(get_db),
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_role("admin", "team_lead")),
 ):
     tid, _ = _resolve_scope(auth, team_id)
     return get_cost_modeling(
@@ -94,7 +94,7 @@ def cost_forecast(
 def budgets_list(
     team_id: str | None = None,
     db: Session = Depends(get_db),
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_role("admin", "team_lead")),
 ):
     tid, _ = _resolve_scope(auth, team_id)
     return list_budgets(db, team_id=tid)
