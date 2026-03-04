@@ -15,6 +15,7 @@ const section = props.section ?? props.frontmatter?.section ?? '';
 const base = import.meta.env.BASE_URL;
 
 const pages = [
+  { title: "What You Can Learn", href: `${base}docs/insights/`, section: "Getting Started" },
   { title: "Installation", href: `${base}docs/installation/`, section: "Getting Started" },
   { title: "Configuration", href: `${base}docs/configuration/`, section: "Getting Started" },
   { title: "CLI Reference", href: `${base}docs/cli/`, section: "Getting Started" },
@@ -23,6 +24,7 @@ const pages = [
   { title: "MCP Sidecar", href: `${base}docs/mcp/`, section: "Architecture" },
   { title: "Team Setup", href: `${base}docs/teams/`, section: "Guides" },
   { title: "GitHub Integration", href: `${base}docs/github/`, section: "Guides" },
+  { title: "FinOps & Cost Management", href: `${base}docs/finops/`, section: "Guides" },
   { title: "Alert Thresholds", href: `${base}docs/alerts/`, section: "Guides" },
   { title: "Deployment", href: `${base}docs/deployment/`, section: "Guides" },
 ];
