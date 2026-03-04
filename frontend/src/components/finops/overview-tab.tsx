@@ -1,7 +1,6 @@
 import { useCostAnalytics, useProductivity } from "@/hooks/use-api-queries"
 import { DailyCostChart } from "@/components/dashboard/daily-cost-chart"
 import { CostBreakdownChart } from "@/components/dashboard/cost-breakdown-chart"
-import { ProductivitySection } from "@/components/dashboard/productivity-section"
 import { CardSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleton"
 import { formatCost, getModelPricing } from "@/lib/utils"
 
@@ -78,8 +77,6 @@ export function OverviewTab({ teamId, startDate, endDate }: OverviewTabProps) {
         <DailyCostChart data={costData.daily_costs} />
         <CostBreakdownChart data={costData.model_breakdown} />
       </div>
-
-      <ProductivitySection data={prod} />
     </div>
   )
 }
