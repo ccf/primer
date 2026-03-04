@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { TrendingUp } from "lucide-react"
-import { useMaturityAnalytics } from "@/hooks/use-api-queries"
+import { useMaturityAnalytics, useToolAdoption } from "@/hooks/use-api-queries"
 import { PageTabs } from "@/components/ui/page-tabs"
 import { PageHeader } from "@/components/shared/page-header"
 import { MaturitySummary } from "@/components/maturity/maturity-summary"
@@ -9,12 +9,17 @@ import { AgentSkillTable } from "@/components/maturity/agent-skill-table"
 import { LeverageScoreTable } from "@/components/maturity/leverage-score-table"
 import { LeverageTrendChart } from "@/components/maturity/leverage-trend-chart"
 import { ProjectReadinessTable } from "@/components/maturity/project-readiness-table"
+import { ToolAdoptionSummary } from "@/components/tools/tool-adoption-summary"
+import { ToolAdoptionChart } from "@/components/tools/tool-adoption-chart"
+import { ToolTrendChart } from "@/components/tools/tool-trend-chart"
+import { EngineerToolTable } from "@/components/tools/engineer-tool-table"
 import { CardSkeleton, ChartSkeleton, TableSkeleton } from "@/components/shared/loading-skeleton"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
 const tabs = [
   { id: "overview", label: "Overview" },
   { id: "agents", label: "Agents & Skills" },
+  { id: "tools", label: "Tools" },
   { id: "engineers", label: "Engineers" },
   { id: "projects", label: "Projects" },
 ] as const
@@ -31,6 +36,7 @@ export function MaturityPage({ teamId, dateRange }: MaturityPageProps) {
   const startDate = dateRange?.startDate
   const endDate = dateRange?.endDate
   const { data, isLoading } = useMaturityAnalytics(teamId, startDate, endDate)
+  const { data: toolData } = useToolAdoption(teamId, startDate, endDate)
 
   return (
     <div className="space-y-6">
@@ -63,6 +69,17 @@ export function MaturityPage({ teamId, dateRange }: MaturityPageProps) {
 
       {data && activeTab === "agents" && (
         <AgentSkillTable data={data.agent_skill_breakdown} />
+      )}
+
+      {activeTab === "tools" && toolData && (
+        <div className="space-y-6">
+          <ToolAdoptionSummary data={toolData} />
+          <div className="grid gap-6 lg:grid-cols-2">
+            <ToolAdoptionChart data={toolData.tool_adoption} />
+            <ToolTrendChart data={toolData.tool_trends} />
+          </div>
+          <EngineerToolTable data={toolData.engineer_profiles} />
+        </div>
       )}
 
       {data && activeTab === "engineers" && (
