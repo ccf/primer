@@ -30,6 +30,63 @@ const tabs = [
 
 type TabId = (typeof tabs)[number]["id"]
 
+interface TabProps {
+  teamId: string | null
+  startDate?: string
+  endDate?: string
+}
+
+function OnboardingTab({ teamId, startDate, endDate }: TabProps) {
+  const { data, isLoading } = useOnboardingAcceleration(teamId, startDate, endDate)
+  if (isLoading) return <ChartSkeleton />
+  if (!data) return null
+  return (
+    <div className="space-y-6">
+      <CohortComparison cohorts={data.cohorts} />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <NewHireTable progress={data.new_hire_progress} />
+        <VelocityChart progress={data.new_hire_progress} />
+      </div>
+      <OnboardingRecommendations recommendations={data.recommendations} />
+    </div>
+  )
+}
+
+function PatternsTab({ teamId, startDate, endDate }: TabProps) {
+  const { data, isLoading } = usePatternSharing(teamId, startDate, endDate)
+  if (isLoading) return <ChartSkeleton />
+  if (!data) return null
+  return (
+    <div className="space-y-6">
+      <PatternSummary data={data} />
+      <SharedPatternCards patterns={data.patterns} />
+    </div>
+  )
+}
+
+function SkillsTab({ teamId, startDate, endDate }: TabProps) {
+  const { data: skills, isLoading: loadingSkills } = useSkillInventory(teamId, startDate, endDate)
+  const { data: learning, isLoading: loadingLearning } = useLearningPaths(teamId, startDate, endDate)
+  if (loadingSkills || loadingLearning) return <ChartSkeleton />
+  return (
+    <div className="space-y-6">
+      {skills && learning && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <SkillInventorySummary data={skills} />
+          <CoverageSummary data={learning} />
+        </div>
+      )}
+      {skills && learning && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <TeamSkillGaps data={skills.team_skill_gaps} />
+          <SkillUniverseChart universe={learning.team_skill_universe} />
+        </div>
+      )}
+      {skills && <EngineerSkillTable data={skills.engineer_profiles} />}
+    </div>
+  )
+}
+
 interface GrowthPageProps {
   teamId: string | null
   dateRange: DateRange | null
@@ -39,27 +96,6 @@ export function GrowthPage({ teamId, dateRange }: GrowthPageProps) {
   const [activeTab, setActiveTab] = useState<TabId>("onboarding")
   const startDate = dateRange?.startDate
   const endDate = dateRange?.endDate
-
-  const { data: onboarding, isLoading: loadingOnboarding } = useOnboardingAcceleration(
-    teamId,
-    startDate,
-    endDate,
-  )
-  const { data: patterns, isLoading: loadingPatterns } = usePatternSharing(
-    teamId,
-    startDate,
-    endDate,
-  )
-  const { data: skills, isLoading: loadingSkills } = useSkillInventory(
-    teamId,
-    startDate,
-    endDate,
-  )
-  const { data: learning, isLoading: loadingLearning } = useLearningPaths(
-    teamId,
-    startDate,
-    endDate,
-  )
 
   return (
     <div className="space-y-6">
@@ -71,59 +107,9 @@ export function GrowthPage({ teamId, dateRange }: GrowthPageProps) {
 
       <PageTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
-      {activeTab === "onboarding" && (
-        <>
-          {loadingOnboarding ? (
-            <ChartSkeleton />
-          ) : onboarding ? (
-            <div className="space-y-6">
-              <CohortComparison cohorts={onboarding.cohorts} />
-              <div className="grid gap-6 lg:grid-cols-2">
-                <NewHireTable progress={onboarding.new_hire_progress} />
-                <VelocityChart progress={onboarding.new_hire_progress} />
-              </div>
-              <OnboardingRecommendations recommendations={onboarding.recommendations} />
-            </div>
-          ) : null}
-        </>
-      )}
-
-      {activeTab === "patterns" && (
-        <>
-          {loadingPatterns ? (
-            <ChartSkeleton />
-          ) : patterns ? (
-            <div className="space-y-6">
-              <PatternSummary data={patterns} />
-              <SharedPatternCards patterns={patterns.patterns} />
-            </div>
-          ) : null}
-        </>
-      )}
-
-      {activeTab === "skills" && (
-        <>
-          {(loadingSkills || loadingLearning) ? (
-            <ChartSkeleton />
-          ) : (
-            <div className="space-y-6">
-              {skills && learning && (
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <SkillInventorySummary data={skills} />
-                  <CoverageSummary data={learning} />
-                </div>
-              )}
-              {skills && learning && (
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <TeamSkillGaps data={skills.team_skill_gaps} />
-                  <SkillUniverseChart universe={learning.team_skill_universe} />
-                </div>
-              )}
-              {skills && <EngineerSkillTable data={skills.engineer_profiles} />}
-            </div>
-          )}
-        </>
-      )}
+      {activeTab === "onboarding" && <OnboardingTab teamId={teamId} startDate={startDate} endDate={endDate} />}
+      {activeTab === "patterns" && <PatternsTab teamId={teamId} startDate={startDate} endDate={endDate} />}
+      {activeTab === "skills" && <SkillsTab teamId={teamId} startDate={startDate} endDate={endDate} />}
     </div>
   )
 }
