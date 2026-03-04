@@ -38,13 +38,13 @@ const engineerLinks: NavItem[] = [
 
 const leadershipLinks: NavItem[] = [
   { to: "/dashboard", label: "Organization", icon: LayoutDashboard },
-  { to: "/engineers", label: "Engineers", icon: Users },
-  { to: "/teams", label: "Teams", icon: Users2 },
-  { to: "/sessions", label: "Sessions", icon: MonitorDot },
-  { to: "/finops", label: "FinOps", icon: DollarSign },
-  { to: "/maturity", label: "AI Maturity", icon: TrendingUp },
   { to: "/synthesis", label: "Synthesis", icon: Sparkles },
+  { to: "/maturity", label: "AI Maturity", icon: TrendingUp },
+  { to: "/finops", label: "FinOps", icon: DollarSign },
   { to: "/explorer", label: "Explorer", icon: MessageSquare },
+  { to: "/sessions", label: "Sessions", icon: MonitorDot },
+  { to: "/teams", label: "Teams", icon: Users2 },
+  { to: "/engineers", label: "Engineers", icon: Users },
 ]
 
 const adminLink: NavItem = { to: "/admin", label: "Admin", icon: Settings }
