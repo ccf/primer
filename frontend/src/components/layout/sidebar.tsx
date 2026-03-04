@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react"
 import { NavLink, useNavigate } from "react-router-dom"
 import {
   DollarSign,
+  GitPullRequest,
   LayoutDashboard,
   MessageSquare,
   MonitorDot,
@@ -41,6 +42,7 @@ const leadershipLinks: NavItem[] = [
   { to: "/synthesis", label: "Synthesis", icon: Sparkles },
   { to: "/maturity", label: "AI Maturity", icon: TrendingUp },
   { to: "/finops", label: "FinOps", icon: DollarSign },
+  { to: "/quality", label: "Code Quality", icon: GitPullRequest },
   { to: "/explorer", label: "Explorer", icon: MessageSquare },
   { to: "/sessions", label: "Sessions", icon: MonitorDot },
   { to: "/teams", label: "Teams", icon: Users2 },
