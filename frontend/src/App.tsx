@@ -97,16 +97,15 @@ function AuthenticatedApp() {
           <Route path="/synthesis" element={<NarrativePage teamId={teamId} dateRange={dateRange} />} />
 
           {/* Redirects for deprecated routes */}
-          <Route path="/overview" element={<Navigate to="/" replace />} />
-          <Route path="/bottlenecks" element={<Navigate to="/" replace />} />
-          <Route path="/tool-adoption" element={<Navigate to="/" replace />} />
-          <Route path="/insights" element={<Navigate to="/synthesis" replace />} />
-          <Route path="/growth" element={<Navigate to="/" replace />} />
           <Route path="/quality" element={<QualityPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/friction" element={<FrictionPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/growth" element={<GrowthPage teamId={teamId} dateRange={dateRange} />} />
-          <Route path="/session-insights" element={<Navigate to="/" replace />} />
-          <Route path="/projects" element={<Navigate to="/" replace />} />
+          <Route path="/overview" element={<Navigate to="/" replace />} />
+          <Route path="/bottlenecks" element={<Navigate to="/friction" replace />} />
+          <Route path="/tool-adoption" element={<Navigate to="/maturity" replace />} />
+          <Route path="/insights" element={<Navigate to="/synthesis" replace />} />
+          <Route path="/session-insights" element={<Navigate to="/sessions" replace />} />
+          <Route path="/projects" element={<Navigate to="/maturity" replace />} />
 
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
