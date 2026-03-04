@@ -17,27 +17,23 @@ function DeepDiveCard({ to, icon: Icon, title, metrics, iconColor, iconBg }: Dee
   return (
     <Link
       to={to}
-      className="group flex flex-col justify-between rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/30 hover:bg-accent/50"
+      className="group flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:border-primary/30 hover:bg-accent/50"
     >
-      <div>
-        <div className="flex items-center gap-3">
-          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${iconBg}`}>
-            <Icon className={`h-4 w-4 ${iconColor}`} />
-          </div>
-          <h3 className="text-sm font-semibold">{title}</h3>
-        </div>
-        <div className="mt-4 grid grid-cols-2 gap-3">
+      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${iconBg}`}>
+        <Icon className={`h-4 w-4 ${iconColor}`} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium text-muted-foreground">{title}</p>
+        <div className="flex items-baseline gap-3">
           {metrics.map((m) => (
-            <div key={m.label}>
-              <p className="text-lg font-display">{m.value}</p>
-              <p className="text-xs text-muted-foreground">{m.label}</p>
+            <div key={m.label} className="flex items-baseline gap-1">
+              <span className="text-base font-display">{m.value}</span>
+              <span className="text-[10px] text-muted-foreground">{m.label}</span>
             </div>
           ))}
         </div>
       </div>
-      <div className="mt-4 flex items-center gap-1 text-xs font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
-        View details <ArrowRight className="h-3 w-3" />
-      </div>
+      <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40 transition-all group-hover:translate-x-0.5 group-hover:text-primary" />
     </Link>
   )
 }

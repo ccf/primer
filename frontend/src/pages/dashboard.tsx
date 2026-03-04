@@ -130,7 +130,7 @@ export function DashboardPage({ teamId, dateRange }: DashboardPageProps) {
       {/* Activity Section */}
       <section className="space-y-4">
         <h2 className="text-sm font-semibold text-muted-foreground">Activity</h2>
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
           {loadingDaily ? <ChartSkeleton /> : daily && <DailyActivityChart data={daily} />}
           <OutcomeChart data={overview.outcome_counts} />
         </div>
