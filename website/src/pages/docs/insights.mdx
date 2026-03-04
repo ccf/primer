@@ -1,0 +1,218 @@
+---
+layout: ../../layouts/DocsPage.astro
+title: What You Can Learn
+description: The questions Primer answers at every level of your organization — and how to act on them.
+section: Getting Started
+---
+
+import Callout from "../../components/docs/Callout.astro";
+
+Primer isn't a dashboard you glance at — it's an intelligence layer that answers specific questions about how your organization uses AI coding tools. This guide explains what you can learn at each level, how to interpret the metrics, and what actions to take.
+
+## The Three Levels
+
+Primer provides insights at three levels, each targeting a different audience:
+
+| Level | Audience | Core Question |
+|-------|----------|---------------|
+| **Organization** | VP Eng, Directors | Is our AI investment working? |
+| **Team** | Team Leads, Managers | How do I help my team get better? |
+| **Individual** | Engineers | How do I improve my own practice? |
+
+Every metric in Primer exists to answer a question that couldn't be answered before AI tools generated session data.
+
+---
+
+## Organization Level
+
+### Adoption & ROI
+
+**The question:** *Are we getting value from our AI tool investment?*
+
+Primer computes:
+
+- **Adoption rate** — percentage of engineers who used an AI tool in the period. A common pattern: adoption starts at 30-40% and plateaus around 80-90%. If you're stuck below 60%, look at the maturity page to find which teams lag.
+- **Sessions per engineer per day** — a proxy for integration depth. Early adopters average 1-2/day; power users hit 4-6. Below 1/day often means the tool isn't integrated into daily workflow yet.
+- **ROI ratio** — estimated time saved per dollar spent (configurable via `PRIMER_MINUTES_PER_SESSION`). This isn't precise, but directionally useful for justifying budget.
+- **Cost per successful outcome** — total spend divided by sessions that achieved their goal. This is the number to optimize, not raw cost.
+
+<Callout type="tip">
+Track adoption rate over time, not as a snapshot. A team at 60% adoption trending upward is healthier than one at 85% and flat — the first is still learning, the second may have stalled.
+</Callout>
+
+### Friction Analysis
+
+**The question:** *What systemic issues are making AI tools less effective across the org?*
+
+Primer classifies friction into types:
+
+| Friction Type | What It Means | Typical Fix |
+|---------------|---------------|-------------|
+| `permission_denied` | Tool tried to access something it couldn't | Update `.claude/settings.json` allowed directories |
+| `context_limit` | Session hit token limit | Break tasks into smaller sessions; use project-scoped instructions |
+| `timeout` | Tool or command timed out | Investigate slow test suites or builds |
+| `edit_conflict` | Tool's edit was rejected or conflicted | Improve CLAUDE.md with project conventions |
+| `tool_error` | An MCP tool or integration failed | Check tool configuration and availability |
+
+**The key insight:** Primer doesn't just count friction — it scores **impact**. A friction type that occurs often but doesn't affect success rates is noise. A type that occurs less often but correlates with 40% lower success rates is worth fixing immediately.
+
+Look at the **Friction Impact** chart on the dashboard. The x-axis is frequency, the y-axis is success rate penalty. Items in the upper-right quadrant are your highest-priority fixes.
+
+### Cost Intelligence
+
+**The question:** *Are we spending efficiently?*
+
+Beyond raw spend tracking, Primer provides:
+
+- **Cache savings analysis** — How much money prompt caching is saving and how much more it *could* save. If your org-wide cache hit rate is below 40%, engineers may not be using project context files effectively.
+- **API vs. subscription modeling** — For each engineer, Primer estimates whether they'd be cheaper on API billing, Pro ($20/mo), or Max ($100/mo). The aggregate recommendation shows potential monthly savings.
+- **30-day cost forecast** — Linear regression on daily costs with confidence bands. Useful for budget planning and catching trends before they become problems.
+- **Budget burn-rate alerts** — Set monthly budgets per team. Primer calculates daily burn rate and projects whether you'll exceed the budget, alerting before it happens.
+
+---
+
+## Team Level
+
+### Engineer Benchmarking
+
+**The question:** *How do my engineers compare, and who needs help?*
+
+The Engineers leaderboard ranks by multiple dimensions:
+
+- **Success rate** — percentage of sessions that achieve their goal. Team median is typically 55-70%. Engineers consistently below 50% likely need configuration help or training.
+- **Cost efficiency** — total cost divided by sessions. High cost with high success is fine. High cost with low success means the engineer is spending more but getting less.
+- **Leverage score** — a 0-100 composite measuring how sophisticatedly someone uses AI tools (tool diversity, orchestration use, cache efficiency). Higher leverage correlates with higher success rates.
+- **PR impact** — number of PRs linked to AI sessions, and merge rate of those PRs.
+
+<Callout type="important">
+Don't use these metrics punitively. An engineer with a low success rate but high session count is *trying hard* — they need guidance, not criticism. An engineer with zero sessions needs a different conversation about whether they've adopted at all.
+</Callout>
+
+### Onboarding & Ramp-Up
+
+**The question:** *How quickly are new hires becoming effective with AI tools?*
+
+Primer's cohort analysis groups engineers by their first session date and tracks how their metrics evolve week-over-week. You can see:
+
+- **Time to team median** — how many weeks until a new hire's success rate matches the team average
+- **Ramp-up patterns** — whether new hires plateau early or continue improving
+- **Configuration gaps** — new hires often have default configs; Primer's config optimization flags when someone's setup differs significantly from high-performers
+
+### Code Quality Impact
+
+**The question:** *Does AI-assisted code meet our quality bar?*
+
+Primer links sessions to GitHub PRs and compares:
+
+| Metric | Claude-Assisted | Non-Claude | What It Means |
+|--------|----------------|------------|---------------|
+| Merge rate | Higher/lower? | Baseline | Are AI PRs being accepted? |
+| Review comments | More/fewer? | Baseline | Do AI PRs need more review? |
+| Time to merge | Faster/slower? | Baseline | Does AI speed up delivery? |
+| Code volume | Larger/smaller? | Baseline | Are AI sessions more ambitious? |
+
+These comparisons answer the skeptic's question: "Is the AI actually helping or just creating more work for reviewers?"
+
+---
+
+## Individual Level
+
+### Personal Trajectory
+
+**The question:** *Am I getting better at using AI tools?*
+
+Each engineer's profile shows weekly sparklines for:
+
+- **Success rate trend** — are you succeeding more often over time?
+- **Session volume** — are you using the tool more or less?
+- **Cost trend** — is your cost per session stable, rising, or falling?
+- **Tool diversity** — are you expanding your tool usage or stuck on the basics?
+
+The goal is upward trends in success rate and tool diversity, with stable or declining cost per session.
+
+### Friction Breakdown
+
+**The question:** *What specific problems keep disrupting my sessions?*
+
+Your profile shows your top friction types ranked by frequency and impact. Common patterns:
+
+- **Heavy on `context_limit`?** You're probably trying to do too much in single sessions. Break work into focused tasks.
+- **Lots of `permission_denied`?** Your Claude settings need updating — you're hitting guardrails that slow you down.
+- **Frequent `edit_conflict`?** Your project's CLAUDE.md may need better conventions about code style and patterns.
+- **`tool_error` spikes?** An MCP server or integration is unreliable — check your tooling setup.
+
+### AI-Generated Insights
+
+**The question:** *What's the big picture of my usage patterns?*
+
+Primer uses Claude to generate narrative reports about your patterns:
+
+- **At a Glance** — What's working, what's hindering, quick wins
+- **Impressive Things You Did** — Highlights from your sessions
+- **Where Things Go Wrong** — Friction pattern analysis
+- **New Usage Patterns** — Emerging behaviors worth building on
+- **On the Horizon** — Suggestions for what to try next
+
+These narratives synthesize hundreds of data points into actionable stories.
+
+### MCP Sidecar
+
+**The question:** *How am I doing right now?*
+
+Engineers can query their own data mid-session via the MCP sidecar in Claude Code:
+
+- "What's my success rate this week?"
+- "What friction am I hitting most?"
+- "How do I compare to my team?"
+- "What recommendations do you have for me?"
+
+This closes the loop — instead of checking a dashboard after the fact, engineers get feedback in the moment they can act on it.
+
+---
+
+## How to Think About These Metrics
+
+### Leading vs. Lagging Indicators
+
+| Type | Metrics | Why |
+|------|---------|-----|
+| **Leading** | Adoption rate, leverage score, tool diversity | Predict future outcomes |
+| **Lagging** | Success rate, cost per outcome, PR merge rate | Confirm past outcomes |
+
+Focus on leading indicators for planning and lagging indicators for validation.
+
+### Healthy Ranges
+
+These are rough benchmarks from typical engineering organizations:
+
+| Metric | Concerning | Healthy | Excellent |
+|--------|-----------|---------|-----------|
+| Adoption rate | < 40% | 60-85% | > 85% |
+| Success rate | < 45% | 55-70% | > 75% |
+| Sessions/engineer/day | < 0.5 | 1-3 | 3-6 |
+| Leverage score | < 25 | 35-55 | > 60 |
+| Cache hit rate | < 20% | 30-50% | > 50% |
+| Cost per success | Trending up | Stable | Trending down |
+
+<Callout type="note">
+These benchmarks will vary by organization, team size, and project complexity. Use them as starting points, then establish your own baselines.
+</Callout>
+
+### Actions by Signal
+
+| You See | What It Means | What to Do |
+|---------|---------------|------------|
+| High adoption, low success | Engineers are using the tool but struggling | Invest in CLAUDE.md, shared prompts, and training |
+| Low adoption, high success | A few people love it, most haven't tried | Pair programming, demos, and reduce setup friction |
+| Rising costs, stable success | Usage is growing but efficiency isn't | Review cache optimization and session scope |
+| Friction spike on one team | Something changed in their environment | Check recent infra changes, permission updates, or tooling |
+| Leverage score plateau | Engineers stopped exploring new capabilities | Share patterns from high-leverage users, run workshops |
+| New hire ramp-up > 4 weeks | Onboarding for AI tools needs work | Create team-specific getting-started guides |
+
+---
+
+## Next Steps
+
+- [Installation](/primer/docs/installation/) — Get Primer running in 5 minutes
+- [FinOps & Cost Management](/primer/docs/finops/) — Deep dive into cost optimization
+- [Alert Thresholds](/primer/docs/alerts/) — Set up automated anomaly detection

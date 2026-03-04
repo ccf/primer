@@ -2,37 +2,70 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import TerminalAnimation from "../components/TerminalAnimation";
 
-const features = [
+const questions = [
   {
-    title: "Usage Dashboard",
-    description: "Track sessions, tokens, costs, and tool usage across your entire engineering team with real-time analytics.",
-    icon: "M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z",
+    audience: "Engineering Leadership",
+    items: [
+      { q: "Is our AI investment paying off?", detail: "Cost per successful outcome, ROI ratio, and time saved vs. dollars spent" },
+      { q: "Which teams have figured it out?", detail: "Cross-team comparison of adoption rates, success rates, and leverage scores" },
+      { q: "What systemic issues tank AI effectiveness?", detail: "Friction impact scoring — not just errors, but which errors cost you the most" },
+      { q: "Are we spending efficiently?", detail: "Per-engineer plan modeling, cache optimization, and budget burn-rate tracking" },
+    ],
   },
   {
-    title: "FinOps & Cost Analysis",
-    description: "Cache savings tracking, subscription vs API cost modeling, 30-day forecasting, and budget alerts. Know where every dollar goes.",
-    icon: "M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+    audience: "Team Leads",
+    items: [
+      { q: "Who needs help and what kind?", detail: "Skill gaps, tool diversity analysis, and personalized improvement suggestions" },
+      { q: "How fast are new hires ramping up?", detail: "Cohort analysis comparing onboarding curves against team baselines" },
+      { q: "Are AI-assisted PRs actually better?", detail: "Merge time, review comments, and merge rate — Claude PRs vs. non-Claude" },
+      { q: "Where should I invest in training?", detail: "Tool proficiency scoring per engineer with learning path recommendations" },
+    ],
   },
   {
-    title: "Friction Detection",
-    description: "Automatically identify workflow bottlenecks, permission denials, and tool failures that slow your team down.",
+    audience: "Individual Engineers",
+    items: [
+      { q: "How am I trending?", detail: "Weekly trajectory with success rate, cost, and session pattern evolution" },
+      { q: "What keeps tripping me up?", detail: "Personal friction breakdown — permission blocks, context limits, tool errors" },
+      { q: "Am I using the right tools?", detail: "Config optimization suggestions based on high-performer patterns in your org" },
+      { q: "What should I try next?", detail: "Learning paths generated from what works best for engineers like you" },
+    ],
+  },
+];
+
+const differentiators = [
+  {
+    title: "Friction intelligence",
+    subtitle: "Not just usage tracking",
+    description: "LLM-powered facet extraction classifies every session: goals, satisfaction, friction types. Then scores their impact on outcomes. You learn that permission_denied errors cause 40% lower success rates — not just that they happen sometimes.",
     icon: "M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z",
   },
   {
-    title: "MCP Sidecar",
-    description: "Real-time insights directly inside Claude Code via Model Context Protocol. No context switching needed.",
-    icon: "M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.686-5.747l4.5-4.5a4.5 4.5 0 016.364 6.364l-1.757 1.757",
+    title: "Individual intelligence",
+    subtitle: "Not just org dashboards",
+    description: "Every engineer gets a trajectory view, strengths profile, friction breakdown, and AI-generated narrative. The MCP sidecar lets Claude query your own stats mid-session without leaving your editor.",
+    icon: "M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z",
   },
   {
-    title: "Multi-Agent Support",
-    description: "Track Claude Code, Codex CLI, and Gemini CLI from a single dashboard. More agents coming soon.",
-    icon: "M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z",
+    title: "Cost optimization",
+    subtitle: "Not just cost tracking",
+    description: "Models whether each engineer should be on API billing, Pro, or Max based on actual usage. Measures cache hit rates per person and surfaces how much money is left on the table. Budget burn-rate alerts catch overruns before they happen.",
+    icon: "M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
   },
   {
-    title: "GitHub Integration",
-    description: "Link sessions to pull requests automatically. See the AI contribution story behind every PR.",
-    icon: "M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z",
+    title: "Maturity scoring",
+    subtitle: "Not just adoption metrics",
+    description: "A composite leverage score per engineer based on tool diversity, orchestration adoption, and cache efficiency. Track your org's maturity curve. Detect which projects have proper AI configuration — and which don't.",
+    icon: "M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941",
   },
+];
+
+const views = [
+  { name: "Organization", image: "readme-dashboard-dark.png", caption: "Org-level KPIs, activity trends, outcomes, alerts, and deep-dive navigation" },
+  { name: "Engineers", image: "readme-engineers-dark.png", caption: "Leaderboard with success rates, costs, PR counts, and leverage scores" },
+  { name: "Engineer Profile", image: "readme-engineer-profile-dark.png", caption: "Individual trajectory, friction analysis, and AI-generated insights report" },
+  { name: "FinOps", image: "readme-finops-dark.png", caption: "Cost tracking, cache analytics, subscription modeling, and budget management" },
+  { name: "AI Maturity", image: "readme-maturity-dark.png", caption: "Leverage scores, tool categories, orchestration adoption, and project readiness" },
+  { name: "Synthesis", image: "readme-synthesis-dark.png", caption: "AI-generated narrative reports at org, team, and engineer scope" },
 ];
 ---
 
@@ -43,7 +76,6 @@ const features = [
     <div class="absolute inset-0 overflow-hidden">
       <div class="absolute top-20 left-1/4 w-96 h-96 bg-primer-brand/5 rounded-full blur-3xl"></div>
       <div class="absolute bottom-20 right-1/4 w-64 h-64 bg-primer-brand/10 rounded-full blur-3xl"></div>
-      <!-- Dot grid pattern -->
       <div class="absolute inset-0" style="background-image: radial-gradient(circle, rgba(99,102,241,0.12) 1px, transparent 1px); background-size: 32px 32px;"></div>
     </div>
 
@@ -54,12 +86,12 @@ const features = [
           Open source &middot; Self-hosted &middot; Privacy-first
         </div>
         <h1 class="font-display text-4xl md:text-5xl lg:text-6xl tracking-tight mb-6 animate-fade-in-up" style="--delay: 80ms">
-          See how your team uses<br />
-          <span class="text-primer-400">AI coding tools</span>
+          Understand how your engineers use AI<span class="text-primer-400"> — </span><br class="hidden lg:block" />
+          <span class="text-primer-400">and make them better at it</span>
         </h1>
         <p class="text-lg md:text-xl text-white/60 max-w-2xl mx-auto mb-10 animate-fade-in-up" style="--delay: 160ms">
-          Aggregate usage insights across Claude Code, Codex CLI, and Gemini CLI.
-          Track costs, detect friction, and accelerate AI adoption across your engineering org.
+          Your team adopted Claude Code, Codex CLI, and Gemini CLI. Now answer the questions
+          that no other tool can — from org-level ROI down to individual learning paths.
         </p>
         <div class="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up" style="--delay: 240ms">
           <a
@@ -89,32 +121,107 @@ const features = [
     </div>
   </section>
 
-  <!-- Features -->
+  <!-- Questions Section -->
   <section id="features" class="py-16 md:py-24">
     <div class="max-w-6xl mx-auto px-6">
       <div class="text-center mb-16">
         <h2 class="font-display text-3xl md:text-4xl tracking-tight mb-4">
-          Everything you need to understand AI usage
+          Questions only Primer can answer
         </h2>
         <p class="text-lg text-muted-foreground max-w-2xl mx-auto">
-          From individual sessions to organization-wide trends, Primer gives you
-          complete visibility into how your team works with AI.
+          From boardroom ROI to an engineer's Friday afternoon friction — insights
+          at every level of your organization.
+        </p>
+      </div>
+
+      <div class="grid lg:grid-cols-3 gap-8">
+        {questions.map((group, gIdx) => (
+          <div
+            class="space-y-4 animate-fade-in-up"
+            style={`--delay: ${gIdx * 100}ms`}
+          >
+            <h3 class="font-display text-sm uppercase tracking-widest text-primer-brand mb-2">{group.audience}</h3>
+            <div class="space-y-3">
+              {group.items.map((item) => (
+                <div class="p-4 rounded-xl border border-border bg-card hover:border-primer-border transition-colors">
+                  <p class="font-semibold text-sm mb-1">{item.q}</p>
+                  <p class="text-xs text-muted-foreground leading-relaxed">{item.detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Product Views -->
+  <section class="py-16 md:py-24 bg-muted/50">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="text-center mb-12">
+        <h2 class="font-display text-3xl md:text-4xl tracking-tight mb-4">
+          See every layer of AI usage
+        </h2>
+        <p class="text-lg text-muted-foreground max-w-2xl mx-auto">
+          Org-wide trends, team comparisons, individual trajectories, cost modeling,
+          maturity scoring, and AI-generated narrative reports.
         </p>
       </div>
 
       <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {features.map((feature, idx) => (
+        {views.map((view, idx) => (
           <div
-            class="group p-6 rounded-2xl border border-border bg-card hover:border-primer-border hover:shadow-lg transition-all duration-200 animate-fade-in-up"
+            class="group rounded-xl border border-border bg-card overflow-hidden hover:border-primer-border hover:shadow-lg transition-all duration-200 animate-fade-in-up"
+            style={`--delay: ${idx * 60}ms`}
+          >
+            <div class="aspect-[16/10] overflow-hidden bg-[#111827]">
+              <img
+                src={`${import.meta.env.BASE_URL}screenshots/${view.image}`}
+                alt={view.caption}
+                class="w-full h-full object-cover object-top opacity-90 group-hover:opacity-100 transition-opacity"
+                loading="lazy"
+              />
+            </div>
+            <div class="p-4">
+              <h3 class="font-semibold text-sm mb-1">{view.name}</h3>
+              <p class="text-xs text-muted-foreground leading-relaxed">{view.caption}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Differentiators -->
+  <section class="py-16 md:py-24">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="text-center mb-16">
+        <h2 class="font-display text-3xl md:text-4xl tracking-tight mb-4">
+          What makes this different
+        </h2>
+        <p class="text-lg text-muted-foreground max-w-2xl mx-auto">
+          Not another dashboard. An intelligence layer that turns AI tool usage into organizational learning.
+        </p>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-6">
+        {differentiators.map((d, idx) => (
+          <div
+            class="p-6 rounded-2xl border border-border bg-card hover:border-primer-border hover:shadow-lg transition-all duration-200 animate-fade-in-up"
             style={`--delay: ${idx * 80}ms`}
           >
-            <div class="w-10 h-10 rounded-lg bg-primer-surface flex items-center justify-center mb-4">
-              <svg class="w-5 h-5 text-primer-brand" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d={feature.icon} />
-              </svg>
+            <div class="flex items-start gap-4">
+              <div class="w-10 h-10 rounded-lg bg-primer-surface flex items-center justify-center shrink-0">
+                <svg class="w-5 h-5 text-primer-brand" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d={d.icon} />
+                </svg>
+              </div>
+              <div>
+                <h3 class="font-semibold text-lg">{d.title}</h3>
+                <p class="text-xs text-primer-brand font-medium mb-2">{d.subtitle}</p>
+                <p class="text-sm text-muted-foreground leading-relaxed">{d.description}</p>
+              </div>
             </div>
-            <h3 class="font-semibold text-lg mb-2">{feature.title}</h3>
-            <p class="text-sm text-muted-foreground leading-relaxed">{feature.description}</p>
           </div>
         ))}
       </div>
@@ -129,33 +236,32 @@ const features = [
           How it works
         </h2>
         <p class="text-lg text-muted-foreground max-w-2xl mx-auto">
-          Three components that work together to give you complete visibility.
+          Three components. Five minutes to install. Your data never leaves your network.
         </p>
       </div>
 
       <div class="relative grid md:grid-cols-3 gap-8">
-        <!-- Connector line between steps (visible on md+) -->
         <div class="hidden md:block absolute top-6 left-[16.67%] right-[16.67%] h-px border-t-2 border-dashed border-primer-brand/30"></div>
 
         <div class="relative text-center animate-fade-in-up" style="--delay: 0ms">
           <div class="w-12 h-12 rounded-full bg-primer-brand text-white flex items-center justify-center text-lg font-semibold mx-auto mb-4 relative z-10">1</div>
           <h3 class="font-semibold text-lg mb-2">Hook captures sessions</h3>
           <p class="text-sm text-muted-foreground">
-            A lightweight hook runs at the end of each Claude Code, Codex CLI, or Gemini CLI session, extracting metadata and sending it to your server.
+            A lightweight SessionEnd hook runs after each AI coding session. LLM-powered extraction classifies goals, friction, and satisfaction automatically.
           </p>
         </div>
         <div class="relative text-center animate-fade-in-up" style="--delay: 100ms">
           <div class="w-12 h-12 rounded-full bg-primer-brand text-white flex items-center justify-center text-lg font-semibold mx-auto mb-4 relative z-10">2</div>
-          <h3 class="font-semibold text-lg mb-2">Server aggregates data</h3>
+          <h3 class="font-semibold text-lg mb-2">Server builds intelligence</h3>
           <p class="text-sm text-muted-foreground">
-            The self-hosted server processes sessions, computes costs, detects friction patterns, and links sessions to GitHub PRs.
+            The self-hosted API computes analytics, detects anomalies, models costs, scores maturity, and generates AI narratives from your data.
           </p>
         </div>
         <div class="relative text-center animate-fade-in-up" style="--delay: 200ms">
           <div class="w-12 h-12 rounded-full bg-primer-brand text-white flex items-center justify-center text-lg font-semibold mx-auto mb-4 relative z-10">3</div>
-          <h3 class="font-semibold text-lg mb-2">Dashboard shows insights</h3>
+          <h3 class="font-semibold text-lg mb-2">Insights reach everyone</h3>
           <p class="text-sm text-muted-foreground">
-            The React dashboard and MCP sidecar give you real-time analytics — from individual sessions to org-wide trends.
+            Leadership sees the dashboard. Engineers see their profiles. Claude queries your data mid-session via the MCP sidecar. Everyone levels up.
           </p>
         </div>
       </div>
@@ -169,7 +275,7 @@ const features = [
         Get started in minutes
       </h2>
       <p class="text-lg text-muted-foreground mb-10">
-        Self-hosted. Your data stays on your infrastructure.
+        Self-hosted. Your data stays on your infrastructure. No telemetry leaves your network.
       </p>
 
       <div class="bg-hero-bg rounded-xl p-6 text-left font-mono text-sm mb-10">
