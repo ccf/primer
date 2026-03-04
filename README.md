@@ -64,11 +64,7 @@ Primer is an open-source intelligence platform that captures session data from [
 - **What should I try next?** — Learning paths generated from high-performer patterns in your org
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/engineer-profile-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="docs/images/engineer-profile-dark.png">
-    <img src="docs/images/engineer-profile-dark.png" alt="Engineer profile with trajectory, friction analysis, and AI-generated insights" width="100%">
-  </picture>
+  <img src="docs/images/engineer-profile-dark.png" alt="Engineer profile with trajectory, friction analysis, and AI-generated insights" width="100%">
 </p>
 
 ## What Makes This Different
@@ -82,11 +78,7 @@ Primer is an open-source intelligence platform that captures session data from [
 **AI maturity scoring.** A composite leverage score (0-100) per engineer based on tool category diversity, orchestration adoption, and cache efficiency. Track your org's maturity curve over time. Detect which projects have CLAUDE.md, AGENTS.md, and proper AI configuration — and which don't.
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/finops-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="docs/images/finops-dark.png">
-    <img src="docs/images/finops-dark.png" alt="FinOps — cost tracking, cache analytics, subscription modeling, and budget management" width="100%">
-  </picture>
+  <img src="docs/images/finops-dark.png" alt="FinOps — cost tracking, cache analytics, subscription modeling, and budget management" width="100%">
 </p>
 
 ## Capabilities

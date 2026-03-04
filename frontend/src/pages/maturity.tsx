@@ -36,7 +36,7 @@ export function MaturityPage({ teamId, dateRange }: MaturityPageProps) {
   const startDate = dateRange?.startDate
   const endDate = dateRange?.endDate
   const { data, isLoading } = useMaturityAnalytics(teamId, startDate, endDate)
-  const { data: toolData } = useToolAdoption(teamId, startDate, endDate)
+  const { data: toolData, isLoading: loadingTools } = useToolAdoption(teamId, startDate, endDate)
 
   return (
     <div className="space-y-6">
@@ -69,6 +69,17 @@ export function MaturityPage({ teamId, dateRange }: MaturityPageProps) {
 
       {data && activeTab === "agents" && (
         <AgentSkillTable data={data.agent_skill_breakdown} />
+      )}
+
+      {activeTab === "tools" && loadingTools && (
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+          </div>
+          <ChartSkeleton />
+        </div>
       )}
 
       {activeTab === "tools" && toolData && (
