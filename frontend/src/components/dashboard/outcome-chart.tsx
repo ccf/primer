@@ -9,9 +9,10 @@ interface OutcomeChartProps {
 
 export function OutcomeChart({ data }: OutcomeChartProps) {
   const chartData = Object.entries(data).map(([name, value]) => ({ name, value }))
-  const total = chartData.reduce((s, d) => s + d.value, 0)
 
   if (chartData.length === 0) return null
+
+  const total = chartData.reduce((s, d) => s + d.value, 0)
 
   // Filter out entries that round to 0% for cleaner legend
   const nonZero = chartData.filter((d) => d.value > 0 && (total > 0 ? Math.round((d.value / total) * 100) : 0) > 0)
