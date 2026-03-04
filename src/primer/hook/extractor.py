@@ -154,7 +154,13 @@ def capture_git_info(cwd: str, started_at: datetime | None) -> dict:
     since = started_at.isoformat()
     # Use record separator (%x1e) + unit separator (%x1f) to avoid pipe-in-message issues
     log_output = _run_git(
-        ["log", f"--since={since}", "--format=%x1e%H%x1f%s%x1f%an%x1f%ae%x1f%aI", "--numstat"],
+        [
+            "log",
+            "--all",
+            f"--since={since}",
+            "--format=%x1e%H%x1f%s%x1f%an%x1f%ae%x1f%aI",
+            "--numstat",
+        ],
         cwd,
     )
     if not log_output:
