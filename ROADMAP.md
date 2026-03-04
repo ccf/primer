@@ -1,88 +1,114 @@
-
 # Primer Roadmap
 
-## Tier 1 — Core Dashboard (Complete)
+Organized by capability area. Items marked with ✅ are shipped; items marked with ◻️ are planned.
 
-- [x] Session search with full-text, outcome, type, model filters
+## Session Intelligence
+
+- [x] Session search with full-text, outcome, type, model, branch filters
 - [x] Transcript viewer with message-level detail
-- [x] Custom date range picker (7d/30d/90d/1y presets + custom)
-- [x] Team dashboard with member stats
-- [x] Daily activity chart
-- [x] Tool ranking chart
-- [x] Model usage chart
-- [x] Outcome and session type distribution
-- [x] Cost analysis (daily cost chart, model cost breakdown)
-- [x] Activity heatmap (day-of-week x hour)
-- [x] Dark mode with system preference detection
-- [x] Deep links for sessions, teams
-- [x] Previous-period comparison deltas on KPI cards
+- [x] Session health scoring (outcome + friction + duration + satisfaction composite)
+- [x] LLM-powered facet extraction (goals, friction types, satisfaction signals)
+- [x] End reason breakdown with success rate per reason
+- [x] Goal analytics (session type and goal category breakdown)
+- [x] Permission mode analysis (success rate by permission level)
+- [x] Satisfaction trend tracking (satisfied / neutral / dissatisfied over time)
+- [x] Similar sessions panel with 3-tier relevance matching
 
-## Tier 2 — Engineering Leadership (Complete)
+## Friction & Bottleneck Analysis
 
-- [x] ROI / Productivity metrics (time saved, value created, adoption rate, power users)
-- [x] Peer benchmarking (percentile ranking, vs-team-avg deltas, radar chart)
-- [x] Anomaly detection (friction spikes, usage drops, cost spikes, success rate drops)
-- [x] Alert system with acknowledge/dismiss workflow
-- [x] Admin panel (engineer management, team management, audit log, system stats)
-- [x] Engineer activation/deactivation
-- [x] API key rotation
+- [x] Friction type classification (permission denied, timeout, context limit, edit conflict, tool error, exec error)
+- [x] Friction impact scoring (occurrence count × success rate penalty)
+- [x] Friction trend chart (count + rate over time)
+- [x] Project-level friction breakdown
+- [x] Friction cluster analysis with sample details
+- [x] Anomaly detection for friction spikes
 
-## Tier 3 — Enterprise Features (Complete)
+## Engineer Intelligence
 
-- [x] GitHub OAuth SSO for dashboard access
-- [x] Role-based access control (engineer, team_lead, admin)
-- [x] Exportable reports (CSV)
-- [x] Custom alert thresholds configuration
-- [x] Audit trail for admin actions
+- [x] Engineer leaderboard with multi-dimensional ranking
+- [x] Personal trajectory dashboard with weekly sparklines
+- [x] Strengths and friction breakdown per engineer
+- [x] Peer benchmarking (percentile ranking, vs-team-avg deltas)
+- [x] AI-generated narrative insights per engineer
+- [x] Personalized tips based on friction patterns and tool gaps
+- [x] Config optimization suggestions from team benchmark comparison
+- [x] Skill inventory with proficiency levels per tool
+- [x] Learning paths generated from high-performer patterns
+
+## Growth & Onboarding
+
+- [x] Cohort comparison (new hire / ramping / experienced)
+- [x] Time-to-team-average tracking for new hires
+- [x] Onboarding velocity scoring
+- [x] Onboarding recommendations
+- [x] Shared behavior pattern discovery with approach comparison
+- [ ] **Bright spot detection** — explicitly surface high-performing engineers and cross-pollinate their patterns across teams
+
+## AI Maturity
+
+- [x] Tool leverage scoring (0-100 composite per engineer)
+- [x] Tool category classification (core, search, orchestration, skill, MCP)
+- [x] Orchestration adoption rate tracking
+- [x] Agent and skill usage analytics (invocation patterns, delegation depth)
+- [x] Tool adoption rates and trend charts
+- [x] Engineer tool proficiency table
+- [x] Project AI-readiness scoring (CLAUDE.md, AGENTS.md, .claude/ detection)
+- [x] Daily leverage trend tracking
+- [ ] **Tool source classification** — distinguish built-in vs marketplace vs custom tools; identify which MCP servers tools originate from
+- [ ] **Cross-team tooling landscape** — analyze tool overlap and reuse across teams; highlight unique vs shared tooling
+
+## Code Quality
+
+- [x] GitHub OAuth SSO
+- [x] Pull request sync via GitHub App
+- [x] Commit correlation with sessions
+- [x] Claude-assisted vs non-Claude PR comparison (merge rate, review comments, time to merge)
+- [x] Quality by session type (debugging, feature, refactoring)
+- [x] Code volume tracking (daily lines added/deleted)
+- [x] Engineer quality ranking table
+- [x] Repository AI-readiness scoring
+
+## FinOps & Cost Management
+
+- [x] Per-model spend tracking with daily cost chart
+- [x] Cost breakdown by model
+- [x] Cache efficiency analytics (hit rates, savings, per-engineer potential)
+- [x] Billing mode detection (API vs subscription)
+- [x] Subscription vs API cost modeling with optimal plan recommendations
+- [x] 30-day cost forecasting (linear regression with confidence bands)
+- [x] Budget tracking with burn-rate alerts and projected overrun warnings
+- [x] Cost per successful outcome metric
+- [ ] **Break-even analysis** — calculate the usage threshold where API billing becomes cheaper than a subscription seat, with per-engineer recommendations
+
+## AI Synthesis
+
+- [x] AI-generated narrative reports (engineer, team, org scope)
+- [x] Narrative caching with TTL-based expiry
+- [x] Auto-refresh via lifespan task
+- [x] Conversational data explorer (SSE-streamed tool-use chat)
+- [x] AI-powered recommendations panel
+
+## Organization & Administration
+
+- [x] Hub-and-spoke dashboard with KPI strip, activity section, attention alerts, deep-dive cards
+- [x] Custom date range picker (7d / 30d / 90d / 1y presets + custom)
+- [x] Team management with member stats
+- [x] Role-based access control (engineer, team lead, admin)
+- [x] Admin panel (engineer/team management, audit log, system stats)
+- [x] Alert system with configurable thresholds, acknowledge/dismiss workflow
+- [x] Slack notification integration
+- [x] CSV and PDF export
 - [x] API rate limiting
-- [x] Scheduled alert digests (email/Slack)
-- [ ] Multi-tenant workspace isolation
-- [x] PDF export
+- [x] Dark mode with system preference detection
+- [ ] **Multi-tenant workspace isolation** — separate data boundaries for distinct organizations sharing a single Primer instance
 
-## Tier 4 — Future Ideas
+## Platform & Integrations
 
-- [x] **Config optimization** — auto-suggest hooks/skills from repeated patterns
-- [x] **Personalized tips** — "You use X but rarely Y; here's when Y helps"
-- [x] **Learning paths** — identify knowledge gaps from session patterns
-- [x] **Pattern sharing** — "3 engineers solved similar problems; best approach"
-- [x] **Bottleneck detection** — common friction points across team
-- [x] **Onboarding acceleration** — compare new hire vs experienced patterns
-- [x] **Skill inventory** — team capabilities from session topics
-- [x] **Tool adoption tracking** — which Claude Code features are/aren't used
-- [x] **Quality metrics** — correlate session outcomes with code quality via git
-
-## Tier 5 — Personal Engineer Experience (Complete)
-
-- [x] **Engineer profile page** — personal trajectory dashboard with weekly sparklines, friction breakdown, strengths/skills, and quality tabs (`/engineers/:id`)
-- [x] **Similar sessions** — contextual pattern sharing panel on session detail with 3-tier relevance matching
-- [x] **Claude vs non-Claude PR comparison** — side-by-side metrics for Claude-assisted vs other PRs (stub awaiting PR models)
-- [x] **Time-to-team-average** — ramp-up tracking for new hires with rolling success rates vs team average
-
-## Tier 6 — AI DevEx Maturity
-
-- [x] **Tool classification & leverage scoring** — categorize tool usage into tiers (core, extended, orchestration, MCP) and score engineers on a leverage spectrum from basic to advanced
-- [x] **Enhanced tool metadata extraction** — capture subagent types from Task calls, skill names from Skill calls, and MCP tool origins from transcripts
-- [x] **Project AI-readiness scoring** — detect CLAUDE.md, AGENTS.md, .claude/ config presence in repos; score project-level AI alignment
-- [ ] **Agent & skill usage analytics** — track built-in vs custom/marketplace agent usage, skill invocation patterns, and delegation depth
-- [ ] **Cache efficiency dashboard** — surface cache hit ratios, cost savings from caching, and model-specific cache strategies from existing token data
-
-## Tier 7 — Tooling Landscape & Performance
-
-- [ ] **Tool source classification** — distinguish built-in vs marketplace vs custom tools/agents/skills; identify which MCP servers tools originate from
-- [ ] **Cross-team tooling landscape** — analyze overlap/reuse of custom tools, agents, skills, and MCP servers across teams; highlight unique vs shared tooling
-- [ ] **Bright spot detection** — surface high-performing engineers and effective patterns to cross-pollinate across teams
-- [ ] **Performance measurement views** — leadership-oriented scorecards combining productivity, quality, cost efficiency, and adoption metrics per engineer
-- [ ] **Claude vs non-Claude PR comparison** — activate the existing stub with real PR data; side-by-side metrics for AI-assisted vs unassisted pull requests
-- [ ] **GitHub integration setup** — connect to real GitHub repos for PR data, avatars, repository metadata, and AI-readiness scoring
-
-## Tier 8 — FinOps
-
-Dedicated cost management panel (separate from the main dashboard) with deep financial analytics for AI coding tool spend.
-
-- [ ] **FinOps panel** — move cost-related views (daily cost chart, model cost breakdown, per-session cost) out of the main dashboard into a dedicated left-nav section
-- [ ] **Cache efficiency analytics** — surface prompt cache hit rates, cache read/write token ratios, and estimated savings from caching per model and per engineer
-- [ ] **Billing mode detection** — identify whether sessions are from subscription plans (Max, Team, Enterprise) or API-key usage based on session metadata, model availability, or header signals
-- [ ] **Subscription vs. API cost modeling** — financial model comparing actual token-based API spend against equivalent subscription cost (seats x plan price), showing net savings or overspend per engineer and team
-- [ ] **Break-even analysis** — calculate the usage threshold where API-key billing becomes cheaper than a subscription seat, with per-engineer recommendations
-- [ ] **Cost forecasting** — project future spend based on trailing usage trends, with scenario modeling for team growth and usage changes
-- [ ] **Budget tracking** — set monthly/quarterly budgets per team with burn-rate alerts and projected overrun warnings
+- [x] Multi-agent support (Claude Code, Codex CLI, Gemini CLI)
+- [x] SessionEnd hook system with agent-specific installers
+- [x] `primer sync --watch` for agents without hook systems
+- [x] MCP sidecar (sync, my_stats, team_overview, friction_report, recommendations)
+- [x] Docker Compose and Kubernetes Helm deployment
+- [x] PostgreSQL and SQLite support
+- [x] Alembic migration bundling in pip package
+- [ ] **Performance measurement views** — leadership-oriented scorecards combining productivity, quality, cost efficiency, and adoption metrics into a single per-engineer view
