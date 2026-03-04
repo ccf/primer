@@ -85,9 +85,9 @@ export function DeepDiveCards({ teamId, startDate, endDate }: DeepDiveCardsProps
           ]}
         />
         <DeepDiveCard
-          to="/sessions"
+          to="/quality"
           icon={GitPullRequest}
-          title="Sessions & PRs"
+          title="Code Quality"
           iconColor="text-violet-600 dark:text-violet-400"
           iconBg="bg-violet-500/10"
           metrics={[

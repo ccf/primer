@@ -21,6 +21,7 @@ import { NarrativePage } from "@/pages/narrative"
 import { AdminPage } from "@/pages/admin"
 import { ExplorerPage } from "@/pages/explorer"
 import { EngineerProfilePage } from "@/pages/engineer-profile"
+import { QualityPage } from "@/pages/quality"
 import { NotFoundPage } from "@/pages/not-found"
 import { FloatingExplorer } from "@/components/explorer/floating-explorer"
 import type { DateRange } from "@/components/layout/date-range-picker"
@@ -99,7 +100,7 @@ function AuthenticatedApp() {
           <Route path="/tool-adoption" element={<Navigate to="/" replace />} />
           <Route path="/insights" element={<Navigate to="/synthesis" replace />} />
           <Route path="/growth" element={<Navigate to="/" replace />} />
-          <Route path="/quality" element={<Navigate to="/" replace />} />
+          <Route path="/quality" element={<QualityPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/session-insights" element={<Navigate to="/" replace />} />
           <Route path="/projects" element={<Navigate to="/" replace />} />
 
