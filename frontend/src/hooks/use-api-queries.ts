@@ -300,8 +300,8 @@ export function useIngestEvents(params?: { engineerId?: string; status?: string;
       const sp = new URLSearchParams()
       if (params?.engineerId) sp.set("engineer_id", params.engineerId)
       if (params?.status) sp.set("status", params.status)
-      if (params?.limit) sp.set("limit", String(params.limit))
-      if (params?.offset) sp.set("offset", String(params.offset))
+      if (params?.limit != null) sp.set("limit", String(params.limit))
+      if (params?.offset != null) sp.set("offset", String(params.offset))
       const qs = sp.toString()
       return apiFetch<PaginatedResponse<IngestEventResponse>>(`/api/v1/admin/ingest-events${qs ? `?${qs}` : ""}`)
     },
