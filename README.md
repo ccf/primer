@@ -109,7 +109,7 @@ curl -fsSL https://ccf.github.io/primer/install.sh | sh
 **Or install manually:**
 
 ```bash
-pip install primer-io            # Install
+pip install primer            # Install
 primer init                      # Initialize database and config
 primer server start              # Start API + dashboard
 primer hook install              # Register the SessionEnd hook

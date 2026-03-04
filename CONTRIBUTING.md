@@ -137,7 +137,7 @@ def test_create_team(client, admin_headers):
 
 ## PR Process
 
-1. Branch from `develop` (or `main` if no develop branch exists)
+1. Branch from `main`
 2. Make your changes following the coding standards above
 3. Add or update tests for any new functionality
 4. Ensure all checks pass:
