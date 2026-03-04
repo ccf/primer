@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 
 const LINES = [
-  { text: "$ pip install primer-io", delay: 0 },
+  { text: "$ pip install primer", delay: 0 },
   { text: "  Installing Primer...", delay: 1200 },
   { text: "  \u2713 Server ready at http://localhost:8000", delay: 2200 },
   { text: "  \u2713 Hook installed for Claude Code", delay: 2800 },

@@ -99,7 +99,7 @@ Primer uses `slowapi` to enforce per-route rate limits. Rate limit keys are deri
 |----------|---------|-------------|
 | `PRIMER_RATE_LIMIT_ENABLED` | `true` | Enable or disable rate limiting globally |
 | `PRIMER_RATE_LIMIT_DEFAULT` | `60/minute` | Default limit for all endpoints |
-| `PRIMER_RATE_LIMIT_INGEST` | `120/minute` | Limit for session ingest endpoints |
+| `PRIMER_RATE_LIMIT_INGEST` | `300/minute` | Limit for session ingest endpoints |
 | `PRIMER_RATE_LIMIT_AUTH` | `10/minute` | Limit for authentication endpoints |
 
 Rate limits are expressed in the format `count/period` where period can be `second`, `minute`, `hour`, or `day`. For example, `120/minute` allows 120 requests per minute per key.
