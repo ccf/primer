@@ -1,24 +1,24 @@
 ---
 title: "Setting Up Primer in 5 Minutes"
-description: "A step-by-step guide to installing Primer, connecting your first AI coding tool, and seeing your first insights."
-date: "2026-02-22"
+description: "Install Primer, connect your AI coding tools, and see your first insights."
+date: "2026-03-04"
 author: "Primer Team"
 ---
 
-This guide walks you through installing Primer on your machine and seeing your first session data in under 5 minutes.
+This guide gets you from zero to a running Primer instance with live session data in about five minutes.
 
 ## Prerequisites
 
 - Python 3.12+
-- An AI coding tool (Claude Code, Codex CLI, or Gemini CLI)
+- At least one AI coding tool: [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), or [Gemini CLI](https://github.com/google-gemini/gemini-cli)
 
-## Step 1: Install Primer
+## Step 1: Install
 
 ```bash
 pip install primer
 ```
 
-This installs the `primer` CLI, server, hook system, and MCP sidecar.
+This installs the `primer` CLI, FastAPI server, hook system, and MCP sidecar.
 
 ## Step 2: Initialize
 
@@ -26,7 +26,7 @@ This installs the `primer` CLI, server, hook system, and MCP sidecar.
 primer init
 ```
 
-This creates a local SQLite database and config file. For production use, you can configure PostgreSQL — see the [docs](/docs/).
+Creates a local SQLite database and config at `~/.primer/`. For production, you can [configure PostgreSQL](/primer/docs/configuration/) later.
 
 ## Step 3: Start the server
 
@@ -34,17 +34,33 @@ This creates a local SQLite database and config file. For production use, you ca
 primer server start
 ```
 
-The server starts in the background and listens on `http://localhost:8000`. Open the dashboard in your browser to confirm it's running.
+The server starts in the background on `http://localhost:8000`. Open it in your browser — you'll see the dashboard (empty for now).
 
-## Step 4: Install the hook
+## Step 4: Install hooks
+
+For **Claude Code** (recommended starting point):
 
 ```bash
 primer hook install
 ```
 
-This registers a session-end hook with Claude Code. Every time a Claude Code session ends, the hook captures session metadata and sends it to your Primer server.
+For **Gemini CLI**:
 
-For Codex CLI and Gemini CLI, sessions are discovered automatically via the MCP sidecar's sync command.
+```bash
+primer hook install --agent gemini
+```
+
+For **Codex CLI** (no hook system, uses sync):
+
+```bash
+primer sync --watch
+```
+
+Check what's installed:
+
+```bash
+primer hook list
+```
 
 ## Step 5: Register yourself
 
@@ -52,28 +68,23 @@ For Codex CLI and Gemini CLI, sessions are discovered automatically via the MCP 
 primer setup
 ```
 
-This creates your engineer profile. Your name and email are pulled from `git config` by default.
+Creates your engineer profile. Name and email are pulled from `git config` by default.
 
 ## Step 6: Use your AI tool
 
-Start a Claude Code session, do some work, and end it. Within seconds, the session will appear in your Primer dashboard.
+Start a Claude Code session, do some work, and end it. Within seconds, the session appears in your dashboard with cost estimates, tool usage, and outcome classification.
+
+After a few sessions, you'll start seeing patterns: activity trends, friction signals, and outcome distribution on the Organization page.
 
 ## Step 7 (optional): MCP sidecar
 
-Add the Primer MCP server to your Claude Code config for in-editor insights:
+Add the Primer MCP server so Claude can query your stats mid-session:
 
-```json
-{
-  "mcpServers": {
-    "primer": {
-      "command": "python",
-      "args": ["-m", "primer.mcp.server"]
-    }
-  }
-}
+```bash
+primer mcp install
 ```
 
-Now you can ask Claude "What are my usage stats?" and get live data from Primer.
+Now you can ask Claude things like "What's my success rate this week?" or "What friction am I hitting most?" and get live answers from your own data.
 
 ## Verify everything
 
@@ -81,10 +92,22 @@ Now you can ask Claude "What are my usage stats?" and get live data from Primer.
 primer doctor
 ```
 
-This runs health checks on your database, hook, server, and MCP connection.
+Checks your database, hook installation, server status, and MCP connection.
+
+## Step 8 (optional): Seed demo data
+
+If you want to explore the full dashboard before collecting real data:
+
+```bash
+python scripts/seed_data.py
+```
+
+This populates the database with a realistic 25-person engineering organization across 6 teams.
 
 ## Next steps
 
-- Set up [teams and engineer profiles](/docs/)
-- Configure [alert thresholds](/docs/)
-- Connect [GitHub integration](/docs/) for PR linking
+- [What You Can Learn](/primer/docs/insights/) — understand the metrics and what actions to take
+- [Team Setup](/primer/docs/teams/) — register engineers and create teams
+- [GitHub Integration](/primer/docs/github/) — link sessions to pull requests
+- [Alert Thresholds](/primer/docs/alerts/) — get notified about friction spikes and cost anomalies
+- [FinOps](/primer/docs/finops/) — cache analytics, cost modeling, and budget tracking
