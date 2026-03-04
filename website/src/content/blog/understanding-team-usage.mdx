@@ -1,40 +1,92 @@
 ---
-title: "Understanding Your Team's Claude Code Usage"
-description: "A guide to the key metrics and patterns that reveal how your engineering team interacts with AI coding tools."
-date: "2026-02-25"
+title: "What Engineering Leaders Should Measure About AI Tool Adoption"
+description: "The metrics that actually matter for understanding AI coding tool usage — and the ones that don't."
+date: "2026-03-04"
 author: "Primer Team"
 ---
 
-When you first deploy Primer and start seeing session data flow in, the volume of information can be overwhelming. This guide walks through the key metrics and what they tell you about your team's AI adoption.
+Most engineering leaders tracking AI tool adoption start with the wrong metric. They count sessions, or they count cost, and draw conclusions from one number. Here's a better framework.
 
-## Sessions per day
+## The metric that matters most: cost per successful outcome
 
-The most basic metric — and one of the most useful. A steady increase in daily sessions suggests healthy adoption. A sudden drop might indicate a broken hook, a tool outage, or friction that's causing engineers to give up.
+Raw session count tells you adoption happened. Raw cost tells you money was spent. Neither tells you whether the investment is working.
 
-## Token distribution
+**Cost per successful outcome** — total spend divided by sessions that actually achieved their goal — is the single metric that connects spend to value. If it's trending down, you're getting more efficient. If it's trending up, either costs are rising or success rates are falling, and you need to know which.
 
-Not all sessions are equal. Some are quick questions; others are deep multi-hour coding sessions. Looking at the token distribution (input vs output) tells you:
+Primer computes this automatically. You'll find it on the FinOps page.
 
-- **High input, low output** — the engineer is providing lots of context but getting short answers. This often indicates prompt refinement or complex debugging.
-- **Low input, high output** — the AI is generating substantial code. These are the high-leverage sessions.
-- **High cache read tokens** — the engineer is working in a long session with lots of context reuse.
+## Leading vs. lagging indicators
 
-## Cost per engineer
+Most dashboards show lagging indicators: success rates, costs, PR merge rates. These confirm what already happened. To make decisions, you need leading indicators that predict where things are headed.
 
-Primer breaks down costs by engineer and model. This isn't about policing usage — it's about understanding value. An engineer spending $50/day on Claude Code who ships 3x faster is a great investment. An engineer spending $5/day but hitting constant friction might need training or better tooling.
+| Leading (act on these) | Lagging (validate with these) |
+|------------------------|------------------------------|
+| Adoption rate trend | Success rate |
+| Tool diversity per engineer | Cost per outcome |
+| Leverage score trajectory | PR merge rate |
+| Friction type emergence | Session health distribution |
 
-## Friction signals
+If your adoption rate is climbing but leverage scores are flat, engineers are using AI tools more but not getting more sophisticated about it. That's a training signal, not a success signal.
 
-Primer's friction detection looks for patterns that indicate problems:
+## Friction analysis: the insight most teams miss
 
-- **Permission denials** — the engineer asked the AI to do something it wasn't allowed to
-- **Tool failures** — commands that failed during execution
-- **Short sessions** — sessions that ended quickly, possibly because the engineer gave up
+Counting errors is noise. What matters is **which errors correlate with failure**.
 
-## Tool usage patterns
+Primer's friction impact scoring measures two things for each friction type: how often it occurs, and how much it reduces success rates. A friction type that happens rarely but tanks success by 40 percentage points is a higher priority fix than one that happens constantly but barely affects outcomes.
 
-Which tools does your team use most? If everyone's using Read and Grep but nobody's using Edit, your team might be using AI for research but not for implementation. This suggests an opportunity for training.
+The Friction Intelligence page ranks these automatically. In our experience, the top three are usually:
+
+1. **Permission blocks** — the AI tool tried to access something it couldn't. Fix: update your tool's allowed directories or permission settings.
+2. **Context limits** — sessions hitting the token limit. Fix: break work into smaller, focused tasks and invest in project-scoped context files (CLAUDE.md).
+3. **Tool errors** — MCP servers or integrations failing silently. Fix: audit your tooling setup with `primer doctor`.
+
+## Adoption isn't binary
+
+Teams often treat AI adoption as a yes/no question. In practice, there are distinct levels:
+
+**Level 1: Occasional use.** Engineers use AI for quick questions. Low session count, basic tools (Read, Grep). Leverage score under 25.
+
+**Level 2: Regular integration.** AI is part of daily workflow. 1-3 sessions per day, expanding tool usage. Leverage score 25-50.
+
+**Level 3: Sophisticated orchestration.** Engineers use agents, skills, multi-step workflows, and prompt caching effectively. Leverage score above 50. These engineers typically have 3-6 sessions per day and high success rates.
+
+Primer's AI Maturity page tracks this progression with a composite leverage score per engineer, plus tool category breakdowns and orchestration adoption rates. The Growth page shows how engineers move between levels over time.
+
+## What to do with the data
+
+The hardest part isn't collecting metrics — it's deciding what to do with them. Here's a decision framework:
+
+**High adoption, low success rate?** Your engineers are trying but struggling. Invest in CLAUDE.md files, shared prompt libraries, and tool configuration guides. Look at the friction breakdown to identify specific blockers.
+
+**Low adoption, high success rate?** A few people love it, most haven't tried. Run demos, pair programming sessions, and reduce setup friction. The Growth page's shared pattern analysis shows what your power users do differently.
+
+**Rising costs, flat success?** Usage is growing but efficiency isn't improving. Check cache hit rates (are engineers reusing context effectively?) and session scope (are people trying to do too much in single sessions?).
+
+**Flat leverage scores across the team?** Engineers have stopped exploring new capabilities. Share patterns from high-leverage users, run workshops on advanced features, and check whether your CLAUDE.md and project configuration files are keeping up with your tools.
+
+## Healthy benchmarks
+
+These are starting points, not hard targets. Every organization is different.
+
+| Metric | Concerning | Healthy | Excellent |
+|--------|-----------|---------|-----------|
+| Adoption rate | < 40% | 60-85% | > 85% |
+| Success rate | < 45% | 55-70% | > 75% |
+| Sessions/engineer/day | < 0.5 | 1-3 | 3-6 |
+| Leverage score | < 25 | 35-55 | > 60 |
+| Cache hit rate | < 20% | 30-50% | > 50% |
+
+For the full metric interpretation guide, including per-page breakdowns and signal-to-action mapping, see [What You Can Learn](/primer/docs/insights/) in the documentation.
 
 ## Getting started
 
-If you haven't set up Primer yet, check out the [5-minute setup guide](/blog/setup-in-5-minutes/). Once data is flowing, the dashboard will start showing these metrics automatically.
+If you're not using Primer yet:
+
+```bash
+pip install primer
+primer init
+primer server start
+primer hook install
+```
+
+The [5-minute setup guide](/primer/blog/setup-in-5-minutes/) walks through every step.

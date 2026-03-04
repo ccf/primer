@@ -1,32 +1,47 @@
 ---
-title: "Introducing Primer"
-description: "Today we're releasing Primer — an open-source platform for understanding how your engineering team uses AI coding tools."
-date: "2026-02-28"
+title: "Primer v0.2: From Dashboard to Intelligence Platform"
+description: "Primer now answers the questions about AI tool adoption that no other tool can — from org-level ROI to individual engineer learning paths."
+date: "2026-03-04"
 author: "Primer Team"
 ---
 
-AI coding assistants are changing how software gets built. Claude Code, Codex CLI, Gemini CLI — engineers are adopting these tools rapidly, but engineering leaders have almost no visibility into what's actually happening.
+When we first released Primer, it was an analytics dashboard. You could see how many sessions your team ran, what they cost, and where friction occurred. Useful — but fundamentally passive.
 
-**How many sessions are running per day? What's the cost? Where are engineers hitting friction?**
+With v0.2, Primer becomes something different: an **intelligence platform** that answers specific questions at every level of your organization.
 
-Today we're releasing **Primer** — an open-source, self-hosted platform that answers these questions.
+## The questions that matter
 
-## What Primer does
+Engineering leaders have been asking us variants of the same three questions:
 
-Primer captures session metadata from AI coding tools and aggregates it into a unified analytics dashboard. It tracks:
+**"Is our AI investment paying off?"** Not just "are people using it" — but cost per successful outcome, ROI ratio, and whether the money would be better spent on training versus tooling.
 
-- **Sessions** — every interaction with an AI coding tool
-- **Costs** — per-engineer, per-model, per-team breakdowns
-- **Friction** — permission denials, tool failures, and workflow bottlenecks
-- **PR links** — which sessions contributed to which pull requests
+**"What's actually blocking effectiveness?"** Not just "errors happen" — but which specific friction types correlate with the biggest drops in success rates, and which projects are hit hardest.
 
-## Why self-hosted?
+**"How do I help individual engineers improve?"** Not just leaderboards — but personalized trajectory analysis, skill gap detection, and learning paths generated from what works for engineers in similar roles.
 
-Session data contains sensitive information about your engineering workflows. Primer runs entirely on your infrastructure — no data ever leaves your network.
+## What's new
 
-## Multi-agent from day one
+### Dedicated intelligence pages
 
-Primer supports Claude Code, OpenAI's Codex CLI, and Google's Gemini CLI out of the box. The extractor registry makes it easy to add support for new tools as they emerge.
+The old 6-tab dashboard is gone. In its place: a hub-and-spoke design with dedicated pages for each insight area.
+
+- **Friction Intelligence** — Trend charts, impact scoring by friction type, project-level breakdown. You can now see that `permission_denied` errors cause a 38 percentage point drop in success rate — and prioritize accordingly.
+- **Code Quality** — Claude-assisted PRs vs. non-Claude, side by side. Merge rates, review comments, time to merge. The data to answer the skeptic's "is AI actually helping?"
+- **Growth & Skills** — Onboarding cohort comparison, shared behavior patterns across your team, skill gap analysis. See how fast new hires ramp up versus the team baseline.
+- **Session Insights** — Health distribution, satisfaction trends, goal analytics, end reason breakdown, permission mode analysis, cache efficiency. The aggregate view of what's working and what isn't.
+- **Tool Adoption** — Which tools are being adopted, at what rate, and by whom. Now a tab on the AI Maturity page.
+
+### Multi-agent hooks
+
+Gemini CLI now has first-class SessionEnd hook support, just like Claude Code. Codex CLI users can use `primer sync --watch` for continuous collection. One platform, three agents.
+
+### Intelligence, not just charts
+
+Every metric in Primer now exists to answer a question. The new [What You Can Learn](/primer/docs/insights/) documentation explains what to measure, what healthy ranges look like, and what actions to take for each signal.
+
+## Self-hosted, privacy-first
+
+Nothing has changed here. Your session data — which contains your team's code, prompts, and workflow patterns — stays on your infrastructure. No telemetry, no cloud dependency.
 
 ## Get started
 
@@ -37,8 +52,4 @@ primer server start
 primer hook install
 ```
 
-Visit [the documentation](/docs/) for the full setup guide.
-
-## What's next
-
-We're working on AI maturity scoring, deeper GitHub integration, and an expanded MCP sidecar with team-level insights. Follow along on [GitHub](https://github.com/ccf/primer).
+See the [documentation](/primer/docs/) for the full setup, or read the [5-minute quick start](/primer/blog/setup-in-5-minutes/).
