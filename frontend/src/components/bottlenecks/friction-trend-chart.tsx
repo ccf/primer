@@ -32,7 +32,7 @@ export function FrictionTrendChart({ data }: FrictionTrendChartProps) {
   if (chartData.length === 0) return null
 
   return (
-    <Card className="col-span-full">
+    <Card className="min-w-0">
       <CardHeader>
         <CardTitle className="text-sm font-medium">Friction Trends</CardTitle>
       </CardHeader>
