@@ -21,7 +21,7 @@ export function DailyCostChart({ data }: DailyCostChartProps) {
   if (chartData.length === 0) return null
 
   return (
-    <Card className="col-span-full">
+    <Card className="min-w-0">
       <CardHeader>
         <CardTitle className="text-sm font-medium">Daily Estimated Cost</CardTitle>
       </CardHeader>
