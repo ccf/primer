@@ -96,10 +96,11 @@ function AuthenticatedApp() {
 
           <Route path="/synthesis" element={<NarrativePage teamId={teamId} dateRange={dateRange} />} />
 
-          {/* Redirects for deprecated routes */}
           <Route path="/quality" element={<QualityPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/friction" element={<FrictionPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/growth" element={<GrowthPage teamId={teamId} dateRange={dateRange} />} />
+
+          {/* Redirects for deprecated routes */}
           <Route path="/overview" element={<Navigate to="/" replace />} />
           <Route path="/bottlenecks" element={<Navigate to="/friction" replace />} />
           <Route path="/tool-adoption" element={<Navigate to="/maturity" replace />} />
