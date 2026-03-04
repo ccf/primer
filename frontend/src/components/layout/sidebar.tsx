@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from "react"
 import { NavLink, useNavigate } from "react-router-dom"
 import {
+  AlertTriangle,
   DollarSign,
   GitPullRequest,
+  GraduationCap,
   LayoutDashboard,
   MessageSquare,
   MonitorDot,
@@ -43,6 +45,8 @@ const leadershipLinks: NavItem[] = [
   { to: "/maturity", label: "AI Maturity", icon: TrendingUp },
   { to: "/finops", label: "FinOps", icon: DollarSign },
   { to: "/quality", label: "Code Quality", icon: GitPullRequest },
+  { to: "/friction", label: "Friction", icon: AlertTriangle },
+  { to: "/growth", label: "Growth", icon: GraduationCap },
   { to: "/explorer", label: "Explorer", icon: MessageSquare },
   { to: "/sessions", label: "Sessions", icon: MonitorDot },
   { to: "/teams", label: "Teams", icon: Users2 },

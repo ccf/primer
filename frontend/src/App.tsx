@@ -22,6 +22,8 @@ import { AdminPage } from "@/pages/admin"
 import { ExplorerPage } from "@/pages/explorer"
 import { EngineerProfilePage } from "@/pages/engineer-profile"
 import { QualityPage } from "@/pages/quality"
+import { FrictionPage } from "@/pages/friction"
+import { GrowthPage } from "@/pages/growth"
 import { NotFoundPage } from "@/pages/not-found"
 import { FloatingExplorer } from "@/components/explorer/floating-explorer"
 import type { DateRange } from "@/components/layout/date-range-picker"
@@ -101,6 +103,8 @@ function AuthenticatedApp() {
           <Route path="/insights" element={<Navigate to="/synthesis" replace />} />
           <Route path="/growth" element={<Navigate to="/" replace />} />
           <Route path="/quality" element={<QualityPage teamId={teamId} dateRange={dateRange} />} />
+          <Route path="/friction" element={<FrictionPage teamId={teamId} dateRange={dateRange} />} />
+          <Route path="/growth" element={<GrowthPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/session-insights" element={<Navigate to="/" replace />} />
           <Route path="/projects" element={<Navigate to="/" replace />} />
 

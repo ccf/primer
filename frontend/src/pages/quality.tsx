@@ -6,6 +6,7 @@ import { PRTable } from "@/components/quality/pr-table"
 import { CodeVolumeChart } from "@/components/quality/code-volume-chart"
 import { QualityByTypeChart } from "@/components/quality/quality-by-type"
 import { GitHubStatusBanner } from "@/components/quality/github-status-banner"
+import { EngineerQualityTable } from "@/components/quality/engineer-quality-table"
 import { CardSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleton"
 import { GitPullRequest } from "lucide-react"
 import type { DateRange } from "@/components/layout/date-range-picker"
@@ -59,6 +60,11 @@ export function QualityPage({ teamId, dateRange }: QualityPageProps) {
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-muted-foreground">Pull Requests</h2>
         <PRTable prs={quality.recent_prs} />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground">Engineer Quality</h2>
+        <EngineerQualityTable engineers={quality.engineer_quality} />
       </section>
     </div>
   )
