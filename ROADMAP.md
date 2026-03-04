@@ -34,6 +34,8 @@ Organized by capability area. Items marked with ✅ are shipped; items marked wi
 - [x] Config optimization suggestions from team benchmark comparison
 - [x] Skill inventory with proficiency levels per tool
 - [x] Learning paths generated from high-performer patterns
+- [ ] **Effectiveness score** — outcome-based composite (success rate, cost per outcome, PR quality) complementing the maturity-focused Leverage score. Together, Leverage measures *how sophisticatedly* an engineer uses AI tools; Effectiveness measures *how well it's working*.
+- [ ] **Plugin & tool recommendation engine** — based on session patterns, recommend MCP servers, skills, and configuration changes that correlate with higher success rates for similar work. Generalize the existing config optimization into a full recommendation system.
 
 ## Growth & Onboarding
 
@@ -54,6 +56,8 @@ Organized by capability area. Items marked with ✅ are shipped; items marked wi
 - [x] Engineer tool proficiency table
 - [x] Project AI-readiness scoring (CLAUDE.md, AGENTS.md, .claude/ detection)
 - [x] Daily leverage trend tracking
+- [ ] **Model diversity factor** — incorporate model selection intelligence into the Leverage score. Engineers who choose cost-appropriate models per task (Haiku for lookups, Sonnet for standard coding, Opus for architecture) score higher than those defaulting to the most powerful model for everything.
+- [ ] **Agent team detection** — detect multi-agent orchestration (TeamCreate, SendMessage, task distribution) and score delegation depth and coordination patterns. This is arguably the strongest signal of AI maturity.
 - [ ] **Tool source classification** — distinguish built-in vs marketplace vs custom tools; identify which MCP servers tools originate from
 - [ ] **Cross-team tooling landscape** — analyze tool overlap and reuse across teams; highlight unique vs shared tooling
 
@@ -88,6 +92,12 @@ Organized by capability area. Items marked with ✅ are shipped; items marked wi
 - [x] Conversational data explorer (SSE-streamed tool-use chat)
 - [x] AI-powered recommendations panel
 
+## Real-Time Engineer Experience
+
+- [x] MCP sidecar with on-demand stats, friction reports, and recommendations
+- [ ] **Proactive coaching skill** — a Claude Code skill that activates at session start and surfaces contextual suggestions during work. "Your last 3 sessions on this project hit context limits — consider smaller tasks." "Engineers on this codebase get better results with tool X." Calls Primer's API periodically, not just on-demand.
+- [ ] **Live session signals** — stream friction and satisfaction signals to the MCP sidecar as a session progresses, enabling real-time intervention rather than post-hoc analysis
+
 ## Organization & Administration
 
 - [x] Hub-and-spoke dashboard with KPI strip, activity section, attention alerts, deep-dive cards
@@ -101,14 +111,16 @@ Organized by capability area. Items marked with ✅ are shipped; items marked wi
 - [x] API rate limiting
 - [x] Dark mode with system preference detection
 - [ ] **Multi-tenant workspace isolation** — separate data boundaries for distinct organizations sharing a single Primer instance
+- [ ] **Enterprise IdP support** — SAML/OIDC integration with Microsoft Entra ID and Okta for automatic engineer provisioning/deprovisioning, group-to-team mapping, and SSO without GitHub dependency. Table-stakes for enterprise deployment.
+- [ ] **Performance measurement views** — leadership-oriented scorecards combining productivity, quality, cost efficiency, and adoption metrics into a single per-engineer view
 
-## Platform & Integrations
+## Platform & Infrastructure
 
 - [x] Multi-agent support (Claude Code, Codex CLI, Gemini CLI)
 - [x] SessionEnd hook system with agent-specific installers
 - [x] `primer sync --watch` for agents without hook systems
-- [x] MCP sidecar (sync, my_stats, team_overview, friction_report, recommendations)
 - [x] Docker Compose and Kubernetes Helm deployment
 - [x] PostgreSQL and SQLite support
 - [x] Alembic migration bundling in pip package
-- [ ] **Performance measurement views** — leadership-oriented scorecards combining productivity, quality, cost efficiency, and adoption metrics into a single per-engineer view
+- [ ] **OpenTelemetry integration** — emit OTEL metrics (session counts, costs, friction rates, API latency), traces (ingest pipeline, analytics computation), and logs so teams can plug Primer into Datadog, Grafana, New Relic, or any OTEL-compatible observability platform
+- [ ] **Caching tier** — optional Redis-backed caching for analytics query results, rate limiting state, and session metadata lookups. Improves performance for deployments with 50+ engineers and concurrent dashboard usage. The narrative cache already uses DB-backed TTL; this generalizes it.
