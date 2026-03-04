@@ -156,6 +156,7 @@ def capture_git_info(cwd: str, started_at: datetime | None) -> dict:
     log_output = _run_git(
         [
             "log",
+            "HEAD",
             "--branches",
             f"--since={since}",
             "--format=%x1e%H%x1f%s%x1f%an%x1f%ae%x1f%aI",
