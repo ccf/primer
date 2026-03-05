@@ -11,8 +11,8 @@
 </p>
 
 <p align="center">
-  <a href="https://ccf.github.io/primer/docs/installation/">Get Started</a> &middot;
-  <a href="https://ccf.github.io/primer/docs/">Docs</a> &middot;
+  <a href="https://useprimer.dev/docs/installation/">Get Started</a> &middot;
+  <a href="https://useprimer.dev/docs/">Docs</a> &middot;
   <a href="ROADMAP.md">Roadmap</a> &middot;
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
@@ -103,7 +103,7 @@ Primer is an open-source intelligence platform that captures session data from [
 **One-liner install:**
 
 ```bash
-curl -fsSL https://ccf.github.io/primer/install.sh | sh
+curl -fsSL https://useprimer.dev/install.sh | sh
 ```
 
 **Or install manually:**
@@ -121,7 +121,7 @@ primer hook install              # Register the SessionEnd hook
 cp .env.docker.example .env && make up
 ```
 
-See the [Installation guide](https://ccf.github.io/primer/docs/installation/) for full setup, GitHub integration, and production configuration.
+See the [Installation guide](https://useprimer.dev/docs/installation/) for full setup, GitHub integration, and production configuration.
 
 ## How It Works
 
@@ -144,16 +144,16 @@ AI Coding Tools ──SessionEnd Hook──▶ Primer API ◀──MCP Sidecar
 
 | | Guide | Description |
 |-|-------|-------------|
-| **Getting Started** | [Installation](https://ccf.github.io/primer/docs/installation/) | Install, configure, first insights |
-| | [Configuration](https://ccf.github.io/primer/docs/configuration/) | Environment variables and options |
-| | [CLI Reference](https://ccf.github.io/primer/docs/cli/) | All `primer` commands |
-| **Architecture** | [Server & API](https://ccf.github.io/primer/docs/server/) | System design, data model, auth, endpoints |
-| | [Hook System](https://ccf.github.io/primer/docs/hooks/) | Multi-agent extractor registry |
-| | [MCP Sidecar](https://ccf.github.io/primer/docs/mcp/) | Mid-session stats, friction reports, recommendations |
-| **Guides** | [GitHub Integration](https://ccf.github.io/primer/docs/github/) | OAuth login, GitHub App for PR sync |
-| | [FinOps & Cost Management](https://ccf.github.io/primer/docs/finops/) | Cache analytics, cost modeling, forecasting, budgets |
-| | [Alert Thresholds](https://ccf.github.io/primer/docs/alerts/) | Anomaly detection and Slack notifications |
-| | [Deployment](https://ccf.github.io/primer/docs/deployment/) | Docker Compose, Helm, PostgreSQL, scaling |
+| **Getting Started** | [Installation](https://useprimer.dev/docs/installation/) | Install, configure, first insights |
+| | [Configuration](https://useprimer.dev/docs/configuration/) | Environment variables and options |
+| | [CLI Reference](https://useprimer.dev/docs/cli/) | All `primer` commands |
+| **Architecture** | [Server & API](https://useprimer.dev/docs/server/) | System design, data model, auth, endpoints |
+| | [Hook System](https://useprimer.dev/docs/hooks/) | Multi-agent extractor registry |
+| | [MCP Sidecar](https://useprimer.dev/docs/mcp/) | Mid-session stats, friction reports, recommendations |
+| **Guides** | [GitHub Integration](https://useprimer.dev/docs/github/) | OAuth login, GitHub App for PR sync |
+| | [FinOps & Cost Management](https://useprimer.dev/docs/finops/) | Cache analytics, cost modeling, forecasting, budgets |
+| | [Alert Thresholds](https://useprimer.dev/docs/alerts/) | Anomaly detection and Slack notifications |
+| | [Deployment](https://useprimer.dev/docs/deployment/) | Docker Compose, Helm, PostgreSQL, scaling |
 
 ## About the Name
 

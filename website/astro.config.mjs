@@ -5,8 +5,8 @@ import sitemap from "@astrojs/sitemap";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  site: "https://ccf.github.io",
-  base: "/primer/",
+  site: "https://useprimer.dev",
+  base: "/",
   integrations: [mdx(), react(), sitemap()],
   markdown: {
     shikiConfig: {
