@@ -88,7 +88,7 @@ Primer is an open-source intelligence platform that captures session data from [
 | **Organization Overview** | Session volume, success rates, health scores, activity heatmaps, outcome distribution, anomaly alerts |
 | **FinOps & Cost Management** | Per-model spend, cache savings analysis, API vs. subscription modeling, 30-day linear regression forecasting, budget burn-rate tracking |
 | **Engineer Profiles** | Weekly trajectory sparklines, strengths/friction breakdown, peer benchmarking, AI-generated narrative insights |
-| **AI Maturity** | Leverage scores, tool category analysis, orchestration adoption rates, project AI-readiness detection |
+| **AI Maturity** | Leverage scores (tool mastery, orchestration depth, efficiency), Effectiveness scores (success rate, cost efficiency), model diversity, agent team detection, project AI-readiness |
 | **Friction Intelligence** | Categorized friction types with impact scoring, bottleneck detection, root cause patterns, cluster analysis |
 | **Quality & Code Impact** | PR merge rates, Claude-assisted vs. non-Claude comparison, code volume per session, review comment analysis |
 | **AI Synthesis** | LLM-generated narrative reports at org, team, and engineer scope — turns metrics into stories |
