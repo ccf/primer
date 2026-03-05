@@ -98,7 +98,8 @@ def compute_agent_team_score(tool_counts: dict[str, int]) -> float:
         return 0.6
     if has_send_message or "Agent" in team_calls:
         return 0.3
-    return 0.1
+    # TeamDelete or EnterWorktree alone aren't meaningful team signals
+    return 0.0
 
 
 def compute_leverage_score(
