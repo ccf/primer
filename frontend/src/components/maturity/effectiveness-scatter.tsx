@@ -64,10 +64,13 @@ export function EffectivenessScatter({ data }: EffectivenessScatterProps) {
   }
 
   // Compute medians for quadrant lines
-  const leverageValues = points.map((p) => p.leverage).sort((a, b) => a - b)
-  const effectivenessValues = points.map((p) => p.effectiveness).sort((a, b) => a - b)
-  const medianLeverage = leverageValues[Math.floor(leverageValues.length / 2)]
-  const medianEffectiveness = effectivenessValues[Math.floor(effectivenessValues.length / 2)]
+  const median = (vals: number[]) => {
+    const s = [...vals].sort((a, b) => a - b)
+    const mid = Math.floor(s.length / 2)
+    return s.length % 2 === 0 ? (s[mid - 1] + s[mid]) / 2 : s[mid]
+  }
+  const medianLeverage = median(points.map((p) => p.leverage))
+  const medianEffectiveness = median(points.map((p) => p.effectiveness))
 
   return (
     <Card>
@@ -128,16 +131,16 @@ export function EffectivenessScatter({ data }: EffectivenessScatterProps) {
         </ResponsiveContainer>
         <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-muted-foreground">
           <div className="rounded-md bg-muted/50 px-2 py-1">
-            <span className="font-medium text-foreground">Top-right:</span> Mastery — advanced tools, strong outcomes
-          </div>
-          <div className="rounded-md bg-muted/50 px-2 py-1">
             <span className="font-medium text-foreground">Top-left:</span> Efficient basics — ships results, could level up
           </div>
           <div className="rounded-md bg-muted/50 px-2 py-1">
-            <span className="font-medium text-foreground">Bottom-right:</span> Experimenting — sophisticated but outcomes lag
+            <span className="font-medium text-foreground">Top-right:</span> Mastery — advanced tools, strong outcomes
           </div>
           <div className="rounded-md bg-muted/50 px-2 py-1">
             <span className="font-medium text-foreground">Bottom-left:</span> Needs support — both tool usage and outcomes lag
+          </div>
+          <div className="rounded-md bg-muted/50 px-2 py-1">
+            <span className="font-medium text-foreground">Bottom-right:</span> Experimenting — sophisticated but outcomes lag
           </div>
         </div>
       </CardContent>
