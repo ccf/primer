@@ -144,15 +144,16 @@ def get_maturity_analytics(
         eng_outcomes[eid].append(outcome)
 
     eng_success_rates: dict[str, float] = {}
+    eng_success_counts: dict[str, int] = {}
     for eid, outcomes in eng_outcomes.items():
         successes = sum(1 for o in outcomes if o in ("full", "fully_achieved", "success"))
+        eng_success_counts[eid] = successes
         eng_success_rates[eid] = successes / len(outcomes) if outcomes else 0.0
 
     # Cost per engineer
     eng_costs = (
         sessions_q.with_entities(
             SessionModel.engineer_id,
-            func.count(SessionModel.id),
             func.sum(SessionModel.input_tokens),
             func.sum(SessionModel.output_tokens),
             func.sum(SessionModel.cache_read_tokens),
@@ -162,12 +163,11 @@ def get_maturity_analytics(
         .all()
     )
     eng_cost_per_success: dict[str, float | None] = {}
-    for eid, count, inp, out, cr, cc in eng_costs:
+    for eid, inp, out, cr, cc in eng_costs:
         total_cost = estimate_cost("claude-sonnet-4", inp or 0, out or 0, cr or 0, cc or 0)
-        sr = eng_success_rates.get(eid)
-        if sr and sr > 0 and count > 0:
-            successes = sr * count
-            eng_cost_per_success[eid] = total_cost / successes if successes > 0 else None
+        successes = eng_success_counts.get(eid, 0)
+        if successes > 0:
+            eng_cost_per_success[eid] = total_cost / successes
         else:
             eng_cost_per_success[eid] = None
 
