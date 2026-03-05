@@ -150,11 +150,13 @@ def get_maturity_analytics(
         eng_success_rates[eid] = successes / len(outcomes) if outcomes else 0.0
 
     # Cost per engineer — use actual per-model pricing from ModelUsage rows
-    eng_total_cost: dict[str, float] = defaultdict(float)
+    eng_total_cost: dict[str, float] = {}
     for sid, model_name, input_tok, output_tok in model_rows:
         if sid in session_engineer:
             eid = session_engineer[sid][0]
-            eng_total_cost[eid] += estimate_cost(model_name, input_tok or 0, output_tok or 0)
+            eng_total_cost[eid] = eng_total_cost.get(eid, 0.0) + estimate_cost(
+                model_name, input_tok or 0, output_tok or 0
+            )
     # Fallback: if no ModelUsage rows, estimate from session-level tokens
     if not eng_total_cost:
         fallback_rows = (
@@ -175,9 +177,12 @@ def get_maturity_analytics(
 
     eng_cost_per_success: dict[str, float | None] = {}
     for eid in set(eng_total_cost) | set(eng_success_counts):
-        cost = eng_total_cost.get(eid, 0.0)
+        cost = eng_total_cost.get(eid)
         successes = eng_success_counts.get(eid, 0)
-        eng_cost_per_success[eid] = cost / successes if successes > 0 else None
+        if cost is not None and cost > 0 and successes > 0:
+            eng_cost_per_success[eid] = cost / successes
+        else:
+            eng_cost_per_success[eid] = None
 
     # Team median cost per success for effectiveness normalization
     valid_costs = [c for c in eng_cost_per_success.values() if c is not None]
