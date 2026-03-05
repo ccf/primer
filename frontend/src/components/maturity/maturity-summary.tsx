@@ -1,4 +1,4 @@
-import { BarChart3, Sparkles, Users } from "lucide-react"
+import { BarChart3, Sparkles, Target, Users } from "lucide-react"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { formatNumber, formatPercent } from "@/lib/utils"
 import type { MaturityAnalyticsResponse } from "@/types/api"
@@ -9,12 +9,18 @@ interface MaturitySummaryProps {
 
 export function MaturitySummary({ data }: MaturitySummaryProps) {
   return (
-    <div className="grid gap-4 sm:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard
         label="Avg Leverage Score"
         value={data.avg_leverage_score.toFixed(1)}
         subtitle="0-100 composite score"
         icon={Sparkles}
+      />
+      <StatCard
+        label="Avg Effectiveness"
+        value={data.avg_effectiveness_score != null ? data.avg_effectiveness_score.toFixed(1) : "N/A"}
+        subtitle="Success rate, cost efficiency"
+        icon={Target}
       />
       <StatCard
         label="Orchestration Adoption"

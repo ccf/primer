@@ -856,16 +856,34 @@ export interface ToolCategoryBreakdown {
   mcp: Record<string, number>
 }
 
+export interface LeverageBreakdown {
+  tool_diversity: number
+  category_spread: number
+  tool_mastery: number
+  orch_skill_ratio: number
+  agent_team_score: number
+  orchestration_depth: number
+  cache_efficiency: number
+  model_diversity: number
+  efficiency: number
+}
+
 export interface EngineerLeverageProfile {
   engineer_id: string
   name: string
   leverage_score: number
+  effectiveness_score: number | null
+  leverage_breakdown: LeverageBreakdown | null
   total_tool_calls: number
   orchestration_calls: number
   skill_calls: number
   mcp_calls: number
+  model_count: number
+  cost_tier_count: number
+  uses_agent_teams: boolean
   top_agents: string[]
   top_skills: string[]
+  top_models: string[]
   category_distribution: Record<string, number>
 }
 
@@ -900,7 +918,10 @@ export interface MaturityAnalyticsResponse {
   project_readiness: ProjectReadinessEntry[]
   sessions_analyzed: number
   avg_leverage_score: number
+  avg_effectiveness_score: number | null
   orchestration_adoption_rate: number
+  team_orchestration_adoption_rate: number
+  model_diversity_avg: number
 }
 
 // --- Narrative Insights ---
