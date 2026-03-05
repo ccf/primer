@@ -2,6 +2,7 @@
 
 from collections import Counter, defaultdict
 from datetime import datetime
+from statistics import median
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -9,13 +10,17 @@ from sqlalchemy.orm import Session
 from primer.common.models import (
     Engineer,
     GitRepository,
+    ModelUsage,
+    SessionFacets,
     ToolUsage,
 )
 from primer.common.models import Session as SessionModel
+from primer.common.pricing import estimate_cost, get_cost_tier
 from primer.common.schemas import (
     AgentSkillUsage,
     DailyLeverageEntry,
     EngineerLeverageProfile,
+    LeverageBreakdown,
     MaturityAnalyticsResponse,
     ProjectReadinessEntry,
     ToolCategoryBreakdown,
@@ -23,6 +28,8 @@ from primer.common.schemas import (
 from primer.common.tool_classification import (
     CATEGORIES,
     classify_tools,
+    compute_agent_team_score,
+    compute_effectiveness_score,
     compute_leverage_score,
 )
 from primer.server.services.analytics_service import base_session_query
@@ -37,17 +44,12 @@ def get_maturity_analytics(
 ) -> MaturityAnalyticsResponse:
     """Compute full maturity analytics response."""
     sessions_q = base_session_query(db, team_id, engineer_id, start_date, end_date)
-    # Use a subquery for session IDs to avoid SQLite bound-parameter limits
     session_id_subq = sessions_q.with_entities(SessionModel.id).subquery()
     sessions_analyzed = db.query(func.count()).select_from(session_id_subq).scalar() or 0
 
     # Gather all tool usage rows for scoped sessions
     tool_rows = (
-        db.query(
-            ToolUsage.session_id,
-            ToolUsage.tool_name,
-            ToolUsage.call_count,
-        )
+        db.query(ToolUsage.session_id, ToolUsage.tool_name, ToolUsage.call_count)
         .filter(ToolUsage.session_id.in_(db.query(session_id_subq.c.id)))
         .all()
     )
@@ -69,8 +71,7 @@ def get_maturity_analytics(
         mcp=classified["mcp"],
     )
 
-    # 2. Per-engineer leverage profiles
-    # Map session_id -> engineer info (query directly to avoid duplicate Engineer join)
+    # Map session_id -> engineer info
     eng_rows = (
         db.query(SessionModel.id, Engineer.id, Engineer.name)
         .join(Engineer, SessionModel.engineer_id == Engineer.id)
@@ -81,7 +82,7 @@ def get_maturity_analytics(
     for sid, eid, ename in eng_rows:
         session_engineer[sid] = (eid, ename)
 
-    # Aggregate per-engineer
+    # Aggregate per-engineer tool counts
     eng_tools: dict[str, Counter[str]] = defaultdict(Counter)
     for sid, tools in per_session.items():
         if sid in session_engineer:
@@ -93,7 +94,7 @@ def get_maturity_analytics(
     for _sid, (eid, ename) in session_engineer.items():
         engineer_names[eid] = ename
 
-    # Get cache hit rates per engineer for leverage scoring
+    # Cache hit rates per engineer
     eng_cache = (
         sessions_q.with_entities(
             SessionModel.engineer_id,
@@ -108,11 +109,80 @@ def get_maturity_analytics(
         total = (input_tok or 0) + (cache_read or 0)
         eng_cache_rates[eid] = (cache_read or 0) / total if total > 0 else 0.0
 
+    # --- NEW: Model usage data per engineer ---
+    model_rows = (
+        db.query(
+            ModelUsage.session_id,
+            ModelUsage.model_name,
+            ModelUsage.input_tokens,
+            ModelUsage.output_tokens,
+        )
+        .filter(ModelUsage.session_id.in_(db.query(session_id_subq.c.id)))
+        .all()
+    )
+    eng_model_tokens: dict[str, Counter[str]] = defaultdict(Counter)
+    eng_model_tier_tokens: dict[str, Counter[str]] = defaultdict(Counter)
+    for sid, model_name, input_tok, output_tok in model_rows:
+        if sid in session_engineer:
+            eid = session_engineer[sid][0]
+            total_tok = (input_tok or 0) + (output_tok or 0)
+            eng_model_tokens[eid][model_name] += total_tok
+            tier = get_cost_tier(model_name)
+            eng_model_tier_tokens[eid][tier] += total_tok
+
+    # --- NEW: Effectiveness data per engineer ---
+    # Success rates
+    facet_rows = (
+        db.query(SessionModel.engineer_id, SessionFacets.outcome)
+        .join(SessionFacets, SessionModel.id == SessionFacets.session_id)
+        .filter(SessionModel.id.in_(db.query(session_id_subq.c.id)))
+        .filter(SessionFacets.outcome.isnot(None))
+        .all()
+    )
+    eng_outcomes: dict[str, list[str]] = defaultdict(list)
+    for eid, outcome in facet_rows:
+        eng_outcomes[eid].append(outcome)
+
+    eng_success_rates: dict[str, float] = {}
+    for eid, outcomes in eng_outcomes.items():
+        successes = sum(1 for o in outcomes if o in ("full", "fully_achieved", "success"))
+        eng_success_rates[eid] = successes / len(outcomes) if outcomes else 0.0
+
+    # Cost per engineer
+    eng_costs = (
+        sessions_q.with_entities(
+            SessionModel.engineer_id,
+            func.count(SessionModel.id),
+            func.sum(SessionModel.input_tokens),
+            func.sum(SessionModel.output_tokens),
+            func.sum(SessionModel.cache_read_tokens),
+            func.sum(SessionModel.cache_creation_tokens),
+        )
+        .group_by(SessionModel.engineer_id)
+        .all()
+    )
+    eng_cost_per_success: dict[str, float | None] = {}
+    for eid, count, inp, out, cr, cc in eng_costs:
+        total_cost = estimate_cost("claude-sonnet-4", inp or 0, out or 0, cr or 0, cc or 0)
+        sr = eng_success_rates.get(eid)
+        if sr and sr > 0 and count > 0:
+            successes = sr * count
+            eng_cost_per_success[eid] = total_cost / successes if successes > 0 else None
+        else:
+            eng_cost_per_success[eid] = None
+
+    # Team median cost per success for effectiveness normalization
+    valid_costs = [c for c in eng_cost_per_success.values() if c is not None]
+    team_median_cps = median(valid_costs) if valid_costs else None
+
+    # 2. Per-engineer leverage + effectiveness profiles
     engineer_profiles: list[EngineerLeverageProfile] = []
     engineers_using_orchestration = 0
-    all_scores: list[float] = []
+    engineers_using_teams = 0
+    all_leverage_scores: list[float] = []
+    all_effectiveness_scores: list[float] = []
+    all_model_diversities: list[float] = []
 
-    # Include all engineers with scoped sessions, not just those with tool rows
     all_engineer_ids = set(eid for eid, _ in session_engineer.values())
     for eid in all_engineer_ids:
         tools = eng_tools.get(eid, Counter())
@@ -123,17 +193,43 @@ def get_maturity_analytics(
         total_calls = sum(tools.values())
 
         cache_rate = eng_cache_rates.get(eid, 0.0)
-        score = compute_leverage_score(dict(tools), cache_rate)
-        all_scores.append(score)
+        model_tokens = dict(eng_model_tokens.get(eid, {}))
+        model_tier_tokens = dict(eng_model_tier_tokens.get(eid, {}))
+
+        score, breakdown = compute_leverage_score(
+            dict(tools), cache_rate, model_tokens or None, model_tier_tokens or None
+        )
+        all_leverage_scores.append(score)
+        all_model_diversities.append(breakdown.get("model_diversity", 0.0))
 
         if orch_calls > 0 or skill_calls > 0:
             engineers_using_orchestration += 1
 
-        # Top agents = orchestration tools sorted by count
+        has_teams = compute_agent_team_score(dict(tools)) > 0
+        if has_teams:
+            engineers_using_teams += 1
+
+        # Effectiveness
+        eff_score, _eff_breakdown = compute_effectiveness_score(
+            success_rate=eng_success_rates.get(eid),
+            cost_per_success=eng_cost_per_success.get(eid),
+            team_median_cost_per_success=team_median_cps,
+            avg_health_score=None,  # health computed dynamically, not stored
+        )
+        if eng_success_rates.get(eid) is not None:
+            all_effectiveness_scores.append(eff_score)
+
+        # Top agents/skills/models
         orch = classified_eng["orchestration"]
         top_agents = sorted(orch, key=orch.get, reverse=True)[:5]  # type: ignore[arg-type]
         skill = classified_eng["skill"]
         top_skills = sorted(skill, key=skill.get, reverse=True)[:5]  # type: ignore[arg-type]
+        if model_tokens:
+            top_models = sorted(  # type: ignore[arg-type]
+                model_tokens, key=model_tokens.get, reverse=True
+            )[:5]
+        else:
+            top_models = []
 
         cat_dist = {cat: sum(classified_eng[cat].values()) for cat in CATEGORIES}
 
@@ -142,12 +238,18 @@ def get_maturity_analytics(
                 engineer_id=eid,
                 name=engineer_names.get(eid, "Unknown"),
                 leverage_score=score,
+                effectiveness_score=eff_score if eng_success_rates.get(eid) is not None else None,
+                leverage_breakdown=LeverageBreakdown(**breakdown) if breakdown else None,
                 total_tool_calls=total_calls,
                 orchestration_calls=orch_calls,
                 skill_calls=skill_calls,
                 mcp_calls=mcp_calls,
+                model_count=len(model_tokens),
+                cost_tier_count=sum(1 for v in model_tier_tokens.values() if v > 0),
+                uses_agent_teams=has_teams,
                 top_agents=top_agents,
                 top_skills=top_skills,
+                top_models=top_models,
                 category_distribution=cat_dist,
             )
         )
@@ -157,7 +259,6 @@ def get_maturity_analytics(
     # 3. Daily leverage trend
     daily_leverage: list[DailyLeverageEntry] = []
     if sessions_analyzed > 0:
-        # Get session dates and cache tokens for daily cache rate
         session_dates = sessions_q.with_entities(
             SessionModel.id,
             SessionModel.started_at,
@@ -178,18 +279,13 @@ def get_maturity_analytics(
 
         for day in sorted(all_days):
             tools = dict(date_tools[day])
-            # Compute daily cache hit rate
             total_cache = sum(c for c, _ in date_cache[day])
             total_input = sum(i for _, i in date_cache[day])
             total_tokens = total_cache + total_input
             daily_cache_rate = total_cache / total_tokens if total_tokens > 0 else 0.0
-            score = compute_leverage_score(tools, daily_cache_rate)
+            score, _ = compute_leverage_score(tools, daily_cache_rate)
             daily_leverage.append(
-                DailyLeverageEntry(
-                    date=day,
-                    leverage_score=score,
-                    total_calls=sum(tools.values()),
-                )
+                DailyLeverageEntry(date=day, leverage_score=score, total_calls=sum(tools.values()))
             )
 
     # 4. Agent/skill breakdown
@@ -225,7 +321,7 @@ def get_maturity_analytics(
         for d in sorted(agent_skill_data.values(), key=lambda x: x["total_calls"], reverse=True)
     ]
 
-    # 5. Project readiness (scoped to repos with sessions in current filter)
+    # 5. Project readiness
     project_readiness: list[ProjectReadinessEntry] = []
     if sessions_analyzed > 0:
         repo_session_counts = (
@@ -261,10 +357,20 @@ def get_maturity_analytics(
     project_readiness.sort(key=lambda p: p.ai_readiness_score, reverse=True)
 
     # Aggregate metrics
-    avg_score = sum(all_scores) / len(all_scores) if all_scores else 0.0
-    # Use distinct engineers from scoped sessions (not just those with tool usage rows)
-    total_engineers = len(set(eid for eid, _ in session_engineer.values()))
+    total_engineers = len(all_engineer_ids)
+    avg_leverage = (
+        sum(all_leverage_scores) / len(all_leverage_scores) if all_leverage_scores else 0.0
+    )
+    avg_effectiveness = (
+        sum(all_effectiveness_scores) / len(all_effectiveness_scores)
+        if all_effectiveness_scores
+        else None
+    )
     adoption_rate = engineers_using_orchestration / total_engineers if total_engineers > 0 else 0.0
+    team_adoption_rate = engineers_using_teams / total_engineers if total_engineers > 0 else 0.0
+    model_div_avg = (
+        sum(all_model_diversities) / len(all_model_diversities) if all_model_diversities else 0.0
+    )
 
     return MaturityAnalyticsResponse(
         tool_categories=tool_categories,
@@ -273,6 +379,11 @@ def get_maturity_analytics(
         agent_skill_breakdown=agent_skill_breakdown,
         project_readiness=project_readiness,
         sessions_analyzed=sessions_analyzed,
-        avg_leverage_score=round(avg_score, 1),
+        avg_leverage_score=round(avg_leverage, 1),
+        avg_effectiveness_score=(
+            round(avg_effectiveness, 1) if avg_effectiveness is not None else None
+        ),
         orchestration_adoption_rate=round(adoption_rate, 3),
+        team_orchestration_adoption_rate=round(team_adoption_rate, 3),
+        model_diversity_avg=round(model_div_avg, 3),
     )

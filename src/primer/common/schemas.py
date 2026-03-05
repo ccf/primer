@@ -1119,16 +1119,34 @@ class ToolCategoryBreakdown(BaseModel):
     mcp: dict[str, int]
 
 
+class LeverageBreakdown(BaseModel):
+    tool_diversity: float = 0.0
+    category_spread: float = 0.0
+    tool_mastery: float = 0.0
+    orch_skill_ratio: float = 0.0
+    agent_team_score: float = 0.0
+    orchestration_depth: float = 0.0
+    cache_efficiency: float = 0.0
+    model_diversity: float = 0.0
+    efficiency: float = 0.0
+
+
 class EngineerLeverageProfile(BaseModel):
     engineer_id: str
     name: str
     leverage_score: float
+    effectiveness_score: float | None = None
+    leverage_breakdown: LeverageBreakdown | None = None
     total_tool_calls: int
     orchestration_calls: int
     skill_calls: int
     mcp_calls: int
+    model_count: int = 0
+    cost_tier_count: int = 0
+    uses_agent_teams: bool = False
     top_agents: list[str]
     top_skills: list[str]
+    top_models: list[str] = []
     category_distribution: dict[str, int]
 
 
@@ -1163,7 +1181,10 @@ class MaturityAnalyticsResponse(BaseModel):
     project_readiness: list[ProjectReadinessEntry]
     sessions_analyzed: int
     avg_leverage_score: float
+    avg_effectiveness_score: float | None = None
     orchestration_adoption_rate: float
+    team_orchestration_adoption_rate: float = 0.0
+    model_diversity_avg: float = 0.0
 
 
 # --- Narrative Insights ---
