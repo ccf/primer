@@ -203,6 +203,24 @@ PLAN_TIERS = [
 ]
 
 
+# Cost tier thresholds (input price per token)
+_TIER_THRESHOLDS = [
+    ("economy", 0.50 / 1_000_000),  # < $0.50/MTok input
+    ("standard", 2.0 / 1_000_000),  # < $2.00/MTok input
+    ("premium", 6.0 / 1_000_000),  # < $6.00/MTok input
+    ("flagship", float("inf")),  # >= $6.00/MTok input
+]
+
+
+def get_cost_tier(model_name: str) -> str:
+    """Classify a model into a cost tier based on its input token price."""
+    pricing = get_pricing(model_name)
+    for tier_name, threshold in _TIER_THRESHOLDS:
+        if pricing.input_per_token < threshold:
+            return tier_name
+    return "flagship"
+
+
 def get_pricing(model_name: str) -> ModelPricing:
     """Return pricing for a model using longest prefix match, falling back to Sonnet 4."""
     best_key = ""
