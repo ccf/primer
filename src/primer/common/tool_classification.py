@@ -140,15 +140,17 @@ def compute_leverage_score(
 
     agent_team = compute_agent_team_score(tool_counts)
 
-    # Graceful degradation: if no teams, orch_ratio takes full weight
-    orchestration_depth = (0.5 * orch_ratio + 0.5 * agent_team) if agent_team > 0 else orch_ratio
+    # Bonus: teams can only help, never hurt. Use max to ensure no penalty.
+    blended_orch = 0.5 * orch_ratio + 0.5 * agent_team
+    orchestration_depth = max(blended_orch, orch_ratio) if agent_team > 0 else orch_ratio
 
     # --- Efficiency (33.3%) ---
     cache = cache_hit_rate if cache_hit_rate is not None else 0.0
     model_div = compute_model_diversity(model_token_counts or {}, model_tier_counts)
 
-    # Graceful degradation: if no model data, cache takes full weight
-    efficiency = (0.5 * cache + 0.5 * model_div) if model_token_counts else cache
+    # Bonus: model diversity can only help, never hurt. Use max to ensure no penalty.
+    blended_eff = 0.5 * cache + 0.5 * model_div
+    efficiency = max(blended_eff, cache) if model_token_counts else cache
 
     score = (100 / 3) * tool_mastery + (100 / 3) * orchestration_depth + (100 / 3) * efficiency
     score = round(min(score, 100.0), 1)

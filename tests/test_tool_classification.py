@@ -239,7 +239,29 @@ def test_leverage_with_teams_bonus():
         {"Read": 10, "Task:explore": 5, "TeamCreate": 1, "SendMessage": 5, "Agent": 2}
     )
     assert bd["agent_team_score"] == 1.0
-    assert score_with_team > score_no_team
+    assert score_with_team >= score_no_team
+
+
+def test_teams_never_penalize():
+    """Low agent_team score should not reduce orchestration_depth below orch_ratio."""
+    # High orch ratio (50% of calls are orchestration)
+    _, bd_no_team = compute_leverage_score({"Read": 5, "Task:explore": 5})
+    # Add SendMessage (agent_team=0.3) which is below orch_ratio
+    _, bd_with_team = compute_leverage_score({"Read": 5, "Task:explore": 5, "SendMessage": 1})
+    assert bd_with_team["orchestration_depth"] >= bd_no_team["orchestration_depth"]
+
+
+def test_model_diversity_never_penalizes():
+    """Low model diversity should not reduce efficiency below cache-only."""
+    _, bd_no_model = compute_leverage_score({"Read": 10}, cache_hit_rate=0.6)
+    # Single model = low diversity, but should not hurt
+    _, bd_with_model = compute_leverage_score(
+        {"Read": 10},
+        cache_hit_rate=0.6,
+        model_token_counts={"claude-sonnet-4": 1000},
+        model_tier_counts={"standard": 1000},
+    )
+    assert bd_with_model["efficiency"] >= bd_no_model["efficiency"]
 
 
 # --- compute_effectiveness_score ---
