@@ -28,7 +28,6 @@ from primer.common.schemas import (
 from primer.common.tool_classification import (
     CATEGORIES,
     classify_tools,
-    compute_agent_team_score,
     compute_effectiveness_score,
     compute_leverage_score,
 )
@@ -205,7 +204,7 @@ def get_maturity_analytics(
         if orch_calls > 0 or skill_calls > 0:
             engineers_using_orchestration += 1
 
-        has_teams = compute_agent_team_score(dict(tools)) > 0
+        has_teams = breakdown.get("agent_team_score", 0) > 0
         if has_teams:
             engineers_using_teams += 1
 
