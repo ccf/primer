@@ -4,7 +4,7 @@ import math
 
 CORE_TOOLS = {"Read", "Write", "Edit", "Bash", "NotebookEdit"}
 SEARCH_TOOLS = {"Glob", "Grep", "WebSearch", "WebFetch"}
-ORCHESTRATION_TOOLS = {"Task", "EnterPlanMode", "ExitPlanMode", "AskUserQuestion"}
+ORCHESTRATION_TOOLS = {"Task", "Agent", "EnterPlanMode", "ExitPlanMode", "AskUserQuestion"}
 TEAM_TOOLS = {"TeamCreate", "TeamDelete", "SendMessage", "EnterWorktree"}
 SKILL_PREFIX = "Skill:"
 TASK_PREFIX = "Task:"
