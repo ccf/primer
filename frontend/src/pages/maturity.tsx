@@ -8,6 +8,7 @@ import { ToolCategoryChart } from "@/components/maturity/tool-category-chart"
 import { AgentSkillTable } from "@/components/maturity/agent-skill-table"
 import { LeverageScoreTable } from "@/components/maturity/leverage-score-table"
 import { LeverageTrendChart } from "@/components/maturity/leverage-trend-chart"
+import { EffectivenessScatter } from "@/components/maturity/effectiveness-scatter"
 import { ProjectReadinessTable } from "@/components/maturity/project-readiness-table"
 import { ToolAdoptionSummary } from "@/components/tools/tool-adoption-summary"
 import { ToolAdoptionChart } from "@/components/tools/tool-adoption-chart"
@@ -21,6 +22,7 @@ const tabs = [
   { id: "agents", label: "Agents & Skills" },
   { id: "tools", label: "Tools" },
   { id: "engineers", label: "Engineers" },
+  { id: "effectiveness", label: "Effectiveness" },
   { id: "projects", label: "Projects" },
 ] as const
 
@@ -98,6 +100,10 @@ export function MaturityPage({ teamId, dateRange }: MaturityPageProps) {
           <LeverageScoreTable data={data.engineer_profiles} />
           <LeverageTrendChart data={data.daily_leverage} />
         </div>
+      )}
+
+      {data && activeTab === "effectiveness" && (
+        <EffectivenessScatter data={data.engineer_profiles} />
       )}
 
       {data && activeTab === "projects" && (
