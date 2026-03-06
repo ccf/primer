@@ -193,6 +193,8 @@ def get_engineer_profile(
                 "avg_time_to_merge_hours": ov.avg_time_to_merge_hours,
                 "github_connected": qm.github_connected,
             }
+        elif qm.github_connected:
+            quality = {"github_connected": True, "no_data_yet": True}
     except Exception:
         quality = {}
 
