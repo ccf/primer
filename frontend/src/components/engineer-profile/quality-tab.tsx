@@ -1,8 +1,19 @@
 import { Card, CardContent } from "@/components/ui/card"
+import { FindingsOverviewSection } from "@/components/quality/findings-overview"
 import { GitPullRequest, CheckCircle2 } from "lucide-react"
+import type { FindingsOverview } from "@/types/api"
 
 interface QualityTabProps {
   quality: Record<string, unknown>
+}
+
+const METRIC_LABELS: Record<string, string> = {
+  total_commits: "Commits",
+  lines_added: "Lines Added",
+  lines_deleted: "Lines Deleted",
+  pull_requests: "Pull Requests",
+  merge_rate: "Merge Rate",
+  avg_time_to_merge: "Avg Time to Merge",
 }
 
 export function QualityTab({ quality }: QualityTabProps) {
@@ -40,24 +51,37 @@ export function QualityTab({ quality }: QualityTabProps) {
     )
   }
 
-  const display = Object.entries(quality).filter(
-    ([key]) => key !== "github_connected" && key !== "no_data_yet",
+  const metrics = Object.entries(quality).filter(
+    ([key]) =>
+      key !== "github_connected" &&
+      key !== "no_data_yet" &&
+      key !== "findings_overview",
   )
 
+  const findingsOverview = quality.findings_overview as FindingsOverview | undefined
+
   return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {display.map(([key, value]) => (
-            <div key={key}>
-              <p className="text-xs text-muted-foreground">{key.replace(/_/g, " ")}</p>
-              <p className="mt-1 text-sm font-medium">
-                {value == null ? "—" : String(value)}
-              </p>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+    <div className="space-y-6">
+      <Card>
+        <CardContent className="p-6">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {metrics.map(([key, value]) => (
+              <div key={key}>
+                <p className="text-xs text-muted-foreground">
+                  {METRIC_LABELS[key] || key.replace(/_/g, " ")}
+                </p>
+                <p className="mt-1 text-lg font-semibold">
+                  {value == null ? "—" : String(value)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {findingsOverview && (
+        <FindingsOverviewSection findings={findingsOverview} />
+      )}
+    </div>
   )
 }

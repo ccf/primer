@@ -205,6 +205,8 @@ def get_engineer_profile(
                 "merge_rate": merge_rate,
                 "avg_time_to_merge": merge_time,
             }
+            if qm.findings_overview:
+                quality["findings_overview"] = qm.findings_overview.model_dump()
         elif qm.github_connected:
             quality = {"github_connected": True, "no_data_yet": True}
     except Exception:

@@ -71,6 +71,10 @@ Organized by capability area. Items marked with ✅ are shipped; items marked wi
 - [x] Code volume tracking (daily lines added/deleted)
 - [x] Engineer quality ranking table
 - [x] Repository AI-readiness scoring
+- [x] Automated review findings tracker (BugBot parser, severity breakdown, fix rate)
+- [x] Review findings overview in quality dashboard and engineer profile
+- [x] `GET /api/v1/analytics/review-findings` endpoint with source/severity/status filters
+- [ ] **Additional review bot parsers** — CodeRabbit, SonarQube, and other automated review tools using the extensible parser registry
 
 ## FinOps & Cost Management
 

@@ -9,7 +9,7 @@ Aggregate AI coding agent usage insights across an engineering organization.
 | Path | Purpose |
 |------|---------|
 | `src/primer/common/` | Shared models, schemas, config, database setup |
-| `src/primer/common/models.py` | SQLAlchemy 2.0 models (Team, Engineer, Session, ModelUsage, ToolUsage, SessionFacets, Alert, AlertConfig, AuditLog, Budget, PullRequest, NarrativeCache, etc.) |
+| `src/primer/common/models.py` | SQLAlchemy 2.0 models (Team, Engineer, Session, ModelUsage, ToolUsage, SessionFacets, Alert, AlertConfig, AuditLog, Budget, PullRequest, ReviewFinding, NarrativeCache, etc.) |
 | `src/primer/common/schemas.py` | 100+ Pydantic v2 DTOs for all API request/response types |
 | `src/primer/common/pricing.py` | Model pricing config + cost estimation (longest-prefix match) |
 | `src/primer/common/config.py` | `pydantic-settings` with `PRIMER_` env prefix |
@@ -37,7 +37,7 @@ Aggregate AI coding agent usage insights across an engineering organization.
 | `frontend/src/components/sessions/` | Session browser, search, filters, transcript viewer, cost/tool charts |
 | `frontend/src/components/maturity/` | AI maturity scoring (leverage, tool categories, project readiness) |
 | `frontend/src/components/growth/` | Onboarding acceleration (cohorts, ramp-up, learning paths, patterns) |
-| `frontend/src/components/quality/` | Code quality metrics, Claude PR comparison, GitHub integration |
+| `frontend/src/components/quality/` | Code quality metrics, Claude PR comparison, review findings, GitHub integration |
 | `frontend/src/components/explorer/` | Conversational data explorer (floating chat, SSE streaming) |
 | `frontend/src/components/narrative/` | AI-generated narrative insights |
 | `frontend/src/components/admin/` | Admin UI tabs (alerts, audit log, engineers, teams, notifications, system) |
@@ -59,7 +59,7 @@ Aggregate AI coding agent usage insights across an engineering organization.
 | `engineers.py` | Engineer CRUD, API key generation/rotation, profile |
 | `sessions.py` | Session list/detail with filters (engineer, team, project, outcome, model, date range) |
 | `ingest.py` | Session ingestion from hooks (single + bulk) |
-| `analytics.py` | Overview stats, friction, benchmarks, cost analysis, tool adoption, daily stats, insights, maturity, quality, explorer, narrative |
+| `analytics.py` | Overview stats, friction, benchmarks, cost analysis, tool adoption, daily stats, insights, maturity, quality, review findings, explorer, narrative |
 | `alerts.py` | Alert list/detail, acknowledge/dismiss, anomaly detection trigger |
 | `alert_configs.py` | Alert threshold CRUD per team |
 | `notifications.py` | Slack webhook config and test |
@@ -82,9 +82,10 @@ Aggregate AI coding agent usage insights across an engineering organization.
 | `synthesis_service.py` | AI synthesis of recommendations |
 | `facet_extraction_service.py` | LLM-powered session facet extraction (goal, friction, satisfaction) |
 | `explorer_service.py` | Conversational data explorer (tool-use chat with Anthropic API) |
-| `quality_service.py` | Code quality metrics, Claude PR comparison, GitHub integration |
+| `quality_service.py` | Code quality metrics, Claude PR comparison, review findings aggregation, GitHub integration |
 | `maturity_service.py` | Tool leverage scoring, AI readiness per project |
-| `github_service.py` | GitHub PR/commit fetching, AI readiness detection |
+| `github_service.py` | GitHub PR/commit fetching, PR comment fetching, AI readiness detection |
+| `review_finding_service.py` | Extensible parser registry for automated review findings (BugBot, etc.) |
 | `alerting_service.py` | Anomaly detection (friction spikes, cost spikes, success rate drops) |
 | `alert_config_service.py` | Alert threshold CRUD and resolution (team > global > defaults) |
 | `audit_service.py` | Audit log recording for admin actions |
@@ -148,6 +149,7 @@ cd frontend && npx tsc -b --noEmit  # Type check
 - **Facet Extraction**: LLM-powered (Anthropic API) session classification into goals, friction, satisfaction
 - **Explorer**: SSE-streamed conversational analytics using Anthropic tool-use API
 - **GitHub Integration**: App-based PR/commit fetching, AI readiness scoring (CLAUDE.md, AGENTS.md detection)
+- **Review Findings**: Extensible parser registry (`@register_parser` decorator) for automated review bot comments (BugBot); fetches issue comments, PR review comments, and review bodies; upsert with unique constraint deduplication
 - **FinOps**: Cache savings via per-model pricing deltas, cost modeling (API vs subscription tiers), linear regression forecasting, budget burn-rate tracking
 
 ## Conventions
