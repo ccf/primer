@@ -113,6 +113,14 @@ Primer links sessions to GitHub PRs and compares:
 
 These comparisons answer the skeptic's question: "Is the AI actually helping or just creating more work for reviewers?"
 
+Primer also tracks **automated review findings** from bots like BugBot (cursor[bot]). For each PR, it parses review comments to extract:
+
+- **Severity breakdown** — how many high, medium, and low severity issues were flagged
+- **Fix rate** — percentage of findings resolved before merge
+- **Average findings per PR** — trend over time to see if AI-assisted code is improving
+
+This gives you a concrete quality signal beyond merge rates: are AI-assisted PRs generating fewer (or more) automated review issues than the baseline?
+
 ---
 
 ## Individual Level
@@ -256,7 +264,7 @@ Each insight area has a dedicated page in the Primer dashboard:
 |------|--------------|----------------------|
 | **Organization** (`/dashboard`) | KPIs, activity trends, outcomes, alerts, deep-dive navigation | How is our AI investment performing overall? |
 | **Friction** (`/friction`) | Friction trends, impact scoring, project-level breakdown | What systemic issues hurt AI effectiveness most? |
-| **Code Quality** (`/quality`) | PR metrics, Claude-vs-non-Claude comparison, engineer rankings | Are AI-assisted PRs better? |
+| **Code Quality** (`/quality`) | PR metrics, Claude-vs-non-Claude comparison, automated review findings, engineer rankings | Are AI-assisted PRs better? |
 | **Sessions** (`/sessions`) | Browse tab + Insights tab with health, satisfaction, goals, cache | How are sessions performing in aggregate? |
 | **AI Maturity** (`/maturity`) | Leverage + Effectiveness scores, tool categories, Tools tab, model diversity, agent teams | How mature is our AI usage? How effective are engineers? |
 | **Growth** (`/growth`) | Onboarding cohorts, shared patterns, team skill gaps | How fast are new hires ramping up? What patterns should we share? |
