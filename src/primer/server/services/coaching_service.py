@@ -63,9 +63,9 @@ def _build_friction_section(friction_data) -> CoachingSection:
 def _build_skills_section(profile, tips) -> CoachingSection:
     items = []
     if profile:
-        if profile.model_count <= 1:
+        if profile.model_count == 1:
             items.append(
-                f"You use {profile.model_count} model. "
+                "You use a single model. "
                 "Try cheaper models for simple tasks — "
                 "Haiku is 3-5x cheaper for lookups and quick edits."
             )
@@ -88,10 +88,13 @@ def _build_skills_section(profile, tips) -> CoachingSection:
             items.append(tip.description)
 
     if not items:
-        items.append(
-            "Your tool usage is well-diversified. "
-            "Look at the Growth page for shared patterns from top performers."
-        )
+        if profile is not None:
+            items.append(
+                "Your tool usage is well-diversified. "
+                "Look at the Growth page for shared patterns from top performers."
+            )
+        else:
+            items.append("Not enough session data yet to assess skill opportunities.")
     return CoachingSection(title="Where you could level up", items=items)
 
 
