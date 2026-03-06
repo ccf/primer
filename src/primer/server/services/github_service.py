@@ -236,19 +236,14 @@ def get_pull_request_commits(full_name: str, pr_number: int) -> list[str]:
         return []
 
 
-def get_pull_request_comments(full_name: str, pr_number: int) -> list[dict]:
-    """Fetch issue comments for a PR (where BugBot posts findings).
-
-    Returns combined list of issue comments. Paginates automatically.
-    """
-    if not is_configured():
-        return []
+def _fetch_paginated_comments(url: str, full_name: str, pr_number: int) -> list[dict]:
+    """Fetch paginated comments from a GitHub API endpoint."""
     comments: list[dict] = []
     try:
         page = 1
         while True:
             resp = httpx.get(
-                f"{GITHUB_API}/repos/{full_name}/issues/{pr_number}/comments",
+                url,
                 params={"per_page": 100, "page": page},
                 headers=_github_headers(),
                 timeout=15.0,
@@ -262,8 +257,54 @@ def get_pull_request_comments(full_name: str, pr_number: int) -> list[dict]:
             if len(batch) < 100:
                 break
     except httpx.HTTPError:
-        logger.exception("Failed to get PR comments for %s#%d", full_name, pr_number)
+        logger.exception("Failed to get comments from %s for %s#%d", url, full_name, pr_number)
     return comments
+
+
+def get_pull_request_comments(full_name: str, pr_number: int) -> list[dict]:
+    """Fetch issue comments and PR review comments for a PR.
+
+    Combines both endpoints:
+    - /issues/{pr}/comments  — general PR comments (where BugBot often posts)
+    - /pulls/{pr}/comments   — inline review comments on the diff
+    - /pulls/{pr}/reviews     — review bodies (top-level review summaries)
+
+    Returns combined deduplicated list. Paginates automatically.
+    """
+    if not is_configured():
+        return []
+
+    # Issue comments (general PR conversation)
+    issue_comments = _fetch_paginated_comments(
+        f"{GITHUB_API}/repos/{full_name}/issues/{pr_number}/comments",
+        full_name,
+        pr_number,
+    )
+
+    # PR review comments (inline on diff)
+    review_comments = _fetch_paginated_comments(
+        f"{GITHUB_API}/repos/{full_name}/pulls/{pr_number}/comments",
+        full_name,
+        pr_number,
+    )
+
+    # Review bodies (top-level review summaries)
+    reviews = _fetch_paginated_comments(
+        f"{GITHUB_API}/repos/{full_name}/pulls/{pr_number}/reviews",
+        full_name,
+        pr_number,
+    )
+
+    # Deduplicate by comment id
+    seen: set[int] = set()
+    combined: list[dict] = []
+    for comment in issue_comments + review_comments + reviews:
+        cid = comment.get("id")
+        if cid and cid not in seen:
+            seen.add(cid)
+            combined.append(comment)
+
+    return combined
 
 
 def check_file_exists(
