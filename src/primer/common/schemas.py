@@ -868,12 +868,42 @@ class PRSummary(BaseModel):
     merged_at: str | None
 
 
+# --- Review Findings ---
+
+
+class ReviewFindingSummary(BaseModel):
+    id: str
+    source: str
+    severity: str
+    title: str
+    description: str | None
+    file_path: str | None
+    line_number: int | None
+    status: str
+    detected_at: datetime
+    resolved_at: datetime | None = None
+    pr_number: int | None = None
+    repository: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class FindingsOverview(BaseModel):
+    total_findings: int
+    by_severity: dict[str, int]
+    by_source: dict[str, int]
+    fix_rate: float | None
+    avg_findings_per_pr: float | None
+    findings_trend: list[dict] = []
+
+
 class QualityMetricsResponse(BaseModel):
     overview: QualityOverview
     daily_volume: list[DailyCodeVolume]
     by_session_type: list[QualityByType]
     engineer_quality: list[EngineerQuality]
     recent_prs: list[PRSummary]
+    findings_overview: FindingsOverview | None = None
     sessions_analyzed: int
     github_connected: bool
 

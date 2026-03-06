@@ -329,6 +329,7 @@ class PullRequest(Base):
 
     repository: Mapped[GitRepository] = relationship(back_populates="pull_requests")
     commits: Mapped[list["SessionCommit"]] = relationship(back_populates="pull_request")
+    findings: Mapped[list["ReviewFinding"]] = relationship(back_populates="pull_request")
 
 
 class NarrativeCache(Base):
@@ -374,6 +375,27 @@ class SessionCommit(Base):
 
     session: Mapped["Session"] = relationship(back_populates="commits")
     pull_request: Mapped[PullRequest | None] = relationship(back_populates="commits")
+
+
+class ReviewFinding(Base):
+    __tablename__ = "review_findings"
+    __table_args__ = (UniqueConstraint("pull_request_id", "external_id"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    pull_request_id: Mapped[str] = mapped_column(ForeignKey("pull_requests.id"), nullable=False)
+    source: Mapped[str] = mapped_column(String(50), nullable=False)
+    external_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    severity: Mapped[str] = mapped_column(String(20), nullable=False)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    file_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    line_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="open")
+    detected_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    pull_request: Mapped[PullRequest] = relationship(back_populates="findings")
 
 
 class Budget(Base):

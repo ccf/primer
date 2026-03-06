@@ -617,12 +617,37 @@ export interface PRSummary {
   merged_at: string | null
 }
 
+export interface ReviewFindingSummary {
+  id: string
+  source: string
+  severity: string
+  title: string
+  description: string | null
+  file_path: string | null
+  line_number: number | null
+  status: string
+  detected_at: string
+  resolved_at: string | null
+  pr_number: number | null
+  repository: string | null
+}
+
+export interface FindingsOverview {
+  total_findings: number
+  by_severity: Record<string, number>
+  by_source: Record<string, number>
+  fix_rate: number | null
+  avg_findings_per_pr: number | null
+  findings_trend: { date: string; count: number }[]
+}
+
 export interface QualityMetricsResponse {
   overview: QualityOverview
   daily_volume: DailyCodeVolume[]
   by_session_type: QualityByType[]
   engineer_quality: EngineerQuality[]
   recent_prs: PRSummary[]
+  findings_overview: FindingsOverview | null
   sessions_analyzed: number
   github_connected: boolean
 }

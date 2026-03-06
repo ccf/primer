@@ -236,6 +236,36 @@ def get_pull_request_commits(full_name: str, pr_number: int) -> list[str]:
         return []
 
 
+def get_pull_request_comments(full_name: str, pr_number: int) -> list[dict]:
+    """Fetch issue comments for a PR (where BugBot posts findings).
+
+    Returns combined list of issue comments. Paginates automatically.
+    """
+    if not is_configured():
+        return []
+    comments: list[dict] = []
+    try:
+        page = 1
+        while True:
+            resp = httpx.get(
+                f"{GITHUB_API}/repos/{full_name}/issues/{pr_number}/comments",
+                params={"per_page": 100, "page": page},
+                headers=_github_headers(),
+                timeout=15.0,
+            )
+            resp.raise_for_status()
+            batch = resp.json()
+            if not batch:
+                break
+            comments.extend(batch)
+            page += 1
+            if len(batch) < 100:
+                break
+    except httpx.HTTPError:
+        logger.exception("Failed to get PR comments for %s#%d", full_name, pr_number)
+    return comments
+
+
 def check_file_exists(
     full_name: str,
     path: str,
@@ -318,7 +348,7 @@ def sync_repository(db: Session, full_name: str, since_days: int = 30) -> dict:
     """Sync PRs from GitHub for a repository and correlate commits."""
     from datetime import datetime, timedelta
 
-    stats = {"prs_found": 0, "commits_correlated": 0}
+    stats = {"prs_found": 0, "commits_correlated": 0, "findings_synced": 0}
 
     if not is_configured():
         return stats
@@ -373,6 +403,15 @@ def sync_repository(db: Session, full_name: str, since_days: int = 30) -> dict:
             for sc in correlated:
                 sc.pull_request_id = pr.id
                 stats["commits_correlated"] += 1
+
+        # Sync automated review findings
+        from primer.server.services.review_finding_service import parse_comments, upsert_findings
+
+        comments = get_pull_request_comments(full_name, pr_number)
+        if comments:
+            findings = parse_comments(comments, pr.id)
+            if findings:
+                stats["findings_synced"] += upsert_findings(db, findings)
 
     db.flush()
     return stats
