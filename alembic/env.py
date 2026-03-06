@@ -18,6 +18,7 @@ from primer.common.models import (  # noqa: F401 — ensure all models are regis
     NarrativeCache,
     PullRequest,
     RefreshToken,
+    ReviewFinding,
     Session,
     SessionCommit,
     SessionFacets,

@@ -35,6 +35,7 @@ import type {
   ProjectAnalytics,
   QualityMetricsResponse,
   Recommendation,
+  ReviewFindingSummary,
   SessionDetailResponse,
   SessionMessage,
   SessionResponse,
@@ -441,6 +442,16 @@ export function useQualityMetrics(teamId: string | null, startDate?: string, end
     queryFn: () =>
       apiFetch<QualityMetricsResponse>(
         `/api/v1/analytics/quality-metrics${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useReviewFindings(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["review-findings", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<PaginatedResponse<ReviewFindingSummary>>(
+        `/api/v1/analytics/review-findings${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate, limit: 50 })}`,
       ),
   })
 }

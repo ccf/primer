@@ -10,6 +10,7 @@ from primer.common.models import (
     Engineer,
     GitRepository,
     PullRequest,
+    ReviewFinding,
     SessionCommit,
     SessionFacets,
 )
@@ -18,6 +19,7 @@ from primer.common.schemas import (
     ClaudePRComparisonResponse,
     DailyCodeVolume,
     EngineerQuality,
+    FindingsOverview,
     PRGroupMetrics,
     PRSummary,
     QualityByType,
@@ -49,6 +51,8 @@ def get_quality_metrics(
     # Always fetch GitHub-synced PRs (not dependent on sessions)
     github_prs = _compute_github_prs(db, team_id, engineer_id, start_date, end_date)
 
+    findings_overview = _compute_findings_overview(db, team_id, engineer_id, start_date, end_date)
+
     if total_sessions == 0:
         # Still compute PR overview from GitHub-synced data
         pr_overview = _compute_pr_overview_from_github(
@@ -60,6 +64,7 @@ def get_quality_metrics(
             by_session_type=[],
             engineer_quality=[],
             recent_prs=github_prs,
+            findings_overview=findings_overview,
             sessions_analyzed=0,
             github_connected=is_configured(),
         )
@@ -96,6 +101,7 @@ def get_quality_metrics(
         by_session_type=by_session_type,
         engineer_quality=engineer_quality,
         recent_prs=merged_prs[:30],
+        findings_overview=findings_overview,
         sessions_analyzed=total_sessions,
         github_connected=is_configured(),
     )
@@ -534,6 +540,67 @@ def _compute_pr_overview_from_github(
         avg_lines_per_session=None,
         avg_review_comments_per_pr=avg_review_comments,
         avg_time_to_merge_hours=avg_time_to_merge_hours,
+    )
+
+
+def _compute_findings_overview(
+    db: Session,
+    team_id: str | None,
+    engineer_id: str | None,
+    start_date: datetime | None,
+    end_date: datetime | None,
+) -> FindingsOverview | None:
+    """Compute aggregated review findings overview scoped by team/engineer/date."""
+    # Build scoped PR query
+    q = db.query(ReviewFinding).join(PullRequest, PullRequest.id == ReviewFinding.pull_request_id)
+
+    if engineer_id:
+        q = q.filter(PullRequest.engineer_id == engineer_id)
+    elif team_id:
+        q = q.join(Engineer, Engineer.id == PullRequest.engineer_id).filter(
+            Engineer.team_id == team_id
+        )
+
+    if start_date:
+        q = q.filter(ReviewFinding.detected_at >= start_date)
+    if end_date:
+        q = q.filter(ReviewFinding.detected_at <= end_date)
+
+    findings = q.all()
+    if not findings:
+        return None
+
+    total = len(findings)
+    by_severity: dict[str, int] = {}
+    by_source: dict[str, int] = {}
+    fixed_count = 0
+    pr_ids: set[str] = set()
+
+    for f in findings:
+        by_severity[f.severity] = by_severity.get(f.severity, 0) + 1
+        by_source[f.source] = by_source.get(f.source, 0) + 1
+        if f.status == "fixed":
+            fixed_count += 1
+        pr_ids.add(f.pull_request_id)
+
+    fix_rate = fixed_count / total if total else None
+    avg_per_pr = total / len(pr_ids) if pr_ids else None
+
+    # Daily trend
+    date_counts: dict[str, int] = {}
+    for f in findings:
+        day = f.detected_at.strftime("%Y-%m-%d")
+        date_counts[day] = date_counts.get(day, 0) + 1
+
+    findings_trend = [{"date": d, "count": c} for d, c in sorted(date_counts.items())]
+
+    return FindingsOverview(
+        total_findings=total,
+        by_severity=by_severity,
+        by_source=by_source,
+        fix_rate=fix_rate,
+        avg_findings_per_pr=avg_per_pr,
+        findings_trend=findings_trend,
     )
 
 

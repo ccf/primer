@@ -26,12 +26,14 @@ from primer.common.schemas import (
     NarrativeStatusResponse,
     OnboardingAccelerationResponse,
     OverviewStats,
+    PaginatedResponse,
     PatternSharingResponse,
     PersonalizedTipsResponse,
     ProductivityMetrics,
     ProjectAnalytics,
     QualityMetricsResponse,
     Recommendation,
+    ReviewFindingSummary,
     SessionInsightsResponse,
     SkillInventoryResponse,
     TimeToTeamAverageResponse,
@@ -645,3 +647,72 @@ def narrative(
         raise HTTPException(status_code=500, detail=error_msg) from None
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e)) from None
+
+
+@router.get("/review-findings", response_model=PaginatedResponse[ReviewFindingSummary])
+def review_findings(
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    source: str | None = None,
+    severity: str | None = None,
+    status: str | None = None,
+    limit: int = Query(default=50, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.common.models import Engineer, GitRepository, PullRequest, ReviewFinding
+
+    tid, eid = _resolve_scope(auth, team_id)
+
+    q = (
+        db.query(ReviewFinding, PullRequest.github_pr_number, GitRepository.full_name)
+        .join(PullRequest, PullRequest.id == ReviewFinding.pull_request_id)
+        .join(GitRepository, GitRepository.id == PullRequest.repository_id)
+    )
+
+    if eid:
+        q = q.filter(PullRequest.engineer_id == eid)
+    elif tid:
+        q = q.join(Engineer, Engineer.id == PullRequest.engineer_id).filter(Engineer.team_id == tid)
+
+    if start_date:
+        q = q.filter(ReviewFinding.detected_at >= start_date)
+    if end_date:
+        q = q.filter(ReviewFinding.detected_at <= end_date)
+    if source:
+        q = q.filter(ReviewFinding.source == source)
+    if severity:
+        q = q.filter(ReviewFinding.severity == severity)
+    if status:
+        q = q.filter(ReviewFinding.status == status)
+
+    total_count = q.count()
+
+    rows = q.order_by(ReviewFinding.detected_at.desc()).offset(offset).limit(limit).all()
+
+    items = [
+        ReviewFindingSummary(
+            id=finding.id,
+            source=finding.source,
+            severity=finding.severity,
+            title=finding.title,
+            description=finding.description,
+            file_path=finding.file_path,
+            line_number=finding.line_number,
+            status=finding.status,
+            detected_at=finding.detected_at,
+            resolved_at=finding.resolved_at,
+            pr_number=pr_number,
+            repository=repo_name,
+        )
+        for finding, pr_number, repo_name in rows
+    ]
+
+    return PaginatedResponse(
+        items=items,
+        total_count=total_count,
+        limit=limit,
+        offset=offset,
+    )

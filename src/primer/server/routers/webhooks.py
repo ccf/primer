@@ -13,8 +13,12 @@ from primer.common.models import (
     GitRepository,
     SessionCommit,
 )
-from primer.server.services.github_service import upsert_pull_request
+from primer.server.services.github_service import (
+    get_pull_request_comments,
+    upsert_pull_request,
+)
 from primer.server.services.ingest_service import find_or_create_repository
+from primer.server.services.review_finding_service import parse_comments, upsert_findings
 
 logger = logging.getLogger(__name__)
 
@@ -99,4 +103,11 @@ def _handle_pull_request(db: Session, payload: dict) -> None:
     if not pr_number:
         return
 
-    upsert_pull_request(db, repo, pr_number, pr_data)
+    pr = upsert_pull_request(db, repo, pr_number, pr_data)
+
+    # Fetch PR comments and parse automated review findings
+    comments = get_pull_request_comments(repo_full_name, pr_number)
+    if comments:
+        findings = parse_comments(comments, pr.id)
+        if findings:
+            upsert_findings(db, findings)
