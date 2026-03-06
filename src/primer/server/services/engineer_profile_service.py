@@ -184,14 +184,19 @@ def get_engineer_profile(
         )
         ov = qm.overview
         if ov.total_commits > 0 or ov.total_prs > 0:
+            merge_rate = f"{ov.pr_merge_rate * 100:.0f}%" if ov.pr_merge_rate is not None else None
+            merge_time = (
+                f"{ov.avg_time_to_merge_hours:.1f}h"
+                if ov.avg_time_to_merge_hours is not None
+                else None
+            )
             quality = {
                 "total_commits": ov.total_commits,
-                "lines_added": ov.total_lines_added,
-                "lines_deleted": ov.total_lines_deleted,
+                "lines_added": f"+{ov.total_lines_added:,}",
+                "lines_deleted": f"-{ov.total_lines_deleted:,}",
                 "pull_requests": ov.total_prs,
-                "pr_merge_rate": ov.pr_merge_rate,
-                "avg_time_to_merge_hours": ov.avg_time_to_merge_hours,
-                "github_connected": qm.github_connected,
+                "merge_rate": merge_rate,
+                "avg_time_to_merge": merge_time,
             }
         elif qm.github_connected:
             quality = {"github_connected": True, "no_data_yet": True}
