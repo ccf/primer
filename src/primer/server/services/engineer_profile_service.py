@@ -183,15 +183,16 @@ def get_engineer_profile(
             db, engineer_id=engineer_id, start_date=start_date, end_date=end_date
         )
         ov = qm.overview
-        quality = {
-            "total_commits": ov.total_commits,
-            "lines_added": ov.total_lines_added,
-            "lines_deleted": ov.total_lines_deleted,
-            "pull_requests": ov.total_prs,
-            "pr_merge_rate": ov.pr_merge_rate,
-            "avg_time_to_merge_hours": ov.avg_time_to_merge_hours,
-            "github_connected": qm.github_connected,
-        }
+        if ov.total_commits > 0 or ov.total_prs > 0:
+            quality = {
+                "total_commits": ov.total_commits,
+                "lines_added": ov.total_lines_added,
+                "lines_deleted": ov.total_lines_deleted,
+                "pull_requests": ov.total_prs,
+                "pr_merge_rate": ov.pr_merge_rate,
+                "avg_time_to_merge_hours": ov.avg_time_to_merge_hours,
+                "github_connected": qm.github_connected,
+            }
     except Exception:
         quality = {}
 
