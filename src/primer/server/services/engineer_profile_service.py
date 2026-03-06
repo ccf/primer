@@ -174,8 +174,26 @@ def get_engineer_profile(
     # Extract this engineer's learning path
     eng_paths = [p for p in learning.engineer_paths if p.engineer_id == engineer_id]
 
-    # Quality placeholder (no quality_service models yet)
+    # Quality data from PR/commit tracking
+    from primer.server.services.quality_service import get_quality_metrics
+
     quality: dict = {}
+    try:
+        qm = get_quality_metrics(
+            db, engineer_id=engineer_id, start_date=start_date, end_date=end_date
+        )
+        ov = qm.overview
+        quality = {
+            "total_commits": ov.total_commits,
+            "lines_added": ov.total_lines_added,
+            "lines_deleted": ov.total_lines_deleted,
+            "pull_requests": ov.total_prs,
+            "pr_merge_rate": ov.pr_merge_rate,
+            "avg_time_to_merge_hours": ov.avg_time_to_merge_hours,
+            "github_connected": qm.github_connected,
+        }
+    except Exception:
+        quality = {}
 
     # Tool rankings
     tool_rankings = get_tool_rankings(
