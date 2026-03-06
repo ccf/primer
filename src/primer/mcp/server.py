@@ -6,6 +6,7 @@ Register this in Claude Code's MCP settings to expose Primer tools during sessio
 from mcp.server.fastmcp import FastMCP
 
 from primer.mcp.tools import (
+    primer_coaching,
     primer_friction_report,
     primer_my_stats,
     primer_recommendations,
@@ -59,6 +60,16 @@ def recommendations(team_id: str | None = None) -> str:
     Based on patterns and friction analysis.
     """
     return primer_recommendations(team_id=team_id)
+
+
+@mcp.tool()
+def coaching(days: int = 30) -> str:
+    """Get your personalized coaching brief.
+
+    What's working, what's slowing you down, and what to try next —
+    based on your usage patterns, friction, and team benchmarks.
+    """
+    return primer_coaching(days=days)
 
 
 if __name__ == "__main__":

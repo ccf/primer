@@ -100,3 +100,33 @@ def primer_recommendations(team_id: str | None = None) -> str:
         return f"Error: {resp.status_code} - {resp.text}"
     except httpx.RequestError as e:
         return f"Error connecting to server: {e}"
+
+
+def primer_coaching(days: int = 30) -> str:
+    """Get your personalized coaching brief.
+
+    Synthesizes your usage patterns, friction hotspots, skill gaps,
+    and config optimization into actionable guidance.
+    """
+    if not API_KEY:
+        return "Error: PRIMER_API_KEY not set"
+    try:
+        resp = httpx.get(
+            f"{SERVER_URL}/api/v1/analytics/coaching",
+            params={"days": days},
+            headers={"x-api-key": API_KEY},
+            timeout=30,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            lines = ["## Your Primer Coaching Brief\n"]
+            lines.append(f"**Status**: {data['status_summary']}\n")
+            for section in data.get("sections", []):
+                lines.append(f"### {section['title']}")
+                for item in section.get("items", []):
+                    lines.append(f"- {item}")
+                lines.append("")
+            return "\n".join(lines)
+        return f"Error: {resp.status_code} - {resp.text}"
+    except httpx.RequestError as e:
+        return f"Error connecting to server: {e}"
