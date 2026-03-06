@@ -23,9 +23,9 @@ def _build_status(overview, profile) -> str:
     parts = [f"{overview.total_sessions} sessions"]
     if overview.success_rate is not None:
         parts.append(f"{_fmt_pct(overview.success_rate)} success rate")
-    if profile and profile.leverage_score:
+    if profile is not None:
         parts.append(f"Leverage: {profile.leverage_score:.1f}")
-    if profile and profile.effectiveness_score is not None:
+    if profile is not None and profile.effectiveness_score is not None:
         parts.append(f"Effectiveness: {profile.effectiveness_score:.1f}")
     return " · ".join(parts)
 
