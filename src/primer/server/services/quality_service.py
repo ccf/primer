@@ -86,6 +86,10 @@ def get_quality_metrics(
         overview.pr_merge_rate = gh_overview.pr_merge_rate
         overview.avg_review_comments_per_pr = gh_overview.avg_review_comments_per_pr
         overview.avg_time_to_merge_hours = gh_overview.avg_time_to_merge_hours
+        # Use GitHub PR-level line counts when commit numstat data is zero
+        if overview.total_lines_added == 0 and overview.total_lines_deleted == 0:
+            overview.total_lines_added = gh_overview.total_lines_added
+            overview.total_lines_deleted = gh_overview.total_lines_deleted
 
     # Merge session-linked PRs with GitHub-synced PRs (dedupe by repo+number)
     seen = {(pr.repository, pr.pr_number) for pr in session_prs}

@@ -446,13 +446,19 @@ def sync_repository(db: Session, full_name: str, since_days: int = 30) -> dict:
                 stats["commits_correlated"] += 1
 
         # Sync automated review findings
-        from primer.server.services.review_finding_service import parse_comments, upsert_findings
+        try:
+            from primer.server.services.review_finding_service import (
+                parse_comments,
+                upsert_findings,
+            )
 
-        comments = get_pull_request_comments(full_name, pr_number)
-        if comments:
-            findings = parse_comments(comments, pr.id)
-            if findings:
-                stats["findings_synced"] += upsert_findings(db, findings)
+            comments = get_pull_request_comments(full_name, pr_number)
+            if comments:
+                findings = parse_comments(comments, pr.id)
+                if findings:
+                    stats["findings_synced"] += upsert_findings(db, findings)
+        except Exception:
+            logger.exception("Failed to sync findings for %s#%d", full_name, pr_number)
 
     db.flush()
     return stats

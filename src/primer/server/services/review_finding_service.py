@@ -87,7 +87,10 @@ def parse_bugbot_comment(comment: dict, pull_request_id: str) -> ReviewFinding |
             file_path = parts[0]
             line_range = parts[1]
             # e.g. "10-20" or "10"
-            line_number = int(line_range.split("-")[0]) if line_range else None
+            try:
+                line_number = int(line_range.split("-")[0]) if line_range else None
+            except ValueError:
+                line_number = None
         elif first_loc:
             file_path = first_loc
 

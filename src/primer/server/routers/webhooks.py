@@ -106,8 +106,11 @@ def _handle_pull_request(db: Session, payload: dict) -> None:
     pr = upsert_pull_request(db, repo, pr_number, pr_data)
 
     # Fetch PR comments and parse automated review findings
-    comments = get_pull_request_comments(repo_full_name, pr_number)
-    if comments:
-        findings = parse_comments(comments, pr.id)
-        if findings:
-            upsert_findings(db, findings)
+    try:
+        comments = get_pull_request_comments(repo_full_name, pr_number)
+        if comments:
+            findings = parse_comments(comments, pr.id)
+            if findings:
+                upsert_findings(db, findings)
+    except Exception:
+        logger.exception("Failed to sync findings for %s#%d", repo_full_name, pr_number)

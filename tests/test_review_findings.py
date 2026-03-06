@@ -157,6 +157,21 @@ class TestBugBotParser:
         assert finding is not None
         assert finding.description is None
 
+    def test_parse_malformed_line_number(self):
+        """Malformed line numbers should not crash the parser (BugBot #5)."""
+        comment = {
+            "body": (
+                "### Title\n\n**High Severity**\n\n"
+                "<!-- BUGBOT_BUG_ID: bad-line -->\n\n"
+                "<!-- LOCATIONS START\nsrc/file.py#Labc\nLOCATIONS END -->"
+            ),
+            "created_at": "2026-01-01T00:00:00Z",
+        }
+        finding = parse_bugbot_comment(comment, "pr-id-1")
+        assert finding is not None
+        assert finding.file_path == "src/file.py"
+        assert finding.line_number is None
+
 
 class TestParseComments:
     def test_multiple_comments_mixed(self):

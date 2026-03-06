@@ -175,10 +175,10 @@ def get_engineer_profile(
     eng_paths = [p for p in learning.engineer_paths if p.engineer_id == engineer_id]
 
     # Quality data from PR/commit tracking
-    from primer.server.services.quality_service import get_quality_metrics
-
     quality: dict = {}
     try:
+        from primer.server.services.quality_service import get_quality_metrics
+
         qm = get_quality_metrics(
             db, engineer_id=engineer_id, start_date=start_date, end_date=end_date
         )
@@ -190,17 +190,10 @@ def get_engineer_profile(
                 if ov.avg_time_to_merge_hours is not None
                 else None
             )
-            # Use PR-level additions/deletions (from GitHub API) when commit-level
-            # line counts are zero — git numstat may not have been available at ingest
-            lines_added = ov.total_lines_added
-            lines_deleted = ov.total_lines_deleted
-            if lines_added == 0 and lines_deleted == 0 and qm.recent_prs:
-                lines_added = sum(pr.additions for pr in qm.recent_prs)
-                lines_deleted = sum(pr.deletions for pr in qm.recent_prs)
             quality = {
                 "total_commits": ov.total_commits,
-                "lines_added": f"+{lines_added:,}",
-                "lines_deleted": f"-{lines_deleted:,}",
+                "lines_added": f"+{ov.total_lines_added:,}",
+                "lines_deleted": f"-{ov.total_lines_deleted:,}",
                 "pull_requests": ov.total_prs,
                 "merge_rate": merge_rate,
                 "avg_time_to_merge": merge_time,
