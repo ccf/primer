@@ -16,7 +16,7 @@ from primer.server.services.maturity_service import get_maturity_analytics
 def _fmt_pct(value: float | None) -> str:
     if value is None:
         return "N/A"
-    return f"{value * 100:.0f}%" if value <= 1.0 else f"{value:.0f}%"
+    return f"{value * 100:.0f}%"
 
 
 def _build_status(overview, profile) -> str:
