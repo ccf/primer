@@ -1187,6 +1187,21 @@ class MaturityAnalyticsResponse(BaseModel):
     model_diversity_avg: float = 0.0
 
 
+# --- Coaching Brief ---
+
+
+class CoachingSection(BaseModel):
+    title: str
+    items: list[str]
+
+
+class CoachingBrief(BaseModel):
+    status_summary: str
+    sections: list[CoachingSection]
+    sessions_analyzed: int = 0
+    generated_at: str
+
+
 # --- Narrative Insights ---
 
 

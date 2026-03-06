@@ -9,6 +9,7 @@ from primer.common.schemas import (
     ActivityHeatmap,
     BottleneckAnalytics,
     ClaudePRComparisonResponse,
+    CoachingBrief,
     ConfigOptimizationResponse,
     CostAnalytics,
     DailyStatsResponse,
@@ -544,6 +545,25 @@ def time_to_team_average(
     return get_time_to_team_average(
         db, team_id=tid, engineer_id=None, start_date=start_date, end_date=end_date
     )
+
+
+@router.get("/coaching", response_model=CoachingBrief)
+def coaching_brief(
+    days: int = Query(default=30, ge=1, le=365),
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.coaching_service import get_coaching_brief
+
+    engineer_id = auth.engineer_id
+    team_id = auth.team_id
+    if auth.role == "admin":
+        # Admins can't get a personal coaching brief without an engineer_id
+        raise HTTPException(
+            status_code=400,
+            detail="Coaching brief requires an engineer context. Use an engineer API key.",
+        )
+    return get_coaching_brief(db, engineer_id=engineer_id, team_id=team_id, days=days)
 
 
 @router.get("/narrative/status", response_model=NarrativeStatusResponse)
