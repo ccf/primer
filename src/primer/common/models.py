@@ -379,7 +379,7 @@ class SessionCommit(Base):
 
 class ReviewFinding(Base):
     __tablename__ = "review_findings"
-    __table_args__ = (UniqueConstraint("pull_request_id", "external_id"),)
+    __table_args__ = (UniqueConstraint("pull_request_id", "source", "external_id"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     pull_request_id: Mapped[str] = mapped_column(ForeignKey("pull_requests.id"), nullable=False)
