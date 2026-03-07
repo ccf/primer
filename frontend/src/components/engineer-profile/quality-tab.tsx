@@ -36,18 +36,24 @@ export function QualityTab({ quality }: QualityTabProps) {
   }
 
   if (quality.no_data_yet) {
+    const findingsData = quality.findings_overview as FindingsOverview | undefined
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-16">
-          <div className="rounded-lg bg-emerald-500/10 p-3">
-            <CheckCircle2 className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <p className="mt-4 text-sm font-medium">GitHub connected</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            No commits or PRs linked to sessions yet. Quality metrics will appear as you work.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <div className="rounded-lg bg-emerald-500/10 p-3">
+              <CheckCircle2 className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <p className="mt-4 text-sm font-medium">GitHub connected</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              No commits or PRs linked to sessions yet. Quality metrics will appear as you work.
+            </p>
+          </CardContent>
+        </Card>
+        {findingsData && (
+          <FindingsOverviewSection findings={findingsData} />
+        )}
+      </div>
     )
   }
 
