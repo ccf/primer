@@ -297,16 +297,9 @@ def get_pull_request_comments(full_name: str, pr_number: int) -> list[dict]:
         pr_number,
     )
 
-    # Deduplicate by comment id
-    seen: set[int] = set()
-    combined: list[dict] = []
-    for comment in issue_comments + review_comments + reviews:
-        cid = comment.get("id")
-        if cid and cid not in seen:
-            seen.add(cid)
-            combined.append(comment)
-
-    return combined
+    # No deduplication needed — these are three distinct API resource types
+    # with separate ID namespaces (issue comments, review comments, reviews).
+    return issue_comments + review_comments + reviews
 
 
 def check_file_exists(
