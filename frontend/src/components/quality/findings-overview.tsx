@@ -61,7 +61,7 @@ export function FindingsOverviewSection({ findings }: Props) {
           <div className="flex h-4 w-full overflow-hidden rounded-full bg-muted">
             {orderedSeverities.map((severity) => {
               const count = findings.by_severity[severity]
-              const widthPct = (count / total) * 100
+              const widthPct = total > 0 ? (count / total) * 100 : 0
               return (
                 <div
                   key={severity}
