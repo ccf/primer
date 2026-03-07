@@ -94,7 +94,12 @@ def parse_bugbot_comment(comment: dict, pull_request_id: str) -> ReviewFinding |
         elif first_loc:
             file_path = first_loc
 
-    detected_at = parse_github_datetime(comment.get("created_at")) or datetime.utcnow()
+    # Reviews use "submitted_at" instead of "created_at"
+    detected_at = (
+        parse_github_datetime(comment.get("created_at"))
+        or parse_github_datetime(comment.get("submitted_at"))
+        or datetime.utcnow()
+    )
 
     return ReviewFinding(
         id=str(uuid.uuid4()),
