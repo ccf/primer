@@ -136,6 +136,9 @@ def _sync_findings_background(repo_full_name: str, pr_number: int, pr_id: str) -
         try:
             upsert_findings(db, findings)
             db.commit()
+        except Exception:
+            db.rollback()
+            raise
         finally:
             db.close()
     except Exception:
