@@ -129,11 +129,11 @@ def _sync_findings_background(repo_full_name: str, pr_number: int, pr_id: str) -
         comments = get_pull_request_comments(repo_full_name, pr_number)
         if not comments:
             return
-        findings = parse_comments(comments, pr_id)
-        if not findings:
-            return
         db = SessionLocal()
         try:
+            findings = parse_comments(comments, pr_id)
+            if not findings:
+                return
             upsert_findings(db, findings)
             db.commit()
         except Exception:
