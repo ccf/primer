@@ -133,7 +133,7 @@ def parse_comments(comments: list[dict], pull_request_id: str) -> list[ReviewFin
 
 
 def upsert_findings(db: Session, findings: list[ReviewFinding]) -> int:
-    """Insert findings, skipping duplicates (same pull_request_id + external_id)."""
+    """Insert findings, skipping duplicates (same pull_request_id + source + external_id)."""
     inserted = 0
     for finding in findings:
         try:
