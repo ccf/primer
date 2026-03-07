@@ -236,12 +236,14 @@ def get_pull_request_commits(full_name: str, pr_number: int) -> list[str]:
         return []
 
 
-def _fetch_paginated_comments(url: str, full_name: str, pr_number: int) -> list[dict]:
+def _fetch_paginated_comments(
+    url: str, full_name: str, pr_number: int, *, max_pages: int = 10
+) -> list[dict]:
     """Fetch paginated comments from a GitHub API endpoint."""
     comments: list[dict] = []
     try:
         page = 1
-        while True:
+        while page <= max_pages:
             resp = httpx.get(
                 url,
                 params={"per_page": 100, "page": page},
