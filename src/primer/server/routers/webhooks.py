@@ -4,11 +4,11 @@ import hashlib
 import hmac
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from primer.common.config import settings
-from primer.common.database import get_db
+from primer.common.database import SessionLocal, get_db
 from primer.common.models import (
     GitRepository,
     SessionCommit,
@@ -40,7 +40,11 @@ def _verify_signature(body: bytes, signature: str | None) -> bool:
 
 
 @router.post("/github")
-async def github_webhook(request: Request, db: Session = Depends(get_db)):
+async def github_webhook(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     body = await request.body()
     signature = request.headers.get("x-hub-signature-256")
 
@@ -57,7 +61,9 @@ async def github_webhook(request: Request, db: Session = Depends(get_db)):
     if event == "push":
         _handle_push(db, payload)
     elif event == "pull_request":
-        _handle_pull_request(db, payload)
+        pr_id, repo_full_name, pr_number = _handle_pull_request(db, payload)
+        if pr_id:
+            background_tasks.add_task(_sync_findings_background, repo_full_name, pr_number, pr_id)
 
     db.commit()
     return {"status": "ok"}
@@ -86,31 +92,45 @@ def _handle_push(db: Session, payload: dict) -> None:
     db.flush()
 
 
-def _handle_pull_request(db: Session, payload: dict) -> None:
-    """Handle pull_request event — upsert PullRequest record."""
+def _handle_pull_request(db: Session, payload: dict) -> tuple[str | None, str | None, int | None]:
+    """Handle pull_request event — upsert PullRequest record.
+
+    Returns (pr_id, repo_full_name, pr_number) for background findings sync,
+    or (None, None, None) if the event was skipped.
+    """
     action = payload.get("action", "")
     if action not in ("opened", "closed", "reopened", "synchronize", "edited"):
-        return
+        return None, None, None
 
     pr_data = payload.get("pull_request", {})
     repo_full_name = payload.get("repository", {}).get("full_name")
     if not repo_full_name or not pr_data:
-        return
+        return None, None, None
 
     repo = find_or_create_repository(db, repo_full_name)
 
     pr_number = pr_data.get("number")
     if not pr_number:
-        return
+        return None, None, None
 
     pr = upsert_pull_request(db, repo, pr_number, pr_data)
+    return pr.id, repo_full_name, pr_number
 
-    # Fetch PR comments and parse automated review findings
+
+def _sync_findings_background(repo_full_name: str, pr_number: int, pr_id: str) -> None:
+    """Sync review findings in a background task (non-blocking)."""
     try:
         comments = get_pull_request_comments(repo_full_name, pr_number)
-        if comments:
-            findings = parse_comments(comments, pr.id)
-            if findings:
-                upsert_findings(db, findings)
+        if not comments:
+            return
+        findings = parse_comments(comments, pr_id)
+        if not findings:
+            return
+        db = SessionLocal()
+        try:
+            upsert_findings(db, findings)
+            db.commit()
+        finally:
+            db.close()
     except Exception:
         logger.exception("Failed to sync findings for %s#%d", repo_full_name, pr_number)

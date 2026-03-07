@@ -554,49 +554,66 @@ def _compute_findings_overview(
     start_date: datetime | None,
     end_date: datetime | None,
 ) -> FindingsOverview | None:
-    """Compute aggregated review findings overview scoped by team/engineer/date."""
-    # Build scoped PR query
-    q = db.query(ReviewFinding).join(PullRequest, PullRequest.id == ReviewFinding.pull_request_id)
+    """Compute aggregated review findings overview scoped by team/engineer/date.
 
+    Uses SQL aggregation to avoid loading all findings into memory.
+    """
+    # Build base filter — reused across all queries
+    base = db.query(ReviewFinding).join(
+        PullRequest, PullRequest.id == ReviewFinding.pull_request_id
+    )
     if engineer_id:
-        q = q.filter(PullRequest.engineer_id == engineer_id)
+        base = base.filter(PullRequest.engineer_id == engineer_id)
     elif team_id:
-        q = q.join(Engineer, Engineer.id == PullRequest.engineer_id).filter(
+        base = base.join(Engineer, Engineer.id == PullRequest.engineer_id).filter(
             Engineer.team_id == team_id
         )
-
     if start_date:
-        q = q.filter(ReviewFinding.detected_at >= start_date)
+        base = base.filter(ReviewFinding.detected_at >= start_date)
     if end_date:
-        q = q.filter(ReviewFinding.detected_at <= end_date)
+        base = base.filter(ReviewFinding.detected_at <= end_date)
 
-    findings = q.all()
-    if not findings:
+    # Totals + fix rate + distinct PRs in one query
+    stats = base.with_entities(
+        func.count(ReviewFinding.id),
+        func.sum(case((ReviewFinding.status == "fixed", 1), else_=0)),
+        func.count(distinct(ReviewFinding.pull_request_id)),
+    ).first()
+
+    total = stats[0] or 0
+    if total == 0:
         return None
 
-    total = len(findings)
-    by_severity: dict[str, int] = {}
-    by_source: dict[str, int] = {}
-    fixed_count = 0
-    pr_ids: set[str] = set()
-
-    for f in findings:
-        by_severity[f.severity] = by_severity.get(f.severity, 0) + 1
-        by_source[f.source] = by_source.get(f.source, 0) + 1
-        if f.status == "fixed":
-            fixed_count += 1
-        pr_ids.add(f.pull_request_id)
-
+    fixed_count = stats[1] or 0
+    distinct_prs = stats[2] or 0
     fix_rate = fixed_count / total if total else None
-    avg_per_pr = total / len(pr_ids) if pr_ids else None
+    avg_per_pr = total / distinct_prs if distinct_prs else None
+
+    # Severity breakdown
+    severity_rows = (
+        base.with_entities(ReviewFinding.severity, func.count(ReviewFinding.id))
+        .group_by(ReviewFinding.severity)
+        .all()
+    )
+    by_severity = {sev: cnt for sev, cnt in severity_rows}
+
+    # Source breakdown
+    source_rows = (
+        base.with_entities(ReviewFinding.source, func.count(ReviewFinding.id))
+        .group_by(ReviewFinding.source)
+        .all()
+    )
+    by_source = {src: cnt for src, cnt in source_rows}
 
     # Daily trend
-    date_counts: dict[str, int] = {}
-    for f in findings:
-        day = f.detected_at.strftime("%Y-%m-%d")
-        date_counts[day] = date_counts.get(day, 0) + 1
-
-    findings_trend = [{"date": d, "count": c} for d, c in sorted(date_counts.items())]
+    day_expr = func.date(ReviewFinding.detected_at)
+    trend_rows = (
+        base.with_entities(day_expr.label("day"), func.count(ReviewFinding.id))
+        .group_by(day_expr)
+        .order_by(day_expr)
+        .all()
+    )
+    findings_trend = [{"date": str(d), "count": c} for d, c in trend_rows]
 
     return FindingsOverview(
         total_findings=total,
