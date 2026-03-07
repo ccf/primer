@@ -58,14 +58,20 @@ async def github_webhook(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON")  # noqa: B904
 
+    findings_task_args = None
     if event == "push":
         _handle_push(db, payload)
     elif event == "pull_request":
         pr_id, repo_full_name, pr_number = _handle_pull_request(db, payload)
         if pr_id:
-            background_tasks.add_task(_sync_findings_background, repo_full_name, pr_number, pr_id)
+            findings_task_args = (repo_full_name, pr_number, pr_id)
 
     db.commit()
+
+    # Schedule findings sync only after successful commit
+    if findings_task_args:
+        background_tasks.add_task(_sync_findings_background, *findings_task_args)
+
     return {"status": "ok"}
 
 
