@@ -205,6 +205,8 @@ def get_engineer_profile(
                 quality["findings_overview"] = qm.findings_overview.model_dump()
         elif qm.github_connected:
             quality = {"github_connected": True, "no_data_yet": True}
+        if qm.findings_overview and "findings_overview" not in quality:
+            quality["findings_overview"] = qm.findings_overview.model_dump()
     except Exception:
         logger.exception("Failed to compute quality data for engineer %s", engineer_id)
         quality = {}
