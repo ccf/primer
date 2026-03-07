@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 from sqlalchemy.orm import Session
@@ -19,6 +20,8 @@ from primer.server.services.insights_service import (
     get_learning_paths,
     get_skill_inventory,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _get_weekly_trajectory(
@@ -203,6 +206,7 @@ def get_engineer_profile(
         elif qm.github_connected:
             quality = {"github_connected": True, "no_data_yet": True}
     except Exception:
+        logger.exception("Failed to compute quality data for engineer %s", engineer_id)
         quality = {}
 
     # Tool rankings
