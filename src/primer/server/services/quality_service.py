@@ -575,7 +575,7 @@ def _compute_findings_overview(
 
     # Totals + fix rate + distinct PRs in one query
     stats = base.with_entities(
-        func.count(ReviewFinding.id),
+        func.count(distinct(ReviewFinding.id)),
         func.sum(case((ReviewFinding.status == "fixed", 1), else_=0)),
         func.count(distinct(ReviewFinding.pull_request_id)),
     ).first()
@@ -591,7 +591,7 @@ def _compute_findings_overview(
 
     # Severity breakdown
     severity_rows = (
-        base.with_entities(ReviewFinding.severity, func.count(ReviewFinding.id))
+        base.with_entities(ReviewFinding.severity, func.count(distinct(ReviewFinding.id)))
         .group_by(ReviewFinding.severity)
         .all()
     )
@@ -599,7 +599,7 @@ def _compute_findings_overview(
 
     # Source breakdown
     source_rows = (
-        base.with_entities(ReviewFinding.source, func.count(ReviewFinding.id))
+        base.with_entities(ReviewFinding.source, func.count(distinct(ReviewFinding.id)))
         .group_by(ReviewFinding.source)
         .all()
     )
@@ -608,7 +608,7 @@ def _compute_findings_overview(
     # Daily trend
     day_expr = func.date(ReviewFinding.detected_at)
     trend_rows = (
-        base.with_entities(day_expr.label("day"), func.count(ReviewFinding.id))
+        base.with_entities(day_expr.label("day"), func.count(distinct(ReviewFinding.id)))
         .group_by(day_expr)
         .order_by(day_expr)
         .all()
