@@ -35,6 +35,14 @@ export function FindingsTable({ findings }: Props) {
     }
   }
 
+  if (findings.length === 0) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+        No automated review findings detected yet.
+      </div>
+    )
+  }
+
   const sorted = [...findings].sort((a, b) => {
     let cmp = 0
     if (sortKey === "severity") {
@@ -44,14 +52,6 @@ export function FindingsTable({ findings }: Props) {
     }
     return sortAsc ? cmp : -cmp
   })
-
-  if (findings.length === 0) {
-    return (
-      <div className="rounded-lg border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-        No automated review findings detected yet.
-      </div>
-    )
-  }
 
   const sortArrow = (key: SortKey) => {
     if (sortKey !== key) return null
