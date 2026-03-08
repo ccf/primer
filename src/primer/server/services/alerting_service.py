@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from primer.common.facet_taxonomy import canonical_outcome, is_success_outcome
 from primer.common.models import Alert, Engineer, ModelUsage, SessionFacets
 from primer.common.models import Session as SessionModel
 from primer.common.pricing import estimate_cost
@@ -305,9 +306,16 @@ def _detect_success_rate_drop(
         elif team_id:
             q = q.join(Engineer).filter(Engineer.team_id == team_id)
         outcomes = [r[0] for r in q.all()]
-        if not outcomes:
+        normalized_outcomes = [
+            normalized
+            for outcome in outcomes
+            if (normalized := canonical_outcome(outcome)) is not None
+        ]
+        if not normalized_outcomes:
             return None
-        return sum(1 for o in outcomes if o == "success") / len(outcomes)
+        return sum(1 for outcome in normalized_outcomes if is_success_outcome(outcome)) / len(
+            normalized_outcomes
+        )
 
     day_rate = _success_rate(1)
     week_rate = _success_rate(7)

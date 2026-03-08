@@ -4,6 +4,7 @@ from datetime import date as date_type
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from primer.common.facet_taxonomy import canonical_outcome, is_success_outcome
 from primer.common.models import (
     ModelUsage,
     SessionFacets,
@@ -30,6 +31,36 @@ from primer.common.schemas import (
 )
 from primer.server.services.analytics_service import base_session_query
 
+_PRIMARY_SUCCESS_BUCKETS = {
+    "full": "full",
+    "partial": "partial",
+    "correct_code_edits": "full",
+    "multi_file_changes": "full",
+    "good_debugging": "full",
+    "none": "none",
+    "failure": "none",
+}
+
+
+def _primary_success_bucket(primary_success: str | None) -> str:
+    """Map legacy and category-style primary_success labels into stable buckets."""
+    if primary_success is None:
+        return "unknown"
+    return _PRIMARY_SUCCESS_BUCKETS.get(primary_success, "unknown")
+
+
+def _primary_success_health_modifier(primary_success: str | None) -> float:
+    """Return the health-score modifier for primary_success."""
+    if primary_success is None:
+        return 0.0
+
+    normalized_primary_success = primary_success.strip()
+    if not normalized_primary_success:
+        return 0.0
+    if normalized_primary_success in {"none", "failure"}:
+        return -5.0
+    return 5.0
+
 
 def compute_session_health_score(
     outcome: str | None,
@@ -41,15 +72,16 @@ def compute_session_health_score(
 ) -> float:
     """Compute a 0-100 health score for a single session."""
     score = 100.0
+    normalized_outcome = canonical_outcome(outcome)
 
     # Outcome penalty
-    if outcome == "success":
+    if normalized_outcome == "success":
         pass
-    elif outcome == "partial":
+    elif normalized_outcome == "partial":
         score -= 20
-    elif outcome == "failure":
+    elif normalized_outcome == "failure":
         score -= 40
-    elif outcome is None:
+    elif normalized_outcome is None:
         score -= 10
 
     # Friction penalty
@@ -75,10 +107,7 @@ def compute_session_health_score(
             score += max(min(net_ratio * 15, 5), -15)
 
     # Primary success modifier
-    if primary_success == "full":
-        score += 5
-    elif primary_success in ("none", "failure"):
-        score -= 5
+    score += _primary_success_health_modifier(primary_success)
 
     return max(0.0, min(100.0, score))
 
@@ -103,29 +132,24 @@ def _compute_end_reason_breakdown(
 
     results = []
     for end_reason, count, avg_dur in rows:
-        # Success rate for this end_reason
-        sr_q = (
-            db.query(func.count(SessionFacets.id))
+        outcome_rows = (
+            db.query(SessionFacets.outcome)
             .join(SessionModel, SessionModel.id == SessionFacets.session_id)
             .filter(SessionModel.id.in_(session_ids_q))
             .filter(SessionModel.end_reason == end_reason)
             .filter(SessionFacets.outcome.isnot(None))
+            .all()
         )
-        total_with_outcome = sr_q.scalar() or 0
-        # Compute success rate for this end_reason
-        if total_with_outcome > 0:
-            sc = (
-                db.query(func.count(SessionFacets.id))
-                .join(SessionModel, SessionModel.id == SessionFacets.session_id)
-                .filter(SessionModel.id.in_(session_ids_q))
-                .filter(SessionModel.end_reason == end_reason)
-                .filter(SessionFacets.outcome == "success")
-                .scalar()
-                or 0
-            )
-            sr = sc / total_with_outcome
-        else:
-            sr = None
+        outcomes = [
+            normalized
+            for (outcome,) in outcome_rows
+            if (normalized := canonical_outcome(outcome)) is not None
+        ]
+        sr = (
+            sum(1 for outcome in outcomes if is_success_outcome(outcome)) / len(outcomes)
+            if outcomes
+            else None
+        )
 
         results.append(
             EndReasonBreakdown(
@@ -328,27 +352,24 @@ def _compute_permission_mode_analysis(
 
     results = []
     for mode, count, avg_dur in rows:
-        # Success rate
-        total_q = (
-            db.query(func.count(SessionFacets.id))
+        outcome_rows = (
+            db.query(SessionFacets.outcome)
             .join(SessionModel, SessionModel.id == SessionFacets.session_id)
             .filter(SessionModel.id.in_(session_ids_q))
             .filter(SessionModel.permission_mode == mode)
             .filter(SessionFacets.outcome.isnot(None))
+            .all()
         )
-        total_with = total_q.scalar() or 0
-        sr = None
-        if total_with > 0:
-            success_c = (
-                db.query(func.count(SessionFacets.id))
-                .join(SessionModel, SessionModel.id == SessionFacets.session_id)
-                .filter(SessionModel.id.in_(session_ids_q))
-                .filter(SessionModel.permission_mode == mode)
-                .filter(SessionFacets.outcome == "success")
-                .scalar()
-                or 0
-            )
-            sr = round(success_c / total_with, 3)
+        outcomes = [
+            normalized
+            for (outcome,) in outcome_rows
+            if (normalized := canonical_outcome(outcome)) is not None
+        ]
+        sr = (
+            round(sum(1 for outcome in outcomes if is_success_outcome(outcome)) / len(outcomes), 3)
+            if outcomes
+            else None
+        )
 
         # Avg friction count
         friction_rows = (
@@ -502,9 +523,10 @@ def _compute_goal_analytics(
         if facet_type not in type_stats:
             type_stats[facet_type] = {"count": 0, "success": 0, "with_outcome": 0}
         type_stats[facet_type]["count"] += 1
-        if outcome is not None:
+        normalized_outcome = canonical_outcome(outcome)
+        if normalized_outcome is not None:
             type_stats[facet_type]["with_outcome"] += 1
-            if outcome == "success":
+            if is_success_outcome(normalized_outcome):
                 type_stats[facet_type]["success"] += 1
 
     # Get avg duration and cost per type
@@ -564,13 +586,14 @@ def _compute_goal_analytics(
     for cats, outcome in cat_rows:
         if not cats:
             continue
+        normalized_outcome = canonical_outcome(outcome)
         for cat in cats:
             if cat not in cat_stats:
                 cat_stats[cat] = {"count": 0, "success": 0, "with_outcome": 0}
             cat_stats[cat]["count"] += 1
-            if outcome is not None:
+            if normalized_outcome is not None:
                 cat_stats[cat]["with_outcome"] += 1
-                if outcome == "success":
+                if is_success_outcome(normalized_outcome):
                     cat_stats[cat]["success"] += 1
 
     cat_breakdown = []
@@ -607,11 +630,12 @@ def _compute_primary_success(
     by_type: dict[str, dict[str, int]] = {}
 
     for ps, st in rows:
-        if ps == "full":
+        bucket = _primary_success_bucket(ps)
+        if bucket == "full":
             full += 1
-        elif ps == "partial":
+        elif bucket == "partial":
             partial += 1
-        elif ps in ("none", "failure"):
+        elif bucket == "none":
             none_count += 1
         else:
             unknown += 1
@@ -619,14 +643,7 @@ def _compute_primary_success(
         if st:
             if st not in by_type:
                 by_type[st] = {"full": 0, "partial": 0, "none": 0, "unknown": 0}
-            if ps == "full":
-                by_type[st]["full"] += 1
-            elif ps == "partial":
-                by_type[st]["partial"] += 1
-            elif ps in ("none", "failure"):
-                by_type[st]["none"] += 1
-            else:
-                by_type[st]["unknown"] += 1
+            by_type[st][bucket] += 1
 
     total = full + partial + none_count + unknown
     full_rate = full / total if total > 0 else None

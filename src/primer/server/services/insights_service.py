@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from primer.common.facet_taxonomy import canonical_outcome, is_success_outcome
 from primer.common.models import Engineer, SessionFacets, ToolUsage
 from primer.common.models import Session as SessionModel
 from primer.common.schemas import (
@@ -419,11 +420,13 @@ def get_personalized_tips(
     )
     type_outcomes: dict[str, list[str]] = defaultdict(list)
     for stype, outcome in eng_facets_with_outcome:
-        type_outcomes[stype].append(outcome)
+        normalized_outcome = canonical_outcome(outcome)
+        if normalized_outcome is not None:
+            type_outcomes[stype].append(normalized_outcome)
 
     for stype, outcomes in type_outcomes.items():
         if len(outcomes) >= 3:
-            successes = sum(1 for o in outcomes if o == "success")
+            successes = sum(1 for outcome in outcomes if is_success_outcome(outcome))
             rate = successes / len(outcomes)
             if rate < 0.5:
                 tips.append(
@@ -902,7 +905,7 @@ def get_pattern_sharing(
             session_id=sid,
             duration_seconds=s.duration_seconds,
             tool_count=session_tool_count.get(sid, 0),
-            outcome=facet.outcome if facet else None,
+            outcome=canonical_outcome(facet.outcome) if facet else None,
             helpfulness=facet.agent_helpfulness if facet else None,
             tools_used=sorted(set(session_tools.get(sid, []))),
         )
@@ -917,14 +920,18 @@ def get_pattern_sharing(
         eng_set = {a.engineer_id for a in approaches}
 
         # Best approach: successful + shortest duration
-        successful = [a for a in approaches if a.outcome == "success" and a.duration_seconds]
+        successful = [
+            approach
+            for approach in approaches
+            if is_success_outcome(approach.outcome) and approach.duration_seconds
+        ]
         best = min(successful, key=lambda a: a.duration_seconds) if successful else None
 
         durations = [a.duration_seconds for a in approaches if a.duration_seconds is not None]
         avg_dur = sum(durations) / len(durations) if durations else None
 
         outcomes = [a.outcome for a in approaches if a.outcome]
-        successes = sum(1 for o in outcomes if o == "success")
+        successes = sum(1 for outcome in outcomes if is_success_outcome(outcome))
         sr = round(successes / len(outcomes), 3) if outcomes else None
 
         # Insight
@@ -1079,7 +1086,9 @@ def get_onboarding_acceleration(
     session_type_map: dict[str, str] = {}
     for f in all_facets:
         if f.outcome:
-            session_outcome[f.session_id] = f.outcome
+            normalized_outcome = canonical_outcome(f.outcome)
+            if normalized_outcome is not None:
+                session_outcome[f.session_id] = normalized_outcome
         if f.session_type:
             session_type_map[f.session_id] = f.session_type
         if f.friction_counts and isinstance(f.friction_counts, dict):
@@ -1127,7 +1136,7 @@ def get_onboarding_acceleration(
 
         outcomes = [session_outcome.get(s.id) for s in sess_list]
         outcomes = [o for o in outcomes if o]
-        successes = sum(1 for o in outcomes if o == "success")
+        successes = sum(1 for outcome in outcomes if is_success_outcome(outcome))
         sr = round(successes / len(outcomes), 3) if outcomes else None
 
         durations = [s.duration_seconds for s in sess_list if s.duration_seconds is not None]
@@ -1498,8 +1507,8 @@ def get_similar_sessions(
         else:
             continue  # skip non-matching
 
-        c_outcome = f.outcome if f else None
-        is_success = c_outcome == "success"
+        c_outcome = canonical_outcome(f.outcome) if f else None
+        is_success = is_success_outcome(c_outcome)
         dur = c.duration_seconds if c.duration_seconds is not None else float("inf")
 
         scored.append((relevance, is_success, dur, c, reason))
@@ -1519,7 +1528,7 @@ def get_similar_sessions(
                 engineer_avatar_url=eavatar,
                 project_name=c.project_name,
                 session_type=f.session_type if f else None,
-                outcome=f.outcome if f else None,
+                outcome=canonical_outcome(f.outcome) if f else None,
                 duration_seconds=c.duration_seconds,
                 tools_used=sorted(set(tools_map.get(c.id, []))),
                 similarity_reason=reason,
@@ -1573,7 +1582,11 @@ def get_time_to_team_average(
         )
         .all()
     )
-    outcome_map: dict[str, str] = {f.session_id: f.outcome for f in all_facets}
+    outcome_map: dict[str, str] = {}
+    for facet in all_facets:
+        normalized_outcome = canonical_outcome(facet.outcome)
+        if normalized_outcome is not None:
+            outcome_map[facet.session_id] = normalized_outcome
 
     # Compute team average success rate
     outcomes_all = list(outcome_map.values())
@@ -1585,7 +1598,9 @@ def get_time_to_team_average(
             engineers_who_matched=0,
             total_engineers=0,
         )
-    team_avg_sr = sum(1 for o in outcomes_all if o == "success") / len(outcomes_all)
+    team_avg_sr = sum(1 for outcome in outcomes_all if is_success_outcome(outcome)) / len(
+        outcomes_all
+    )
 
     # Group sessions by engineer
     eng_sessions: dict[str, list] = defaultdict(list)
@@ -1660,7 +1675,9 @@ def get_time_to_team_average(
             rolling_outcomes.extend(bucket)
             count = len(bucket)
             if rolling_outcomes:
-                sr = sum(1 for o in rolling_outcomes if o == "success") / len(rolling_outcomes)
+                sr = sum(1 for outcome in rolling_outcomes if is_success_outcome(outcome)) / len(
+                    rolling_outcomes
+                )
             else:
                 sr = None
 
@@ -1678,7 +1695,8 @@ def get_time_to_team_average(
         # Current success rate
         current_outcomes = [outcome_map.get(s.id) for s in sess_list if outcome_map.get(s.id)]
         current_sr = (
-            sum(1 for o in current_outcomes if o == "success") / len(current_outcomes)
+            sum(1 for outcome in current_outcomes if is_success_outcome(outcome))
+            / len(current_outcomes)
             if current_outcomes
             else None
         )

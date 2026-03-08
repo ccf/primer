@@ -3,6 +3,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
+from primer.common.facet_taxonomy import canonical_outcome, is_success_outcome
 from primer.common.models import Engineer, ModelUsage, SessionFacets, ToolUsage
 from primer.common.models import Session as SessionModel
 from primer.common.pricing import estimate_cost
@@ -52,7 +53,11 @@ def _get_weekly_trajectory(
         .filter(SessionFacets.session_id.in_(session_ids))
         .all()
     )
-    outcome_map = {f.session_id: f.outcome for f in facets}
+    outcome_map = {}
+    for facet in facets:
+        normalized_outcome = canonical_outcome(facet.outcome)
+        if normalized_outcome is not None:
+            outcome_map[facet.session_id] = normalized_outcome
 
     # Tool usages for diversity
     tool_usages = (
@@ -101,7 +106,11 @@ def _get_weekly_trajectory(
 
         # Success rate
         outcomes = [outcome_map.get(s.id) for s in week_sessions if outcome_map.get(s.id)]
-        sr = sum(1 for o in outcomes if o == "success") / len(outcomes) if outcomes else None
+        sr = (
+            sum(1 for outcome in outcomes if is_success_outcome(outcome)) / len(outcomes)
+            if outcomes
+            else None
+        )
 
         # Avg duration
         durations = [s.duration_seconds for s in week_sessions if s.duration_seconds is not None]

@@ -288,6 +288,19 @@ export interface SystemStats {
   database_type: string
 }
 
+export interface MeasurementIntegrityStats {
+  total_sessions: number
+  sessions_with_messages: number
+  sessions_with_facets: number
+  facet_coverage_pct: number
+  transcript_coverage_pct: number
+  low_confidence_sessions: number
+  missing_confidence_sessions: number
+  legacy_outcome_sessions: number
+  legacy_goal_category_sessions: number
+  remaining_legacy_rows: number
+}
+
 export interface IngestEventResponse {
   id: number
   engineer_id: string

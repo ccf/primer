@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from primer.common.config import settings
@@ -7,12 +7,18 @@ from primer.common.models import Engineer, IngestEvent, Team
 from primer.common.models import Session as SessionModel
 from primer.common.schemas import (
     AuditLogResponse,
+    FacetNormalizationSummary,
     IngestEventResponse,
+    MeasurementIntegrityStats,
     PaginatedResponse,
     SystemStats,
 )
 from primer.server.deps import AuthContext, require_role
 from primer.server.services import audit_service
+from primer.server.services.measurement_integrity_service import (
+    get_measurement_integrity_stats,
+    normalize_existing_facets,
+)
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
@@ -42,6 +48,14 @@ def system_stats(
         total_ingest_events=total_ingest_events,
         database_type=db_type,
     )
+
+
+@router.get("/measurement-integrity", response_model=MeasurementIntegrityStats)
+def measurement_integrity(
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_role("admin")),
+):
+    return get_measurement_integrity_stats(db)
 
 
 @router.get("/ingest-events", response_model=PaginatedResponse[IngestEventResponse])
@@ -83,6 +97,33 @@ def backfill_facets(
 
     background_tasks.add_task(_backfill, limit)
     return {"status": "started", "limit": limit}
+
+
+@router.post("/normalize-facets", response_model=FacetNormalizationSummary)
+def normalize_facets(
+    request: Request,
+    limit: int = Query(default=500, le=5000),
+    dry_run: bool = Query(default=True),
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_role("admin")),
+):
+    summary = normalize_existing_facets(db, limit=limit, dry_run=dry_run)
+    if not dry_run:
+        ip = request.client.host if request.client else None
+        audit_service.log_action(
+            db,
+            auth,
+            "normalize",
+            "session_facets",
+            details={
+                "limit": limit,
+                "dry_run": dry_run,
+                **summary,
+            },
+            ip_address=ip,
+        )
+        db.commit()
+    return summary
 
 
 @router.get("/audit-logs", response_model=PaginatedResponse[AuditLogResponse])
