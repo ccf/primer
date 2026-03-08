@@ -279,6 +279,55 @@ class TestPatternSharing:
         assert best is not None
         assert best["engineer_id"] == engineers[1].id
 
+    def test_best_approach_treats_legacy_success_as_success(
+        self, client, db_session, admin_headers
+    ):
+        team, engineers = _create_team_engineers(db_session, 2)
+        now = datetime.now(UTC)
+
+        legacy_success = _create_session(
+            db_session,
+            engineers[0],
+            started_at=now - timedelta(hours=2),
+            project_name="proj",
+            duration_seconds=60.0,
+        )
+        db_session.add(
+            SessionFacets(
+                session_id=legacy_success.id,
+                session_type="feature",
+                outcome="fully_achieved",
+            )
+        )
+
+        failure = _create_session(
+            db_session,
+            engineers[1],
+            started_at=now - timedelta(hours=1),
+            project_name="proj",
+            duration_seconds=200.0,
+        )
+        db_session.add(
+            SessionFacets(
+                session_id=failure.id,
+                session_type="feature",
+                outcome="failure",
+            )
+        )
+        db_session.flush()
+
+        r = client.get(
+            f"/api/v1/analytics/pattern-sharing?team_id={team.id}",
+            headers=admin_headers,
+        )
+        assert r.status_code == 200
+        data = r.json()
+
+        type_clusters = [p for p in data["patterns"] if p["cluster_type"] == "session_type"]
+        assert len(type_clusters) >= 1
+        assert type_clusters[0]["success_rate"] == 0.5
+        assert type_clusters[0]["best_approach"]["engineer_id"] == engineers[0].id
+
     def test_single_engineer_no_cluster(self, client, db_session, admin_headers):
         """A single engineer working alone doesn't create clusters."""
         team, engineers = _create_team_engineers(db_session, 1)

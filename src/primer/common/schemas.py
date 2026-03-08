@@ -1,7 +1,14 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from primer.common.facet_taxonomy import (
+    canonical_outcome,
+    normalize_goal_categories,
+    validate_inbound_goal_categories,
+    validate_inbound_outcome,
+)
 
 
 class PaginatedResponse[T](BaseModel):
@@ -74,6 +81,7 @@ class SessionFacetsPayload(BaseModel):
     underlying_goal: str | None = None
     goal_categories: list[str] | None = None
     outcome: str | None = None
+    confidence_score: float | None = Field(default=None, ge=0.0, le=1.0)
     session_type: str | None = None
     primary_success: str | None = None
     agent_helpfulness: str | None = None
@@ -89,11 +97,29 @@ class SessionFacetsPayload(BaseModel):
             data.setdefault("agent_helpfulness", data.pop("claude_helpfulness"))
         return data
 
+    @field_validator("goal_categories", mode="before")
+    @classmethod
+    def _normalize_goal_categories(cls, value: object) -> list[str] | None:
+        return validate_inbound_goal_categories(value)
+
+    @field_validator("outcome", mode="before")
+    @classmethod
+    def _normalize_outcome(cls, value: object) -> str | None:
+        return validate_inbound_outcome(value)
+
+    @field_validator("confidence_score", mode="before")
+    @classmethod
+    def _reject_boolean_confidence_score(cls, value: object) -> object:
+        if isinstance(value, bool):
+            raise ValueError("confidence_score must be numeric, not boolean")
+        return value
+
 
 class SessionFacetsResponse(BaseModel):
     underlying_goal: str | None
     goal_categories: list[str] | None
     outcome: str | None
+    confidence_score: float | None = Field(default=None, ge=0.0, le=1.0)
     session_type: str | None
     primary_success: str | None
     agent_helpfulness: str | None
@@ -102,6 +128,20 @@ class SessionFacetsResponse(BaseModel):
     friction_counts: dict[str, int] | None
     friction_detail: str | None
     created_at: datetime
+
+    @field_validator("goal_categories", mode="before")
+    @classmethod
+    def _normalize_goal_categories(cls, value: object) -> list[str] | None:
+        return normalize_goal_categories(value)
+
+    @field_validator("outcome", mode="before")
+    @classmethod
+    def _normalize_outcome(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return canonical_outcome(value)
+        return value
 
     model_config = {"from_attributes": True}
 
@@ -535,6 +575,25 @@ class SystemStats(BaseModel):
     total_sessions: int
     total_ingest_events: int
     database_type: str
+
+
+class MeasurementIntegrityStats(BaseModel):
+    total_sessions: int
+    sessions_with_messages: int
+    sessions_with_facets: int
+    facet_coverage_pct: float
+    transcript_coverage_pct: float
+    low_confidence_sessions: int
+    missing_confidence_sessions: int
+    legacy_outcome_sessions: int
+    legacy_goal_category_sessions: int
+    remaining_legacy_rows: int
+
+
+class FacetNormalizationSummary(BaseModel):
+    rows_scanned: int
+    rows_updated: int
+    remaining_legacy_rows: int
 
 
 class IngestEventResponse(BaseModel):

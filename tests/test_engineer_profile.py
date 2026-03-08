@@ -102,6 +102,50 @@ class TestEngineerProfileOverview:
         assert "tool_rankings" in data
         assert isinstance(data["tool_rankings"], list)
 
+    def test_profile_overview_treats_legacy_outcomes_as_canonical(
+        self, client, db_session, engineer_with_key, admin_headers
+    ):
+        eng, _key = engineer_with_key
+        now = datetime.now(UTC)
+
+        success_session = _create_session(
+            db_session,
+            eng,
+            started_at=now - timedelta(hours=2),
+        )
+        db_session.add(
+            SessionFacets(
+                session_id=success_session.id,
+                session_type="feature",
+                outcome="fully_achieved",
+            )
+        )
+
+        failure_session = _create_session(
+            db_session,
+            eng,
+            started_at=now - timedelta(hours=1),
+        )
+        db_session.add(
+            SessionFacets(
+                session_id=failure_session.id,
+                session_type="debugging",
+                outcome="failure",
+            )
+        )
+        db_session.flush()
+
+        r = client.get(
+            f"/api/v1/analytics/engineers/{eng.id}/profile",
+            headers=admin_headers,
+        )
+        assert r.status_code == 200
+        overview = r.json()["overview"]
+
+        assert overview["outcome_counts"]["success"] == 1
+        assert overview["outcome_counts"]["failure"] == 1
+        assert overview["success_rate"] == 0.5
+
 
 class TestEngineerProfileWeeklyTrajectory:
     def test_profile_weekly_trajectory(self, client, db_session, engineer_with_key, admin_headers):
