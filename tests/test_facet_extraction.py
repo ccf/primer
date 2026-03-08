@@ -595,6 +595,50 @@ class TestMeasurementIntegrityService:
         assert second_legacy_row.outcome == "success"
         assert second_legacy_row.goal_categories == ["testing"]
 
+    def test_normalize_existing_facets_flushes_without_committing(
+        self, db_session, session_with_messages
+    ):
+        from primer.server.services.measurement_integrity_service import (
+            normalize_existing_facets,
+        )
+
+        session = (
+            db_session.query(SessionModel)
+            .filter(SessionModel.id == session_with_messages["session_id"])
+            .one()
+        )
+        session.has_facets = True
+        db_session.add(
+            SessionFacets(
+                session_id=session.id,
+                goal_categories={"fix_bug": 1},
+                outcome="mostly_achieved",
+                confidence_score=0.45,
+            )
+        )
+        db_session.flush()
+
+        original_flush = db_session.flush
+        db_session.flush = MagicMock(wraps=original_flush)
+        db_session.commit = MagicMock(
+            side_effect=AssertionError("normalize_existing_facets should not commit")
+        )
+
+        summary = normalize_existing_facets(db_session, limit=1, dry_run=False)
+
+        assert summary == {
+            "rows_scanned": 1,
+            "rows_updated": 1,
+            "remaining_legacy_rows": 0,
+        }
+        assert db_session.flush.called
+
+        facets = (
+            db_session.query(SessionFacets).filter(SessionFacets.session_id == session.id).one()
+        )
+        assert facets.outcome == "partial"
+        assert facets.goal_categories == ["fix_bug"]
+
 
 # --- API call ---
 

@@ -197,7 +197,7 @@ def normalize_existing_facets(
         for row, updates in pending_updates:
             for field_name, value in updates.items():
                 setattr(row, field_name, value)
-        db.commit()
+        db.flush()
 
     return {
         "rows_scanned": len(candidate_rows),
