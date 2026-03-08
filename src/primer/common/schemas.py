@@ -18,7 +18,7 @@ class PaginatedResponse[T](BaseModel):
     offset: int
 
 
-AgentType = Literal["claude_code", "codex_cli", "gemini_cli"]
+AgentType = Literal["claude_code", "codex_cli", "gemini_cli", "cursor"]
 
 # --- Team ---
 
@@ -280,7 +280,7 @@ class BulkIngestResponse(BaseModel):
 class SessionResponse(BaseModel):
     id: str
     engineer_id: str
-    agent_type: str = "claude_code"
+    agent_type: AgentType = "claude_code"
     project_path: str | None
     project_name: str | None
     git_branch: str | None
@@ -577,17 +577,30 @@ class SystemStats(BaseModel):
     database_type: str
 
 
+class AgentSourceQuality(BaseModel):
+    agent_type: AgentType
+    session_count: int
+    transcript_coverage_pct: float
+    tool_call_coverage_pct: float
+    model_usage_coverage_pct: float
+    facet_coverage_pct: float
+
+
 class MeasurementIntegrityStats(BaseModel):
     total_sessions: int
     sessions_with_messages: int
     sessions_with_facets: int
     facet_coverage_pct: float
     transcript_coverage_pct: float
+    sessions_missing_transcript_telemetry: int
+    sessions_missing_tool_telemetry: int
+    sessions_missing_model_telemetry: int
     low_confidence_sessions: int
     missing_confidence_sessions: int
     legacy_outcome_sessions: int
     legacy_goal_category_sessions: int
     remaining_legacy_rows: int
+    source_quality: list[AgentSourceQuality] = []
 
 
 class FacetNormalizationSummary(BaseModel):

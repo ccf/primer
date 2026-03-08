@@ -25,7 +25,7 @@ export interface EngineerResponse {
   created_at: string
 }
 
-export type AgentType = 'claude_code' | 'codex_cli' | 'gemini_cli'
+export type AgentType = 'claude_code' | 'codex_cli' | 'gemini_cli' | 'cursor'
 
 export interface SessionResponse {
   id: string
@@ -288,17 +288,30 @@ export interface SystemStats {
   database_type: string
 }
 
+export interface AgentSourceQuality {
+  agent_type: AgentType
+  session_count: number
+  transcript_coverage_pct: number
+  tool_call_coverage_pct: number
+  model_usage_coverage_pct: number
+  facet_coverage_pct: number
+}
+
 export interface MeasurementIntegrityStats {
   total_sessions: number
   sessions_with_messages: number
   sessions_with_facets: number
   facet_coverage_pct: number
   transcript_coverage_pct: number
+  sessions_missing_transcript_telemetry: number
+  sessions_missing_tool_telemetry: number
+  sessions_missing_model_telemetry: number
   low_confidence_sessions: number
   missing_confidence_sessions: number
   legacy_outcome_sessions: number
   legacy_goal_category_sessions: number
   remaining_legacy_rows: number
+  source_quality: AgentSourceQuality[]
 }
 
 export interface IngestEventResponse {

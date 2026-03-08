@@ -51,6 +51,18 @@ def test_main_missing_session_id(monkeypatch):
     assert exc_info.value.code == 1
 
 
+def test_main_rejects_cursor_agent_flag(monkeypatch):
+    monkeypatch.setenv("PRIMER_API_KEY", "test-key")
+    monkeypatch.setattr("sys.stdin", _make_stdin({"session_id": "cursor-1"}))
+    monkeypatch.setattr("sys.argv", ["session_end", "--agent", "cursor"])
+
+    from primer.hook.session_end import main
+
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+    assert exc_info.value.code == 2
+
+
 @patch("primer.hook.session_end.httpx.post")
 @patch("primer.hook.session_end.load_facets")
 @patch("primer.hook.session_end.get_extractor_for")

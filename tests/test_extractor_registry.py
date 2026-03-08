@@ -1,4 +1,5 @@
 from primer.hook.codex_extractor import CodexExtractor
+from primer.hook.cursor_extractor import CursorExtractor
 from primer.hook.extractor import ClaudeCodeExtractor
 from primer.hook.extractor_registry import get_all_extractors, get_extractor_for
 from primer.hook.gemini_extractor import GeminiExtractor
@@ -6,9 +7,9 @@ from primer.hook.gemini_extractor import GeminiExtractor
 
 def test_get_all_extractors():
     extractors = get_all_extractors()
-    assert len(extractors) == 3
+    assert len(extractors) == 4
     types = {e.agent_type for e in extractors}
-    assert types == {"claude_code", "codex_cli", "gemini_cli"}
+    assert types == {"claude_code", "codex_cli", "gemini_cli", "cursor"}
 
 
 def test_get_extractor_for_claude():
@@ -30,6 +31,13 @@ def test_get_extractor_for_gemini():
     assert ext is not None
     assert isinstance(ext, GeminiExtractor)
     assert ext.agent_type == "gemini_cli"
+
+
+def test_get_extractor_for_cursor():
+    ext = get_extractor_for("cursor")
+    assert ext is not None
+    assert isinstance(ext, CursorExtractor)
+    assert ext.agent_type == "cursor"
 
 
 def test_get_extractor_for_unknown():
