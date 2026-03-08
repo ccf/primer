@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timedelta
 
+from primer.common.models import SessionFacets
 from primer.server.services.session_insights_service import compute_session_health_score
 
 
@@ -264,6 +265,45 @@ def test_session_insights_goals(client, engineer_with_key, admin_headers):
     assert cats["coding"]["count"] == 2
 
 
+def test_session_insights_goals_accept_legacy_success_outcomes(
+    client, engineer_with_key, admin_headers, db_session
+):
+    _eng, api_key = engineer_with_key
+    legacy_sid = _ingest_session(
+        client,
+        api_key,
+        facets={
+            "outcome": "success",
+            "session_type": "feature",
+            "goal_categories": ["coding"],
+        },
+    )
+    _ingest_session(
+        client,
+        api_key,
+        facets={
+            "outcome": "failure",
+            "session_type": "feature",
+            "goal_categories": ["coding"],
+        },
+    )
+
+    legacy_facets = (
+        db_session.query(SessionFacets).filter(SessionFacets.session_id == legacy_sid).one()
+    )
+    legacy_facets.outcome = "fully_achieved"
+    db_session.flush()
+
+    r = client.get("/api/v1/analytics/session-insights", headers=admin_headers)
+    data = r.json()
+    goals = data["goals"]
+    types = {t["session_type"]: t for t in goals["session_type_breakdown"]}
+    cats = {c["category"]: c for c in goals["goal_category_breakdown"]}
+
+    assert types["feature"]["success_rate"] == 0.5
+    assert cats["coding"]["success_rate"] == 0.5
+
+
 def test_session_insights_primary_success(client, engineer_with_key, admin_headers):
     _eng, api_key = engineer_with_key
     _ingest_session(
@@ -291,6 +331,44 @@ def test_session_insights_primary_success(client, engineer_with_key, admin_heade
     assert ps["full_rate"] is not None
     assert "feature" in ps["by_session_type"]
     assert ps["by_session_type"]["feature"]["full"] == 1
+
+
+def test_session_insights_primary_success_buckets_category_labels(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        facets={"session_type": "feature", "primary_success": "correct_code_edits"},
+    )
+    _ingest_session(
+        client,
+        api_key,
+        facets={"session_type": "feature", "primary_success": "multi_file_changes"},
+    )
+    _ingest_session(
+        client,
+        api_key,
+        facets={"session_type": "debugging", "primary_success": "good_debugging"},
+    )
+    _ingest_session(
+        client,
+        api_key,
+        facets={"session_type": "debugging", "primary_success": "none"},
+    )
+
+    r = client.get("/api/v1/analytics/session-insights", headers=admin_headers)
+    data = r.json()
+    ps = data["primary_success"]
+
+    assert ps["full_count"] == 3
+    assert ps["partial_count"] == 0
+    assert ps["none_count"] == 1
+    assert ps["unknown_count"] == 0
+    assert ps["by_session_type"]["feature"]["full"] == 2
+    assert ps["by_session_type"]["debugging"]["full"] == 1
+    assert ps["by_session_type"]["debugging"]["none"] == 1
 
 
 def test_session_insights_date_filtering(client, engineer_with_key, admin_headers):
@@ -412,7 +490,7 @@ def test_health_score_computation():
         primary_success="failure",
     )
     # 100 - 40(failure) - 30(4 friction types capped 30) - 10(3x duration)
-    # - 15(all dissatisfied) - 5(failure)
+    # - 15(all dissatisfied) - 5(negative primary_success)
     assert score == 0.0
 
     # Missing outcome
@@ -425,3 +503,45 @@ def test_health_score_computation():
         primary_success=None,
     )
     assert score == 90.0  # 100 - 10(missing outcome)
+
+
+def test_health_score_uses_canonical_outcomes_and_primary_success_semantics():
+    score = compute_session_health_score(
+        outcome="not_achieved",
+        friction_counts=None,
+        duration_seconds=100,
+        median_duration=100,
+        satisfaction_counts=None,
+        primary_success=None,
+    )
+    assert score == 60.0
+
+    score = compute_session_health_score(
+        outcome="partial",
+        friction_counts=None,
+        duration_seconds=100,
+        median_duration=100,
+        satisfaction_counts=None,
+        primary_success="correct_code_edits",
+    )
+    assert score == 85.0
+
+    score = compute_session_health_score(
+        outcome="partial",
+        friction_counts=None,
+        duration_seconds=100,
+        median_duration=100,
+        satisfaction_counts=None,
+        primary_success="some_new_positive_label",
+    )
+    assert score == 85.0
+
+    score = compute_session_health_score(
+        outcome="partial",
+        friction_counts=None,
+        duration_seconds=100,
+        median_duration=100,
+        satisfaction_counts=None,
+        primary_success="failure",
+    )
+    assert score == 75.0

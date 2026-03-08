@@ -22,6 +22,7 @@ import type {
   FrictionReport,
   IngestEventResponse,
   LearningPathsResponse,
+  MeasurementIntegrityStats,
   MaturityAnalyticsResponse,
   ModelRanking,
   NarrativeResponse,
@@ -291,6 +292,13 @@ export function useSystemStats() {
   return useQuery({
     queryKey: ["system-stats"],
     queryFn: () => apiFetch<SystemStats>("/api/v1/admin/system-stats"),
+  })
+}
+
+export function useMeasurementIntegrity() {
+  return useQuery({
+    queryKey: ["measurement-integrity"],
+    queryFn: () => apiFetch<MeasurementIntegrityStats>("/api/v1/admin/measurement-integrity"),
   })
 }
 

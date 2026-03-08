@@ -1,5 +1,12 @@
 import uuid
 
+import pytest
+
+from primer.common.models import Session as SessionModel
+from primer.common.models import SessionFacets
+from primer.common.schemas import SessionFacetsPayload
+from primer.server.services.ingest_service import upsert_facets
+
 
 def test_health(client):
     r = client.get("/health")
@@ -64,6 +71,36 @@ def test_ingest_session(client, engineer_with_key):
     assert data["created"] is True
 
 
+def test_ingest_session_normalizes_legacy_facet_payload(client, engineer_with_key, db_session):
+    _eng, api_key = engineer_with_key
+    session_id = str(uuid.uuid4())
+    payload = {
+        "session_id": session_id,
+        "api_key": api_key,
+        "project_name": "test-project",
+        "message_count": 10,
+        "user_message_count": 5,
+        "assistant_message_count": 5,
+        "tool_call_count": 3,
+        "input_tokens": 1000,
+        "output_tokens": 500,
+        "primary_model": "claude-sonnet-4-5-20250929",
+        "first_prompt": "Help me fix the bug",
+        "facets": {
+            "underlying_goal": "Fix a bug",
+            "goal_categories": {"fix_bug": 1, "testing": 1},
+            "outcome": "mostly_achieved",
+            "brief_summary": "Made progress and added coverage",
+        },
+    }
+    r = client.post("/api/v1/ingest/session", json=payload)
+    assert r.status_code == 200
+
+    stored = db_session.query(SessionFacets).filter(SessionFacets.session_id == session_id).one()
+    assert stored.goal_categories == ["fix_bug", "testing"]
+    assert stored.outcome == "partial"
+
+
 def test_ingest_session_upsert(client, engineer_with_key):
     _eng, api_key = engineer_with_key
     session_id = str(uuid.uuid4())
@@ -102,6 +139,90 @@ def test_ingest_invalid_key(client):
         },
     )
     assert r.status_code == 401
+
+
+def test_upsert_facets_normalizes_legacy_values_at_write_boundary(db_session, engineer_with_key):
+    engineer, _api_key = engineer_with_key
+    session_id = str(uuid.uuid4())
+    db_session.add(SessionModel(id=session_id, engineer_id=engineer.id))
+    db_session.flush()
+
+    facets = SessionFacetsPayload.model_construct(
+        underlying_goal="Fix a bug",
+        goal_categories={"fix_bug": 1, "testing": 1},
+        outcome="mostly_achieved",
+        brief_summary="Made progress and added coverage",
+    )
+
+    upsert_facets(db_session, session_id, facets)
+
+    stored = db_session.query(SessionFacets).filter(SessionFacets.session_id == session_id).one()
+    assert stored.goal_categories == ["fix_bug", "testing"]
+    assert stored.outcome == "partial"
+
+
+def test_upsert_facets_rejects_unknown_outcome_at_write_boundary(db_session, engineer_with_key):
+    engineer, _api_key = engineer_with_key
+    session_id = str(uuid.uuid4())
+    db_session.add(SessionModel(id=session_id, engineer_id=engineer.id))
+    db_session.flush()
+
+    facets = SessionFacetsPayload.model_construct(
+        underlying_goal="Fix a bug",
+        goal_categories=["fix_bug"],
+        outcome="unexpected_outcome",
+        brief_summary="Bad outcome value",
+    )
+
+    with pytest.raises(ValueError, match="outcome"):
+        upsert_facets(db_session, session_id, facets)
+
+    stored = db_session.query(SessionFacets).filter(SessionFacets.session_id == session_id).all()
+    assert stored == []
+
+
+def test_upsert_facets_rejects_scalar_goal_categories_at_write_boundary(
+    db_session, engineer_with_key
+):
+    engineer, _api_key = engineer_with_key
+    session_id = str(uuid.uuid4())
+    db_session.add(SessionModel(id=session_id, engineer_id=engineer.id))
+    db_session.flush()
+
+    facets = SessionFacetsPayload.model_construct(
+        underlying_goal="Fix a bug",
+        goal_categories="fix_bug",
+        outcome="success",
+        brief_summary="Bad goal categories value",
+    )
+
+    with pytest.raises(ValueError, match="goal_categories"):
+        upsert_facets(db_session, session_id, facets)
+
+    stored = db_session.query(SessionFacets).filter(SessionFacets.session_id == session_id).all()
+    assert stored == []
+
+
+def test_upsert_facets_rejects_mixed_goal_category_list_at_write_boundary(
+    db_session, engineer_with_key
+):
+    engineer, _api_key = engineer_with_key
+    session_id = str(uuid.uuid4())
+    db_session.add(SessionModel(id=session_id, engineer_id=engineer.id))
+    db_session.flush()
+
+    facets = SessionFacetsPayload.model_construct(
+        underlying_goal="Fix a bug",
+        goal_categories=["fix_bug", 3],
+        outcome="success",
+        brief_summary="Mixed goal categories value",
+    )
+
+    with pytest.raises(ValueError, match="goal_categories"):
+        upsert_facets(db_session, session_id, facets)
+
+    stored = db_session.query(SessionFacets).filter(SessionFacets.session_id == session_id).all()
+    assert stored == []
 
 
 def test_ingest_facets_success(client, engineer_with_key):

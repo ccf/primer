@@ -36,6 +36,29 @@ def test_session_facets_relationship(db_session):
     assert sess.facets.outcome == "success"
 
 
+def test_session_facets_confidence_score_persists(db_session):
+    team = Team(name="Confidence Team")
+    db_session.add(team)
+    db_session.flush()
+    eng = Engineer(name="Dana", email="dana@co.com", team_id=team.id, api_key_hash="h")
+    db_session.add(eng)
+    db_session.flush()
+    sess = Session(id="sess-confidence", engineer_id=eng.id)
+    db_session.add(sess)
+    db_session.flush()
+    facets = SessionFacets(
+        session_id=sess.id,
+        outcome="success",
+        brief_summary="Stored with confidence",
+        confidence_score=0.82,
+    )
+    db_session.add(facets)
+    db_session.flush()
+
+    stored = db_session.query(SessionFacets).filter(SessionFacets.session_id == sess.id).one()
+    assert stored.confidence_score == 0.82
+
+
 def test_tool_usage(db_session):
     team = Team(name="TT")
     db_session.add(team)

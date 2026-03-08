@@ -2,10 +2,11 @@ from collections import Counter
 from datetime import UTC, datetime
 from datetime import date as date_type
 
-from sqlalchemy import case, func
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from primer.common.config import settings
+from primer.common.facet_taxonomy import canonical_outcome, is_success_outcome
 from primer.common.models import (
     Engineer,
     ModelUsage,
@@ -86,10 +87,14 @@ def _compute_success_rate(
     if end_date:
         facets_q = facets_q.filter(SessionModel.started_at <= end_date)
     facets_q = facets_q.filter(SessionFacets.outcome.isnot(None))
-    outcomes = [row[0] for row in facets_q.all()]
+    outcomes = [
+        normalized
+        for (outcome,) in facets_q.all()
+        if (normalized := canonical_outcome(outcome)) is not None
+    ]
     if not outcomes:
         return None
-    return sum(1 for o in outcomes if o == "success") / len(outcomes)
+    return sum(1 for outcome in outcomes if is_success_outcome(outcome)) / len(outcomes)
 
 
 def _build_overview(
@@ -143,7 +148,10 @@ def _build_overview(
         facets_q = facets_q.filter(SessionModel.started_at <= end_date)
     outcome_counts: dict[str, int] = {}
     for (outcome,) in facets_q.filter(SessionFacets.outcome.isnot(None)).all():
-        outcome_counts[outcome] = outcome_counts.get(outcome, 0) + 1
+        normalized_outcome = canonical_outcome(outcome)
+        if normalized_outcome is None:
+            continue
+        outcome_counts[normalized_outcome] = outcome_counts.get(normalized_outcome, 0) + 1
 
     # Session type counts
     type_q = db.query(SessionFacets.session_type).join(SessionModel)
@@ -347,8 +355,7 @@ def get_daily_stats(
         sr_q = (
             db.query(
                 func.date(SessionModel.started_at).label("date"),
-                func.sum(case((SessionFacets.outcome == "success", 1), else_=0)).label("successes"),
-                func.count(SessionFacets.outcome).label("total"),
+                SessionFacets.outcome,
             )
             .join(SessionFacets, SessionFacets.session_id == SessionModel.id)
             .filter(SessionModel.started_at.isnot(None))
@@ -362,10 +369,18 @@ def get_daily_stats(
             sr_q = sr_q.filter(SessionModel.started_at >= start_date)
         if end_date:
             sr_q = sr_q.filter(SessionModel.started_at <= end_date)
-        sr_q = sr_q.group_by(func.date(SessionModel.started_at))
-        for d, successes, total in sr_q.all():
-            if total > 0:
-                success_rates[str(d)] = successes / total
+        daily_outcomes: dict[str, list[str]] = {}
+        for d, outcome in sr_q.all():
+            normalized_outcome = canonical_outcome(outcome)
+            if normalized_outcome is None:
+                continue
+            date_key = str(d)
+            daily_outcomes.setdefault(date_key, []).append(normalized_outcome)
+        for date_key, outcomes in daily_outcomes.items():
+            if outcomes:
+                success_rates[date_key] = sum(
+                    1 for outcome in outcomes if is_success_outcome(outcome)
+                ) / len(outcomes)
 
     return [
         DailyStatsResponse(
@@ -784,7 +799,10 @@ def get_project_analytics(
             outcome_q = outcome_q.filter(SessionModel.started_at <= end_date)
         outcome_dist: dict[str, int] = {}
         for (o,) in outcome_q.all():
-            outcome_dist[o] = outcome_dist.get(o, 0) + 1
+            normalized_outcome = canonical_outcome(o)
+            if normalized_outcome is None:
+                continue
+            outcome_dist[normalized_outcome] = outcome_dist.get(normalized_outcome, 0) + 1
 
         # Top tools
         tool_q = (
@@ -910,9 +928,7 @@ def get_productivity_metrics(
 
     # Success count from facets
     success_q = (
-        db.query(func.count(SessionFacets.id))
-        .join(SessionModel)
-        .filter(SessionFacets.outcome == "success")
+        db.query(SessionFacets.outcome).join(SessionModel).filter(SessionFacets.outcome.isnot(None))
     )
     if engineer_id:
         success_q = success_q.filter(SessionModel.engineer_id == engineer_id)
@@ -922,7 +938,7 @@ def get_productivity_metrics(
         success_q = success_q.filter(SessionModel.started_at >= start_date)
     if end_date:
         success_q = success_q.filter(SessionModel.started_at <= end_date)
-    success_count = success_q.scalar() or 0
+    success_count = sum(1 for (outcome,) in success_q.all() if is_success_outcome(outcome))
 
     # Compute days in range
     if start_date and end_date:
@@ -1226,7 +1242,7 @@ def get_bottleneck_analytics(
 
     for session, facets in rows:
         sid = session.id
-        outcome = facets.outcome if facets else None
+        outcome = canonical_outcome(facets.outcome) if facets else None
 
         date_key = session.started_at.strftime("%Y-%m-%d") if session.started_at else None
         project = session.project_name or "unknown"
@@ -1295,7 +1311,7 @@ def get_bottleneck_analytics(
     def _success_rate(outcomes: list[str]) -> float | None:
         if not outcomes:
             return None
-        return sum(1 for o in outcomes if o == "success") / len(outcomes)
+        return sum(1 for outcome in outcomes if is_success_outcome(outcome)) / len(outcomes)
 
     all_session_ids = set(session_outcomes.keys())
 

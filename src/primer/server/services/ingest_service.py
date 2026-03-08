@@ -3,6 +3,10 @@ import logging
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from primer.common.facet_taxonomy import (
+    validate_inbound_goal_categories,
+    validate_inbound_outcome,
+)
 from primer.common.models import (
     GitRepository,
     IngestEvent,
@@ -19,6 +23,22 @@ from primer.common.schemas import SessionFacetsPayload, SessionIngestPayload
 from primer.common.utils import parse_repo_full_name
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_confidence_score(value: object) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise ValueError("confidence_score must be between 0.0 and 1.0")
+
+    try:
+        score = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("confidence_score must be between 0.0 and 1.0") from exc
+
+    if not 0.0 <= score <= 1.0:
+        raise ValueError("confidence_score must be between 0.0 and 1.0")
+    return score
 
 
 def find_or_create_repository(db: Session, full_name: str) -> GitRepository:
@@ -90,7 +110,11 @@ def upsert_session(db: Session, engineer_id: str, payload: SessionIngestPayload)
         db.query(ToolUsage).filter(ToolUsage.session_id == session.id).delete()
         for tu in payload.tool_usages:
             db.add(
-                ToolUsage(session_id=session.id, tool_name=tu.tool_name, call_count=tu.call_count)
+                ToolUsage(
+                    session_id=session.id,
+                    tool_name=tu.tool_name,
+                    call_count=tu.call_count,
+                )
             )
 
     # Model usages — replace all
@@ -144,6 +168,14 @@ def upsert_session(db: Session, engineer_id: str, payload: SessionIngestPayload)
 
 def upsert_facets(db: Session, session_id: str, facets: SessionFacetsPayload) -> None:
     """Upsert facets for a session."""
+    validated_values = {
+        "goal_categories": validate_inbound_goal_categories(
+            getattr(facets, "goal_categories", None)
+        ),
+        "outcome": validate_inbound_outcome(getattr(facets, "outcome", None)),
+        "confidence_score": _validate_confidence_score(getattr(facets, "confidence_score", None)),
+    }
+
     existing = db.query(SessionFacets).filter(SessionFacets.session_id == session_id).first()
     if existing:
         record = existing
@@ -155,6 +187,7 @@ def upsert_facets(db: Session, session_id: str, facets: SessionFacetsPayload) ->
         "underlying_goal",
         "goal_categories",
         "outcome",
+        "confidence_score",
         "session_type",
         "primary_success",
         "agent_helpfulness",
@@ -163,7 +196,10 @@ def upsert_facets(db: Session, session_id: str, facets: SessionFacetsPayload) ->
         "friction_counts",
         "friction_detail",
     ]:
-        value = getattr(facets, field, None)
+        value = validated_values.get(field, getattr(facets, field, None))
+        if field == "confidence_score":
+            setattr(record, field, value)
+            continue
         if value is not None:
             setattr(record, field, value)
 

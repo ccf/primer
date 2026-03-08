@@ -1,5 +1,7 @@
 import uuid
 
+from primer.common.models import SessionFacets
+
 
 def _ingest_session(client, api_key, **kwargs):
     session_id = kwargs.pop("session_id", str(uuid.uuid4()))
@@ -63,6 +65,40 @@ def test_overview_with_data(client, engineer_with_key, admin_headers):
     assert data["outcome_counts"]["success"] == 2
     assert data["outcome_counts"]["partial"] == 1
     assert data["session_type_counts"]["feature"] == 2
+
+
+def test_overview_treats_legacy_success_outcomes_as_canonical(
+    client, engineer_with_key, admin_headers, db_session
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        facets={
+            "outcome": "success",
+            "session_type": "feature",
+        },
+    )
+    legacy_sid = _ingest_session(
+        client,
+        api_key,
+        facets={
+            "outcome": "success",
+            "session_type": "debugging",
+        },
+    )
+
+    legacy_facets = (
+        db_session.query(SessionFacets).filter(SessionFacets.session_id == legacy_sid).one()
+    )
+    legacy_facets.outcome = "fully_achieved"
+    db_session.flush()
+
+    r = client.get("/api/v1/analytics/overview", headers=admin_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["outcome_counts"]["success"] == 2
+    assert data["success_rate"] == 1.0
 
 
 def test_tool_rankings(client, engineer_with_key, admin_headers):

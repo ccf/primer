@@ -8,6 +8,12 @@ from primer.server.services.analytics_service import (
     get_overview,
     get_tool_rankings,
 )
+from primer.server.services.measurement_integrity_service import (
+    LOW_CONFIDENCE_THRESHOLD,
+    get_measurement_integrity_stats,
+)
+
+LOW_COVERAGE_THRESHOLD_PCT = 30.0
 
 
 def get_recommendations(
@@ -47,19 +53,78 @@ def get_recommendations(
 
     # Low facet coverage
     if overview.total_sessions > 10:
-        facet_sessions = sum(overview.outcome_counts.values())
-        coverage = facet_sessions / overview.total_sessions
-        if coverage < 0.3:
+        integrity = get_measurement_integrity_stats(
+            db,
+            team_id=team_id,
+            engineer_id=engineer_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        facet_coverage_pct = float(integrity["facet_coverage_pct"])
+        transcript_coverage_pct = float(integrity["transcript_coverage_pct"])
+        sessions_with_facets = int(integrity["sessions_with_facets"])
+        low_confidence_sessions = int(integrity["low_confidence_sessions"])
+        missing_confidence_sessions = int(integrity["missing_confidence_sessions"])
+        legacy_outcome_sessions = int(integrity["legacy_outcome_sessions"])
+        legacy_goal_category_sessions = int(integrity["legacy_goal_category_sessions"])
+        remaining_legacy_rows = int(integrity["remaining_legacy_rows"])
+        low_confidence_pct = (
+            round((low_confidence_sessions / sessions_with_facets) * 100, 1)
+            if sessions_with_facets
+            else 0.0
+        )
+        missing_confidence_pct = (
+            round((missing_confidence_sessions / sessions_with_facets) * 100, 1)
+            if sessions_with_facets
+            else 0.0
+        )
+
+        integrity_signals: list[str] = []
+        if facet_coverage_pct < LOW_COVERAGE_THRESHOLD_PCT:
+            integrity_signals.append(f"facet coverage is {facet_coverage_pct:.1f}%")
+        if transcript_coverage_pct < LOW_COVERAGE_THRESHOLD_PCT:
+            integrity_signals.append(f"transcript coverage is {transcript_coverage_pct:.1f}%")
+        if low_confidence_sessions > 0:
+            integrity_signals.append(
+                f"{low_confidence_sessions} sessions are below the "
+                f"{LOW_CONFIDENCE_THRESHOLD:.2f} confidence threshold"
+            )
+        if missing_confidence_sessions > 0:
+            integrity_signals.append(
+                f"{missing_confidence_sessions} sessions are missing confidence scores"
+            )
+        if remaining_legacy_rows > 0:
+            integrity_signals.append(
+                f"{remaining_legacy_rows} legacy facet rows still need normalization"
+            )
+
+        if integrity_signals:
             recs.append(
                 Recommendation(
                     category="data_quality",
-                    title="Low facet coverage",
+                    title="Measurement integrity needs attention",
                     description=(
-                        f"Only {coverage:.0%} of sessions have facets. "
-                        "Encourage engineers to run /insights periodically."
+                        "Recommendation confidence is limited because "
+                        + "; ".join(integrity_signals)
+                        + ". Improve transcript/facet collection and normalize "
+                        + "legacy rows before acting on downstream insights."
                     ),
                     severity="info",
-                    evidence={"coverage": coverage, "total_sessions": overview.total_sessions},
+                    evidence={
+                        "total_sessions": int(integrity["total_sessions"]),
+                        "sessions_with_facets": sessions_with_facets,
+                        "facet_coverage_pct": facet_coverage_pct,
+                        "sessions_with_messages": int(integrity["sessions_with_messages"]),
+                        "transcript_coverage_pct": transcript_coverage_pct,
+                        "low_confidence_sessions": low_confidence_sessions,
+                        "low_confidence_pct": low_confidence_pct,
+                        "missing_confidence_sessions": missing_confidence_sessions,
+                        "missing_confidence_pct": missing_confidence_pct,
+                        "confidence_threshold": LOW_CONFIDENCE_THRESHOLD,
+                        "legacy_outcome_sessions": legacy_outcome_sessions,
+                        "legacy_goal_category_sessions": legacy_goal_category_sessions,
+                        "remaining_legacy_rows": remaining_legacy_rows,
+                    },
                 )
             )
 

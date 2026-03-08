@@ -12,6 +12,7 @@ import httpx
 
 from primer.common.config import settings
 from primer.common.database import SessionLocal
+from primer.common.facet_taxonomy import canonical_outcome, normalize_goal_categories
 from primer.common.models import Session as SessionModel
 from primer.common.models import SessionFacets, SessionMessage
 from primer.common.schemas import SessionFacetsPayload
@@ -25,7 +26,7 @@ EXTRACTION_PROMPT = """\
 Analyze this AI coding assistant session and extract structured facets.
 
 CRITICAL GUIDELINES:
-1. **goal_categories**: Count ONLY what the USER explicitly asked for.
+1. **goal_categories**: Return a list of strings for ONLY what the USER explicitly asked for.
    - DO NOT count the assistant's autonomous codebase exploration
    - DO NOT count work the assistant decided to do on its own
    - ONLY count when user says "can you...", "please...", "I need...", "let's..."
@@ -51,8 +52,9 @@ CRITICAL GUIDELINES:
 Return a single JSON object with these fields:
 {
   "underlying_goal": "What the user fundamentally wanted to achieve",
-  "goal_categories": {"category_name": count, ...},
-  "outcome": "fully_achieved|mostly_achieved|partially_achieved|not_achieved",
+  "goal_categories": ["category_name", ...],
+  "outcome": "success|partial|failure",
+  "confidence_score": 0.0,
   "user_satisfaction_counts": {"satisfied|likely_satisfied|dissatisfied": N},
   "agent_helpfulness": "unhelpful|slightly_helpful|moderately_helpful|very_helpful",
   "session_type": "single_task|multi_task|iterative_refinement|exploration",
@@ -67,6 +69,21 @@ Respond with ONLY the JSON object, no other text."""
 # Minimum session requirements (matches Claude Code's filters)
 MIN_USER_MESSAGES = 2
 MIN_DURATION_SECONDS = 60
+
+
+def _coerce_extracted_confidence_score(value: object) -> float | None:
+    """Keep facet extraction resilient to malformed LLM confidence scores."""
+    if value is None or isinstance(value, bool):
+        return None
+
+    try:
+        score = float(value)
+    except (TypeError, ValueError):
+        return None
+
+    if 0.0 <= score <= 1.0:
+        return score
+    return None
 
 
 def _build_transcript_text(messages: list[dict]) -> str:
@@ -128,17 +145,20 @@ def _parse_facets_response(text: str) -> dict | None:
 
 def _facets_dict_to_payload(data: dict) -> SessionFacetsPayload:
     """Convert raw LLM facets dict to a SessionFacetsPayload."""
-    # Convert goal_categories from dict[str, int] to list[str]
+    # Preserve malformed category values so the payload validator can reject them.
     goal_cats = data.get("goal_categories")
     if isinstance(goal_cats, dict):
-        goal_cats = list(goal_cats.keys())
-    elif not isinstance(goal_cats, list):
-        goal_cats = None
+        goal_cats = normalize_goal_categories(goal_cats)
+
+    outcome = data.get("outcome")
+    if isinstance(outcome, str):
+        outcome = canonical_outcome(outcome)
 
     return SessionFacetsPayload(
         underlying_goal=data.get("underlying_goal"),
         goal_categories=goal_cats,
-        outcome=data.get("outcome"),
+        outcome=outcome,
+        confidence_score=_coerce_extracted_confidence_score(data.get("confidence_score")),
         session_type=data.get("session_type"),
         primary_success=data.get("primary_success"),
         agent_helpfulness=data.get("agent_helpfulness"),
@@ -259,6 +279,7 @@ def extract_and_store_facets(session_id: str, messages: list[dict]) -> bool:
             "underlying_goal",
             "goal_categories",
             "outcome",
+            "confidence_score",
             "session_type",
             "primary_success",
             "agent_helpfulness",

@@ -7,6 +7,7 @@ from statistics import median
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from primer.common.facet_taxonomy import canonical_outcome, is_success_outcome
 from primer.common.models import (
     Engineer,
     GitRepository,
@@ -140,12 +141,14 @@ def get_maturity_analytics(
     )
     eng_outcomes: dict[str, list[str]] = defaultdict(list)
     for eid, outcome in facet_rows:
-        eng_outcomes[eid].append(outcome)
+        normalized_outcome = canonical_outcome(outcome)
+        if normalized_outcome is not None:
+            eng_outcomes[eid].append(normalized_outcome)
 
     eng_success_rates: dict[str, float] = {}
     eng_success_counts: dict[str, int] = {}
     for eid, outcomes in eng_outcomes.items():
-        successes = sum(1 for o in outcomes if o in ("full", "fully_achieved", "success"))
+        successes = sum(1 for outcome in outcomes if is_success_outcome(outcome))
         eng_success_counts[eid] = successes
         eng_success_rates[eid] = successes / len(outcomes) if outcomes else 0.0
 
