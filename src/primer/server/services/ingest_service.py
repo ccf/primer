@@ -106,7 +106,7 @@ def upsert_session(db: Session, engineer_id: str, payload: SessionIngestPayload)
             session.repository_id = repo.id
 
     # Tool usages — replace all
-    if payload.tool_usages:
+    if payload.tool_usages is not None:
         db.query(ToolUsage).filter(ToolUsage.session_id == session.id).delete()
         for tu in payload.tool_usages:
             db.add(
@@ -118,7 +118,7 @@ def upsert_session(db: Session, engineer_id: str, payload: SessionIngestPayload)
             )
 
     # Model usages — replace all
-    if payload.model_usages:
+    if payload.model_usages is not None:
         db.query(ModelUsage).filter(ModelUsage.session_id == session.id).delete()
         for mu in payload.model_usages:
             db.add(
@@ -133,7 +133,7 @@ def upsert_session(db: Session, engineer_id: str, payload: SessionIngestPayload)
             )
 
     # Commits — replace all
-    if payload.commits:
+    if payload.commits is not None:
         db.query(SessionCommit).filter(SessionCommit.session_id == session.id).delete()
         for c in payload.commits:
             db.add(
@@ -152,7 +152,7 @@ def upsert_session(db: Session, engineer_id: str, payload: SessionIngestPayload)
             )
 
     # Messages
-    if payload.messages:
+    if payload.messages is not None:
         db.query(SessionMessage).filter(SessionMessage.session_id == session.id).delete()
         for msg in payload.messages:
             db.add(SessionMessage(session_id=session.id, **msg.model_dump()))
