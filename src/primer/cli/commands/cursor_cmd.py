@@ -25,6 +25,9 @@ def import_bundle(bundle_path: Path) -> None:
     except ValueError as exc:
         raise click.ClickException(f"Invalid Cursor bundle: {exc}") from exc
 
+    if meta.message_count == 0:
+        raise click.ClickException("Invalid Cursor bundle: file contains no messages")
+
     if store_path.exists():
         console.warn(f"Cursor session already imported: {meta.session_id}")
         return
