@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from click.testing import CliRunner
@@ -61,6 +62,35 @@ def test_cursor_import_rejects_missing_session_id(tmp_path, monkeypatch):
     assert result.exit_code != 0
     assert "session_id" in result.output
     assert not (primer_home / "cursor" / "sessions").exists()
+
+
+def test_cursor_import_wraps_extractor_failures_in_click_exception(tmp_path, monkeypatch):
+    _mock_primer_home(tmp_path, monkeypatch)
+    bundle_path = _write_bundle(
+        tmp_path,
+        {
+            "session_id": "cursor-bad-1",
+            "project_path": str(tmp_path / "demo"),
+            "messages": [
+                {
+                    "role": "human",
+                    "content_text": "This bundle triggers an extractor bug",
+                }
+            ],
+        },
+        name="extractor-error.json",
+    )
+
+    runner = CliRunner()
+    with patch(
+        "primer.cli.commands.cursor_cmd.CursorExtractor.extract",
+        side_effect=RuntimeError("boom"),
+    ):
+        result = runner.invoke(cli, ["cursor", "import", str(bundle_path)])
+
+    assert result.exit_code != 0
+    assert "Invalid Cursor bundle" in result.output
+    assert "boom" in result.output
 
 
 def test_cursor_import_rejects_bundle_with_no_messages(tmp_path, monkeypatch):
