@@ -244,11 +244,11 @@ class SessionIngestPayload(BaseModel):
     first_prompt: str | None = None
     summary: str | None = None
     facets: SessionFacetsPayload | None = None
-    tool_usages: list[ToolUsagePayload] = []
-    model_usages: list[ModelUsagePayload] = []
-    messages: list[SessionMessagePayload] = []
+    tool_usages: list[ToolUsagePayload] | None = None
+    model_usages: list[ModelUsagePayload] | None = None
+    messages: list[SessionMessagePayload] | None = None
     git_remote_url: str | None = None
-    commits: list[CommitPayload] = []
+    commits: list[CommitPayload] | None = None
 
     @model_validator(mode="before")
     @classmethod
