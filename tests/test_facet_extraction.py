@@ -202,6 +202,7 @@ class TestExtractionPrompt:
 
     def test_requests_confidence_score(self):
         assert '"confidence_score"' in EXTRACTION_PROMPT
+        assert '"confidence_score": 0.85' in EXTRACTION_PROMPT
 
 
 # --- Payload conversion ---
@@ -253,15 +254,15 @@ class TestFacetsDictToPayload:
         payload = _facets_dict_to_payload({**sample_facets_response, "outcome": "abandoned"})
         assert payload.outcome is None
 
-    def test_rejects_scalar_goal_categories(self):
-        with pytest.raises(ValidationError):
-            _facets_dict_to_payload(
-                {
-                    "underlying_goal": "test",
-                    "goal_categories": "fix_bug",
-                    "outcome": "success",
-                }
-            )
+    def test_coerces_scalar_goal_categories_to_none(self):
+        payload = _facets_dict_to_payload(
+            {
+                "underlying_goal": "test",
+                "goal_categories": "fix_bug",
+                "outcome": "success",
+            }
+        )
+        assert payload.goal_categories is None
 
     def test_rejects_mixed_type_goal_category_list(self):
         with pytest.raises(ValidationError):

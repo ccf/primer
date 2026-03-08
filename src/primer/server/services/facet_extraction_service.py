@@ -58,7 +58,7 @@ Return a single JSON object with these fields:
   "underlying_goal": "What the user fundamentally wanted to achieve",
   "goal_categories": ["category_name", ...],
   "outcome": "success|partial|failure",
-  "confidence_score": 0.0,
+  "confidence_score": 0.85,
   "user_satisfaction_counts": {"satisfied|likely_satisfied|dissatisfied": N},
   "agent_helpfulness": "unhelpful|slightly_helpful|moderately_helpful|very_helpful",
   "session_type": "single_task|multi_task|iterative_refinement|exploration",
@@ -149,10 +149,11 @@ def _parse_facets_response(text: str) -> dict | None:
 
 def _facets_dict_to_payload(data: dict) -> SessionFacetsPayload:
     """Convert raw LLM facets dict to a SessionFacetsPayload."""
-    # Preserve malformed category values so the payload validator can reject them.
     goal_cats = data.get("goal_categories")
     if isinstance(goal_cats, dict):
         goal_cats = normalize_goal_categories(goal_cats)
+    elif not isinstance(goal_cats, list):
+        goal_cats = None
 
     outcome = data.get("outcome")
     if isinstance(outcome, str):
