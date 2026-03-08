@@ -74,13 +74,13 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Outcome normalization and historical backfill for previously ingested sessions
 - [ ] [P0] Coverage dashboard for facet extraction, transcript completeness, GitHub sync, and repository metadata
 - [x] Confidence scoring for extracted facets and downstream recommendations
-- [ ] [P0] Cross-agent schema parity matrix so Primer knows which session fields are required, optional, or unavailable per source
+- [x] Cross-agent schema parity matrix so Primer knows which session fields are required, optional, or unavailable per source
 - [x] Partial-telemetry handling for IDE-native agents like Cursor so missing transcript, tool, or model fields do not distort org-wide metrics
 - [ ] [P1] Execution evidence capture: lint, test, build, and verification signals per session
 - [ ] [P1] Change-shape capture: files touched, diff size, churn, and rewrite/revert indicators
 - [ ] [P1] Recovery-path tracking: detect whether engineers recover after friction or abandon the attempt
 - [ ] [P1] Derived analytics tables and materialized rollups for heavy longitudinal queries
-- [ ] [P1] Source-quality dashboard by agent type, including capture coverage and telemetry completeness for Cursor
+- [x] Source-quality dashboard by agent type, including capture coverage and telemetry completeness for Cursor
 - [ ] [P2] Data-quality anomaly detection for broken ingestion, sparse transcripts, or stale integrations
 
 ## Session Intelligence

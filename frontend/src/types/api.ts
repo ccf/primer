@@ -26,6 +26,7 @@ export interface EngineerResponse {
 }
 
 export type AgentType = 'claude_code' | 'codex_cli' | 'gemini_cli' | 'cursor'
+export type TelemetryParity = 'required' | 'optional' | 'unavailable'
 
 export interface SessionResponse {
   id: string
@@ -291,10 +292,15 @@ export interface SystemStats {
 export interface AgentSourceQuality {
   agent_type: AgentType
   session_count: number
+  transcript_parity: TelemetryParity
   transcript_coverage_pct: number
+  tool_call_parity: TelemetryParity
   tool_call_coverage_pct: number
+  model_usage_parity: TelemetryParity
   model_usage_coverage_pct: number
+  facet_parity: TelemetryParity
   facet_coverage_pct: number
+  native_discovery_parity: TelemetryParity
 }
 
 export interface MeasurementIntegrityStats {

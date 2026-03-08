@@ -14,7 +14,7 @@ from primer.common.models import (
 from primer.common.models import (
     Session as SessionModel,
 )
-from primer.common.source_capabilities import get_capability_for
+from primer.common.source_capabilities import TelemetryField, get_capability_for
 
 LOW_CONFIDENCE_THRESHOLD = 0.7
 LEGACY_OUTCOMES = {
@@ -171,6 +171,28 @@ def _normalized_row_updates(row: SessionFacets) -> dict[str, object]:
     return updates
 
 
+def _required_session_count_for_field(
+    sessions_by_agent: dict[str, int], field_name: TelemetryField
+) -> int:
+    return sum(
+        session_count
+        for agent_type, session_count in sessions_by_agent.items()
+        if (capability := get_capability_for(agent_type)) and capability.is_required(field_name)
+    )
+
+
+def _covered_session_count_for_field(
+    sessions_by_agent: dict[str, int],
+    covered_sessions_by_agent: dict[str, int],
+    field_name: TelemetryField,
+) -> int:
+    return sum(
+        covered_sessions_by_agent.get(agent_type, 0)
+        for agent_type in sessions_by_agent
+        if (capability := get_capability_for(agent_type)) and capability.is_required(field_name)
+    )
+
+
 def get_measurement_integrity_stats(
     db: Session,
     team_id: str | None = None,
@@ -260,27 +282,60 @@ def get_measurement_integrity_stats(
         start_date=start_date,
         end_date=end_date,
     )
-    facet_capable_session_count = sum(
-        session_count
-        for agent_type, session_count in sessions_by_agent.items()
-        if (capability := get_capability_for(agent_type)) and capability.supports_facets
+    required_transcript_session_count = _required_session_count_for_field(
+        sessions_by_agent, "transcript"
     )
-    facet_capable_sessions_with_facets = sum(
-        facet_sessions_by_agent.get(agent_type, 0)
-        for agent_type in sessions_by_agent
-        if (capability := get_capability_for(agent_type)) and capability.supports_facets
+    required_transcript_sessions_with_messages = _covered_session_count_for_field(
+        sessions_by_agent,
+        transcript_sessions_by_agent,
+        "transcript",
+    )
+    required_tool_session_count = _required_session_count_for_field(sessions_by_agent, "tool_calls")
+    required_tool_sessions_with_telemetry = _covered_session_count_for_field(
+        sessions_by_agent,
+        tool_sessions_by_agent,
+        "tool_calls",
+    )
+    required_model_session_count = _required_session_count_for_field(
+        sessions_by_agent, "model_usage"
+    )
+    required_model_sessions_with_telemetry = _covered_session_count_for_field(
+        sessions_by_agent,
+        model_sessions_by_agent,
+        "model_usage",
+    )
+    required_facet_session_count = _required_session_count_for_field(sessions_by_agent, "facets")
+    required_facet_sessions_with_facets = _covered_session_count_for_field(
+        sessions_by_agent,
+        facet_sessions_by_agent,
+        "facets",
     )
 
     facet_coverage_pct = (
-        round((facet_capable_sessions_with_facets / facet_capable_session_count) * 100, 1)
-        if facet_capable_session_count
+        round((required_facet_sessions_with_facets / required_facet_session_count) * 100, 1)
+        if required_facet_session_count
         else 0.0
     )
     transcript_coverage_pct = (
-        round((sessions_with_messages / total_sessions) * 100, 1) if total_sessions else 0.0
+        round(
+            (required_transcript_sessions_with_messages / required_transcript_session_count) * 100,
+            1,
+        )
+        if required_transcript_session_count
+        else 0.0
     )
-    sessions_missing_tool_telemetry = 0
-    sessions_missing_model_telemetry = 0
+    sessions_missing_transcript_telemetry = max(
+        required_transcript_session_count - required_transcript_sessions_with_messages,
+        0,
+    )
+    sessions_missing_tool_telemetry = max(
+        required_tool_session_count - required_tool_sessions_with_telemetry,
+        0,
+    )
+    sessions_missing_model_telemetry = max(
+        required_model_session_count - required_model_sessions_with_telemetry,
+        0,
+    )
     source_quality: list[dict[str, str | int | float]] = []
     for agent_type in sorted(sessions_by_agent):
         session_count = sessions_by_agent[agent_type]
@@ -289,31 +344,35 @@ def get_measurement_integrity_stats(
         tool_count = tool_sessions_by_agent.get(agent_type, 0)
         model_count = model_sessions_by_agent.get(agent_type, 0)
         facet_count = facet_sessions_by_agent.get(agent_type, 0)
-        supports_tool_calls = bool(capability and capability.supports_tool_calls)
-        supports_model_usage = bool(capability and capability.supports_model_usage)
-        supports_facets = bool(capability and capability.supports_facets)
-
-        if supports_tool_calls:
-            sessions_missing_tool_telemetry += max(session_count - tool_count, 0)
-        if supports_model_usage:
-            sessions_missing_model_telemetry += max(session_count - model_count, 0)
+        transcript_parity = capability.parity_for("transcript") if capability else "unavailable"
+        tool_call_parity = capability.parity_for("tool_calls") if capability else "unavailable"
+        model_usage_parity = capability.parity_for("model_usage") if capability else "unavailable"
+        facet_parity = capability.parity_for("facets") if capability else "unavailable"
+        native_discovery_parity = (
+            capability.parity_for("native_discovery") if capability else "unavailable"
+        )
 
         source_quality.append(
             {
                 "agent_type": agent_type,
                 "session_count": session_count,
+                "transcript_parity": transcript_parity,
                 "transcript_coverage_pct": round((transcript_count / session_count) * 100, 1)
                 if session_count
                 else 0.0,
+                "tool_call_parity": tool_call_parity,
                 "tool_call_coverage_pct": round((tool_count / session_count) * 100, 1)
                 if session_count
                 else 0.0,
+                "model_usage_parity": model_usage_parity,
                 "model_usage_coverage_pct": round((model_count / session_count) * 100, 1)
                 if session_count
                 else 0.0,
+                "facet_parity": facet_parity,
                 "facet_coverage_pct": round((facet_count / session_count) * 100, 1)
-                if supports_facets and session_count
+                if capability and capability.supports_facets and session_count
                 else 0.0,
+                "native_discovery_parity": native_discovery_parity,
             }
         )
 
@@ -328,7 +387,7 @@ def get_measurement_integrity_stats(
         "legacy_outcome_sessions": legacy_outcome_sessions,
         "legacy_goal_category_sessions": legacy_goal_category_sessions,
         "remaining_legacy_rows": remaining_legacy_rows,
-        "sessions_missing_transcript_telemetry": total_sessions - sessions_with_messages,
+        "sessions_missing_transcript_telemetry": sessions_missing_transcript_telemetry,
         "sessions_missing_tool_telemetry": sessions_missing_tool_telemetry,
         "sessions_missing_model_telemetry": sessions_missing_model_telemetry,
         "source_quality": source_quality,

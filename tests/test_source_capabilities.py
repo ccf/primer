@@ -7,12 +7,16 @@ def test_cursor_capability_exists():
 
     assert cap == AgentCapability(
         agent_type="cursor",
-        supports_transcript=True,
-        supports_tool_calls=False,
-        supports_model_usage=False,
-        supports_facets=False,
-        supports_native_discovery=False,
+        transcript="required",
+        tool_calls="unavailable",
+        model_usage="unavailable",
+        facets="unavailable",
+        native_discovery="unavailable",
     )
+    assert cap.supports_transcript is True
+    assert cap.supports_tool_calls is False
+    assert cap.parity_for("transcript") == "required"
+    assert cap.parity_for("tool_calls") == "unavailable"
 
 
 def test_unknown_agent_capability_is_none():
