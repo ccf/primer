@@ -6,8 +6,10 @@ import bcrypt
 
 from primer.common.models import (
     Engineer,
+    ModelUsage,
     Session,
     SessionFacets,
+    SessionMessage,
     Team,
     ToolUsage,
 )
@@ -67,6 +69,26 @@ class TestEngineerProfileOverview:
             duration_seconds=300.0,
         )
         db_session.add(SessionFacets(session_id=s1.id, session_type="feature", outcome="success"))
+        for ordinal in range(10):
+            db_session.add(
+                SessionMessage(
+                    session_id=s1.id,
+                    ordinal=ordinal,
+                    role="human" if ordinal % 2 == 0 else "assistant",
+                    content_text=f"message {ordinal}",
+                )
+            )
+        db_session.add(ToolUsage(session_id=s1.id, tool_name="Read", call_count=4))
+        db_session.add(
+            ModelUsage(
+                session_id=s1.id,
+                model_name="claude-sonnet-4-5-20250929",
+                input_tokens=2000,
+                output_tokens=1000,
+                cache_read_tokens=0,
+                cache_creation_tokens=0,
+            )
+        )
 
         s2 = _create_session(
             db_session,
@@ -79,6 +101,26 @@ class TestEngineerProfileOverview:
             duration_seconds=200.0,
         )
         db_session.add(SessionFacets(session_id=s2.id, session_type="debugging", outcome="partial"))
+        for ordinal in range(8):
+            db_session.add(
+                SessionMessage(
+                    session_id=s2.id,
+                    ordinal=ordinal,
+                    role="human" if ordinal % 2 == 0 else "assistant",
+                    content_text=f"message {ordinal}",
+                )
+            )
+        db_session.add(ToolUsage(session_id=s2.id, tool_name="Read", call_count=2))
+        db_session.add(
+            ModelUsage(
+                session_id=s2.id,
+                model_name="claude-sonnet-4-5-20250929",
+                input_tokens=1500,
+                output_tokens=800,
+                cache_read_tokens=0,
+                cache_creation_tokens=0,
+            )
+        )
         db_session.flush()
 
         r = client.get(
