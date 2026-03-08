@@ -189,6 +189,15 @@ def test_recommendation_high_token_usage(client, engineer_with_key, admin_header
             input_tokens=400_000,
             output_tokens=200_000,
             duration_seconds=300.0,
+            model_usages=[
+                {
+                    "model_name": "claude-sonnet-4-20250514",
+                    "input_tokens": 400_000,
+                    "output_tokens": 200_000,
+                    "cache_read_tokens": 0,
+                    "cache_creation_tokens": 0,
+                }
+            ],
         )
 
     r = client.get("/api/v1/analytics/recommendations", headers=admin_headers)
