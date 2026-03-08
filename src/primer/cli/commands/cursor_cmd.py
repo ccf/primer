@@ -19,10 +19,10 @@ def import_bundle(bundle_path: Path) -> None:
     from primer.cli import console
 
     extractor = CursorExtractor()
-    meta = extractor.extract(str(bundle_path))
     try:
+        meta = extractor.extract(str(bundle_path))
         store_path = extractor.get_session_path(meta.session_id)
-    except ValueError as exc:
+    except Exception as exc:
         raise click.ClickException(f"Invalid Cursor bundle: {exc}") from exc
 
     if meta.message_count == 0:
