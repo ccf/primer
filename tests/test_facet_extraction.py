@@ -249,6 +249,10 @@ class TestFacetsDictToPayload:
         payload = _facets_dict_to_payload({**sample_facets_response, "confidence_score": "82%"})
         assert payload.confidence_score is None
 
+    def test_unknown_extracted_outcome_is_dropped(self, sample_facets_response):
+        payload = _facets_dict_to_payload({**sample_facets_response, "outcome": "abandoned"})
+        assert payload.outcome is None
+
     def test_rejects_scalar_goal_categories(self):
         with pytest.raises(ValidationError):
             _facets_dict_to_payload(

@@ -12,7 +12,11 @@ import httpx
 
 from primer.common.config import settings
 from primer.common.database import SessionLocal
-from primer.common.facet_taxonomy import canonical_outcome, normalize_goal_categories
+from primer.common.facet_taxonomy import (
+    CANONICAL_OUTCOME_ALIASES,
+    canonical_outcome,
+    normalize_goal_categories,
+)
 from primer.common.models import Session as SessionModel
 from primer.common.models import SessionFacets, SessionMessage
 from primer.common.schemas import SessionFacetsPayload
@@ -152,7 +156,7 @@ def _facets_dict_to_payload(data: dict) -> SessionFacetsPayload:
 
     outcome = data.get("outcome")
     if isinstance(outcome, str):
-        outcome = canonical_outcome(outcome)
+        outcome = canonical_outcome(outcome) if outcome in CANONICAL_OUTCOME_ALIASES else None
 
     return SessionFacetsPayload(
         underlying_goal=data.get("underlying_goal"),
