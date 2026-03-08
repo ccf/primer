@@ -281,6 +281,63 @@ def test_ingest_session_upsert_clears_related_rows_when_payload_lists_are_empty(
     assert stored.commits == []
 
 
+def test_ingest_session_upsert_preserves_related_rows_when_payload_lists_are_omitted(
+    client, engineer_with_key, db_session
+):
+    _eng, api_key = engineer_with_key
+    session_id = str(uuid.uuid4())
+
+    initial_payload = {
+        "session_id": session_id,
+        "api_key": api_key,
+        "message_count": 2,
+        "tool_usages": [{"tool_name": "Read", "call_count": 3}],
+        "model_usages": [
+            {
+                "model_name": "claude-sonnet-4-20250514",
+                "input_tokens": 100,
+                "output_tokens": 50,
+            }
+        ],
+        "messages": [
+            {"ordinal": 0, "role": "human", "content_text": "hello"},
+            {"ordinal": 1, "role": "assistant", "content_text": "hi"},
+        ],
+        "commits": [
+            {
+                "sha": "abc123",
+                "message": "Initial commit",
+                "author_name": "Test Engineer",
+                "author_email": "test@example.com",
+                "committed_at": datetime(2026, 3, 8, 12, 0, 0).isoformat(),
+                "files_changed": 1,
+                "lines_added": 10,
+                "lines_deleted": 2,
+            }
+        ],
+    }
+    response = client.post("/api/v1/ingest/session", json=initial_payload)
+    assert response.status_code == 200
+
+    update_payload = {
+        "session_id": session_id,
+        "api_key": api_key,
+        "message_count": 5,
+    }
+    response = client.post("/api/v1/ingest/session", json=update_payload)
+    assert response.status_code == 200
+    assert response.json()["created"] is False
+
+    stored = db_session.query(SessionModel).filter(SessionModel.id == session_id).one()
+    assert stored.message_count == 5
+    assert [(usage.tool_name, usage.call_count) for usage in stored.tool_usages] == [("Read", 3)]
+    assert [
+        (usage.model_name, usage.input_tokens, usage.output_tokens) for usage in stored.model_usages
+    ] == [("claude-sonnet-4-20250514", 100, 50)]
+    assert [message.content_text for message in stored.messages] == ["hello", "hi"]
+    assert [commit.commit_sha for commit in stored.commits] == ["abc123"]
+
+
 def test_ingest_bulk(client, engineer_with_key):
     _eng, api_key = engineer_with_key
     sessions = [
