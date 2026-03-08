@@ -210,8 +210,9 @@ class CursorExtractor:
         if not meta.primary_model and model_tokens:
             meta.primary_model = max(
                 model_tokens,
-                key=lambda model: model_tokens[model].get("input", 0)
-                + model_tokens[model].get("output", 0),
+                key=lambda model: (
+                    model_tokens[model].get("input", 0) + model_tokens[model].get("output", 0)
+                ),
             )
 
         return meta
