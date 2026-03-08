@@ -8,7 +8,6 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
-from urllib.parse import unquote, urlparse
 
 from primer.hook.extractor import SessionMetadata
 
@@ -301,28 +300,3 @@ def _safe_int(value: object) -> int:
 
 def _safe_non_negative_int(value: object) -> int:
     return max(0, _safe_int(value))
-
-
-def _load_json_object(path: Path) -> dict | None:
-    try:
-        with open(path) as f:
-            data = json.load(f)
-    except (json.JSONDecodeError, OSError):
-        return None
-    return data if isinstance(data, dict) else None
-
-
-def _load_workspace_project_path(workspace_file: Path) -> str | None:
-    workspace = _load_json_object(workspace_file)
-    if not isinstance(workspace, dict):
-        return None
-
-    folder_uri = workspace.get("folder")
-    if not isinstance(folder_uri, str) or not folder_uri:
-        return None
-
-    parsed = urlparse(folder_uri)
-    if parsed.scheme != "file":
-        return None
-
-    return unquote(parsed.path) or None

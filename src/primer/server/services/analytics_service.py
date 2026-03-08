@@ -228,9 +228,9 @@ def _build_overview(
     ).first()
     duration_agg = q.with_entities(func.avg(SessionModel.duration_seconds)).first()
 
-    total_tool_calls = tool_agg[0] or 0 if tool_agg else 0
-    total_input_tokens = model_agg[0] or 0 if model_agg else 0
-    total_output_tokens = model_agg[1] or 0 if model_agg else 0
+    total_tool_calls = (tool_agg[0] or 0) if tool_agg else 0
+    total_input_tokens = (model_agg[0] or 0) if model_agg else 0
+    total_output_tokens = (model_agg[1] or 0) if model_agg else 0
     avg_duration = float(duration_agg[0]) if duration_agg and duration_agg[0] else None
     message_backed_total, message_backed_sessions = _message_backed_stats(
         db,

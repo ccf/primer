@@ -37,7 +37,8 @@ def _has_legacy_goal_categories(value: object) -> bool:
 
 
 def _legacy_goal_categories_predicate(db: Session):
-    dialect_name = db.get_bind().dialect.name if db.get_bind() is not None else ""
+    engine = db.get_bind()
+    dialect_name = engine.dialect.name if engine is not None else ""
     if dialect_name == "sqlite":
         return func.json_type(SessionFacets.goal_categories) == "object"
     if dialect_name == "postgresql":
