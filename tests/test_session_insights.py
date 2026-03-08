@@ -454,6 +454,15 @@ def test_overview_enrichment(client, engineer_with_key, admin_headers):
         end_reason="user_exit",
         cache_read_tokens=500,
         input_tokens=1000,
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-20250514",
+                "input_tokens": 1000,
+                "output_tokens": 500,
+                "cache_read_tokens": 500,
+                "cache_creation_tokens": 0,
+            }
+        ],
         facets={"outcome": "success", "primary_success": "full"},
     )
 
