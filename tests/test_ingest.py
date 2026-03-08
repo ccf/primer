@@ -1,10 +1,12 @@
 import uuid
+from datetime import datetime
 
 import pytest
+from pydantic import ValidationError
 
 from primer.common.models import Session as SessionModel
 from primer.common.models import SessionFacets
-from primer.common.schemas import SessionFacetsPayload
+from primer.common.schemas import SessionFacetsPayload, SessionResponse
 from primer.server.services.ingest_service import upsert_facets
 
 
@@ -69,6 +71,109 @@ def test_ingest_session(client, engineer_with_key):
     assert data["status"] == "ok"
     assert data["session_id"] == session_id
     assert data["created"] is True
+
+
+def test_ingest_session_accepts_cursor_agent_type_and_persists(
+    client, engineer_with_key, db_session
+):
+    _eng, api_key = engineer_with_key
+    session_id = str(uuid.uuid4())
+    payload = {
+        "session_id": session_id,
+        "api_key": api_key,
+        "agent_type": "cursor",
+        "project_name": "cursor-project",
+        "message_count": 2,
+        "user_message_count": 1,
+        "assistant_message_count": 1,
+        "tool_call_count": 0,
+        "input_tokens": 120,
+        "output_tokens": 45,
+        "primary_model": "gpt-4.1",
+        "first_prompt": "Imported from Cursor",
+        "messages": [
+            {"ordinal": 0, "role": "human", "content_text": "Imported from Cursor"},
+            {"ordinal": 1, "role": "assistant", "content_text": "Ready to help"},
+        ],
+    }
+
+    r = client.post("/api/v1/ingest/session", json=payload)
+
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok", "session_id": session_id, "created": True}
+
+    stored = db_session.query(SessionModel).filter(SessionModel.id == session_id).one()
+    assert stored.agent_type == "cursor"
+    assert stored.project_name == "cursor-project"
+    assert stored.message_count == 2
+    assert stored.user_message_count == 1
+    assert stored.assistant_message_count == 1
+    assert stored.primary_model == "gpt-4.1"
+    assert stored.first_prompt == "Imported from Cursor"
+    assert stored.has_facets is False
+
+
+def test_session_response_accepts_cursor_agent_type():
+    response = SessionResponse(
+        id=str(uuid.uuid4()),
+        engineer_id=str(uuid.uuid4()),
+        agent_type="cursor",
+        project_path="/workspace/demo",
+        project_name="demo",
+        git_branch=None,
+        agent_version="cursor-1.0.0",
+        permission_mode=None,
+        end_reason=None,
+        started_at=datetime(2026, 3, 8, 10, 0, 0),
+        ended_at=datetime(2026, 3, 8, 10, 5, 0),
+        duration_seconds=300.0,
+        message_count=2,
+        user_message_count=1,
+        assistant_message_count=1,
+        tool_call_count=0,
+        input_tokens=0,
+        output_tokens=0,
+        cache_read_tokens=0,
+        cache_creation_tokens=0,
+        primary_model="gpt-4.1",
+        first_prompt="Imported from Cursor",
+        summary=None,
+        has_facets=False,
+        created_at=datetime(2026, 3, 8, 10, 5, 1),
+    )
+
+    assert response.agent_type == "cursor"
+
+
+def test_session_response_rejects_unknown_agent_type():
+    with pytest.raises(ValidationError):
+        SessionResponse(
+            id=str(uuid.uuid4()),
+            engineer_id=str(uuid.uuid4()),
+            agent_type="unknown_agent",
+            project_path=None,
+            project_name=None,
+            git_branch=None,
+            agent_version=None,
+            permission_mode=None,
+            end_reason=None,
+            started_at=None,
+            ended_at=None,
+            duration_seconds=None,
+            message_count=0,
+            user_message_count=0,
+            assistant_message_count=0,
+            tool_call_count=0,
+            input_tokens=0,
+            output_tokens=0,
+            cache_read_tokens=0,
+            cache_creation_tokens=0,
+            primary_model=None,
+            first_prompt=None,
+            summary=None,
+            has_facets=False,
+            created_at=datetime(2026, 3, 8, 10, 0, 0),
+        )
 
 
 def test_ingest_session_normalizes_legacy_facet_payload(client, engineer_with_key, db_session):

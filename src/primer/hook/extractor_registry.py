@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 
 from primer.hook.codex_extractor import CodexExtractor
+from primer.hook.cursor_extractor import CursorExtractor
 from primer.hook.extractor import ClaudeCodeExtractor, SessionExtractor
 from primer.hook.gemini_extractor import GeminiExtractor
 
@@ -17,6 +18,7 @@ EXTRACTORS: dict[str, type] = {
     "claude_code": ClaudeCodeExtractor,
     "codex_cli": CodexExtractor,
     "gemini_cli": GeminiExtractor,
+    "cursor": CursorExtractor,
 }
 
 

@@ -62,6 +62,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - `P0` Build an effectiveness and quality attribution layer that connects workflows to code outcomes.
 - `P0` Launch a true project intelligence workspace instead of hiding project insights inside other pages.
 - `P0` Turn static recommendations into a measurable intervention workflow.
+- `P1` Add Cursor as the next first-class captured session source, with parity checks before it participates in cross-agent analytics.
 - `P1` Add workflow fingerprints, exemplar sessions, and playbooks that capture how high performers actually work.
 - `P1` Bring key recommendations into the MCP sidecar and live session flow.
 
@@ -73,10 +74,13 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [ ] [P0] Outcome normalization and historical backfill for previously ingested sessions
 - [ ] [P0] Coverage dashboard for facet extraction, transcript completeness, GitHub sync, and repository metadata
 - [ ] [P0] Confidence scoring for extracted facets and downstream recommendations
+- [ ] [P0] Cross-agent schema parity matrix so Primer knows which session fields are required, optional, or unavailable per source
+- [ ] [P0] Partial-telemetry handling for IDE-native agents like Cursor so missing transcript, tool, or model fields do not distort org-wide metrics
 - [ ] [P1] Execution evidence capture: lint, test, build, and verification signals per session
 - [ ] [P1] Change-shape capture: files touched, diff size, churn, and rewrite/revert indicators
 - [ ] [P1] Recovery-path tracking: detect whether engineers recover after friction or abandon the attempt
 - [ ] [P1] Derived analytics tables and materialized rollups for heavy longitudinal queries
+- [ ] [P1] Source-quality dashboard by agent type, including capture coverage and telemetry completeness for Cursor
 - [ ] [P2] Data-quality anomaly detection for broken ingestion, sparse transcripts, or stale integrations
 
 ## Session Intelligence
@@ -90,7 +94,10 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Permission mode analysis (success rate by permission level)
 - [x] Satisfaction trend tracking (satisfied / neutral / dissatisfied over time)
 - [x] Similar sessions panel with 3-tier relevance matching
+- [ ] [P0] Cursor session ingestion and discovery pipeline
+- [ ] [P0] Cursor transcript, tool-call, and model-usage extraction mapped onto the normalized session model
 - [ ] [P1] Workflow fingerprinting: infer common sequences like search -> read -> edit -> test -> fix
+- [ ] [P1] Cursor-specific workflow fingerprinting and session archetype mapping
 - [ ] [P1] Session archetype detection: debugging, feature delivery, refactor, migration, docs, investigation
 - [ ] [P1] Delegation graph capture for multi-agent and subagent workflows
 - [ ] [P2] Exemplar session library for high-value workflows and onboarding examples
@@ -146,6 +153,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Project AI-readiness scoring (CLAUDE.md, AGENTS.md, .claude/ detection)
 - [ ] [P0] Project scorecard that combines adoption, effectiveness, quality, and cost efficiency
 - [ ] [P0] Project-level workflow fingerprints and friction hotspots
+- [ ] [P1] Project-level agent mix comparison, including Cursor sessions alongside CLI agents
 - [ ] [P1] Repository context model: language mix, test maturity, repo size, and AI-enablement signals
 - [ ] [P1] Project enablement recommendations tied to observed bottlenecks
 - [ ] [P1] Cross-project comparison: which repos are easiest or hardest to use AI effectively in
@@ -255,8 +263,10 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Docker Compose and Kubernetes Helm deployment
 - [x] PostgreSQL and SQLite support
 - [x] Alembic migration bundling in pip package
+- [ ] [P0] Cursor `agent_type` support across capture, sync, ingest, and analytics filters
 - [ ] [P0] Durable background job system for sync, facet extraction, narratives, and alerts
 - [ ] [P0] Scalable API key lookup and verification strategy
+- [ ] [P1] Source-capability registry so Primer can safely gate analytics by what each agent source actually provides
 - [ ] [P1] OpenTelemetry integration for metrics, traces, and logs
 - [ ] [P1] Redis-backed caching for analytics query results and high-read metadata
 - [ ] [P1] Analytics performance work for large orgs and concurrent dashboard usage

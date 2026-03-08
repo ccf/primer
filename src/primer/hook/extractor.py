@@ -444,13 +444,17 @@ def _extract_message(entry: dict, ordinal: int) -> dict | None:
     return None
 
 
-def load_facets(session_id: str) -> dict | None:
-    """Load facets from ~/.claude/usage-data/facets/{session_id}.json if they exist."""
-    facets_path = Path.home() / ".claude" / "usage-data" / "facets" / f"{session_id}.json"
-    if not facets_path.exists():
+def load_facets(session_id: str, facets_path: str | None = None) -> dict | None:
+    """Load facets from an explicit path or the default Claude facets store."""
+    path = (
+        Path(facets_path)
+        if facets_path
+        else (Path.home() / ".claude" / "usage-data" / "facets" / f"{session_id}.json")
+    )
+    if not path.exists():
         return None
     try:
-        with open(facets_path) as f:
+        with open(path) as f:
             data = json.load(f)
         # Map to our schema field names
         return {

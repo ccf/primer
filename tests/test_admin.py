@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from primer.common.models import AuditLog, SessionFacets, SessionMessage
+from primer.common.models import AuditLog, ModelUsage, SessionFacets, SessionMessage, ToolUsage
 from primer.common.models import Session as SessionModel
 
 
@@ -30,7 +30,10 @@ def _create_measurement_integrity_session(
     db_session,
     engineer_id,
     *,
+    agent_type="claude_code",
     with_messages=False,
+    with_tool_usage=False,
+    with_model_usage=False,
     outcome=None,
     goal_categories=None,
     confidence_score=None,
@@ -38,13 +41,15 @@ def _create_measurement_integrity_session(
     session = SessionModel(
         id=str(uuid.uuid4()),
         engineer_id=engineer_id,
+        agent_type=agent_type,
         started_at=datetime.now(UTC),
         message_count=1 if with_messages else 0,
         user_message_count=1 if with_messages else 0,
         assistant_message_count=0,
-        tool_call_count=0,
-        input_tokens=0,
-        output_tokens=0,
+        tool_call_count=1 if with_tool_usage else 0,
+        input_tokens=100 if with_model_usage else 0,
+        output_tokens=50 if with_model_usage else 0,
+        primary_model="claude-sonnet-4-5-20250929" if with_model_usage else None,
         duration_seconds=60.0,
         has_facets=(
             outcome is not None or goal_categories is not None or confidence_score is not None
@@ -60,6 +65,25 @@ def _create_measurement_integrity_session(
                 ordinal=0,
                 role="human",
                 content_text="Investigate measurement integrity coverage",
+            )
+        )
+
+    if with_tool_usage:
+        db_session.add(
+            ToolUsage(
+                session_id=session.id,
+                tool_name="Read",
+                call_count=1,
+            )
+        )
+
+    if with_model_usage:
+        db_session.add(
+            ModelUsage(
+                session_id=session.id,
+                model_name="claude-sonnet-4-5-20250929",
+                input_tokens=100,
+                output_tokens=50,
             )
         )
 
@@ -154,6 +178,144 @@ def test_measurement_integrity_stats(client, admin_headers, engineer_with_key, d
     assert data["legacy_outcome_sessions"] == 1
     assert data["legacy_goal_category_sessions"] == 1
     assert data["remaining_legacy_rows"] == 1
+
+
+def test_measurement_integrity_stats_include_source_quality_breakdown(
+    client, admin_headers, engineer_with_key, db_session
+):
+    eng, _api_key = engineer_with_key
+
+    _create_measurement_integrity_session(
+        db_session,
+        eng.id,
+        agent_type="claude_code",
+        with_messages=True,
+        with_tool_usage=True,
+        with_model_usage=True,
+        outcome="success",
+        goal_categories=["fix_bug"],
+        confidence_score=0.95,
+    )
+    _create_measurement_integrity_session(
+        db_session,
+        eng.id,
+        agent_type="cursor",
+        with_messages=True,
+    )
+    _create_measurement_integrity_session(
+        db_session,
+        eng.id,
+        agent_type="cursor",
+        with_messages=False,
+    )
+
+    response = client.get("/api/v1/admin/measurement-integrity", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["sessions_missing_transcript_telemetry"] == 1
+    assert data["sessions_missing_tool_telemetry"] == 0
+    assert data["sessions_missing_model_telemetry"] == 0
+
+    source_quality = {entry["agent_type"]: entry for entry in data["source_quality"]}
+
+    assert source_quality["claude_code"] == {
+        "agent_type": "claude_code",
+        "session_count": 1,
+        "transcript_coverage_pct": 100.0,
+        "tool_call_coverage_pct": 100.0,
+        "model_usage_coverage_pct": 100.0,
+        "facet_coverage_pct": 100.0,
+    }
+    assert source_quality["cursor"] == {
+        "agent_type": "cursor",
+        "session_count": 2,
+        "transcript_coverage_pct": 50.0,
+        "tool_call_coverage_pct": 0.0,
+        "model_usage_coverage_pct": 0.0,
+        "facet_coverage_pct": 0.0,
+    }
+
+
+def test_measurement_integrity_stats_count_missing_supported_tool_and_model_telemetry(
+    client, admin_headers, engineer_with_key, db_session
+):
+    eng, _api_key = engineer_with_key
+
+    _create_measurement_integrity_session(
+        db_session,
+        eng.id,
+        agent_type="claude_code",
+        with_messages=True,
+        with_tool_usage=True,
+        with_model_usage=True,
+        outcome="success",
+        confidence_score=0.95,
+    )
+    _create_measurement_integrity_session(
+        db_session,
+        eng.id,
+        agent_type="claude_code",
+        with_messages=True,
+        with_tool_usage=False,
+        with_model_usage=False,
+        outcome="success",
+        confidence_score=0.91,
+    )
+    _create_measurement_integrity_session(
+        db_session,
+        eng.id,
+        agent_type="cursor",
+        with_messages=True,
+        with_tool_usage=False,
+        with_model_usage=False,
+    )
+
+    response = client.get("/api/v1/admin/measurement-integrity", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["sessions_missing_tool_telemetry"] == 1
+    assert data["sessions_missing_model_telemetry"] == 1
+
+    source_quality = {entry["agent_type"]: entry for entry in data["source_quality"]}
+    assert source_quality["claude_code"]["tool_call_coverage_pct"] == 50.0
+    assert source_quality["claude_code"]["model_usage_coverage_pct"] == 50.0
+    assert source_quality["cursor"]["tool_call_coverage_pct"] == 0.0
+    assert source_quality["cursor"]["model_usage_coverage_pct"] == 0.0
+
+
+def test_measurement_integrity_facet_coverage_pct_ignores_unsupported_sources(
+    client, admin_headers, engineer_with_key, db_session
+):
+    eng, _api_key = engineer_with_key
+
+    _create_measurement_integrity_session(
+        db_session,
+        eng.id,
+        agent_type="claude_code",
+        with_messages=True,
+        outcome=None,
+        goal_categories=None,
+        confidence_score=None,
+    )
+    _create_measurement_integrity_session(
+        db_session,
+        eng.id,
+        agent_type="cursor",
+        with_messages=True,
+        outcome="success",
+        goal_categories=["fix_bug"],
+        confidence_score=0.95,
+    )
+
+    response = client.get("/api/v1/admin/measurement-integrity", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total_sessions"] == 2
+    assert data["sessions_with_facets"] == 1
+    assert data["facet_coverage_pct"] == 0.0
 
 
 def test_normalize_facets_endpoint_dry_run_and_limit(

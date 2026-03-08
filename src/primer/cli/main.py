@@ -6,6 +6,7 @@ Entry point: `primer` (registered via pyproject.toml [project.scripts]).
 import click
 
 from primer.cli.commands.configure import configure
+from primer.cli.commands.cursor_cmd import cursor
 from primer.cli.commands.doctor import doctor
 from primer.cli.commands.hook import hook
 from primer.cli.commands.init import init
@@ -32,3 +33,4 @@ cli.add_command(mcp)
 cli.add_command(sync)
 cli.add_command(doctor)
 cli.add_command(configure)
+cli.add_command(cursor)

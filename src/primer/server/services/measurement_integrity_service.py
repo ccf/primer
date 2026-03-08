@@ -6,12 +6,15 @@ from sqlalchemy.orm import Session
 from primer.common.facet_taxonomy import canonical_outcome, normalize_goal_categories
 from primer.common.models import (
     Engineer,
+    ModelUsage,
     SessionFacets,
     SessionMessage,
+    ToolUsage,
 )
 from primer.common.models import (
     Session as SessionModel,
 )
+from primer.common.source_capabilities import get_capability_for
 
 LOW_CONFIDENCE_THRESHOLD = 0.7
 LEGACY_OUTCOMES = {
@@ -103,6 +106,58 @@ def _scoped_facets_query(db: Session, scoped_session_ids):
     )
 
 
+def _grouped_session_counts(
+    db: Session,
+    *,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> dict[str, int]:
+    rows = (
+        _apply_session_scope(
+            db.query(
+                SessionModel.agent_type,
+                func.count(SessionModel.id),
+            ),
+            team_id=team_id,
+            engineer_id=engineer_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        .group_by(SessionModel.agent_type)
+        .all()
+    )
+    return {agent_type: count for agent_type, count in rows if agent_type}
+
+
+def _grouped_related_counts(
+    db: Session,
+    related_model,
+    session_key,
+    *,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> dict[str, int]:
+    rows = (
+        _apply_session_scope(
+            db.query(
+                SessionModel.agent_type,
+                func.count(func.distinct(session_key)),
+            ).join(related_model, session_key == SessionModel.id),
+            team_id=team_id,
+            engineer_id=engineer_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        .group_by(SessionModel.agent_type)
+        .all()
+    )
+    return {agent_type: count for agent_type, count in rows if agent_type}
+
+
 def _normalized_row_updates(row: SessionFacets) -> dict[str, object]:
     updates: dict[str, object] = {}
 
@@ -121,7 +176,7 @@ def get_measurement_integrity_stats(
     engineer_id: str | None = None,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
-) -> dict[str, int | float]:
+) -> dict[str, int | float | list[dict[str, str | int | float]]]:
     scoped_session_ids = _scoped_session_ids_subquery(
         db,
         team_id=team_id,
@@ -161,13 +216,105 @@ def get_measurement_integrity_stats(
     remaining_legacy_rows = _count_legacy_rows(
         db, query=_scoped_facets_query(db, scoped_session_ids)
     )
+    sessions_by_agent = _grouped_session_counts(
+        db,
+        team_id=team_id,
+        engineer_id=engineer_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    transcript_sessions_by_agent = _grouped_related_counts(
+        db,
+        SessionMessage,
+        SessionMessage.session_id,
+        team_id=team_id,
+        engineer_id=engineer_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    tool_sessions_by_agent = _grouped_related_counts(
+        db,
+        ToolUsage,
+        ToolUsage.session_id,
+        team_id=team_id,
+        engineer_id=engineer_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    model_sessions_by_agent = _grouped_related_counts(
+        db,
+        ModelUsage,
+        ModelUsage.session_id,
+        team_id=team_id,
+        engineer_id=engineer_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    facet_sessions_by_agent = _grouped_related_counts(
+        db,
+        SessionFacets,
+        SessionFacets.session_id,
+        team_id=team_id,
+        engineer_id=engineer_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    facet_capable_session_count = sum(
+        session_count
+        for agent_type, session_count in sessions_by_agent.items()
+        if (capability := get_capability_for(agent_type)) and capability.supports_facets
+    )
+    facet_capable_sessions_with_facets = sum(
+        facet_sessions_by_agent.get(agent_type, 0)
+        for agent_type in sessions_by_agent
+        if (capability := get_capability_for(agent_type)) and capability.supports_facets
+    )
 
     facet_coverage_pct = (
-        round((sessions_with_facets / total_sessions) * 100, 1) if total_sessions else 0.0
+        round((facet_capable_sessions_with_facets / facet_capable_session_count) * 100, 1)
+        if facet_capable_session_count
+        else 0.0
     )
     transcript_coverage_pct = (
         round((sessions_with_messages / total_sessions) * 100, 1) if total_sessions else 0.0
     )
+    sessions_missing_tool_telemetry = 0
+    sessions_missing_model_telemetry = 0
+    source_quality: list[dict[str, str | int | float]] = []
+    for agent_type in sorted(sessions_by_agent):
+        session_count = sessions_by_agent[agent_type]
+        capability = get_capability_for(agent_type)
+        transcript_count = transcript_sessions_by_agent.get(agent_type, 0)
+        tool_count = tool_sessions_by_agent.get(agent_type, 0)
+        model_count = model_sessions_by_agent.get(agent_type, 0)
+        facet_count = facet_sessions_by_agent.get(agent_type, 0)
+        supports_tool_calls = bool(capability and capability.supports_tool_calls)
+        supports_model_usage = bool(capability and capability.supports_model_usage)
+        supports_facets = bool(capability and capability.supports_facets)
+
+        if supports_tool_calls:
+            sessions_missing_tool_telemetry += max(session_count - tool_count, 0)
+        if supports_model_usage:
+            sessions_missing_model_telemetry += max(session_count - model_count, 0)
+
+        source_quality.append(
+            {
+                "agent_type": agent_type,
+                "session_count": session_count,
+                "transcript_coverage_pct": round((transcript_count / session_count) * 100, 1)
+                if session_count
+                else 0.0,
+                "tool_call_coverage_pct": round((tool_count / session_count) * 100, 1)
+                if session_count
+                else 0.0,
+                "model_usage_coverage_pct": round((model_count / session_count) * 100, 1)
+                if session_count
+                else 0.0,
+                "facet_coverage_pct": round((facet_count / session_count) * 100, 1)
+                if supports_facets and session_count
+                else 0.0,
+            }
+        )
 
     return {
         "total_sessions": total_sessions,
@@ -180,6 +327,10 @@ def get_measurement_integrity_stats(
         "legacy_outcome_sessions": legacy_outcome_sessions,
         "legacy_goal_category_sessions": legacy_goal_category_sessions,
         "remaining_legacy_rows": remaining_legacy_rows,
+        "sessions_missing_transcript_telemetry": total_sessions - sessions_with_messages,
+        "sessions_missing_tool_telemetry": sessions_missing_tool_telemetry,
+        "sessions_missing_model_telemetry": sessions_missing_model_telemetry,
+        "source_quality": source_quality,
     }
 
 

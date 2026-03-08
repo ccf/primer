@@ -29,16 +29,16 @@ def get_usage_data_dir() -> Path:
 def list_local_sessions() -> list[LocalSession]:
     """Discover all local sessions across all supported agents.
 
-    Aggregates sessions from Claude Code, Codex CLI, and Gemini CLI
+    Aggregates sessions from Claude Code, Codex CLI, Gemini CLI, and Cursor
     using the extractor registry.
     """
     from primer.hook.extractor_registry import get_all_extractors
 
     results: list[LocalSession] = []
+    seen_keys: set[tuple[str, str]] = set()
     for extractor in get_all_extractors():
         try:
-            sessions = extractor.discover_sessions()
-            results.extend(sessions)
+            _extend_unique_sessions(results, seen_keys, extractor.discover_sessions())
         except Exception:
             logger.exception(f"Error discovering {extractor.agent_type} sessions")
     return results
@@ -59,3 +59,17 @@ def read_local_stats() -> dict:
             return json.load(f)
     except (json.JSONDecodeError, OSError):
         return {}
+
+
+def _extend_unique_sessions(
+    results: list[LocalSession],
+    seen_keys: set[tuple[str, str]],
+    sessions: list[LocalSession],
+) -> None:
+    # Preserve the first discovered session for a given agent/session key.
+    for session in sessions:
+        key = (session.agent_type, session.session_id)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        results.append(session)

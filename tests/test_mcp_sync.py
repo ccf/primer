@@ -113,6 +113,84 @@ def test_sync_uploads_missing(mock_list, mock_server_ids, mock_get_ext, mock_fac
 @patch("primer.mcp.sync.get_extractor_for")
 @patch("primer.mcp.sync.get_server_session_ids")
 @patch("primer.mcp.sync.list_local_sessions")
+def test_sync_uploads_imported_cursor_session_without_facets(
+    mock_list, mock_server_ids, mock_get_ext, mock_facets, mock_post
+):
+    mock_list.return_value = [
+        LocalSession(
+            session_id="cursor-1",
+            transcript_path="/t/cursor-1.json",
+            facets_path=None,
+            has_facets=False,
+            project_path=None,
+            agent_type="cursor",
+        ),
+    ]
+    mock_server_ids.return_value = set()
+
+    meta = SessionMetadata(session_id="", agent_type="cursor")
+    mock_get_ext.return_value = _make_mock_extractor(meta)
+    mock_facets.return_value = {"outcome": "success"}
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_post.return_value = mock_resp
+
+    from primer.mcp.sync import sync_sessions
+
+    result = sync_sessions("http://test:8000", "key")
+
+    assert result["synced"] == 1
+    mock_facets.assert_not_called()
+    payload = mock_post.call_args.kwargs.get("json") or mock_post.call_args[1].get("json")
+    assert payload["agent_type"] == "cursor"
+    assert "facets" not in payload
+
+
+@patch("primer.mcp.sync.httpx.post")
+@patch("primer.mcp.sync.load_facets")
+@patch("primer.mcp.sync.get_extractor_for")
+@patch("primer.mcp.sync.get_server_session_ids")
+@patch("primer.mcp.sync.list_local_sessions")
+def test_sync_skips_cursor_facets_when_source_capability_disables_them(
+    mock_list, mock_server_ids, mock_get_ext, mock_facets, mock_post
+):
+    mock_list.return_value = [
+        LocalSession(
+            session_id="cursor-2",
+            transcript_path="/t/cursor-2.json",
+            facets_path="/workspace/cursor-2-facets.json",
+            has_facets=True,
+            project_path=None,
+            agent_type="cursor",
+        ),
+    ]
+    mock_server_ids.return_value = set()
+
+    meta = SessionMetadata(session_id="", agent_type="cursor")
+    mock_get_ext.return_value = _make_mock_extractor(meta)
+    mock_facets.return_value = {"outcome": "success"}
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_post.return_value = mock_resp
+
+    from primer.mcp.sync import sync_sessions
+
+    result = sync_sessions("http://test:8000", "key")
+
+    assert result["synced"] == 1
+    mock_facets.assert_not_called()
+    payload = mock_post.call_args.kwargs.get("json") or mock_post.call_args[1].get("json")
+    assert payload["agent_type"] == "cursor"
+    assert "facets" not in payload
+
+
+@patch("primer.mcp.sync.httpx.post")
+@patch("primer.mcp.sync.load_facets")
+@patch("primer.mcp.sync.get_extractor_for")
+@patch("primer.mcp.sync.get_server_session_ids")
+@patch("primer.mcp.sync.list_local_sessions")
 def test_sync_upload_failure(mock_list, mock_server_ids, mock_get_ext, mock_facets, mock_post):
     mock_list.return_value = [
         _local("s1", "/t/s1.jsonl"),

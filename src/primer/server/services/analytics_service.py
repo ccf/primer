@@ -11,6 +11,7 @@ from primer.common.models import (
     Engineer,
     ModelUsage,
     SessionFacets,
+    SessionMessage,
     ToolUsage,
 )
 from primer.common.models import (
@@ -45,6 +46,7 @@ from primer.common.schemas import (
     ToolRanking,
     ToolTrendEntry,
 )
+from primer.common.source_capabilities import CAPABILITIES
 
 
 def base_session_query(
@@ -69,6 +71,96 @@ def base_session_query(
     return q
 
 
+def _agent_types_with_capability(capability_name: str) -> list[str]:
+    return [
+        agent_type
+        for agent_type, capability in CAPABILITIES.items()
+        if getattr(capability, capability_name)
+    ]
+
+
+def _filter_sessions_by_capability(query, capability_name: str):
+    supported_agent_types = _agent_types_with_capability(capability_name)
+    if not supported_agent_types:
+        return query.filter(SessionModel.id.is_(None))
+    return query.filter(SessionModel.agent_type.in_(supported_agent_types))
+
+
+def _apply_session_scope_filters(
+    query,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+):
+    if engineer_id:
+        query = query.filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
+        query = query.join(Engineer).filter(Engineer.team_id == team_id)
+    if start_date:
+        query = query.filter(SessionModel.started_at >= start_date)
+    if end_date:
+        query = query.filter(SessionModel.started_at <= end_date)
+    return query
+
+
+def _message_backed_stats(
+    db: Session,
+    *,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> tuple[int, int]:
+    total_messages, session_count = _apply_session_scope_filters(
+        _filter_sessions_by_capability(
+            db.query(
+                func.count(SessionMessage.id),
+                func.count(func.distinct(SessionModel.id)),
+            ).join(SessionModel, SessionMessage.session_id == SessionModel.id),
+            "supports_transcript",
+        ),
+        team_id=team_id,
+        engineer_id=engineer_id,
+        start_date=start_date,
+        end_date=end_date,
+    ).first() or (0, 0)
+    return int(total_messages or 0), int(session_count or 0)
+
+
+def _model_token_totals_by_group(
+    db: Session,
+    group_by_column,
+    *,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> dict[str, int]:
+    rows = (
+        _apply_session_scope_filters(
+            _filter_sessions_by_capability(
+                db.query(
+                    group_by_column,
+                    func.coalesce(func.sum(ModelUsage.input_tokens + ModelUsage.output_tokens), 0),
+                ).join(SessionModel),
+                "supports_model_usage",
+            ),
+            team_id=team_id,
+            engineer_id=engineer_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        .group_by(group_by_column)
+        .all()
+    )
+    return {
+        group_key: int(total_tokens or 0)
+        for group_key, total_tokens in rows
+        if group_key is not None
+    }
+
+
 def _compute_success_rate(
     db: Session,
     team_id: str | None = None,
@@ -78,6 +170,7 @@ def _compute_success_rate(
 ) -> float | None:
     """Compute success rate from session facets."""
     facets_q = db.query(SessionFacets.outcome).join(SessionModel)
+    facets_q = _filter_sessions_by_capability(facets_q, "supports_facets")
     if engineer_id:
         facets_q = facets_q.filter(SessionModel.engineer_id == engineer_id)
     elif team_id:
@@ -109,20 +202,47 @@ def _build_overview(
 
     total_sessions = q.count()
 
-    agg = q.with_entities(
-        func.sum(SessionModel.message_count),
-        func.sum(SessionModel.tool_call_count),
-        func.sum(SessionModel.input_tokens),
-        func.sum(SessionModel.output_tokens),
-        func.avg(SessionModel.duration_seconds),
+    tool_agg = _apply_session_scope_filters(
+        _filter_sessions_by_capability(
+            db.query(func.coalesce(func.sum(ToolUsage.call_count), 0)).join(SessionModel),
+            "supports_tool_calls",
+        ),
+        team_id=team_id,
+        engineer_id=engineer_id,
+        start_date=start_date,
+        end_date=end_date,
     ).first()
+    model_agg = _apply_session_scope_filters(
+        _filter_sessions_by_capability(
+            db.query(
+                func.coalesce(func.sum(ModelUsage.input_tokens), 0),
+                func.coalesce(func.sum(ModelUsage.output_tokens), 0),
+                func.coalesce(func.sum(ModelUsage.cache_read_tokens), 0),
+            ).join(SessionModel),
+            "supports_model_usage",
+        ),
+        team_id=team_id,
+        engineer_id=engineer_id,
+        start_date=start_date,
+        end_date=end_date,
+    ).first()
+    duration_agg = q.with_entities(func.avg(SessionModel.duration_seconds)).first()
 
-    total_messages = agg[0] or 0
-    total_tool_calls = agg[1] or 0
-    total_input_tokens = agg[2] or 0
-    total_output_tokens = agg[3] or 0
-    avg_duration = float(agg[4]) if agg[4] else None
-    avg_messages = total_messages / total_sessions if total_sessions > 0 else None
+    total_tool_calls = tool_agg[0] or 0 if tool_agg else 0
+    total_input_tokens = model_agg[0] or 0 if model_agg else 0
+    total_output_tokens = model_agg[1] or 0 if model_agg else 0
+    avg_duration = float(duration_agg[0]) if duration_agg and duration_agg[0] else None
+    message_backed_total, message_backed_sessions = _message_backed_stats(
+        db,
+        team_id=team_id,
+        engineer_id=engineer_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    total_messages = message_backed_total
+    avg_messages = (
+        message_backed_total / message_backed_sessions if message_backed_sessions > 0 else None
+    )
 
     # Count unique engineers
     eng_q = db.query(func.count(func.distinct(SessionModel.engineer_id)))
@@ -138,6 +258,7 @@ def _build_overview(
 
     # Outcome counts from facets
     facets_q = db.query(SessionFacets.outcome).join(SessionModel)
+    facets_q = _filter_sessions_by_capability(facets_q, "supports_facets")
     if engineer_id:
         facets_q = facets_q.filter(SessionModel.engineer_id == engineer_id)
     elif team_id:
@@ -155,6 +276,7 @@ def _build_overview(
 
     # Session type counts
     type_q = db.query(SessionFacets.session_type).join(SessionModel)
+    type_q = _filter_sessions_by_capability(type_q, "supports_facets")
     if engineer_id:
         type_q = type_q.filter(SessionModel.engineer_id == engineer_id)
     elif team_id:
@@ -168,6 +290,9 @@ def _build_overview(
         session_type_counts[st] = session_type_counts.get(st, 0) + 1
 
     # Estimated cost from model usages
+    # Guardrail: model-based metrics only participate for sources whose telemetry
+    # explicitly supports model usage. Unsupported sources like Cursor must not
+    # silently inflate token or cost aggregates with placeholder session fields.
     cost_q = db.query(
         ModelUsage.model_name,
         func.sum(ModelUsage.input_tokens),
@@ -175,6 +300,7 @@ def _build_overview(
         func.sum(ModelUsage.cache_read_tokens),
         func.sum(ModelUsage.cache_creation_tokens),
     ).join(SessionModel)
+    cost_q = _filter_sessions_by_capability(cost_q, "supports_model_usage")
     if engineer_id:
         cost_q = cost_q.filter(SessionModel.engineer_id == engineer_id)
     elif team_id:
@@ -205,25 +331,24 @@ def _build_overview(
         end_reason_counts[er] = end_reason_counts.get(er, 0) + 1
 
     # Cache hit rate from aggregated token sums
-    cache_agg = q.with_entities(
-        func.sum(SessionModel.cache_read_tokens),
-        func.sum(SessionModel.input_tokens),
-    ).first()
-    total_cache_read = cache_agg[0] or 0 if cache_agg else 0
-    total_input_for_cache = cache_agg[1] or 0 if cache_agg else 0
+    total_cache_read = model_agg[2] or 0 if model_agg else 0
+    total_input_for_cache = total_input_tokens
     cache_denom = total_cache_read + total_input_for_cache
     cache_hit_rate = round(total_cache_read / cache_denom, 3) if cache_denom > 0 else None
 
     # Avg health score
     from primer.server.services.session_insights_service import compute_session_health_score
 
+    # Guardrail: health depends on facets-derived fields, so only sessions from
+    # facet-capable sources with actual facet rows participate in the average.
     health_rows = db.query(
         SessionModel.duration_seconds,
         SessionFacets.outcome,
         SessionFacets.friction_counts,
         SessionFacets.user_satisfaction_counts,
         SessionFacets.primary_success,
-    ).outerjoin(SessionFacets, SessionFacets.session_id == SessionModel.id)
+    ).join(SessionFacets, SessionFacets.session_id == SessionModel.id)
+    health_rows = _filter_sessions_by_capability(health_rows, "supports_facets")
     if engineer_id:
         health_rows = health_rows.filter(SessionModel.engineer_id == engineer_id)
     elif team_id:
@@ -328,8 +453,6 @@ def get_daily_stats(
     q = db.query(
         func.date(SessionModel.started_at).label("date"),
         func.count(SessionModel.id).label("session_count"),
-        func.coalesce(func.sum(SessionModel.message_count), 0).label("message_count"),
-        func.coalesce(func.sum(SessionModel.tool_call_count), 0).label("tool_call_count"),
     ).filter(SessionModel.started_at.isnot(None))
 
     if engineer_id:
@@ -347,6 +470,46 @@ def get_daily_stats(
     )
 
     rows = q.limit(days).all()
+    message_counts: dict[str, int] = {}
+    message_q = (
+        _apply_session_scope_filters(
+            _filter_sessions_by_capability(
+                db.query(
+                    func.date(SessionModel.started_at).label("date"),
+                    func.count(SessionMessage.id).label("message_count"),
+                ).join(SessionMessage, SessionMessage.session_id == SessionModel.id),
+                "supports_transcript",
+            ).filter(SessionModel.started_at.isnot(None)),
+            team_id=team_id,
+            engineer_id=engineer_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        .group_by(func.date(SessionModel.started_at))
+        .order_by(func.date(SessionModel.started_at).desc())
+    )
+    for d, message_count in message_q.limit(days).all():
+        message_counts[str(d)] = int(message_count or 0)
+    tool_counts: dict[str, int] = {}
+    tool_q = (
+        _apply_session_scope_filters(
+            _filter_sessions_by_capability(
+                db.query(
+                    func.date(SessionModel.started_at).label("date"),
+                    func.coalesce(func.sum(ToolUsage.call_count), 0).label("tool_call_count"),
+                ).join(ToolUsage, ToolUsage.session_id == SessionModel.id),
+                "supports_tool_calls",
+            ).filter(SessionModel.started_at.isnot(None)),
+            team_id=team_id,
+            engineer_id=engineer_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        .group_by(func.date(SessionModel.started_at))
+        .order_by(func.date(SessionModel.started_at).desc())
+    )
+    for d, tool_call_count in tool_q.limit(days).all():
+        tool_counts[str(d)] = int(tool_call_count or 0)
 
     # Compute per-day success rates from facets
     date_set = {row.date for row in rows}
@@ -361,6 +524,7 @@ def get_daily_stats(
             .filter(SessionModel.started_at.isnot(None))
             .filter(SessionFacets.outcome.isnot(None))
         )
+        sr_q = _filter_sessions_by_capability(sr_q, "supports_facets")
         if engineer_id:
             sr_q = sr_q.filter(SessionModel.engineer_id == engineer_id)
         elif team_id:
@@ -386,8 +550,8 @@ def get_daily_stats(
         DailyStatsResponse(
             date=row.date,
             session_count=row.session_count,
-            message_count=row.message_count,
-            tool_call_count=row.tool_call_count,
+            message_count=message_counts.get(str(row.date), 0),
+            tool_call_count=tool_counts.get(str(row.date), 0),
             success_rate=success_rates.get(str(row.date)),
         )
         for row in rows
@@ -402,6 +566,7 @@ def get_friction_report(
     end_date: datetime | None = None,
 ) -> list[FrictionReport]:
     facets_q = db.query(SessionFacets).join(SessionModel)
+    facets_q = _filter_sessions_by_capability(facets_q, "supports_facets")
     if engineer_id:
         facets_q = facets_q.filter(SessionModel.engineer_id == engineer_id)
     elif team_id:
@@ -446,6 +611,7 @@ def get_tool_rankings(
         func.sum(ToolUsage.call_count).label("total_calls"),
         func.count(func.distinct(ToolUsage.session_id)).label("session_count"),
     ).join(SessionModel)
+    q = _filter_sessions_by_capability(q, "supports_tool_calls")
     if engineer_id:
         q = q.filter(SessionModel.engineer_id == engineer_id)
     elif team_id:
@@ -474,6 +640,7 @@ def get_model_rankings(
         func.sum(ModelUsage.output_tokens).label("total_output"),
         func.count(func.distinct(ModelUsage.session_id)).label("session_count"),
     ).join(SessionModel)
+    q = _filter_sessions_by_capability(q, "supports_model_usage")
     if engineer_id:
         q = q.filter(SessionModel.engineer_id == engineer_id)
     elif team_id:
@@ -510,6 +677,7 @@ def get_cost_analytics(
         func.sum(ModelUsage.cache_read_tokens).label("cache_read_tokens"),
         func.sum(ModelUsage.cache_creation_tokens).label("cache_creation_tokens"),
     ).join(SessionModel)
+    q = _filter_sessions_by_capability(q, "supports_model_usage")
     if engineer_id:
         q = q.filter(SessionModel.engineer_id == engineer_id)
     elif team_id:
@@ -552,6 +720,7 @@ def get_cost_analytics(
         .join(SessionModel)
         .filter(SessionModel.started_at.isnot(None))
     )
+    daily_q = _filter_sessions_by_capability(daily_q, "supports_model_usage")
     if engineer_id:
         daily_q = daily_q.filter(SessionModel.engineer_id == engineer_id)
     elif team_id:
@@ -597,6 +766,15 @@ def get_engineer_analytics(
     limit: int = 50,
 ) -> EngineerAnalytics:
     """Per-engineer analytics: sessions, tokens, cost, success rate, top tools."""
+    token_totals_by_engineer = _model_token_totals_by_group(
+        db,
+        SessionModel.engineer_id,
+        team_id=team_id,
+        engineer_id=engineer_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
     # Base query grouping by engineer
     q = db.query(
         SessionModel.engineer_id,
@@ -606,9 +784,6 @@ def get_engineer_analytics(
         Engineer.avatar_url,
         Engineer.github_username,
         func.count(SessionModel.id).label("total_sessions"),
-        func.coalesce(
-            func.sum(SessionModel.input_tokens) + func.sum(SessionModel.output_tokens), 0
-        ).label("total_tokens"),
         func.avg(SessionModel.duration_seconds).label("avg_duration"),
     ).join(Engineer, Engineer.id == SessionModel.engineer_id)
     if engineer_id:
@@ -630,15 +805,13 @@ def get_engineer_analytics(
     )
 
     # Sorting
-    token_sum = func.sum(SessionModel.input_tokens) + func.sum(SessionModel.output_tokens)
     sort_map = {
         "total_sessions": func.count(SessionModel.id).desc(),
-        "total_tokens": token_sum.desc(),
         "avg_duration": func.avg(SessionModel.duration_seconds).desc(),
         "name": Engineer.name.asc(),
     }
     # estimated_cost and success_rate are computed post-query, so skip SQL limit
-    python_sort = sort_by in ("estimated_cost", "success_rate")
+    python_sort = sort_by in ("estimated_cost", "success_rate", "total_tokens")
     q = q.order_by(sort_map.get(sort_by, func.count(SessionModel.id).desc()))
     rows = q.all() if python_sort else q.limit(limit).all()
 
@@ -658,6 +831,7 @@ def get_engineer_analytics(
             .join(SessionModel)
             .filter(SessionModel.engineer_id == eid)
         )
+        cost_q = _filter_sessions_by_capability(cost_q, "supports_model_usage")
         if start_date:
             cost_q = cost_q.filter(SessionModel.started_at >= start_date)
         if end_date:
@@ -676,6 +850,7 @@ def get_engineer_analytics(
             .join(SessionModel)
             .filter(SessionModel.engineer_id == eid)
         )
+        tool_q = _filter_sessions_by_capability(tool_q, "supports_tool_calls")
         if start_date:
             tool_q = tool_q.filter(SessionModel.started_at >= start_date)
         if end_date:
@@ -694,7 +869,7 @@ def get_engineer_analytics(
                 avatar_url=row.avatar_url,
                 github_username=row.github_username,
                 total_sessions=row.total_sessions,
-                total_tokens=row.total_tokens,
+                total_tokens=token_totals_by_engineer.get(eid, 0),
                 estimated_cost=eng_cost,
                 success_rate=sr,
                 avg_duration=float(row.avg_duration) if row.avg_duration else None,
@@ -708,6 +883,9 @@ def get_engineer_analytics(
         engineers = engineers[:limit]
     elif sort_by == "success_rate":
         engineers.sort(key=lambda e: e.success_rate or 0, reverse=True)
+        engineers = engineers[:limit]
+    elif sort_by == "total_tokens":
+        engineers.sort(key=lambda e: e.total_tokens, reverse=True)
         engineers = engineers[:limit]
 
     return EngineerAnalytics(engineers=engineers, total_count=len(engineers))
@@ -723,13 +901,19 @@ def get_project_analytics(
     limit: int = 50,
 ) -> ProjectAnalytics:
     """Per-project analytics: sessions, engineers, tokens, cost, outcomes, tools."""
+    token_totals_by_project = _model_token_totals_by_group(
+        db,
+        SessionModel.project_name,
+        team_id=team_id,
+        engineer_id=engineer_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
     q = db.query(
         SessionModel.project_name,
         func.count(SessionModel.id).label("total_sessions"),
         func.count(func.distinct(SessionModel.engineer_id)).label("unique_engineers"),
-        func.coalesce(
-            func.sum(SessionModel.input_tokens) + func.sum(SessionModel.output_tokens), 0
-        ).label("total_tokens"),
     ).filter(SessionModel.project_name.isnot(None))
 
     if engineer_id:
@@ -743,15 +927,13 @@ def get_project_analytics(
 
     q = q.group_by(SessionModel.project_name)
 
-    token_sum = func.sum(SessionModel.input_tokens) + func.sum(SessionModel.output_tokens)
     sort_map = {
         "total_sessions": func.count(SessionModel.id).desc(),
-        "total_tokens": token_sum.desc(),
         "unique_engineers": func.count(func.distinct(SessionModel.engineer_id)).desc(),
         "project_name": SessionModel.project_name.asc(),
     }
     q = q.order_by(sort_map.get(sort_by, func.count(SessionModel.id).desc()))
-    rows = q.limit(limit).all()
+    rows = q.all() if sort_by == "total_tokens" else q.limit(limit).all()
 
     projects: list[ProjectStats] = []
     for row in rows:
@@ -769,6 +951,7 @@ def get_project_analytics(
             .join(SessionModel)
             .filter(SessionModel.project_name == pname)
         )
+        cost_q = _filter_sessions_by_capability(cost_q, "supports_model_usage")
         if engineer_id:
             cost_q = cost_q.filter(SessionModel.engineer_id == engineer_id)
         elif team_id:
@@ -789,6 +972,7 @@ def get_project_analytics(
             .filter(SessionModel.project_name == pname)
             .filter(SessionFacets.outcome.isnot(None))
         )
+        outcome_q = _filter_sessions_by_capability(outcome_q, "supports_facets")
         if engineer_id:
             outcome_q = outcome_q.filter(SessionModel.engineer_id == engineer_id)
         elif team_id:
@@ -810,6 +994,7 @@ def get_project_analytics(
             .join(SessionModel)
             .filter(SessionModel.project_name == pname)
         )
+        tool_q = _filter_sessions_by_capability(tool_q, "supports_tool_calls")
         if engineer_id:
             tool_q = tool_q.filter(SessionModel.engineer_id == engineer_id)
         elif team_id:
@@ -828,12 +1013,16 @@ def get_project_analytics(
                 project_name=pname,
                 total_sessions=row.total_sessions,
                 unique_engineers=row.unique_engineers,
-                total_tokens=row.total_tokens,
+                total_tokens=token_totals_by_project.get(pname, 0),
                 estimated_cost=proj_cost,
                 outcome_distribution=outcome_dist,
                 top_tools=top_tools,
             )
         )
+
+    if sort_by == "total_tokens":
+        projects.sort(key=lambda p: p.total_tokens, reverse=True)
+        projects = projects[:limit]
 
     return ProjectAnalytics(projects=projects, total_count=len(projects))
 
@@ -913,6 +1102,7 @@ def get_productivity_metrics(
         func.sum(ModelUsage.cache_read_tokens),
         func.sum(ModelUsage.cache_creation_tokens),
     ).join(SessionModel)
+    cost_q = _filter_sessions_by_capability(cost_q, "supports_model_usage")
     if engineer_id:
         cost_q = cost_q.filter(SessionModel.engineer_id == engineer_id)
     elif team_id:
@@ -926,10 +1116,26 @@ def get_productivity_metrics(
     for name, inp, out, cr, cc in cost_q.all():
         total_cost += estimate_cost(name, inp or 0, out or 0, cr or 0, cc or 0)
 
+    # Guardrail: per-session cost averages only include sessions from sources
+    # that can actually provide model telemetry, otherwise partial sources like
+    # Cursor dilute the metric with unsupported zero-cost participation.
+    cost_session_q = db.query(func.count(func.distinct(SessionModel.id))).join(ModelUsage)
+    cost_session_q = _filter_sessions_by_capability(cost_session_q, "supports_model_usage")
+    if engineer_id:
+        cost_session_q = cost_session_q.filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
+        cost_session_q = cost_session_q.join(Engineer).filter(Engineer.team_id == team_id)
+    if start_date:
+        cost_session_q = cost_session_q.filter(SessionModel.started_at >= start_date)
+    if end_date:
+        cost_session_q = cost_session_q.filter(SessionModel.started_at <= end_date)
+    cost_session_count = cost_session_q.scalar() or 0
+
     # Success count from facets
     success_q = (
         db.query(SessionFacets.outcome).join(SessionModel).filter(SessionFacets.outcome.isnot(None))
     )
+    success_q = _filter_sessions_by_capability(success_q, "supports_facets")
     if engineer_id:
         success_q = success_q.filter(SessionModel.engineer_id == engineer_id)
     elif team_id:
@@ -965,7 +1171,7 @@ def get_productivity_metrics(
     active_eng_count = max(total_active_engineers, 1)
     sessions_per_engineer_per_day = total_sessions / (active_eng_count * days_in_range)
 
-    avg_cost_per_session = total_cost / total_sessions if total_sessions > 0 else None
+    avg_cost_per_session = total_cost / cost_session_count if cost_session_count > 0 else None
     cost_per_success = total_cost / success_count if success_count > 0 else None
 
     # Time saved estimation
@@ -1027,6 +1233,14 @@ def get_engineer_benchmarks(
     end_date: datetime | None = None,
 ) -> EngineerBenchmarkResponse:
     """Compute per-engineer benchmarks with percentiles and vs-team-avg."""
+    token_totals_by_engineer = _model_token_totals_by_group(
+        db,
+        SessionModel.engineer_id,
+        team_id=team_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
     # Grouped query by engineer
     q = db.query(
         SessionModel.engineer_id,
@@ -1034,9 +1248,6 @@ def get_engineer_benchmarks(
         Engineer.display_name,
         Engineer.avatar_url,
         func.count(SessionModel.id).label("total_sessions"),
-        func.coalesce(
-            func.sum(SessionModel.input_tokens) + func.sum(SessionModel.output_tokens), 0
-        ).label("total_tokens"),
         func.avg(SessionModel.duration_seconds).label("avg_duration"),
     ).join(Engineer, Engineer.id == SessionModel.engineer_id)
 
@@ -1084,6 +1295,7 @@ def get_engineer_benchmarks(
             .join(SessionModel)
             .filter(SessionModel.engineer_id == eid)
         )
+        cost_q = _filter_sessions_by_capability(cost_q, "supports_model_usage")
         if start_date:
             cost_q = cost_q.filter(SessionModel.started_at >= start_date)
         if end_date:
@@ -1104,7 +1316,7 @@ def get_engineer_benchmarks(
                 "display_name": row.display_name,
                 "avatar_url": row.avatar_url,
                 "total_sessions": row.total_sessions,
-                "total_tokens": row.total_tokens,
+                "total_tokens": token_totals_by_engineer.get(eid, 0),
                 "estimated_cost": eng_cost,
                 "success_rate": sr,
                 "avg_duration": float(row.avg_duration) if row.avg_duration else None,
@@ -1194,6 +1406,7 @@ def get_bottleneck_analytics(
     q = db.query(SessionModel, SessionFacets).join(
         SessionFacets, SessionFacets.session_id == SessionModel.id
     )
+    q = _filter_sessions_by_capability(q, "supports_facets")
     if engineer_id:
         q = q.filter(SessionModel.engineer_id == engineer_id)
     elif team_id:
@@ -1398,6 +1611,7 @@ def get_tool_adoption_analytics(
 
     # --- Total engineers in scope ---
     eng_q = db.query(func.count(func.distinct(SessionModel.engineer_id)))
+    eng_q = _filter_sessions_by_capability(eng_q, "supports_tool_calls")
     if engineer_id:
         eng_q = eng_q.filter(SessionModel.engineer_id == engineer_id)
     elif team_id:
@@ -1415,6 +1629,7 @@ def get_tool_adoption_analytics(
         func.count(func.distinct(ToolUsage.session_id)).label("session_count"),
         func.count(func.distinct(SessionModel.engineer_id)).label("engineer_count"),
     ).join(SessionModel)
+    tool_q = _filter_sessions_by_capability(tool_q, "supports_tool_calls")
     if engineer_id:
         tool_q = tool_q.filter(SessionModel.engineer_id == engineer_id)
     elif team_id:
@@ -1458,6 +1673,7 @@ def get_tool_adoption_analytics(
                 SessionModel.started_at.isnot(None),
             )
         )
+        trend_q = _filter_sessions_by_capability(trend_q, "supports_tool_calls")
         if engineer_id:
             trend_q = trend_q.filter(SessionModel.engineer_id == engineer_id)
         elif team_id:
@@ -1486,6 +1702,7 @@ def get_tool_adoption_analytics(
         .join(ToolUsage, ToolUsage.session_id == SessionModel.id)
         .join(Engineer, Engineer.id == SessionModel.engineer_id)
     )
+    prof_q = _filter_sessions_by_capability(prof_q, "supports_tool_calls")
     if engineer_id:
         prof_q = prof_q.filter(SessionModel.engineer_id == engineer_id)
     elif team_id:
@@ -1507,6 +1724,7 @@ def get_tool_adoption_analytics(
             .join(SessionModel)
             .filter(SessionModel.engineer_id == eid)
         )
+        top_q = _filter_sessions_by_capability(top_q, "supports_tool_calls")
         if start_date:
             top_q = top_q.filter(SessionModel.started_at >= start_date)
         if end_date:
@@ -1527,6 +1745,7 @@ def get_tool_adoption_analytics(
     # --- Aggregate stats ---
     # Separate count query so total_tools_discovered isn't bounded by `limit`
     total_tools_q = db.query(func.count(func.distinct(ToolUsage.tool_name))).join(SessionModel)
+    total_tools_q = _filter_sessions_by_capability(total_tools_q, "supports_tool_calls")
     if engineer_id:
         total_tools_q = total_tools_q.filter(SessionModel.engineer_id == engineer_id)
     elif team_id:
@@ -1541,6 +1760,7 @@ def get_tool_adoption_analytics(
     tools_per_eng_q = db.query(
         func.count(func.distinct(ToolUsage.tool_name)).label("tool_count"),
     ).join(SessionModel)
+    tools_per_eng_q = _filter_sessions_by_capability(tools_per_eng_q, "supports_tool_calls")
     if engineer_id:
         tools_per_eng_q = tools_per_eng_q.filter(SessionModel.engineer_id == engineer_id)
     elif team_id:

@@ -3,6 +3,17 @@ import uuid
 from primer.common.models import SessionFacets
 
 
+def _messages(count: int) -> list[dict[str, str | int]]:
+    return [
+        {
+            "ordinal": ordinal,
+            "role": "human" if ordinal % 2 == 0 else "assistant",
+            "content_text": f"message {ordinal}",
+        }
+        for ordinal in range(count)
+    ]
+
+
 def _ingest_session(client, api_key, **kwargs):
     session_id = kwargs.pop("session_id", str(uuid.uuid4()))
     payload = {
@@ -34,6 +45,7 @@ def test_overview_with_data(client, engineer_with_key, admin_headers):
     _ingest_session(
         client,
         api_key,
+        messages=_messages(10),
         facets={
             "outcome": "success",
             "session_type": "feature",
@@ -42,6 +54,7 @@ def test_overview_with_data(client, engineer_with_key, admin_headers):
     _ingest_session(
         client,
         api_key,
+        messages=_messages(10),
         facets={
             "outcome": "success",
             "session_type": "debugging",
@@ -50,6 +63,7 @@ def test_overview_with_data(client, engineer_with_key, admin_headers):
     _ingest_session(
         client,
         api_key,
+        messages=_messages(10),
         facets={
             "outcome": "partial",
             "session_type": "feature",
@@ -101,6 +115,158 @@ def test_overview_treats_legacy_success_outcomes_as_canonical(
     assert data["success_rate"] == 1.0
 
 
+def test_overview_excludes_cursor_sessions_from_avg_health_score(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        facets={"outcome": "success"},
+    )
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="cursor",
+    )
+
+    response = client.get("/api/v1/analytics/overview", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total_sessions"] == 2
+    assert data["avg_health_score"] == 100.0
+
+
+def test_overview_avg_messages_per_session_requires_actual_message_rows(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        message_count=2,
+        user_message_count=1,
+        assistant_message_count=1,
+        messages=[
+            {"ordinal": 0, "role": "human", "content_text": "Investigate failing test"},
+            {"ordinal": 1, "role": "assistant", "content_text": "Checking the suite now"},
+        ],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        message_count=10,
+        user_message_count=5,
+        assistant_message_count=5,
+        messages=[],
+    )
+
+    response = client.get("/api/v1/analytics/overview", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total_messages"] == 2
+    assert data["avg_messages_per_session"] == 2.0
+
+
+def test_overview_excludes_cursor_facets_from_unsupported_metrics(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        facets={"outcome": "success", "session_type": "feature"},
+    )
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="cursor",
+        facets={"outcome": "failure", "session_type": "debugging"},
+    )
+
+    response = client.get("/api/v1/analytics/overview", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["success_rate"] == 1.0
+    assert data["outcome_counts"] == {"success": 1}
+    assert data["session_type_counts"] == {"feature": 1}
+
+
+def test_overview_total_tool_calls_requires_actual_tool_usage_rows(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        tool_call_count=3,
+        tool_usages=[
+            {"tool_name": "Read", "call_count": 2},
+            {"tool_name": "Edit", "call_count": 1},
+        ],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        tool_call_count=9,
+        tool_usages=[],
+    )
+
+    response = client.get("/api/v1/analytics/overview", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total_tool_calls"] == 3
+
+
+def test_overview_model_and_cache_rollups_require_actual_model_usage_rows(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        input_tokens=1000,
+        output_tokens=500,
+        cache_read_tokens=250,
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 1000,
+                "output_tokens": 500,
+                "cache_read_tokens": 250,
+            }
+        ],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        input_tokens=9000,
+        output_tokens=4500,
+        cache_read_tokens=1000,
+        model_usages=[],
+    )
+
+    response = client.get("/api/v1/analytics/overview", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total_input_tokens"] == 1000
+    assert data["total_output_tokens"] == 500
+    assert data["cache_hit_rate"] == 0.2
+
+
 def test_tool_rankings(client, engineer_with_key, admin_headers):
     _eng, api_key = engineer_with_key
     _ingest_session(
@@ -126,6 +292,33 @@ def test_tool_rankings(client, engineer_with_key, admin_headers):
     assert len(data) >= 2
     assert data[0]["tool_name"] == "Read"
     assert data[0]["total_calls"] == 18
+
+
+def test_tool_rankings_exclude_cursor_unsupported_tool_usage(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        tool_usages=[{"tool_name": "Read", "call_count": 3}],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="cursor",
+        tool_usages=[
+            {"tool_name": "Read", "call_count": 10},
+            {"tool_name": "Ghost", "call_count": 7},
+        ],
+    )
+
+    response = client.get("/api/v1/analytics/tools", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data == [{"tool_name": "Read", "total_calls": 3, "session_count": 1}]
 
 
 def test_model_rankings(client, engineer_with_key, admin_headers):
@@ -161,6 +354,49 @@ def test_model_rankings(client, engineer_with_key, admin_headers):
     assert data[0]["total_input_tokens"] == 3000
 
 
+def test_model_rankings_exclude_cursor_unsupported_model_usage(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 1000,
+                "output_tokens": 500,
+            }
+        ],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="cursor",
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 9000,
+                "output_tokens": 4500,
+            }
+        ],
+    )
+
+    response = client.get("/api/v1/analytics/models", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data == [
+        {
+            "model_name": "claude-sonnet-4-5-20250929",
+            "total_input_tokens": 1000,
+            "total_output_tokens": 500,
+            "session_count": 1,
+        }
+    ]
+
+
 def test_friction_report(client, engineer_with_key, admin_headers):
     _eng, api_key = engineer_with_key
     _ingest_session(
@@ -188,6 +424,38 @@ def test_friction_report(client, engineer_with_key, admin_headers):
     assert tool_error["count"] == 5
 
 
+def test_friction_report_excludes_cursor_facets_from_unsupported_metrics(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        facets={
+            "friction_counts": {"tool_error": 2},
+            "friction_detail": "Supported friction",
+        },
+    )
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="cursor",
+        facets={
+            "friction_counts": {"tool_error": 5},
+            "friction_detail": "Unsupported cursor friction",
+        },
+    )
+
+    response = client.get("/api/v1/analytics/friction", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    tool_error = next(f for f in data if f["friction_type"] == "tool_error")
+    assert tool_error["count"] == 2
+    assert tool_error["details"] == ["Supported friction"]
+
+
 def test_daily_stats_endpoint(client, engineer_with_key, admin_headers):
     _eng, api_key = engineer_with_key
     _ingest_session(
@@ -196,6 +464,8 @@ def test_daily_stats_endpoint(client, engineer_with_key, admin_headers):
         started_at="2025-01-15T10:00:00",
         message_count=10,
         tool_call_count=5,
+        messages=_messages(10),
+        tool_usages=[{"tool_name": "Read", "call_count": 5}],
     )
     _ingest_session(
         client,
@@ -203,6 +473,8 @@ def test_daily_stats_endpoint(client, engineer_with_key, admin_headers):
         started_at="2025-01-15T14:00:00",
         message_count=8,
         tool_call_count=3,
+        messages=_messages(8),
+        tool_usages=[{"tool_name": "Edit", "call_count": 3}],
     )
     _ingest_session(
         client,
@@ -210,6 +482,8 @@ def test_daily_stats_endpoint(client, engineer_with_key, admin_headers):
         started_at="2025-01-16T09:00:00",
         message_count=12,
         tool_call_count=7,
+        messages=_messages(12),
+        tool_usages=[{"tool_name": "Bash", "call_count": 7}],
     )
 
     r = client.get("/api/v1/analytics/daily", headers=admin_headers)
@@ -227,6 +501,118 @@ def test_daily_stats_endpoint(client, engineer_with_key, admin_headers):
     assert day_15["session_count"] == 2
     assert day_15["message_count"] == 18
     assert day_15["tool_call_count"] == 8
+
+
+def test_daily_stats_excludes_sessions_without_supported_tool_telemetry(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        started_at="2025-01-15T10:00:00",
+        tool_call_count=5,
+        tool_usages=[{"tool_name": "Read", "call_count": 5}],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        started_at="2025-01-15T12:00:00",
+        tool_call_count=4,
+        tool_usages=[],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="cursor",
+        started_at="2025-01-15T14:00:00",
+        tool_call_count=9,
+        tool_usages=[],
+    )
+
+    response = client.get("/api/v1/analytics/daily", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    day_15 = next(d for d in data if d["date"] == "2025-01-15")
+    assert day_15["session_count"] == 3
+    assert day_15["tool_call_count"] == 5
+
+
+def test_daily_stats_message_count_requires_actual_message_rows(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        started_at="2025-01-15T10:00:00",
+        message_count=2,
+        user_message_count=1,
+        assistant_message_count=1,
+        messages=_messages(2),
+    )
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        started_at="2025-01-15T12:00:00",
+        message_count=10,
+        user_message_count=5,
+        assistant_message_count=5,
+        messages=[],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="cursor",
+        started_at="2025-01-15T14:00:00",
+        message_count=9,
+        user_message_count=4,
+        assistant_message_count=5,
+        messages=[],
+    )
+
+    response = client.get("/api/v1/analytics/daily", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    day_15 = next(d for d in data if d["date"] == "2025-01-15")
+    assert day_15["session_count"] == 3
+    assert day_15["message_count"] == 2
+
+
+def test_daily_stats_success_rate_excludes_cursor_facets_from_unsupported_metrics(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        started_at="2025-05-01T10:00:00",
+        facets={"outcome": "success"},
+    )
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="cursor",
+        started_at="2025-05-01T14:00:00",
+        facets={"outcome": "failure"},
+    )
+
+    response = client.get(
+        "/api/v1/analytics/daily?start_date=2025-05-01T00:00:00&end_date=2025-05-01T23:59:59",
+        headers=admin_headers,
+    )
+    assert response.status_code == 200
+
+    data = response.json()
+    day = data[0]
+    assert day["success_rate"] == 1.0
 
 
 def test_daily_stats_with_team_filter(client, engineer_with_key, admin_headers):
@@ -314,6 +700,80 @@ def test_cost_analytics(client, engineer_with_key, admin_headers):
     assert opus["estimated_cost"] > 0
 
 
+def test_cost_analytics_exclude_cursor_unsupported_model_usage(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        started_at="2025-01-15T10:00:00",
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 1000,
+                "output_tokens": 500,
+            }
+        ],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="cursor",
+        started_at="2025-01-15T14:00:00",
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 9000,
+                "output_tokens": 4500,
+            }
+        ],
+    )
+
+    response = client.get("/api/v1/analytics/costs", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert len(data["model_breakdown"]) == 1
+    model = data["model_breakdown"][0]
+    assert model["model_name"] == "claude-sonnet-4-5-20250929"
+    assert model["input_tokens"] == 1000
+    assert model["output_tokens"] == 500
+    assert len(data["daily_costs"]) == 1
+    assert data["daily_costs"][0]["session_count"] == 1
+
+
+def test_tool_adoption_excludes_cursor_unsupported_tool_usage(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        started_at="2025-01-15T10:00:00",
+        tool_usages=[{"tool_name": "Read", "call_count": 3}],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="cursor",
+        started_at="2025-01-15T14:00:00",
+        tool_usages=[{"tool_name": "Ghost", "call_count": 7}],
+    )
+
+    response = client.get("/api/v1/analytics/tool-adoption", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total_tools_discovered"] == 1
+    assert [entry["tool_name"] for entry in data["tool_adoption"]] == ["Read"]
+    assert data["tool_adoption"][0]["total_calls"] == 3
+    assert data["engineer_profiles"][0]["top_tools"] == ["Read"]
+    assert all(trend["tool_name"] == "Read" for trend in data["tool_trends"])
+
+
 def test_overview_includes_estimated_cost(client, engineer_with_key, admin_headers):
     _eng, api_key = engineer_with_key
     _ingest_session(
@@ -336,9 +796,15 @@ def test_overview_includes_estimated_cost(client, engineer_with_key, admin_heade
 
 def test_date_range_filtering(client, engineer_with_key, admin_headers):
     _eng, api_key = engineer_with_key
-    _ingest_session(client, api_key, started_at="2025-01-10T10:00:00", message_count=5)
-    _ingest_session(client, api_key, started_at="2025-01-20T10:00:00", message_count=10)
-    _ingest_session(client, api_key, started_at="2025-02-01T10:00:00", message_count=15)
+    _ingest_session(
+        client, api_key, started_at="2025-01-10T10:00:00", message_count=5, messages=_messages(5)
+    )
+    _ingest_session(
+        client, api_key, started_at="2025-01-20T10:00:00", message_count=10, messages=_messages(10)
+    )
+    _ingest_session(
+        client, api_key, started_at="2025-02-01T10:00:00", message_count=15, messages=_messages(15)
+    )
 
     # Filter to January only
     r = client.get(
@@ -438,6 +904,40 @@ def test_engineer_analytics(client, engineer_with_key, admin_headers):
     assert len(eng["top_tools"]) > 0
 
 
+def test_engineer_analytics_excludes_sessions_without_supported_model_telemetry_from_token_totals(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        project_name="token-safe-project",
+        agent_type="claude_code",
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 1000,
+                "output_tokens": 500,
+            }
+        ],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        project_name="token-safe-project",
+        agent_type="cursor",
+        model_usages=[],
+    )
+
+    response = client.get("/api/v1/analytics/engineers", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    engineer = data["engineers"][0]
+    assert engineer["total_sessions"] == 2
+    assert engineer["total_tokens"] == 1500
+
+
 def test_project_analytics(client, engineer_with_key, admin_headers):
     _eng, api_key = engineer_with_key
     _ingest_session(
@@ -477,6 +977,67 @@ def test_project_analytics(client, engineer_with_key, admin_headers):
     assert len(proj["top_tools"]) > 0
 
 
+def test_project_analytics_excludes_sessions_without_supported_model_telemetry_from_token_totals(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        project_name="token-safe-project",
+        agent_type="claude_code",
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 1000,
+                "output_tokens": 500,
+            }
+        ],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        project_name="token-safe-project",
+        agent_type="cursor",
+        model_usages=[],
+    )
+
+    response = client.get("/api/v1/analytics/projects", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    project = next(p for p in data["projects"] if p["project_name"] == "token-safe-project")
+    assert project["total_sessions"] == 2
+    assert project["total_tokens"] == 1500
+
+
+def test_project_analytics_excludes_cursor_facets_from_outcome_distribution(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        project_name="facet-safe-project",
+        agent_type="claude_code",
+        facets={"outcome": "success"},
+    )
+    _ingest_session(
+        client,
+        api_key,
+        project_name="facet-safe-project",
+        agent_type="cursor",
+        facets={"outcome": "failure"},
+    )
+
+    response = client.get("/api/v1/analytics/projects", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    project = next(p for p in data["projects"] if p["project_name"] == "facet-safe-project")
+    assert project["outcome_distribution"] == {"success": 1}
+
+
 def test_activity_heatmap(client, engineer_with_key, admin_headers):
     _eng, api_key = engineer_with_key
     _ingest_session(client, api_key, started_at="2025-06-10T14:00:00")  # Tuesday 14:00
@@ -491,6 +1052,181 @@ def test_activity_heatmap(client, engineer_with_key, admin_headers):
     tuesday_14 = next((c for c in data["cells"] if c["day_of_week"] == 1 and c["hour"] == 14), None)
     assert tuesday_14 is not None
     assert tuesday_14["count"] >= 2
+
+
+def test_productivity_excludes_cursor_sessions_without_model_usage_from_avg_cost_per_session(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 1_000,
+                "output_tokens": 500,
+            }
+        ],
+    )
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="cursor",
+        model_usages=[],
+    )
+
+    response = client.get("/api/v1/analytics/productivity", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total_cost"] > 0
+    assert data["avg_cost_per_session"] == data["total_cost"]
+
+
+def test_productivity_excludes_cursor_facets_from_cost_per_success(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 1_000,
+                "output_tokens": 500,
+            }
+        ],
+        facets={"outcome": "success"},
+    )
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="cursor",
+        facets={"outcome": "success"},
+    )
+
+    response = client.get("/api/v1/analytics/productivity", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total_cost"] > 0
+    assert data["cost_per_successful_outcome"] == data["total_cost"]
+
+
+def test_engineer_benchmarks_exclude_sessions_without_supported_model_telemetry_from_token_totals(
+    client, db_session, admin_headers
+):
+    import secrets
+
+    import bcrypt
+
+    from primer.common.models import Engineer, Team
+
+    team = Team(name="Benchmark Token Safety")
+    db_session.add(team)
+    db_session.flush()
+
+    def _create_engineer(name: str, email: str):
+        raw_key = f"primer_{secrets.token_urlsafe(32)}"
+        hashed = bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt()).decode()
+        engineer = Engineer(
+            name=name,
+            email=email,
+            team_id=team.id,
+            api_key_hash=hashed,
+        )
+        db_session.add(engineer)
+        db_session.flush()
+        return engineer, raw_key
+
+    _eng1, key1 = _create_engineer("Alice Safe", "alice-safe@example.com")
+    _eng2, key2 = _create_engineer("Bob Partial", "bob-partial@example.com")
+
+    _ingest_session(
+        client,
+        key1,
+        started_at="2025-05-01T10:00:00",
+        agent_type="claude_code",
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 1000,
+                "output_tokens": 500,
+            }
+        ],
+        facets={"outcome": "success"},
+    )
+    _ingest_session(
+        client,
+        key2,
+        started_at="2025-05-01T11:00:00",
+        agent_type="cursor",
+        model_usages=[],
+        facets={"outcome": "partial"},
+    )
+
+    response = client.get(
+        f"/api/v1/analytics/engineers/benchmarks?team_id={team.id}&start_date=2025-05-01T00:00:00&end_date=2025-05-02T00:00:00",
+        headers=admin_headers,
+    )
+    assert response.status_code == 200
+
+    data = response.json()
+    alice = next(e for e in data["engineers"] if e["name"] == "Alice Safe")
+    bob = next(e for e in data["engineers"] if e["name"] == "Bob Partial")
+    assert alice["total_tokens"] == 1500
+    assert bob["total_tokens"] == 0
+    assert data["benchmark"]["team_avg_tokens"] == 750.0
+
+
+def test_bottlenecks_exclude_cursor_facets_from_unsupported_metrics(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="claude_code",
+        project_name="supported-project",
+        started_at="2025-06-01T10:00:00",
+        facets={
+            "outcome": "failure",
+            "friction_counts": {"tool_error": 1},
+            "friction_detail": "Supported bottleneck",
+        },
+    )
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="cursor",
+        project_name="cursor-project",
+        started_at="2025-06-01T11:00:00",
+        facets={
+            "outcome": "failure",
+            "friction_counts": {"tool_error": 5},
+            "friction_detail": "Unsupported cursor bottleneck",
+        },
+    )
+
+    response = client.get("/api/v1/analytics/bottlenecks", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total_sessions_analyzed"] == 1
+    assert data["sessions_with_any_friction"] == 1
+    assert data["overall_friction_rate"] == 1.0
+    impact = next(
+        item for item in data["friction_impacts"] if item["friction_type"] == "tool_error"
+    )
+    assert impact["occurrence_count"] == 1
+    project = next(
+        item for item in data["project_friction"] if item["project_name"] == "supported-project"
+    )
+    assert project["total_friction_count"] == 1
 
 
 def test_overview_with_trends(client, engineer_with_key, admin_headers):

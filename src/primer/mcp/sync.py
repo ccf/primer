@@ -5,6 +5,7 @@ import os
 
 import httpx
 
+from primer.common.source_capabilities import get_capability_for
 from primer.hook.extractor import capture_git_info, load_facets
 from primer.hook.extractor_registry import get_extractor_for
 from primer.mcp.reader import list_local_sessions
@@ -51,8 +52,14 @@ def sync_sessions(server_url: str, api_key: str) -> dict:
             meta.session_id = local_session.session_id
             meta.agent_type = local_session.agent_type
 
-            # Load facets (currently only Claude Code has facets)
-            facets = load_facets(local_session.session_id) if local_session.has_facets else None
+            capability = get_capability_for(local_session.agent_type)
+
+            # Only attach facets for sources that explicitly support them.
+            facets = (
+                load_facets(local_session.session_id, local_session.facets_path)
+                if capability and capability.supports_facets and local_session.has_facets
+                else None
+            )
 
             # Capture git info from the project directory
             cwd = local_session.project_path
