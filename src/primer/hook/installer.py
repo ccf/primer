@@ -53,6 +53,32 @@ def _get_config(agent: str) -> AgentHookConfig:
     return AGENT_CONFIGS[agent]
 
 
+def _resolve_settings_path(path: Path | None, config: AgentHookConfig, agent: str) -> Path:
+    """Honor explicit path overrides and backward-compatible Claude aliases."""
+    if path is not None:
+        return path
+    if agent == "claude":
+        return SETTINGS_PATH
+    return config.settings_path
+
+
+def _resolve_hook_command(config: AgentHookConfig, agent: str) -> str:
+    """Honor backward-compatible Claude command overrides used by tests/tools."""
+    if agent == "claude":
+        return HOOK_COMMAND
+    return config.hook_command
+
+
+def _with_resolved_compat_overrides(config: AgentHookConfig, agent: str) -> AgentHookConfig:
+    """Return a config with any backward-compatible overrides applied."""
+    return AgentHookConfig(
+        agent_name=config.agent_name,
+        settings_path=config.settings_path,
+        hook_command=_resolve_hook_command(config, agent),
+        hook_format=config.hook_format,
+    )
+
+
 def _load_settings(path: Path) -> dict:
     if path.exists():
         with open(path) as f:
@@ -207,8 +233,8 @@ def install(path: Path | None = None, agent: str = "claude") -> tuple[bool, str]
 
     Returns (success, message).
     """
-    config = _get_config(agent)
-    settings_path = path or config.settings_path
+    config = _with_resolved_compat_overrides(_get_config(agent), agent)
+    settings_path = _resolve_settings_path(path, config, agent)
     settings = _load_settings(settings_path)
 
     if config.hook_format == "gemini":
@@ -228,8 +254,8 @@ def uninstall(path: Path | None = None, agent: str = "claude") -> tuple[bool, st
 
     Returns (success, message).
     """
-    config = _get_config(agent)
-    settings_path = path or config.settings_path
+    config = _with_resolved_compat_overrides(_get_config(agent), agent)
+    settings_path = _resolve_settings_path(path, config, agent)
     settings = _load_settings(settings_path)
 
     if config.hook_format == "gemini":
@@ -249,8 +275,8 @@ def status(path: Path | None = None, agent: str = "claude") -> tuple[bool, str]:
 
     Returns (installed, message).
     """
-    config = _get_config(agent)
-    settings_path = path or config.settings_path
+    config = _with_resolved_compat_overrides(_get_config(agent), agent)
+    settings_path = _resolve_settings_path(path, config, agent)
     settings = _load_settings(settings_path)
 
     if config.hook_format == "gemini":
