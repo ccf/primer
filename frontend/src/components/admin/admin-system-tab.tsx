@@ -40,12 +40,13 @@ function CoverageCell({
   parity: TelemetryParity
   coverage?: number
 }) {
+  const coverageLabel =
+    parity === "unavailable" ? "Not expected" : coverage == null ? "-" : formatCoverage(coverage)
+
   return (
     <div className="space-y-1">
       <Badge variant={parityVariant(parity)}>{parityLabel(parity)}</Badge>
-      <div className="text-xs text-muted-foreground">
-        {parity === "unavailable" || coverage == null ? "Not expected" : formatCoverage(coverage)}
-      </div>
+      <div className="text-xs text-muted-foreground">{coverageLabel}</div>
     </div>
   )
 }

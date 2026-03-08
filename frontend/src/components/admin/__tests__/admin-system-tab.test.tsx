@@ -81,6 +81,7 @@ describe("AdminSystemTab", () => {
     expect(screen.getByText("cursor")).toBeInTheDocument()
     expect(screen.getByText("Native Discovery")).toBeInTheDocument()
     expect(screen.getAllByText("Unavailable").length).toBeGreaterThan(0)
+    expect(screen.getAllByText("-").length).toBeGreaterThan(0)
     expect(screen.getByText("73.3%")).toBeInTheDocument()
     expect(screen.getAllByText("Not expected").length).toBeGreaterThan(0)
   })
