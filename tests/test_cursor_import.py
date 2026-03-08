@@ -63,6 +63,26 @@ def test_cursor_import_rejects_missing_session_id(tmp_path, monkeypatch):
     assert not (primer_home / "cursor" / "sessions").exists()
 
 
+def test_cursor_import_rejects_bundle_with_no_messages(tmp_path, monkeypatch):
+    primer_home = _mock_primer_home(tmp_path, monkeypatch)
+    bundle_path = _write_bundle(
+        tmp_path,
+        {
+            "session_id": "cursor-empty-1",
+            "project_path": str(tmp_path / "demo"),
+            "messages": [],
+        },
+        name="empty-messages.json",
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["cursor", "import", str(bundle_path)])
+
+    assert result.exit_code != 0
+    assert "contains no messages" in result.output
+    assert not (primer_home / "cursor" / "sessions").exists()
+
+
 def test_cursor_import_is_idempotent_for_same_session_id(tmp_path, monkeypatch):
     primer_home = _mock_primer_home(tmp_path, monkeypatch)
     bundle = {

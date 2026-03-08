@@ -353,6 +353,6 @@ def normalize_existing_facets(
 
     return {
         "rows_scanned": len(candidate_rows),
-        "rows_updated": 0 if dry_run else len(pending_updates),
+        "rows_updated": 0 if dry_run else sum(1 for _, updates in pending_updates if updates),
         "remaining_legacy_rows": _count_legacy_rows(db),
     }
