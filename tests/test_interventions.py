@@ -239,6 +239,29 @@ def test_engineer_patch_is_limited_to_workflow_fields(client, admin_headers, eng
     assert forbidden.status_code == 403
 
 
+def test_engineer_patch_cannot_clear_owner_assignment(client, admin_headers, engineer_with_key):
+    engineer, api_key = engineer_with_key
+    created = client.post(
+        "/api/v1/interventions",
+        headers=admin_headers,
+        json={
+            "title": "Keep ownership intact",
+            "description": "Engineers should not be able to unassign ownership.",
+            "category": "workflow",
+            "engineer_id": engineer.id,
+            "owner_engineer_id": engineer.id,
+        },
+    )
+    intervention_id = created.json()["id"]
+
+    forbidden = client.patch(
+        f"/api/v1/interventions/{intervention_id}",
+        headers={"x-api-key": api_key},
+        json={"owner_engineer_id": None},
+    )
+    assert forbidden.status_code == 403
+
+
 def test_recommendations_endpoint_accepts_engineer_scope_for_team_leads(client, db_session):
     team = Team(name="Scoped Team")
     db_session.add(team)
