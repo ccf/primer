@@ -43,7 +43,13 @@ def test_build_seed_auth_headers_falls_back_to_api_key(monkeypatch):
     assert seed_data._build_seed_auth_headers() == {"x-api-key": "api-key"}
 
 
-def test_build_facets_always_returns_complete_payload():
+def test_should_force_facets_respects_env(monkeypatch):
+    monkeypatch.setenv("PRIMER_SEED_FORCE_FACETS", "true")
+
+    assert seed_data._should_force_facets() is True
+
+
+def test_build_facets_returns_payload_with_optional_satisfaction():
     seed_data.random.seed(42)
 
     facets = seed_data._build_facets(
@@ -53,6 +59,7 @@ def test_build_facets_always_returns_complete_payload():
         summary=None,
         friction_counts={"tool_failure": 2},
         friction_detail="Command exited with status 1",
+        include_user_satisfaction=False,
     )
 
     assert facets["underlying_goal"] == "Working on feature task for api-service"
@@ -63,8 +70,24 @@ def test_build_facets_always_returns_complete_payload():
     assert facets["friction_detail"] == "Command exited with status 1"
     assert facets["primary_success"] in seed_data.PRIMARY_SUCCESS_VALUES
     assert facets["goal_categories"]
-    assert facets["user_satisfaction_counts"]
+    assert facets["user_satisfaction_counts"] is None
     assert 0.0 <= facets["confidence_score"] <= 1.0
+
+
+def test_build_facets_can_include_user_satisfaction():
+    seed_data.random.seed(42)
+
+    facets = seed_data._build_facets(
+        session_type="feature",
+        outcome="partial",
+        project_name="api-service",
+        summary=None,
+        friction_counts=None,
+        friction_detail=None,
+        include_user_satisfaction=True,
+    )
+
+    assert facets["user_satisfaction_counts"]
 
 
 def test_scale_session_count_preserves_expected_subset_volume():

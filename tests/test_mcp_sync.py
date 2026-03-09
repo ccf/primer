@@ -77,6 +77,25 @@ def test_get_server_session_ids_paginates(mock_get):
     assert mock_get.call_args_list[1].kwargs["params"] == {"limit": 1000, "offset": 1000}
 
 
+@patch("primer.mcp.sync.logger")
+@patch("primer.mcp.sync.httpx.get")
+def test_get_server_session_ids_stops_at_max_pages(mock_get, mock_logger, monkeypatch):
+    from primer.mcp import sync
+
+    monkeypatch.setattr(sync, "_MAX_PAGES", 2)
+
+    page = MagicMock()
+    page.status_code = 200
+    page.json.return_value = {"items": [{"id": "s1"}] * 1000}
+    mock_get.side_effect = [page, page]
+
+    ids = sync.get_server_session_ids("http://test:8000", "key")
+
+    assert ids == {"s1"}
+    assert mock_get.call_count == 2
+    mock_logger.warning.assert_called_once()
+
+
 # --- sync_sessions ---
 
 
