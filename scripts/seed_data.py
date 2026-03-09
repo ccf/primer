@@ -1703,12 +1703,8 @@ def main():
                 elif "haiku" in model:
                     token_scale *= 0.5
                 elif (
-                    model == "gpt-5.3-codex"
-                    or model == "gpt-5.2"
-                    or model == "gpt-5.4"
-                    or (model.startswith("gpt-5") and "mini" not in model)
-                    or model == "gemini-2.5-pro"
-                ):
+                    model.startswith("gpt-5") and "mini" not in model
+                ) or model == "gemini-2.5-pro":
                     token_scale *= 1.6  # reasoning models produce more tokens
                 elif model in ("gpt-4.1-nano", "gemini-2.0-flash"):
                     token_scale *= 0.5
