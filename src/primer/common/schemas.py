@@ -1020,6 +1020,48 @@ class QualityMetricsResponse(BaseModel):
     github_connected: bool
 
 
+class ProjectScorecard(BaseModel):
+    adoption_rate: float | None = None
+    effectiveness_rate: float | None = None
+    quality_rate: float | None = None
+    avg_cost_per_session: float | None = None
+    cost_per_successful_outcome: float | None = None
+    measurement_confidence: float | None = None
+
+
+class ProjectRepositorySummary(BaseModel):
+    repository: str
+    session_count: int
+    default_branch: str | None = None
+    readiness_checked: bool
+    ai_readiness_score: float | None = None
+    has_claude_md: bool | None = None
+    has_agents_md: bool | None = None
+    has_claude_dir: bool | None = None
+
+
+class ProjectEnablementSummary(BaseModel):
+    linked_repository_count: int = 0
+    agent_type_counts: dict[str, int] = {}
+    session_type_counts: dict[str, int] = {}
+    permission_mode_counts: dict[str, int] = {}
+    top_tools: list[str] = []
+    top_models: list[str] = []
+
+
+class ProjectWorkspaceResponse(BaseModel):
+    project: ProjectStats
+    scorecard: ProjectScorecard
+    overview: OverviewStats
+    productivity: ProductivityMetrics
+    cost: CostAnalytics
+    quality: QualityMetricsResponse
+    friction: ProjectFriction | None = None
+    friction_impacts: list[FrictionImpact] = []
+    repositories: list[ProjectRepositorySummary] = []
+    enablement: ProjectEnablementSummary
+
+
 class GitHubSyncResponse(BaseModel):
     repos_synced: int
     prs_found: int

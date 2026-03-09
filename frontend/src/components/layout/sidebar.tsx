@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom"
 import {
   AlertTriangle,
   DollarSign,
+  FolderKanban,
   GitPullRequest,
   GraduationCap,
   LayoutDashboard,
@@ -46,6 +47,7 @@ const leadershipLinks: NavItem[] = [
   { to: "/finops", label: "FinOps", icon: DollarSign },
   { to: "/quality", label: "Code Quality", icon: GitPullRequest },
   { to: "/friction", label: "Friction", icon: AlertTriangle },
+  { to: "/projects", label: "Projects", icon: FolderKanban },
   { to: "/growth", label: "Growth", icon: GraduationCap },
   { to: "/explorer", label: "Explorer", icon: MessageSquare },
   { to: "/sessions", label: "Sessions", icon: MonitorDot },
