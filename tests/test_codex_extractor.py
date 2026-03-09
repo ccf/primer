@@ -102,6 +102,106 @@ def test_extract_basic_session():
     assert meta.duration_seconds == 10.0
 
 
+def test_extract_current_rollout_envelope_format():
+    lines = [
+        {
+            "timestamp": "2025-02-01T10:00:00Z",
+            "type": "session_meta",
+            "payload": {
+                "id": "thread-current",
+                "timestamp": "2025-02-01T09:59:59Z",
+                "cwd": "/home/user/current-app",
+                "cli_version": "0.111.0",
+            },
+        },
+        {
+            "timestamp": "2025-02-01T10:00:00Z",
+            "type": "turn_context",
+            "payload": {"model": "gpt-5.4", "approval_policy": "on-request"},
+        },
+        {
+            "timestamp": "2025-02-01T10:00:01Z",
+            "type": "event_msg",
+            "payload": {"type": "user_message", "message": "Fix the failing sync test"},
+        },
+        {
+            "timestamp": "2025-02-01T10:00:02Z",
+            "type": "response_item",
+            "payload": {
+                "type": "function_call",
+                "name": "exec_command",
+                "arguments": '{"cmd":"pytest"}',
+                "call_id": "call-1",
+            },
+        },
+        {
+            "timestamp": "2025-02-01T10:00:03Z",
+            "type": "response_item",
+            "payload": {
+                "type": "function_call_output",
+                "call_id": "call-1",
+                "output": "1 failed, 10 passed",
+            },
+        },
+        {
+            "timestamp": "2025-02-01T10:00:04Z",
+            "type": "event_msg",
+            "payload": {"type": "agent_message", "message": "I found the failure and fixed it."},
+        },
+        {
+            "timestamp": "2025-02-01T10:00:05Z",
+            "type": "event_msg",
+            "payload": {
+                "type": "token_count",
+                "info": {
+                    "last_token_usage": {
+                        "input_tokens": 400,
+                        "output_tokens": 120,
+                        "cached_input_tokens": 30,
+                    }
+                },
+            },
+        },
+        {
+            "timestamp": "2025-02-01T10:00:06Z",
+            "type": "event_msg",
+            "payload": {
+                "type": "token_count",
+                "info": {
+                    "last_token_usage": {
+                        "input_tokens": 250,
+                        "output_tokens": 80,
+                        "cached_input_tokens": 20,
+                    }
+                },
+            },
+        },
+    ]
+    extractor = CodexExtractor()
+    path = _write_jsonl(lines)
+    meta = extractor.extract(path)
+
+    assert meta.session_id == "thread-current"
+    assert meta.project_path == "/home/user/current-app"
+    assert meta.project_name == "current-app"
+    assert meta.agent_version == "0.111.0"
+    assert meta.permission_mode == "on-request"
+    assert meta.message_count == 2
+    assert meta.user_message_count == 1
+    assert meta.assistant_message_count == 1
+    assert meta.tool_call_count == 1
+    assert meta.tool_counts["exec_command"] == 1
+    assert meta.first_prompt == "Fix the failing sync test"
+    assert meta.input_tokens == 650
+    assert meta.output_tokens == 200
+    assert meta.cache_read_tokens == 50
+    assert meta.primary_model == "gpt-5.4"
+    assert meta.duration_seconds == 7.0
+    assert len(meta.messages) == 4
+    assert meta.messages[1]["tool_calls"][0]["name"] == "exec_command"
+    assert meta.messages[2]["tool_results"][0]["name"] == "exec_command"
+
+
 def test_token_delta_computation():
     """Cumulative token events should produce correct deltas."""
     lines = [
@@ -189,6 +289,41 @@ def test_discover_sessions(tmp_path):
         assert sessions[0].session_id == "thread-abc"
         assert sessions[0].agent_type == "codex_cli"
         assert sessions[0].project_path == "/project"
+    finally:
+        Path.home = original_home
+
+
+def test_discover_sessions_current_rollout_format(tmp_path):
+    sessions_dir = tmp_path / ".codex" / "sessions" / "2025" / "02" / "01"
+    sessions_dir.mkdir(parents=True)
+
+    rollout = sessions_dir / "rollout-current.jsonl"
+    rollout.write_text(
+        json.dumps(
+            {
+                "timestamp": "2025-02-01T10:00:00Z",
+                "type": "session_meta",
+                "payload": {"id": "thread-current", "cwd": "/project/current"},
+            }
+        )
+        + "\n"
+    )
+
+    from pathlib import Path
+
+    original_home = Path.home
+
+    def mock_home():
+        return tmp_path
+
+    Path.home = staticmethod(mock_home)
+    try:
+        extractor = CodexExtractor()
+        sessions = extractor.discover_sessions()
+        assert len(sessions) == 1
+        assert sessions[0].session_id == "thread-current"
+        assert sessions[0].project_path == "/project/current"
+        assert sessions[0].agent_type == "codex_cli"
     finally:
         Path.home = original_home
 

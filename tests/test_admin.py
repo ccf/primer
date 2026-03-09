@@ -282,11 +282,11 @@ def test_measurement_integrity_stats_include_source_quality_breakdown(
         "session_count": 2,
         "transcript_parity": "required",
         "transcript_coverage_pct": 50.0,
-        "tool_call_parity": "unavailable",
+        "tool_call_parity": "optional",
         "tool_call_coverage_pct": 0.0,
-        "model_usage_parity": "unavailable",
+        "model_usage_parity": "optional",
         "model_usage_coverage_pct": 0.0,
-        "facet_parity": "unavailable",
+        "facet_parity": "optional",
         "facet_coverage_pct": 0.0,
         "native_discovery_parity": "unavailable",
     }
@@ -338,8 +338,9 @@ def test_measurement_integrity_stats_count_missing_supported_tool_and_model_tele
     assert source_quality["claude_code"]["tool_call_coverage_pct"] == 50.0
     assert source_quality["claude_code"]["model_usage_coverage_pct"] == 50.0
     assert source_quality["cursor"]["transcript_parity"] == "required"
-    assert source_quality["cursor"]["tool_call_parity"] == "unavailable"
+    assert source_quality["cursor"]["tool_call_parity"] == "optional"
     assert source_quality["cursor"]["tool_call_coverage_pct"] == 0.0
+    assert source_quality["cursor"]["model_usage_parity"] == "optional"
     assert source_quality["cursor"]["model_usage_coverage_pct"] == 0.0
 
 
@@ -461,8 +462,8 @@ def test_measurement_integrity_facet_coverage_pct_ignores_unsupported_sources(
     source_quality = {entry["agent_type"]: entry for entry in data["source_quality"]}
     assert source_quality["claude_code"]["facet_parity"] == "required"
     assert source_quality["claude_code"]["facet_coverage_pct"] == 0.0
-    assert source_quality["cursor"]["facet_parity"] == "unavailable"
-    assert source_quality["cursor"]["facet_coverage_pct"] == 0.0
+    assert source_quality["cursor"]["facet_parity"] == "optional"
+    assert source_quality["cursor"]["facet_coverage_pct"] == 100.0
 
 
 def test_normalize_facets_endpoint_dry_run_and_limit(

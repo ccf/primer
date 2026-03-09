@@ -1,14 +1,12 @@
 """Extract structured metadata from Gemini CLI (Google) session files.
 
-Gemini CLI stores sessions as JSON files at:
-    ~/.gemini/tmp/<project_hash>/chats/session-*.json
+Gemini CLI has shipped more than one on-disk session shape:
+- Older per-session JSON files under `~/.gemini/tmp/<hash>/chats/session-*.json`
+- Newer shared logs under `~/.gemini/tmp/<hash>/logs.json`
 
-Each file is a JSON object with a `Content[]` array. Messages have:
-- role: "user", "model", or "function"
-- parts: array with text, functionCall, or functionResponse
-
-Token data may come from ~/.gemini/telemetry.log (OpenTelemetry events),
-but we gracefully degrade to zero token counts if unavailable.
+The extractor supports both. Token data may come from inline usage metadata
+or `~/.gemini/telemetry.log`; if neither is available, we gracefully degrade
+to zero token counts.
 """
 
 from __future__ import annotations
@@ -23,6 +21,8 @@ from primer.hook.extractor import SessionMetadata
 
 logger = logging.getLogger(__name__)
 
+_LOG_SESSION_DELIMITER = "::"
+
 
 class GeminiExtractor:
     """Extractor for Gemini CLI sessions (~/.gemini/)."""
@@ -33,7 +33,7 @@ class GeminiExtractor:
         return Path.home() / ".gemini"
 
     def discover_sessions(self) -> list:
-        """Discover Gemini CLI sessions from ~/.gemini/tmp/*/chats/."""
+        """Discover Gemini CLI sessions from ~/.gemini/tmp/."""
         from primer.mcp.reader import LocalSession
 
         gemini_dir = self.get_data_dir()
@@ -63,6 +63,9 @@ class GeminiExtractor:
                     agent_type=self.agent_type,
                 )
             )
+
+        for log_file in tmp_dir.glob("*/logs.json"):
+            results.extend(self._discover_log_sessions(log_file, seen_ids))
         return results
 
     def extract(self, transcript_path: str) -> SessionMetadata:
@@ -72,7 +75,7 @@ class GeminiExtractor:
         model_tokens: dict[str, dict[str, int]] = {}
         ordinal = 0
 
-        path = Path(transcript_path)
+        path, selected_session_id = self._split_transcript_ref(transcript_path)
         if not path.exists():
             return meta
 
@@ -82,7 +85,10 @@ class GeminiExtractor:
         except (json.JSONDecodeError, OSError):
             return meta
 
-        meta.session_id = path.stem
+        if self._looks_like_logs_payload(data):
+            return self._extract_logs_payload(path, data, selected_session_id)
+
+        meta.session_id = selected_session_id or path.stem
 
         # Extract content array
         contents = data if isinstance(data, list) else data.get("contents", data.get("Content", []))
@@ -163,7 +169,7 @@ class GeminiExtractor:
 
         # Try telemetry as a fallback for token data
         if not model_tokens:
-            telemetry_tokens = self._load_telemetry_tokens(path)
+            telemetry_tokens = self._load_telemetry_tokens(path, meta.session_id)
             if telemetry_tokens:
                 model_tokens.update(telemetry_tokens)
                 for model_data in telemetry_tokens.values():
@@ -179,6 +185,182 @@ class GeminiExtractor:
             )
 
         return meta
+
+    def _discover_log_sessions(self, log_file: Path, seen_ids: set[str]) -> list:
+        from primer.mcp.reader import LocalSession
+
+        try:
+            with open(log_file) as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return []
+
+        if not self._looks_like_logs_payload(data):
+            return []
+
+        results: list[LocalSession] = []
+        project_path = self._infer_project_path(log_file)
+        ordered_session_ids: list[str] = []
+        seen_in_file: set[str] = set()
+        for entry in data:
+            if not isinstance(entry, dict):
+                continue
+            session_id = entry.get("sessionId") or entry.get("session_id")
+            if not isinstance(session_id, str) or not session_id or session_id in seen_in_file:
+                continue
+            seen_in_file.add(session_id)
+            ordered_session_ids.append(session_id)
+
+        for session_id in ordered_session_ids:
+            if session_id in seen_ids:
+                continue
+            seen_ids.add(session_id)
+            results.append(
+                LocalSession(
+                    session_id=session_id,
+                    transcript_path=f"{log_file}{_LOG_SESSION_DELIMITER}{session_id}",
+                    facets_path=None,
+                    has_facets=False,
+                    project_path=project_path,
+                    agent_type=self.agent_type,
+                )
+            )
+        return results
+
+    def _extract_logs_payload(
+        self,
+        path: Path,
+        data: list,
+        selected_session_id: str | None,
+    ) -> SessionMetadata:
+        meta = SessionMetadata(agent_type=self.agent_type)
+        tool_counter: Counter[str] = Counter()
+        model_tokens: dict[str, dict[str, int]] = {}
+        ordinal = 0
+        first_ts: datetime | None = None
+        last_ts: datetime | None = None
+
+        entries = [entry for entry in data if isinstance(entry, dict)]
+        if selected_session_id:
+            entries = [
+                entry
+                for entry in entries
+                if (entry.get("sessionId") or entry.get("session_id")) == selected_session_id
+            ]
+
+        if not entries:
+            return meta
+
+        meta.session_id = selected_session_id or str(entries[0].get("sessionId") or "")
+
+        for entry in entries:
+            entry_type = str(entry.get("type") or "").lower()
+            message = entry.get("message")
+            message_text = message[:2000] if isinstance(message, str) and message else None
+
+            ts = self._parse_content_timestamp(entry)
+            if ts:
+                if first_ts is None:
+                    first_ts = ts
+                last_ts = ts
+
+            if entry_type == "user":
+                if not message_text:
+                    continue
+                meta.message_count += 1
+                meta.user_message_count += 1
+                if not meta.first_prompt:
+                    meta.first_prompt = message_text[:500]
+                meta.messages.append(
+                    {"ordinal": ordinal, "role": "human", "content_text": message_text}
+                )
+                ordinal += 1
+                continue
+
+            if entry_type in {"model", "assistant"}:
+                if message_text:
+                    meta.message_count += 1
+                    meta.assistant_message_count += 1
+                    meta.messages.append(
+                        {"ordinal": ordinal, "role": "assistant", "content_text": message_text}
+                    )
+                    ordinal += 1
+            elif entry_type in {"tool_result", "function", "function_response"} and message_text:
+                meta.messages.append(
+                    {
+                        "ordinal": ordinal,
+                        "role": "tool_result",
+                        "tool_results": [
+                            {
+                                "name": entry.get("toolName")
+                                or entry.get("tool_name")
+                                or entry.get("name")
+                                or "tool_result",
+                                "output_preview": message_text[:500],
+                            }
+                        ],
+                    }
+                )
+                ordinal += 1
+
+            if entry_type in {"tool_call", "function_call"}:
+                tool_name = (
+                    entry.get("toolName")
+                    or entry.get("tool_name")
+                    or entry.get("name")
+                    or "tool_call"
+                )
+                tool_counter[tool_name] += 1
+                meta.tool_call_count += 1
+
+            usage = entry.get("usageMetadata") or entry.get("usage_metadata")
+            if isinstance(usage, dict):
+                model = entry.get("model") or entry.get("modelName") or "gemini-2.5-flash"
+                self._apply_usage(meta, model_tokens, str(model), usage)
+
+        meta.tool_counts = dict(tool_counter)
+        meta.started_at = first_ts
+        meta.ended_at = last_ts
+        if first_ts and last_ts:
+            meta.duration_seconds = (last_ts - first_ts).total_seconds()
+
+        if not model_tokens:
+            telemetry_tokens = self._load_telemetry_tokens(path, meta.session_id)
+            if telemetry_tokens:
+                model_tokens.update(telemetry_tokens)
+                for model_data in telemetry_tokens.values():
+                    meta.input_tokens += model_data.get("input", 0)
+                    meta.output_tokens += model_data.get("output", 0)
+                    meta.cache_read_tokens += model_data.get("cache_read", 0)
+
+        meta.model_tokens = model_tokens
+        if model_tokens:
+            meta.primary_model = max(
+                model_tokens,
+                key=lambda model: (
+                    model_tokens[model].get("input", 0) + model_tokens[model].get("output", 0)
+                ),
+            )
+
+        return meta
+
+    @staticmethod
+    def _split_transcript_ref(transcript_path: str) -> tuple[Path, str | None]:
+        if _LOG_SESSION_DELIMITER not in transcript_path:
+            return Path(transcript_path), None
+        path_str, session_id = transcript_path.rsplit(_LOG_SESSION_DELIMITER, 1)
+        return Path(path_str), session_id or None
+
+    @staticmethod
+    def _looks_like_logs_payload(data: object) -> bool:
+        if not isinstance(data, list):
+            return False
+        return any(
+            isinstance(entry, dict)
+            and ("sessionId" in entry or "session_id" in entry)
+            and ("message" in entry or "type" in entry)
+            for entry in data
+        )
 
     @staticmethod
     def _parse_content_timestamp(content: dict) -> datetime | None:
@@ -268,13 +450,16 @@ class GeminiExtractor:
         meta.output_tokens += output_t
         meta.cache_read_tokens += cached_t
 
-    def _load_telemetry_tokens(self, session_path: Path) -> dict[str, dict[str, int]] | None:
+    def _load_telemetry_tokens(
+        self,
+        session_path: Path,
+        session_id: str,
+    ) -> dict[str, dict[str, int]] | None:
         """Try to load token counts from ~/.gemini/telemetry.log (OpenTelemetry)."""
         telemetry_path = self.get_data_dir() / "telemetry.log"
         if not telemetry_path.exists():
             return None
 
-        session_id = session_path.stem
         model_tokens: dict[str, dict[str, int]] = {}
 
         try:
@@ -317,10 +502,14 @@ class GeminiExtractor:
     def _infer_project_path(session_file: Path) -> str | None:
         """Try to infer project path from the hash directory structure.
 
-        Gemini uses ~/.gemini/tmp/<project_hash>/chats/ — the hash isn't
-        reversible, so we return None unless we find a metadata file.
+        Gemini stores sessions under ~/.gemini/tmp/<project_hash>/... — the hash
+        isn't reversible, so we return None unless we find a metadata file.
         """
-        project_dir = session_file.parent.parent
+        project_dir = (
+            session_file.parent.parent
+            if session_file.parent.name == "chats"
+            else session_file.parent
+        )
         meta_file = project_dir / "metadata.json"
         if meta_file.exists():
             try:

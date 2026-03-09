@@ -2,6 +2,7 @@
 
 import logging
 import os
+from pathlib import Path
 
 import httpx
 
@@ -15,16 +16,37 @@ logger = logging.getLogger(__name__)
 
 def get_server_session_ids(server_url: str, api_key: str) -> set[str]:
     """Fetch the set of session IDs already on the server for this engineer."""
-    resp = httpx.get(
-        f"{server_url}/api/v1/sessions",
-        headers={"x-api-key": api_key, "x-admin-key": api_key},
-        params={"limit": 10000},
-        timeout=30.0,
-    )
-    if resp.status_code != 200:
-        logger.warning(f"Failed to fetch server sessions: {resp.status_code}")
-        return set()
-    return {s["id"] for s in resp.json()["items"]}
+    session_ids: set[str] = set()
+    limit = 1000
+    offset = 0
+
+    while True:
+        try:
+            resp = httpx.get(
+                f"{server_url}/api/v1/sessions",
+                headers={"x-api-key": api_key},
+                params={"limit": limit, "offset": offset},
+                timeout=30.0,
+            )
+        except httpx.RequestError as exc:
+            logger.warning("Failed to fetch server sessions: %s", exc)
+            return session_ids
+
+        if resp.status_code != 200:
+            logger.warning(f"Failed to fetch server sessions: {resp.status_code}")
+            return session_ids
+
+        payload = resp.json()
+        items = payload.get("items", [])
+        session_ids.update(item["id"] for item in items if "id" in item)
+
+        total_count = payload.get("total_count")
+        if len(items) < limit:
+            return session_ids
+        if isinstance(total_count, int) and offset + len(items) >= total_count:
+            return session_ids
+
+        offset += limit
 
 
 def sync_sessions(server_url: str, api_key: str) -> dict:
@@ -37,24 +59,32 @@ def sync_sessions(server_url: str, api_key: str) -> dict:
         return {"local_count": 0, "server_count": 0, "synced": 0, "errors": 0}
 
     server_ids = get_server_session_ids(server_url, api_key)
-    missing = [s for s in local_sessions if s.session_id not in server_ids]
+    missing: list[tuple[object, str | None]] = []
+    already_synced = 0
+    for local_session in local_sessions:
+        matched_server_id = _match_existing_server_session_id(local_session, server_ids)
+        if matched_server_id == local_session.session_id:
+            already_synced += 1
+            continue
+        missing.append((local_session, matched_server_id))
 
     synced = 0
     errors = 0
 
-    for local_session in missing:
+    for local_session, matched_server_id in missing:
         try:
             extractor = get_extractor_for(local_session.agent_type)
             if not extractor:
                 errors += 1
                 continue
             meta = extractor.extract(local_session.transcript_path)
-            meta.session_id = local_session.session_id
+            meta.session_id = matched_server_id or meta.session_id or local_session.session_id
             meta.agent_type = local_session.agent_type
 
             capability = get_capability_for(local_session.agent_type)
 
-            # Only attach facets for sources that explicitly support them.
+            # Only attach native facet files when the source actually has them.
+            # Other agents rely on ingest-time transcript extraction instead.
             facets = (
                 load_facets(local_session.session_id, local_session.facets_path)
                 if capability and capability.supports_facets and local_session.has_facets
@@ -96,5 +126,23 @@ def sync_sessions(server_url: str, api_key: str) -> dict:
         "server_count": len(server_ids),
         "synced": synced,
         "errors": errors,
-        "already_synced": len(local_sessions) - len(missing),
+        "already_synced": already_synced,
     }
+
+
+def _match_existing_server_session_id(local_session, server_ids: set[str]) -> str | None:
+    """Return an already-synced server ID for this local session, if any.
+
+    Codex previously fell back to rollout filename stems when session_meta parsing
+    failed. Keep that legacy ID as an alias so upgraded clients enrich the old row
+    instead of creating a duplicate.
+    """
+    if local_session.session_id in server_ids:
+        return local_session.session_id
+
+    if local_session.agent_type == "codex_cli":
+        legacy_rollout_id = Path(local_session.transcript_path).stem
+        if legacy_rollout_id in server_ids:
+            return legacy_rollout_id
+
+    return None

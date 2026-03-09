@@ -173,9 +173,7 @@ def test_overview_avg_messages_per_session_requires_actual_message_rows(
     assert data["avg_messages_per_session"] == 2.0
 
 
-def test_overview_excludes_cursor_facets_from_unsupported_metrics(
-    client, engineer_with_key, admin_headers
-):
+def test_overview_includes_cursor_facets_when_present(client, engineer_with_key, admin_headers):
     _eng, api_key = engineer_with_key
     _ingest_session(
         client,
@@ -194,9 +192,37 @@ def test_overview_excludes_cursor_facets_from_unsupported_metrics(
     assert response.status_code == 200
 
     data = response.json()
-    assert data["success_rate"] == 1.0
-    assert data["outcome_counts"] == {"success": 1}
-    assert data["session_type_counts"] == {"feature": 1}
+    assert data["success_rate"] == 0.5
+    assert data["outcome_counts"] == {"success": 1, "failure": 1}
+    assert data["session_type_counts"] == {"feature": 1, "debugging": 1}
+
+
+def test_overview_includes_codex_facets_from_supported_transcript_source(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="codex_cli",
+        messages=_messages(6),
+        facets={"outcome": "success", "session_type": "feature"},
+    )
+    _ingest_session(
+        client,
+        api_key,
+        agent_type="cursor",
+        messages=_messages(6),
+        facets={"outcome": "failure", "session_type": "debugging"},
+    )
+
+    response = client.get("/api/v1/analytics/overview", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["success_rate"] == 0.5
+    assert data["outcome_counts"] == {"success": 1, "failure": 1}
+    assert data["session_type_counts"] == {"feature": 1, "debugging": 1}
 
 
 def test_overview_total_tool_calls_requires_actual_tool_usage_rows(
@@ -294,7 +320,7 @@ def test_tool_rankings(client, engineer_with_key, admin_headers):
     assert data[0]["total_calls"] == 18
 
 
-def test_tool_rankings_exclude_cursor_unsupported_tool_usage(
+def test_tool_rankings_include_cursor_tool_usage_when_present(
     client, engineer_with_key, admin_headers
 ):
     _eng, api_key = engineer_with_key
@@ -318,7 +344,10 @@ def test_tool_rankings_exclude_cursor_unsupported_tool_usage(
     assert response.status_code == 200
 
     data = response.json()
-    assert data == [{"tool_name": "Read", "total_calls": 3, "session_count": 1}]
+    assert data == [
+        {"tool_name": "Read", "total_calls": 13, "session_count": 2},
+        {"tool_name": "Ghost", "total_calls": 7, "session_count": 1},
+    ]
 
 
 def test_model_rankings(client, engineer_with_key, admin_headers):
@@ -354,7 +383,7 @@ def test_model_rankings(client, engineer_with_key, admin_headers):
     assert data[0]["total_input_tokens"] == 3000
 
 
-def test_model_rankings_exclude_cursor_unsupported_model_usage(
+def test_model_rankings_include_cursor_model_usage_when_present(
     client, engineer_with_key, admin_headers
 ):
     _eng, api_key = engineer_with_key
@@ -390,9 +419,9 @@ def test_model_rankings_exclude_cursor_unsupported_model_usage(
     assert data == [
         {
             "model_name": "claude-sonnet-4-5-20250929",
-            "total_input_tokens": 1000,
-            "total_output_tokens": 500,
-            "session_count": 1,
+            "total_input_tokens": 10000,
+            "total_output_tokens": 5000,
+            "session_count": 2,
         }
     ]
 
@@ -424,7 +453,7 @@ def test_friction_report(client, engineer_with_key, admin_headers):
     assert tool_error["count"] == 5
 
 
-def test_friction_report_excludes_cursor_facets_from_unsupported_metrics(
+def test_friction_report_includes_cursor_facets_when_present(
     client, engineer_with_key, admin_headers
 ):
     _eng, api_key = engineer_with_key
@@ -452,8 +481,11 @@ def test_friction_report_excludes_cursor_facets_from_unsupported_metrics(
 
     data = response.json()
     tool_error = next(f for f in data if f["friction_type"] == "tool_error")
-    assert tool_error["count"] == 2
-    assert tool_error["details"] == ["Supported friction"]
+    assert tool_error["count"] == 7
+    assert set(tool_error["details"]) == {
+        "Supported friction",
+        "Unsupported cursor friction",
+    }
 
 
 def test_daily_stats_endpoint(client, engineer_with_key, admin_headers):
@@ -585,7 +617,7 @@ def test_daily_stats_message_count_requires_actual_message_rows(
     assert day_15["message_count"] == 2
 
 
-def test_daily_stats_success_rate_excludes_cursor_facets_from_unsupported_metrics(
+def test_daily_stats_success_rate_includes_cursor_facets_when_present(
     client, engineer_with_key, admin_headers
 ):
     _eng, api_key = engineer_with_key
@@ -612,7 +644,7 @@ def test_daily_stats_success_rate_excludes_cursor_facets_from_unsupported_metric
 
     data = response.json()
     day = data[0]
-    assert day["success_rate"] == 1.0
+    assert day["success_rate"] == 0.5
 
 
 def test_daily_stats_with_team_filter(client, engineer_with_key, admin_headers):
@@ -700,7 +732,7 @@ def test_cost_analytics(client, engineer_with_key, admin_headers):
     assert opus["estimated_cost"] > 0
 
 
-def test_cost_analytics_exclude_cursor_unsupported_model_usage(
+def test_cost_analytics_include_cursor_model_usage_when_present(
     client, engineer_with_key, admin_headers
 ):
     _eng, api_key = engineer_with_key
@@ -738,13 +770,13 @@ def test_cost_analytics_exclude_cursor_unsupported_model_usage(
     assert len(data["model_breakdown"]) == 1
     model = data["model_breakdown"][0]
     assert model["model_name"] == "claude-sonnet-4-5-20250929"
-    assert model["input_tokens"] == 1000
-    assert model["output_tokens"] == 500
+    assert model["input_tokens"] == 10000
+    assert model["output_tokens"] == 5000
     assert len(data["daily_costs"]) == 1
-    assert data["daily_costs"][0]["session_count"] == 1
+    assert data["daily_costs"][0]["session_count"] == 2
 
 
-def test_tool_adoption_excludes_cursor_unsupported_tool_usage(
+def test_tool_adoption_includes_cursor_tool_usage_when_present(
     client, engineer_with_key, admin_headers
 ):
     _eng, api_key = engineer_with_key
@@ -767,11 +799,11 @@ def test_tool_adoption_excludes_cursor_unsupported_tool_usage(
     assert response.status_code == 200
 
     data = response.json()
-    assert data["total_tools_discovered"] == 1
-    assert [entry["tool_name"] for entry in data["tool_adoption"]] == ["Read"]
-    assert data["tool_adoption"][0]["total_calls"] == 3
-    assert data["engineer_profiles"][0]["top_tools"] == ["Read"]
-    assert all(trend["tool_name"] == "Read" for trend in data["tool_trends"])
+    assert data["total_tools_discovered"] == 2
+    assert [entry["tool_name"] for entry in data["tool_adoption"]] == ["Ghost", "Read"]
+    assert data["tool_adoption"][0]["total_calls"] == 7
+    assert data["engineer_profiles"][0]["top_tools"] == ["Ghost", "Read"]
+    assert {trend["tool_name"] for trend in data["tool_trends"]} == {"Ghost", "Read"}
 
 
 def test_overview_includes_estimated_cost(client, engineer_with_key, admin_headers):
@@ -1011,7 +1043,7 @@ def test_project_analytics_excludes_sessions_without_supported_model_telemetry_f
     assert project["total_tokens"] == 1500
 
 
-def test_project_analytics_excludes_cursor_facets_from_outcome_distribution(
+def test_project_analytics_includes_cursor_facets_when_present(
     client, engineer_with_key, admin_headers
 ):
     _eng, api_key = engineer_with_key
@@ -1035,7 +1067,7 @@ def test_project_analytics_excludes_cursor_facets_from_outcome_distribution(
 
     data = response.json()
     project = next(p for p in data["projects"] if p["project_name"] == "facet-safe-project")
-    assert project["outcome_distribution"] == {"success": 1}
+    assert project["outcome_distribution"] == {"success": 1, "failure": 1}
 
 
 def test_activity_heatmap(client, engineer_with_key, admin_headers):
@@ -1085,7 +1117,7 @@ def test_productivity_excludes_cursor_sessions_without_model_usage_from_avg_cost
     assert data["avg_cost_per_session"] == data["total_cost"]
 
 
-def test_productivity_excludes_cursor_facets_from_cost_per_success(
+def test_productivity_cost_per_success_requires_measured_cost_sessions(
     client, engineer_with_key, admin_headers
 ):
     _eng, api_key = engineer_with_key
@@ -1183,9 +1215,7 @@ def test_engineer_benchmarks_exclude_sessions_without_supported_model_telemetry_
     assert data["benchmark"]["team_avg_tokens"] == 750.0
 
 
-def test_bottlenecks_exclude_cursor_facets_from_unsupported_metrics(
-    client, engineer_with_key, admin_headers
-):
+def test_bottlenecks_include_cursor_facets_when_present(client, engineer_with_key, admin_headers):
     _eng, api_key = engineer_with_key
     _ingest_session(
         client,
@@ -1216,17 +1246,21 @@ def test_bottlenecks_exclude_cursor_facets_from_unsupported_metrics(
     assert response.status_code == 200
 
     data = response.json()
-    assert data["total_sessions_analyzed"] == 1
-    assert data["sessions_with_any_friction"] == 1
+    assert data["total_sessions_analyzed"] == 2
+    assert data["sessions_with_any_friction"] == 2
     assert data["overall_friction_rate"] == 1.0
     impact = next(
         item for item in data["friction_impacts"] if item["friction_type"] == "tool_error"
     )
-    assert impact["occurrence_count"] == 1
-    project = next(
+    assert impact["occurrence_count"] == 6
+    supported_project = next(
         item for item in data["project_friction"] if item["project_name"] == "supported-project"
     )
-    assert project["total_friction_count"] == 1
+    cursor_project = next(
+        item for item in data["project_friction"] if item["project_name"] == "cursor-project"
+    )
+    assert supported_project["total_friction_count"] == 1
+    assert cursor_project["total_friction_count"] == 5
 
 
 def test_overview_with_trends(client, engineer_with_key, admin_headers):

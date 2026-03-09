@@ -1131,11 +1131,15 @@ def get_productivity_metrics(
         cost_session_q = cost_session_q.filter(SessionModel.started_at <= end_date)
     cost_session_count = cost_session_q.scalar() or 0
 
-    # Success count from facets
+    # Guardrail: cost-per-success should only count successful sessions that
+    # also contributed measured model telemetry. Otherwise facet-capable but
+    # cost-unmeasured sessions can dilute the denominator and understate cost.
     success_q = (
         db.query(SessionFacets.outcome).join(SessionModel).filter(SessionFacets.outcome.isnot(None))
     )
     success_q = _filter_sessions_by_capability(success_q, "supports_facets")
+    success_q = _filter_sessions_by_capability(success_q, "supports_model_usage")
+    success_q = success_q.filter(SessionModel.id.in_(db.query(ModelUsage.session_id).distinct()))
     if engineer_id:
         success_q = success_q.filter(SessionModel.engineer_id == engineer_id)
     elif team_id:
