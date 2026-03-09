@@ -10,6 +10,7 @@ from primer.common.config import settings
 from primer.common.models import (
     GitRepository,
     PullRequest,
+    ReviewFinding,
     SessionCommit,
 )
 from primer.common.models import Session as SessionModel
@@ -455,6 +456,151 @@ class TestQualityMetrics:
     def test_auth_required(self, client):
         resp = client.get("/api/v1/analytics/quality-metrics")
         assert resp.status_code == 401
+
+    def test_quality_attribution_links_session_behaviors_to_pr_outcomes(
+        self, client, engineer_with_key, admin_headers, db_session
+    ):
+        _eng, key = engineer_with_key
+        now = datetime.utcnow()
+
+        payload = _ingest_payload(
+            key,
+            session_id="attrib-session-a",
+            git_remote_url="https://github.com/acme/attrib-test.git",
+            commits=[
+                {
+                    "sha": "attrib_commit_a",
+                    "message": "fix: attributed change",
+                    "committed_at": now.isoformat(),
+                    "files_changed": 2,
+                    "lines_added": 20,
+                    "lines_deleted": 5,
+                },
+            ],
+        )
+        payload["permission_mode"] = "on-request"
+        payload["tool_usages"] = [
+            {"tool_name": "Read", "call_count": 2},
+            {"tool_name": "Edit", "call_count": 1},
+        ]
+        payload["facets"] = {"session_type": "bug_fix", "outcome": "success"}
+        resp = client.post("/api/v1/ingest/session", json=payload)
+        assert resp.status_code == 200
+
+        payload_b = _ingest_payload(
+            key,
+            session_id="attrib-session-b",
+            commits=[
+                {
+                    "sha": "attrib_commit_b",
+                    "message": "feat: attributed change",
+                    "committed_at": now.isoformat(),
+                    "files_changed": 1,
+                    "lines_added": 8,
+                    "lines_deleted": 3,
+                },
+            ],
+        )
+        payload_b["agent_type"] = "codex_cli"
+        payload_b["permission_mode"] = "never"
+        payload_b["facets"] = {"session_type": "feature_delivery", "outcome": "failure"}
+        resp = client.post("/api/v1/ingest/session", json=payload_b)
+        assert resp.status_code == 200
+
+        repo = (
+            db_session.query(GitRepository)
+            .filter(GitRepository.full_name == "acme/attrib-test")
+            .first()
+        )
+        assert repo is not None
+
+        pr_merged = PullRequest(
+            repository_id=repo.id,
+            github_pr_number=101,
+            title="Merged attribution PR",
+            state="merged",
+            review_comments_count=2,
+            pr_created_at=now - timedelta(hours=5),
+            merged_at=now - timedelta(hours=1),
+        )
+        pr_closed = PullRequest(
+            repository_id=repo.id,
+            github_pr_number=102,
+            title="Closed attribution PR",
+            state="closed",
+            review_comments_count=4,
+            pr_created_at=now - timedelta(hours=6),
+            closed_at=now - timedelta(hours=2),
+        )
+        db_session.add_all([pr_merged, pr_closed])
+        db_session.flush()
+
+        commit_a = (
+            db_session.query(SessionCommit)
+            .filter(SessionCommit.commit_sha == "attrib_commit_a")
+            .first()
+        )
+        commit_b = (
+            db_session.query(SessionCommit)
+            .filter(SessionCommit.commit_sha == "attrib_commit_b")
+            .first()
+        )
+        commit_a.pull_request_id = pr_merged.id
+        commit_b.pull_request_id = pr_closed.id
+
+        db_session.add_all(
+            [
+                ReviewFinding(
+                    pull_request_id=pr_merged.id,
+                    source="bugbot",
+                    external_id="attrib-finding-1",
+                    severity="high",
+                    title="High issue",
+                    status="fixed",
+                    detected_at=now - timedelta(hours=4),
+                ),
+                ReviewFinding(
+                    pull_request_id=pr_merged.id,
+                    source="bugbot",
+                    external_id="attrib-finding-2",
+                    severity="medium",
+                    title="Medium issue",
+                    status="open",
+                    detected_at=now - timedelta(hours=4),
+                ),
+            ]
+        )
+        db_session.flush()
+
+        resp = client.get("/api/v1/analytics/quality-metrics", headers=admin_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+
+        def _row(dimension, label):
+            return next(
+                row
+                for row in data["attribution"]
+                if row["dimension"] == dimension and row["label"] == label
+            )
+
+        bug_fix = _row("session_type", "bug_fix")
+        assert bug_fix["linked_sessions"] == 1
+        assert bug_fix["linked_prs"] == 1
+        assert bug_fix["merge_rate"] == 1.0
+        assert bug_fix["avg_findings_per_pr"] == 2.0
+        assert bug_fix["high_severity_findings_per_pr"] == 1.0
+        assert bug_fix["findings_fix_rate"] == 0.5
+
+        codex = _row("agent_type", "codex_cli")
+        assert codex["linked_prs"] == 1
+        assert codex["merge_rate"] == 0.0
+
+        no_tools = _row("tool_breadth", "No tools")
+        assert no_tools["linked_sessions"] == 1
+        assert no_tools["linked_prs"] == 1
+
+        on_request = _row("permission_mode", "on-request")
+        assert on_request["avg_review_comments_per_pr"] == 2.0
 
 
 # ---------------------------------------------------------------------------

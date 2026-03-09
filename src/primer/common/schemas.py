@@ -951,6 +951,19 @@ class EngineerQuality(BaseModel):
     avg_review_comments: float | None
 
 
+class QualityAttributionRow(BaseModel):
+    dimension: str
+    label: str
+    linked_sessions: int
+    linked_prs: int
+    merge_rate: float | None
+    avg_review_comments_per_pr: float | None
+    avg_findings_per_pr: float | None
+    high_severity_findings_per_pr: float | None
+    avg_time_to_merge_hours: float | None
+    findings_fix_rate: float | None
+
+
 class PRSummary(BaseModel):
     repository: str
     pr_number: int
@@ -1000,6 +1013,7 @@ class QualityMetricsResponse(BaseModel):
     daily_volume: list[DailyCodeVolume]
     by_session_type: list[QualityByType]
     engineer_quality: list[EngineerQuality]
+    attribution: list[QualityAttributionRow]
     recent_prs: list[PRSummary]
     findings_overview: FindingsOverview | None = None
     sessions_analyzed: int
