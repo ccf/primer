@@ -3,7 +3,16 @@ from datetime import UTC, datetime
 
 import pytest
 
-from primer.common.models import AuditLog, ModelUsage, SessionFacets, SessionMessage, ToolUsage
+from primer.common.models import (
+    AuditLog,
+    GitRepository,
+    ModelUsage,
+    PullRequest,
+    SessionCommit,
+    SessionFacets,
+    SessionMessage,
+    ToolUsage,
+)
 from primer.common.models import Session as SessionModel
 
 
@@ -37,10 +46,12 @@ def _create_measurement_integrity_session(
     outcome=None,
     goal_categories=None,
     confidence_score=None,
+    repository_id=None,
 ):
     session = SessionModel(
         id=str(uuid.uuid4()),
         engineer_id=engineer_id,
+        repository_id=repository_id,
         agent_type=agent_type,
         started_at=datetime.now(UTC),
         message_count=1 if with_messages else 0,
@@ -99,6 +110,40 @@ def _create_measurement_integrity_session(
 
     db_session.flush()
     return session.id
+
+
+def _create_repository(
+    db_session,
+    *,
+    full_name,
+    github_id=None,
+    default_branch=None,
+    readiness_checked=False,
+):
+    repo = GitRepository(
+        full_name=full_name,
+        github_id=github_id,
+        default_branch=default_branch,
+        ai_readiness_checked_at=datetime.now(UTC) if readiness_checked else None,
+    )
+    db_session.add(repo)
+    db_session.flush()
+    return repo
+
+
+def _add_session_commit(db_session, session_id, repository_id, *, pull_request_id=None):
+    db_session.add(
+        SessionCommit(
+            session_id=session_id,
+            repository_id=repository_id,
+            pull_request_id=pull_request_id,
+            commit_sha=uuid.uuid4().hex[:12],
+            committed_at=datetime.now(UTC),
+            lines_added=10,
+            lines_deleted=2,
+        )
+    )
+    db_session.flush()
 
 
 def test_system_stats(client, admin_headers, engineer_with_key):
@@ -296,6 +341,90 @@ def test_measurement_integrity_stats_count_missing_supported_tool_and_model_tele
     assert source_quality["cursor"]["tool_call_parity"] == "unavailable"
     assert source_quality["cursor"]["tool_call_coverage_pct"] == 0.0
     assert source_quality["cursor"]["model_usage_coverage_pct"] == 0.0
+
+
+def test_measurement_integrity_stats_include_github_sync_and_repository_metadata_coverage(
+    client, admin_headers, engineer_with_key, db_session
+):
+    eng, _api_key = engineer_with_key
+    complete_repo = _create_repository(
+        db_session,
+        full_name="acme/complete-repo",
+        github_id=101,
+        default_branch="main",
+        readiness_checked=True,
+    )
+    pending_repo = _create_repository(
+        db_session,
+        full_name="acme/pending-repo",
+    )
+    synced_session_id = _create_measurement_integrity_session(
+        db_session,
+        eng.id,
+        with_messages=True,
+        repository_id=complete_repo.id,
+    )
+    unsynced_session_id = _create_measurement_integrity_session(
+        db_session,
+        eng.id,
+        with_messages=True,
+        repository_id=pending_repo.id,
+    )
+    linked_pr = PullRequest(
+        repository_id=complete_repo.id,
+        engineer_id=eng.id,
+        github_pr_number=42,
+        title="Ship integrity dashboard",
+        state="merged",
+    )
+    db_session.add(linked_pr)
+    db_session.flush()
+
+    _add_session_commit(
+        db_session,
+        synced_session_id,
+        complete_repo.id,
+        pull_request_id=linked_pr.id,
+    )
+    _add_session_commit(db_session, unsynced_session_id, pending_repo.id)
+
+    response = client.get("/api/v1/admin/measurement-integrity", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["sessions_with_commit_sync_target"] == 2
+    assert data["sessions_with_linked_pull_requests"] == 1
+    assert data["github_sync_coverage_pct"] == 50.0
+    assert data["repositories_in_scope"] == 2
+    assert data["repositories_with_complete_metadata"] == 1
+    assert data["repositories_with_readiness_check"] == 1
+    assert data["repository_metadata_coverage_pct"] == 50.0
+
+    repository_quality = {
+        entry["repository_full_name"]: entry for entry in data["repository_quality"]
+    }
+    assert repository_quality["acme/complete-repo"] == {
+        "repository_full_name": "acme/complete-repo",
+        "session_count": 1,
+        "sessions_with_commits": 1,
+        "sessions_with_linked_pull_requests": 1,
+        "github_sync_coverage_pct": 100.0,
+        "has_github_id": True,
+        "has_default_branch": True,
+        "metadata_coverage_pct": 100.0,
+        "readiness_checked": True,
+    }
+    assert repository_quality["acme/pending-repo"] == {
+        "repository_full_name": "acme/pending-repo",
+        "session_count": 1,
+        "sessions_with_commits": 1,
+        "sessions_with_linked_pull_requests": 0,
+        "github_sync_coverage_pct": 0.0,
+        "has_github_id": False,
+        "has_default_branch": False,
+        "metadata_coverage_pct": 0.0,
+        "readiness_checked": False,
+    }
 
 
 def test_measurement_integrity_facet_coverage_pct_ignores_unsupported_sources(

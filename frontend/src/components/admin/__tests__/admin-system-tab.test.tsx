@@ -26,7 +26,7 @@ describe("AdminSystemTab", () => {
     })
   })
 
-  it("renders schema parity coverage by source", () => {
+  it("renders measurement integrity coverage dashboards", () => {
     mockUseMeasurementIntegrity.mockReturnValue({
       data: {
         total_sessions: 48,
@@ -34,6 +34,13 @@ describe("AdminSystemTab", () => {
         sessions_with_facets: 18,
         facet_coverage_pct: 100,
         transcript_coverage_pct: 83.3,
+        sessions_with_commit_sync_target: 12,
+        sessions_with_linked_pull_requests: 9,
+        github_sync_coverage_pct: 75,
+        repositories_in_scope: 3,
+        repositories_with_complete_metadata: 2,
+        repositories_with_readiness_check: 2,
+        repository_metadata_coverage_pct: 66.7,
         sessions_missing_transcript_telemetry: 8,
         sessions_missing_tool_telemetry: 2,
         sessions_missing_model_telemetry: 2,
@@ -70,19 +77,52 @@ describe("AdminSystemTab", () => {
             native_discovery_parity: "unavailable",
           },
         ],
+        repository_quality: [
+          {
+            repository_full_name: "acme/complete-repo",
+            session_count: 12,
+            sessions_with_commits: 8,
+            sessions_with_linked_pull_requests: 8,
+            github_sync_coverage_pct: 100,
+            has_github_id: true,
+            has_default_branch: true,
+            metadata_coverage_pct: 100,
+            readiness_checked: true,
+          },
+          {
+            repository_full_name: "acme/pending-repo",
+            session_count: 6,
+            sessions_with_commits: 0,
+            sessions_with_linked_pull_requests: 0,
+            github_sync_coverage_pct: null,
+            has_github_id: false,
+            has_default_branch: false,
+            metadata_coverage_pct: 0,
+            readiness_checked: false,
+          },
+        ],
       },
       isLoading: false,
     })
 
     render(<AdminSystemTab />)
 
+    expect(screen.getAllByText("GitHub Sync").length).toBeGreaterThan(0)
+    expect(screen.getByText("Repository Metadata")).toBeInTheDocument()
     expect(screen.getByText("Schema Parity by Source")).toBeInTheDocument()
+    expect(screen.getByText("Repository Coverage")).toBeInTheDocument()
     expect(screen.getByText("claude_code")).toBeInTheDocument()
     expect(screen.getByText("cursor")).toBeInTheDocument()
+    expect(screen.getByText("acme/complete-repo")).toBeInTheDocument()
+    expect(screen.getByText("acme/pending-repo")).toBeInTheDocument()
     expect(screen.getByText("Native Discovery")).toBeInTheDocument()
     expect(screen.getAllByText("Unavailable").length).toBeGreaterThan(0)
     expect(screen.getAllByText("-").length).toBeGreaterThan(0)
     expect(screen.getByText("73.3%")).toBeInTheDocument()
     expect(screen.getAllByText("Not expected").length).toBeGreaterThan(0)
+    expect(screen.getByText("75.0%")).toBeInTheDocument()
+    expect(screen.getByText("66.7%")).toBeInTheDocument()
+    expect(screen.getByText("Checked")).toBeInTheDocument()
+    expect(screen.getByText("Pending")).toBeInTheDocument()
   })
 })

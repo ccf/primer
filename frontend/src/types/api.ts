@@ -303,12 +303,31 @@ export interface AgentSourceQuality {
   native_discovery_parity: TelemetryParity
 }
 
+export interface RepositoryQuality {
+  repository_full_name: string
+  session_count: number
+  sessions_with_commits: number
+  sessions_with_linked_pull_requests: number
+  github_sync_coverage_pct: number | null
+  has_github_id: boolean
+  has_default_branch: boolean
+  metadata_coverage_pct: number
+  readiness_checked: boolean
+}
+
 export interface MeasurementIntegrityStats {
   total_sessions: number
   sessions_with_messages: number
   sessions_with_facets: number
   facet_coverage_pct: number
   transcript_coverage_pct: number
+  sessions_with_commit_sync_target: number
+  sessions_with_linked_pull_requests: number
+  github_sync_coverage_pct: number
+  repositories_in_scope: number
+  repositories_with_complete_metadata: number
+  repositories_with_readiness_check: number
+  repository_metadata_coverage_pct: number
   sessions_missing_transcript_telemetry: number
   sessions_missing_tool_telemetry: number
   sessions_missing_model_telemetry: number
@@ -318,6 +337,7 @@ export interface MeasurementIntegrityStats {
   legacy_goal_category_sessions: number
   remaining_legacy_rows: number
   source_quality: AgentSourceQuality[]
+  repository_quality: RepositoryQuality[]
 }
 
 export interface IngestEventResponse {
