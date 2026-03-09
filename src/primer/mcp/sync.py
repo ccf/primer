@@ -67,26 +67,26 @@ def sync_sessions(server_url: str, api_key: str) -> dict:
         return {"local_count": 0, "server_count": 0, "synced": 0, "errors": 0}
 
     server_ids = get_server_session_ids(server_url, api_key)
-    missing: list[tuple[object, str | None]] = []
+    missing: list[object] = []
     already_synced = 0
     for local_session in local_sessions:
         matched_server_id = _match_existing_server_session_id(local_session, server_ids)
-        if matched_server_id == local_session.session_id:
+        if matched_server_id is not None:
             already_synced += 1
             continue
-        missing.append((local_session, matched_server_id))
+        missing.append(local_session)
 
     synced = 0
     errors = 0
 
-    for local_session, matched_server_id in missing:
+    for local_session in missing:
         try:
             extractor = get_extractor_for(local_session.agent_type)
             if not extractor:
                 errors += 1
                 continue
             meta = extractor.extract(local_session.transcript_path)
-            meta.session_id = matched_server_id or meta.session_id or local_session.session_id
+            meta.session_id = meta.session_id or local_session.session_id
             meta.agent_type = local_session.agent_type
 
             capability = get_capability_for(local_session.agent_type)
@@ -142,8 +142,8 @@ def _match_existing_server_session_id(local_session, server_ids: set[str]) -> st
     """Return an already-synced server ID for this local session, if any.
 
     Codex previously fell back to rollout filename stems when session_meta parsing
-    failed. Keep that legacy ID as an alias so upgraded clients enrich the old row
-    instead of creating a duplicate.
+    failed. Treat that legacy ID as already-synced so upgraded clients don't
+    perpetually re-upload the same session under the alias.
     """
     if local_session.session_id in server_ids:
         return local_session.session_id
