@@ -28,18 +28,25 @@ def sync(watch: bool, interval: int) -> None:
         console.info(f"Watching for new sessions every {interval}s (Ctrl+C to stop)...")
         try:
             while True:
-                _run_sync(console, server_url, api_key, sync_sessions)
+                _run_sync(console, server_url, api_key, sync_sessions, exit_on_fatal=False)
                 time.sleep(interval)
         except KeyboardInterrupt:
             console.info("Watch stopped.")
     else:
-        _run_sync(console, server_url, api_key, sync_sessions)
+        _run_sync(console, server_url, api_key, sync_sessions, exit_on_fatal=True)
 
 
-def _run_sync(console, server_url: str, api_key: str, sync_fn) -> None:
+def _run_sync(console, server_url: str, api_key: str, sync_fn, *, exit_on_fatal: bool) -> None:
     """Execute a single sync cycle and print results."""
     console.info("Syncing sessions...")
     result = sync_fn(server_url, api_key)
+
+    if result.get("fatal_error"):
+        message = result.get("error_message") or "Sync failed before upload."
+        if exit_on_fatal:
+            raise click.ClickException(message)
+        console.error(message)
+        return
 
     console.kvp("Local sessions", str(result.get("local_count", 0)))
     console.kvp("Already synced", str(result.get("already_synced", 0)))
