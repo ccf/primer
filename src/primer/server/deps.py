@@ -16,15 +16,34 @@ def require_admin(x_admin_key: str = Header()) -> str:
     return x_admin_key
 
 
+def _require_active_engineer(
+    engineer: Engineer | None,
+    *,
+    missing_detail: str,
+) -> Engineer:
+    if not engineer:
+        raise HTTPException(status_code=401, detail=missing_detail)
+    if not engineer.is_active:
+        raise HTTPException(status_code=403, detail="Account deactivated")
+    return engineer
+
+
+def _find_engineer_by_api_key(api_key: str, db: Session) -> Engineer | None:
+    encoded_key = api_key.encode()
+    engineers = db.query(Engineer).filter(
+        Engineer.api_key_hash.is_not(None),
+        Engineer.api_key_hash != "",
+    )
+    for eng in engineers:
+        if bcrypt.checkpw(encoded_key, eng.api_key_hash.encode()):
+            return eng
+    return None
+
+
 def verify_api_key(api_key: str, db: Session) -> Engineer:
     """Verify an API key against stored hashes. Returns the engineer or raises."""
-    engineers = db.query(Engineer).all()
-    for eng in engineers:
-        if eng.api_key_hash and bcrypt.checkpw(api_key.encode(), eng.api_key_hash.encode()):
-            if not eng.is_active:
-                raise HTTPException(status_code=403, detail="Account deactivated")
-            return eng
-    raise HTTPException(status_code=401, detail="Invalid API key")
+    engineer = _find_engineer_by_api_key(api_key, db)
+    return _require_active_engineer(engineer, missing_detail="Invalid API key")
 
 
 def require_engineer(x_api_key: str = Header(), db: Session = Depends(get_db)) -> Engineer:
@@ -50,13 +69,14 @@ def get_auth_context(
     if primer_access:
         payload = verify_access_token(primer_access)
         if payload:
-            eng = db.query(Engineer).filter(Engineer.id == payload["sub"]).first()
-            if eng and not eng.is_active:
-                raise HTTPException(status_code=403, detail="Account deactivated")
+            eng = _require_active_engineer(
+                db.query(Engineer).filter(Engineer.id == payload["sub"]).first(),
+                missing_detail="Engineer not found",
+            )
             return AuthContext(
-                engineer_id=payload["sub"],
-                role=payload.get("role", "engineer"),
-                team_id=payload.get("team_id"),
+                engineer_id=eng.id,
+                role=eng.role,
+                team_id=eng.team_id,
             )
 
     # 2. Admin key header
@@ -65,16 +85,12 @@ def get_auth_context(
 
     # 3. API key header
     if x_api_key:
-        engineers = db.query(Engineer).all()
-        for eng in engineers:
-            if eng.api_key_hash and bcrypt.checkpw(x_api_key.encode(), eng.api_key_hash.encode()):
-                if not eng.is_active:
-                    raise HTTPException(status_code=403, detail="Account deactivated")
-                return AuthContext(
-                    engineer_id=eng.id,
-                    role=eng.role,
-                    team_id=eng.team_id,
-                )
+        eng = verify_api_key(x_api_key, db)
+        return AuthContext(
+            engineer_id=eng.id,
+            role=eng.role,
+            team_id=eng.team_id,
+        )
 
     raise HTTPException(status_code=401, detail="Authentication required")
 
