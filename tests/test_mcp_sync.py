@@ -45,10 +45,12 @@ def test_get_server_session_ids_non_200(mock_get):
     mock_resp.status_code = 500
     mock_get.return_value = mock_resp
 
-    from primer.mcp.sync import get_server_session_ids
+    import pytest
 
-    ids = get_server_session_ids("http://test:8000", "key")
-    assert ids == set()
+    from primer.mcp.sync import SyncPreflightError, get_server_session_ids
+
+    with pytest.raises(SyncPreflightError, match="500"):
+        get_server_session_ids("http://test:8000", "key")
 
 
 @patch("primer.mcp.sync.httpx.get")
@@ -80,6 +82,8 @@ def test_get_server_session_ids_paginates(mock_get):
 @patch("primer.mcp.sync.logger")
 @patch("primer.mcp.sync.httpx.get")
 def test_get_server_session_ids_stops_at_max_pages(mock_get, mock_logger, monkeypatch):
+    import pytest
+
     from primer.mcp import sync
 
     monkeypatch.setattr(sync, "_MAX_PAGES", 2)
@@ -89,9 +93,9 @@ def test_get_server_session_ids_stops_at_max_pages(mock_get, mock_logger, monkey
     page.json.return_value = {"items": [{"id": "s1"}] * 1000}
     mock_get.side_effect = [page, page]
 
-    ids = sync.get_server_session_ids("http://test:8000", "key")
+    with pytest.raises(sync.SyncPreflightError, match="Pagination safety limit"):
+        sync.get_server_session_ids("http://test:8000", "key")
 
-    assert ids == {"s1"}
     assert mock_get.call_count == 2
     mock_logger.warning.assert_called_once()
 
@@ -109,6 +113,7 @@ def test_sync_no_local_sessions(mock_list, mock_server_ids):
     result = sync_sessions("http://test:8000", "key")
     assert result["local_count"] == 0
     assert result["synced"] == 0
+    assert result["fatal_error"] is False
     mock_server_ids.assert_not_called()
 
 
@@ -125,6 +130,25 @@ def test_sync_all_already_synced(mock_list, mock_server_ids):
     result = sync_sessions("http://test:8000", "key")
     assert result["already_synced"] == 1
     assert result["synced"] == 0
+    assert result["fatal_error"] is False
+
+
+@patch("primer.mcp.sync.get_server_session_ids")
+@patch("primer.mcp.sync.list_local_sessions")
+def test_sync_aborts_when_server_preflight_fails(mock_list, mock_server_ids):
+    mock_list.return_value = [_local("s1", "/t/s1.jsonl")]
+
+    from primer.mcp import sync
+
+    mock_server_ids.side_effect = sync.SyncPreflightError("Failed to fetch server sessions: 500")
+
+    result = sync.sync_sessions("http://test:8000", "key")
+
+    assert result["synced"] == 0
+    assert result["already_synced"] == 0
+    assert result["errors"] == 1
+    assert result["fatal_error"] is True
+    assert result["error_message"] == "Failed to fetch server sessions: 500"
 
 
 @patch("primer.mcp.sync.httpx.post")
@@ -153,6 +177,7 @@ def test_sync_uploads_missing(mock_list, mock_server_ids, mock_get_ext, mock_fac
     assert result["synced"] == 1
     assert result["already_synced"] == 1
     assert result["errors"] == 0
+    assert result["fatal_error"] is False
 
 
 @patch("primer.mcp.sync.httpx.post")
@@ -189,6 +214,7 @@ def test_sync_treats_legacy_codex_rollout_alias_as_already_synced(
 
     assert result["synced"] == 0
     assert result["already_synced"] == 1
+    assert result["fatal_error"] is False
     mock_get_ext.assert_not_called()
     mock_facets.assert_not_called()
     mock_post.assert_not_called()
@@ -227,6 +253,7 @@ def test_sync_uploads_imported_cursor_session_without_facets(
     result = sync_sessions("http://test:8000", "key")
 
     assert result["synced"] == 1
+    assert result["fatal_error"] is False
     mock_facets.assert_not_called()
     payload = mock_post.call_args.kwargs.get("json") or mock_post.call_args[1].get("json")
     assert payload["agent_type"] == "cursor"
@@ -266,6 +293,7 @@ def test_sync_includes_cursor_facets_when_bundle_provides_them(
     result = sync_sessions("http://test:8000", "key")
 
     assert result["synced"] == 1
+    assert result["fatal_error"] is False
     mock_facets.assert_called_once_with("cursor-2", "/workspace/cursor-2-facets.json")
     payload = mock_post.call_args.kwargs.get("json") or mock_post.call_args[1].get("json")
     assert payload["agent_type"] == "cursor"
@@ -296,6 +324,7 @@ def test_sync_upload_failure(mock_list, mock_server_ids, mock_get_ext, mock_face
     result = sync_sessions("http://test:8000", "key")
     assert result["synced"] == 0
     assert result["errors"] == 1
+    assert result["fatal_error"] is False
 
 
 @patch("primer.mcp.sync.get_extractor_for")
@@ -315,6 +344,7 @@ def test_sync_extraction_exception(mock_list, mock_server_ids, mock_get_ext):
     result = sync_sessions("http://test:8000", "key")
     assert result["errors"] == 1
     assert result["synced"] == 0
+    assert result["fatal_error"] is False
 
 
 @patch("primer.mcp.sync.get_extractor_for")
@@ -333,3 +363,4 @@ def test_sync_unknown_agent_type(mock_list, mock_server_ids, mock_get_ext):
     result = sync_sessions("http://test:8000", "key")
     assert result["errors"] == 1
     assert result["synced"] == 0
+    assert result["fatal_error"] is False

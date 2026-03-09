@@ -481,6 +481,31 @@ def test_sync_with_errors(tmp_path, monkeypatch):
     assert "failed" in result.output.lower()
 
 
+def test_sync_fails_closed_on_preflight_error(tmp_path, monkeypatch):
+    config_file = tmp_path / "config.toml"
+    config_file.write_text('[auth]\napi_key = "test-key"\n')
+    monkeypatch.setattr("primer.cli.config.CONFIG_FILE", config_file)
+    monkeypatch.delenv("PRIMER_API_KEY", raising=False)
+    monkeypatch.delenv("PRIMER_SERVER_URL", raising=False)
+
+    monkeypatch.setattr(
+        "primer.mcp.sync.sync_sessions",
+        lambda url, key: {
+            "local_count": 5,
+            "already_synced": 0,
+            "synced": 0,
+            "errors": 1,
+            "fatal_error": True,
+            "error_message": "Failed to fetch server sessions: 500",
+        },
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["sync"])
+    assert result.exit_code == 1
+    assert "failed to fetch server sessions" in result.output.lower()
+
+
 # ---------------------------------------------------------------------------
 # doctor command
 # ---------------------------------------------------------------------------

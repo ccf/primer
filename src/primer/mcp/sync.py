@@ -16,6 +16,10 @@ logger = logging.getLogger(__name__)
 _MAX_PAGES = 200
 
 
+class SyncPreflightError(RuntimeError):
+    """Raised when sync cannot safely determine server-side session state."""
+
+
 def get_server_session_ids(server_url: str, api_key: str) -> set[str]:
     """Fetch the set of session IDs already on the server for this engineer."""
     session_ids: set[str] = set()
@@ -31,12 +35,14 @@ def get_server_session_ids(server_url: str, api_key: str) -> set[str]:
                 timeout=30.0,
             )
         except httpx.RequestError as exc:
-            logger.warning("Failed to fetch server sessions: %s", exc)
-            return session_ids
+            message = f"Failed to fetch server sessions: {exc}"
+            logger.warning(message)
+            raise SyncPreflightError(message) from exc
 
         if resp.status_code != 200:
-            logger.warning(f"Failed to fetch server sessions: {resp.status_code}")
-            return session_ids
+            message = f"Failed to fetch server sessions: {resp.status_code}"
+            logger.warning(message)
+            raise SyncPreflightError(message)
 
         payload = resp.json()
         items = payload.get("items", [])
@@ -50,11 +56,9 @@ def get_server_session_ids(server_url: str, api_key: str) -> set[str]:
 
         offset += limit
 
-    logger.warning(
-        "Pagination safety limit (%d pages) reached; returning partial results",
-        _MAX_PAGES,
-    )
-    return session_ids
+    message = f"Pagination safety limit ({_MAX_PAGES} pages) reached while fetching server sessions"
+    logger.warning(message)
+    raise SyncPreflightError(message)
 
 
 def sync_sessions(server_url: str, api_key: str) -> dict:
@@ -64,9 +68,29 @@ def sync_sessions(server_url: str, api_key: str) -> dict:
     """
     local_sessions = list_local_sessions()
     if not local_sessions:
-        return {"local_count": 0, "server_count": 0, "synced": 0, "errors": 0}
+        return {
+            "local_count": 0,
+            "server_count": 0,
+            "synced": 0,
+            "errors": 0,
+            "already_synced": 0,
+            "fatal_error": False,
+            "error_message": None,
+        }
 
-    server_ids = get_server_session_ids(server_url, api_key)
+    try:
+        server_ids = get_server_session_ids(server_url, api_key)
+    except SyncPreflightError as exc:
+        return {
+            "local_count": len(local_sessions),
+            "server_count": 0,
+            "synced": 0,
+            "errors": 1,
+            "already_synced": 0,
+            "fatal_error": True,
+            "error_message": str(exc),
+        }
+
     missing: list[object] = []
     already_synced = 0
     for local_session in local_sessions:
@@ -135,6 +159,8 @@ def sync_sessions(server_url: str, api_key: str) -> dict:
         "synced": synced,
         "errors": errors,
         "already_synced": already_synced,
+        "fatal_error": False,
+        "error_message": None,
     }
 
 
