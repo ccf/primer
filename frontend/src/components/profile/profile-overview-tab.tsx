@@ -20,7 +20,12 @@ export function ProfileOverviewTab({ engineerId, teamId, startDate, endDate }: P
     endDate,
     limit: 10,
   })
-  const { data: recs, isLoading: loadingRecs } = useRecommendations(teamId, startDate, endDate)
+  const { data: recs, isLoading: loadingRecs } = useRecommendations(
+    teamId,
+    startDate,
+    endDate,
+    engineerId,
+  )
 
   return (
     <div className="space-y-6">
@@ -42,7 +47,17 @@ export function ProfileOverviewTab({ engineerId, teamId, startDate, endDate }: P
       {loadingRecs ? (
         <ChartSkeleton />
       ) : (
-        recs && recs.length > 0 && <RecommendationsPanel data={recs} />
+        recs &&
+        recs.length > 0 && (
+          <RecommendationsPanel
+            data={recs}
+            teamId={teamId}
+            engineerId={engineerId}
+            startDate={startDate}
+            endDate={endDate}
+            defaultOwnerEngineerId={engineerId}
+          />
+        )
       )}
     </div>
   )

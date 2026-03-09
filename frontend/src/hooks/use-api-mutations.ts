@@ -200,3 +200,60 @@ export function useDeleteBudget() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["finops-budgets"] }),
   })
 }
+
+export function useCreateIntervention() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: {
+      title: string
+      description: string
+      category: string
+      severity: string
+      team_id?: string | null
+      engineer_id?: string | null
+      owner_engineer_id?: string | null
+      project_name?: string | null
+      due_date?: string | null
+      source_type?: string | null
+      source_title?: string | null
+      evidence?: Record<string, unknown> | null
+      baseline_start_at?: string | null
+      baseline_end_at?: string | null
+    }) =>
+      apiFetch("/api/v1/interventions", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["interventions"] }),
+  })
+}
+
+export function useUpdateIntervention() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...payload
+    }: {
+      id: string
+      title?: string
+      description?: string
+      category?: string
+      severity?: string
+      team_id?: string | null
+      engineer_id?: string | null
+      owner_engineer_id?: string | null
+      project_name?: string | null
+      due_date?: string | null
+      status?: string
+      source_type?: string | null
+      source_title?: string | null
+      evidence?: Record<string, unknown> | null
+    }) =>
+      apiFetch(`/api/v1/interventions/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["interventions"] }),
+  })
+}

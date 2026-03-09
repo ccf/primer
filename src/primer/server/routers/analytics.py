@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from primer.common.config import settings
 from primer.common.database import get_db
+from primer.common.models import Engineer
 from primer.common.schemas import (
     ActivityHeatmap,
     BottleneckAnalytics,
@@ -160,6 +161,7 @@ def costs(
 @router.get("/recommendations", response_model=list[Recommendation])
 def recommendations(
     team_id: str | None = None,
+    engineer_id: str | None = None,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
     db: Session = Depends(get_db),
@@ -167,7 +169,19 @@ def recommendations(
 ):
     from primer.server.services.synthesis_service import get_recommendations
 
-    tid, eid = _resolve_scope(auth, team_id)
+    if auth.role == "admin":
+        tid, eid = team_id, engineer_id
+    elif auth.role == "team_lead":
+        tid, eid = auth.team_id, None
+        if engineer_id:
+            engineer = db.query(Engineer).filter(Engineer.id == engineer_id).first()
+            if not engineer or engineer.team_id != auth.team_id:
+                raise HTTPException(status_code=403, detail="Cannot view other engineers")
+            tid, eid = None, engineer_id
+    else:
+        if engineer_id and engineer_id != auth.engineer_id:
+            raise HTTPException(status_code=403, detail="Cannot view other engineers")
+        tid, eid = None, auth.engineer_id
     return get_recommendations(
         db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
     )

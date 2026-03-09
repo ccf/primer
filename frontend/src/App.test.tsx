@@ -53,6 +53,7 @@ vi.mock("@/hooks/use-api-queries", () => ({
   useTranscript: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useFriction: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useProjectAnalytics: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useInterventions: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useSystemStats: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useMeasurementIntegrity: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useIngestEvents: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
@@ -66,6 +67,8 @@ vi.mock("@/hooks/use-api-mutations", () => ({
   useUpdateEngineerRole: vi.fn().mockReturnValue({ mutate: vi.fn() }),
   useCreateTeam: vi.fn().mockReturnValue({ mutate: vi.fn() }),
   useCreateEngineer: vi.fn().mockReturnValue({ mutate: vi.fn() }),
+  useCreateIntervention: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
+  useUpdateIntervention: vi.fn().mockReturnValue({ mutate: vi.fn() }),
 }))
 
 import { getApiKey } from "@/lib/api"

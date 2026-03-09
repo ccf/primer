@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom"
 import {
   AlertTriangle,
   DollarSign,
+  ClipboardList,
   FolderKanban,
   GitPullRequest,
   GraduationCap,
@@ -36,6 +37,7 @@ interface NavItem {
 const engineerLinks: NavItem[] = [
   { to: "/profile", label: "Home", icon: User },
   { to: "/sessions", label: "Sessions", icon: MonitorDot },
+  { to: "/interventions", label: "Interventions", icon: ClipboardList },
   { to: "/synthesis", label: "Synthesis", icon: Sparkles },
   { to: "/explorer", label: "Explorer", icon: MessageSquare },
 ]
@@ -47,6 +49,7 @@ const leadershipLinks: NavItem[] = [
   { to: "/finops", label: "FinOps", icon: DollarSign },
   { to: "/quality", label: "Code Quality", icon: GitPullRequest },
   { to: "/friction", label: "Friction", icon: AlertTriangle },
+  { to: "/interventions", label: "Interventions", icon: ClipboardList },
   { to: "/projects", label: "Projects", icon: FolderKanban },
   { to: "/growth", label: "Growth", icon: GraduationCap },
   { to: "/explorer", label: "Explorer", icon: MessageSquare },
