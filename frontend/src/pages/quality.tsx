@@ -9,6 +9,7 @@ import { GitHubStatusBanner } from "@/components/quality/github-status-banner"
 import { EngineerQualityTable } from "@/components/quality/engineer-quality-table"
 import { FindingsOverviewSection } from "@/components/quality/findings-overview"
 import { FindingsTable } from "@/components/quality/findings-table"
+import { QualityAttributionTable } from "@/components/quality/quality-attribution-table"
 import { CardSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleton"
 import { GitPullRequest } from "lucide-react"
 import type { DateRange } from "@/components/layout/date-range-picker"
@@ -81,6 +82,11 @@ export function QualityPage({ teamId, dateRange }: QualityPageProps) {
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-muted-foreground">Engineer Quality</h2>
         <EngineerQualityTable engineers={quality.engineer_quality} />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground">Quality Attribution</h2>
+        <QualityAttributionTable rows={quality.attribution} />
       </section>
     </div>
   )

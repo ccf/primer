@@ -654,6 +654,19 @@ export interface EngineerQuality {
   avg_review_comments: number | null
 }
 
+export interface QualityAttributionRow {
+  dimension: string
+  label: string
+  linked_sessions: number
+  linked_prs: number
+  merge_rate: number | null
+  avg_review_comments_per_pr: number | null
+  avg_findings_per_pr: number | null
+  high_severity_findings_per_pr: number | null
+  avg_time_to_merge_hours: number | null
+  findings_fix_rate: number | null
+}
+
 export interface PRSummary {
   repository: string
   pr_number: number
@@ -698,6 +711,7 @@ export interface QualityMetricsResponse {
   daily_volume: DailyCodeVolume[]
   by_session_type: QualityByType[]
   engineer_quality: EngineerQuality[]
+  attribution: QualityAttributionRow[]
   recent_prs: PRSummary[]
   findings_overview: FindingsOverview | null
   sessions_analyzed: number
