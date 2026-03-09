@@ -56,6 +56,7 @@ def base_session_query(
     start_date: datetime | None = None,
     end_date: datetime | None = None,
     agent_type: str | None = None,
+    project_name: str | None = None,
 ):
     q = db.query(SessionModel)
     if engineer_id:
@@ -68,6 +69,8 @@ def base_session_query(
         q = q.filter(SessionModel.started_at <= end_date)
     if agent_type:
         q = q.filter(SessionModel.agent_type == agent_type)
+    if project_name:
+        q = q.filter(SessionModel.project_name == project_name)
     return q
 
 
@@ -92,6 +95,7 @@ def _apply_session_scope_filters(
     engineer_id: str | None = None,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
+    project_name: str | None = None,
 ):
     if engineer_id:
         query = query.filter(SessionModel.engineer_id == engineer_id)
@@ -101,6 +105,8 @@ def _apply_session_scope_filters(
         query = query.filter(SessionModel.started_at >= start_date)
     if end_date:
         query = query.filter(SessionModel.started_at <= end_date)
+    if project_name:
+        query = query.filter(SessionModel.project_name == project_name)
     return query
 
 
@@ -111,6 +117,7 @@ def _message_backed_stats(
     engineer_id: str | None = None,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
+    project_name: str | None = None,
 ) -> tuple[int, int]:
     total_messages, session_count = _apply_session_scope_filters(
         _filter_sessions_by_capability(
@@ -124,6 +131,7 @@ def _message_backed_stats(
         engineer_id=engineer_id,
         start_date=start_date,
         end_date=end_date,
+        project_name=project_name,
     ).first() or (0, 0)
     return int(total_messages or 0), int(session_count or 0)
 
@@ -167,6 +175,7 @@ def _compute_success_rate(
     engineer_id: str | None = None,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
+    project_name: str | None = None,
 ) -> float | None:
     """Compute success rate from session facets."""
     facets_q = db.query(SessionFacets.outcome).join(SessionModel)
@@ -179,6 +188,8 @@ def _compute_success_rate(
         facets_q = facets_q.filter(SessionModel.started_at >= start_date)
     if end_date:
         facets_q = facets_q.filter(SessionModel.started_at <= end_date)
+    if project_name:
+        facets_q = facets_q.filter(SessionModel.project_name == project_name)
     facets_q = facets_q.filter(SessionFacets.outcome.isnot(None))
     outcomes = [
         normalized
@@ -196,9 +207,17 @@ def _build_overview(
     engineer_id: str | None = None,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
+    project_name: str | None = None,
 ) -> OverviewStats:
     """Internal helper that builds an OverviewStats without previous_period."""
-    q = base_session_query(db, team_id, engineer_id, start_date, end_date)
+    q = base_session_query(
+        db,
+        team_id,
+        engineer_id,
+        start_date,
+        end_date,
+        project_name=project_name,
+    )
 
     total_sessions = q.count()
 
@@ -211,6 +230,7 @@ def _build_overview(
         engineer_id=engineer_id,
         start_date=start_date,
         end_date=end_date,
+        project_name=project_name,
     ).first()
     model_agg = _apply_session_scope_filters(
         _filter_sessions_by_capability(
@@ -225,6 +245,7 @@ def _build_overview(
         engineer_id=engineer_id,
         start_date=start_date,
         end_date=end_date,
+        project_name=project_name,
     ).first()
     duration_agg = q.with_entities(func.avg(SessionModel.duration_seconds)).first()
 
@@ -238,6 +259,7 @@ def _build_overview(
         engineer_id=engineer_id,
         start_date=start_date,
         end_date=end_date,
+        project_name=project_name,
     )
     total_messages = message_backed_total
     avg_messages = (
@@ -254,6 +276,8 @@ def _build_overview(
         eng_q = eng_q.filter(SessionModel.started_at >= start_date)
     if end_date:
         eng_q = eng_q.filter(SessionModel.started_at <= end_date)
+    if project_name:
+        eng_q = eng_q.filter(SessionModel.project_name == project_name)
     total_engineers = eng_q.scalar() or 0
 
     # Outcome counts from facets
@@ -267,6 +291,8 @@ def _build_overview(
         facets_q = facets_q.filter(SessionModel.started_at >= start_date)
     if end_date:
         facets_q = facets_q.filter(SessionModel.started_at <= end_date)
+    if project_name:
+        facets_q = facets_q.filter(SessionModel.project_name == project_name)
     outcome_counts: dict[str, int] = {}
     for (outcome,) in facets_q.filter(SessionFacets.outcome.isnot(None)).all():
         normalized_outcome = canonical_outcome(outcome)
@@ -285,6 +311,8 @@ def _build_overview(
         type_q = type_q.filter(SessionModel.started_at >= start_date)
     if end_date:
         type_q = type_q.filter(SessionModel.started_at <= end_date)
+    if project_name:
+        type_q = type_q.filter(SessionModel.project_name == project_name)
     session_type_counts: dict[str, int] = {}
     for (st,) in type_q.filter(SessionFacets.session_type.isnot(None)).all():
         session_type_counts[st] = session_type_counts.get(st, 0) + 1
@@ -309,6 +337,8 @@ def _build_overview(
         cost_q = cost_q.filter(SessionModel.started_at >= start_date)
     if end_date:
         cost_q = cost_q.filter(SessionModel.started_at <= end_date)
+    if project_name:
+        cost_q = cost_q.filter(SessionModel.project_name == project_name)
     cost_q = cost_q.group_by(ModelUsage.model_name)
 
     estimated_cost = 0.0
@@ -322,7 +352,14 @@ def _build_overview(
         agent_type_counts[at] = agent_type_counts.get(at, 0) + 1
 
     # Success rate
-    success_rate = _compute_success_rate(db, team_id, engineer_id, start_date, end_date)
+    success_rate = _compute_success_rate(
+        db,
+        team_id,
+        engineer_id,
+        start_date,
+        end_date,
+        project_name=project_name,
+    )
 
     # End reason counts
     er_q = q.filter(SessionModel.end_reason.isnot(None)).with_entities(SessionModel.end_reason)
@@ -357,6 +394,8 @@ def _build_overview(
         health_rows = health_rows.filter(SessionModel.started_at >= start_date)
     if end_date:
         health_rows = health_rows.filter(SessionModel.started_at <= end_date)
+    if project_name:
+        health_rows = health_rows.filter(SessionModel.project_name == project_name)
     health_data = health_rows.all()
 
     avg_health_score = None
@@ -411,8 +450,16 @@ def get_overview(
     engineer_id: str | None = None,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
+    project_name: str | None = None,
 ) -> OverviewStats:
-    result = _build_overview(db, team_id, engineer_id, start_date, end_date)
+    result = _build_overview(
+        db,
+        team_id,
+        engineer_id,
+        start_date,
+        end_date,
+        project_name=project_name,
+    )
 
     # Compute previous period for comparison (only when a date range is provided)
     if start_date and end_date:
@@ -424,7 +471,14 @@ def get_overview(
         delta = end_date - start_date
         prev_end = start_date
         prev_start = prev_end - delta
-        previous = _build_overview(db, team_id, engineer_id, prev_start, prev_end)
+        previous = _build_overview(
+            db,
+            team_id,
+            engineer_id,
+            prev_start,
+            prev_end,
+            project_name=project_name,
+        )
         if previous.total_sessions > 0:
             result.previous_period = previous
     elif start_date:
@@ -433,7 +487,14 @@ def get_overview(
         delta = datetime.now(UTC) - start_date
         prev_end = start_date
         prev_start = prev_end - delta
-        previous = _build_overview(db, team_id, engineer_id, prev_start, prev_end)
+        previous = _build_overview(
+            db,
+            team_id,
+            engineer_id,
+            prev_start,
+            prev_end,
+            project_name=project_name,
+        )
         if previous.total_sessions > 0:
             result.previous_period = previous
     # No date range ("All") → skip deltas since comparing all-time vs an
@@ -667,6 +728,7 @@ def get_cost_analytics(
     engineer_id: str | None = None,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
+    project_name: str | None = None,
 ) -> CostAnalytics:
     """Compute cost breakdown by model and daily cost trend."""
     # Per-model breakdown
@@ -686,6 +748,8 @@ def get_cost_analytics(
         q = q.filter(SessionModel.started_at >= start_date)
     if end_date:
         q = q.filter(SessionModel.started_at <= end_date)
+    if project_name:
+        q = q.filter(SessionModel.project_name == project_name)
     q = q.group_by(ModelUsage.model_name)
 
     total_cost = 0.0
@@ -729,6 +793,8 @@ def get_cost_analytics(
         daily_q = daily_q.filter(SessionModel.started_at >= start_date)
     if end_date:
         daily_q = daily_q.filter(SessionModel.started_at <= end_date)
+    if project_name:
+        daily_q = daily_q.filter(SessionModel.project_name == project_name)
     daily_q = daily_q.group_by(func.date(SessionModel.started_at), ModelUsage.model_name).order_by(
         func.date(SessionModel.started_at)
     )
@@ -1062,9 +1128,17 @@ def get_productivity_metrics(
     engineer_id: str | None = None,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
+    project_name: str | None = None,
 ) -> ProductivityMetrics:
     """Compute ROI / productivity metrics."""
-    q = base_session_query(db, team_id, engineer_id, start_date, end_date)
+    q = base_session_query(
+        db,
+        team_id,
+        engineer_id,
+        start_date,
+        end_date,
+        project_name=project_name,
+    )
 
     # Session counts and total duration
     agg = q.with_entities(
@@ -1111,6 +1185,8 @@ def get_productivity_metrics(
         cost_q = cost_q.filter(SessionModel.started_at >= start_date)
     if end_date:
         cost_q = cost_q.filter(SessionModel.started_at <= end_date)
+    if project_name:
+        cost_q = cost_q.filter(SessionModel.project_name == project_name)
     cost_q = cost_q.group_by(ModelUsage.model_name)
     total_cost = 0.0
     for name, inp, out, cr, cc in cost_q.all():
@@ -1129,6 +1205,8 @@ def get_productivity_metrics(
         cost_session_q = cost_session_q.filter(SessionModel.started_at >= start_date)
     if end_date:
         cost_session_q = cost_session_q.filter(SessionModel.started_at <= end_date)
+    if project_name:
+        cost_session_q = cost_session_q.filter(SessionModel.project_name == project_name)
     cost_session_count = cost_session_q.scalar() or 0
 
     # Guardrail: cost-per-success should only count successful sessions that
@@ -1148,6 +1226,8 @@ def get_productivity_metrics(
         success_q = success_q.filter(SessionModel.started_at >= start_date)
     if end_date:
         success_q = success_q.filter(SessionModel.started_at <= end_date)
+    if project_name:
+        success_q = success_q.filter(SessionModel.project_name == project_name)
     success_count = sum(1 for (outcome,) in success_q.all() if is_success_outcome(outcome))
 
     # Compute days in range
@@ -1403,6 +1483,7 @@ def get_bottleneck_analytics(
     engineer_id: str | None = None,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
+    project_name: str | None = None,
 ) -> BottleneckAnalytics:
     """Analyse friction patterns across sessions for bottleneck detection."""
     # Fetch sessions with their facets (inner join so only sessions with
@@ -1421,6 +1502,8 @@ def get_bottleneck_analytics(
         q = q.filter(SessionModel.started_at >= start_date)
     if end_date:
         q = q.filter(SessionModel.started_at <= end_date)
+    if project_name:
+        q = q.filter(SessionModel.project_name == project_name)
 
     rows = q.all()
 

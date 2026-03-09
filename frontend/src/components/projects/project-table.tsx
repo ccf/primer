@@ -100,7 +100,7 @@ export function ProjectTable({ projects, onSortChange, sortBy }: ProjectTablePro
                   className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/50"
                   onMouseEnter={() => setHoveredName(proj.project_name)}
                   onMouseLeave={() => setHoveredName(null)}
-                  onClick={() => navigate(`/sessions?project=${encodeURIComponent(proj.project_name)}`)}
+                  onClick={() => navigate(`/projects/${encodeURIComponent(proj.project_name)}`)}
                 >
                   <td className="py-2.5">
                     <span className={hoveredName === proj.project_name ? "underline" : ""}>

@@ -40,25 +40,48 @@ def get_quality_metrics(
     engineer_id: str | None = None,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
+    project_name: str | None = None,
 ) -> QualityMetricsResponse:
     """Compute quality metrics from session commits and pull requests."""
 
     base_q = base_session_query(
-        db, team_id=team_id, engineer_id=engineer_id, start_date=start_date, end_date=end_date
+        db,
+        team_id=team_id,
+        engineer_id=engineer_id,
+        start_date=start_date,
+        end_date=end_date,
+        project_name=project_name,
     )
     # Use subquery instead of materializing IDs to avoid SQLite 999-variable limit
     session_id_q = base_q.with_entities(SessionModel.id)
     total_sessions = session_id_q.count()
 
-    # Always fetch GitHub-synced PRs (not dependent on sessions)
-    github_prs = _compute_github_prs(db, team_id, engineer_id, start_date, end_date)
-
-    findings_overview = _compute_findings_overview(db, team_id, engineer_id, start_date, end_date)
+    github_prs = (
+        [] if project_name else _compute_github_prs(db, team_id, engineer_id, start_date, end_date)
+    )
+    findings_overview = (
+        _compute_findings_overview_for_session_scope(db, session_id_q)
+        if project_name
+        else _compute_findings_overview(db, team_id, engineer_id, start_date, end_date)
+    )
 
     if total_sessions == 0:
         # Still compute PR overview from GitHub-synced data
-        pr_overview = _compute_pr_overview_from_github(
-            db, team_id, engineer_id, start_date, end_date
+        pr_overview = (
+            _compute_pr_overview_from_github(db, team_id, engineer_id, start_date, end_date)
+            if not project_name
+            else QualityOverview(
+                sessions_with_commits=0,
+                total_commits=0,
+                total_lines_added=0,
+                total_lines_deleted=0,
+                total_prs=0,
+                pr_merge_rate=None,
+                avg_commits_per_session=None,
+                avg_lines_per_session=None,
+                avg_review_comments_per_pr=None,
+                avg_time_to_merge_hours=None,
+            )
         )
         return QualityMetricsResponse(
             overview=pr_overview,
@@ -96,12 +119,13 @@ def get_quality_metrics(
             overview.total_lines_deleted = gh_overview.total_lines_deleted
 
     # Merge session-linked PRs with GitHub-synced PRs (dedupe by repo+number)
-    seen = {(pr.repository, pr.pr_number) for pr in session_prs}
     merged_prs = list(session_prs)
-    for pr in github_prs:
-        if (pr.repository, pr.pr_number) not in seen:
-            merged_prs.append(pr)
-    merged_prs.sort(key=lambda p: p.pr_created_at or "", reverse=True)
+    if github_prs:
+        seen = {(pr.repository, pr.pr_number) for pr in session_prs}
+        for pr in github_prs:
+            if (pr.repository, pr.pr_number) not in seen:
+                merged_prs.append(pr)
+        merged_prs.sort(key=lambda p: p.pr_created_at or "", reverse=True)
 
     return QualityMetricsResponse(
         overview=overview,
@@ -627,6 +651,64 @@ def _compute_findings_overview(
         fix_rate=fix_rate,
         avg_findings_per_pr=avg_per_pr,
         findings_trend=findings_trend,
+    )
+
+
+def _compute_findings_overview_for_session_scope(
+    db: Session, session_id_q
+) -> FindingsOverview | None:
+    """Compute findings overview from PRs directly linked to the scoped sessions."""
+    pr_id_q = (
+        db.query(distinct(SessionCommit.pull_request_id).label("pull_request_id"))
+        .filter(
+            SessionCommit.session_id.in_(session_id_q),
+            SessionCommit.pull_request_id.isnot(None),
+        )
+        .subquery()
+    )
+
+    base = db.query(ReviewFinding).filter(
+        ReviewFinding.pull_request_id.in_(db.query(pr_id_q.c.pull_request_id))
+    )
+
+    stats = base.with_entities(
+        func.count(distinct(ReviewFinding.id)),
+        func.sum(case((ReviewFinding.status == "fixed", 1), else_=0)),
+        func.count(distinct(ReviewFinding.pull_request_id)),
+    ).first()
+
+    total = stats[0] or 0
+    if total == 0:
+        return None
+
+    fixed_count = stats[1] or 0
+    distinct_prs = stats[2] or 0
+
+    severity_rows = (
+        base.with_entities(ReviewFinding.severity, func.count(distinct(ReviewFinding.id)))
+        .group_by(ReviewFinding.severity)
+        .all()
+    )
+    source_rows = (
+        base.with_entities(ReviewFinding.source, func.count(distinct(ReviewFinding.id)))
+        .group_by(ReviewFinding.source)
+        .all()
+    )
+    day_expr = func.date(ReviewFinding.detected_at)
+    trend_rows = (
+        base.with_entities(day_expr.label("day"), func.count(distinct(ReviewFinding.id)))
+        .group_by(day_expr)
+        .order_by(day_expr)
+        .all()
+    )
+
+    return FindingsOverview(
+        total_findings=total,
+        by_severity={sev: cnt for sev, cnt in severity_rows},
+        by_source={src: cnt for src, cnt in source_rows},
+        fix_rate=fixed_count / total if total else None,
+        avg_findings_per_pr=total / distinct_prs if distinct_prs else None,
+        findings_trend=[{"date": str(d), "count": c} for d, c in trend_rows],
     )
 
 

@@ -31,6 +31,7 @@ from primer.common.schemas import (
     PersonalizedTipsResponse,
     ProductivityMetrics,
     ProjectAnalytics,
+    ProjectWorkspaceResponse,
     QualityMetricsResponse,
     Recommendation,
     ReviewFindingSummary,
@@ -214,6 +215,31 @@ def project_analytics(
         sort_by=sort_by,
         limit=limit,
     )
+
+
+@router.get("/projects/{project_name}/workspace", response_model=ProjectWorkspaceResponse)
+def project_workspace(
+    project_name: str,
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.project_workspace_service import get_project_workspace
+
+    tid, eid = _resolve_scope(auth, team_id)
+    workspace = get_project_workspace(
+        db,
+        project_name,
+        team_id=tid,
+        engineer_id=eid,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    if workspace is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return workspace
 
 
 @router.get("/productivity", response_model=ProductivityMetrics)

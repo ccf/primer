@@ -34,6 +34,7 @@ import type {
   PersonalizedTipsResponse,
   ProductivityMetrics,
   ProjectAnalytics,
+  ProjectWorkspaceResponse,
   QualityMetricsResponse,
   Recommendation,
   ReviewFindingSummary,
@@ -220,6 +221,22 @@ export function useProjectAnalytics(
       apiFetch<ProjectAnalytics>(
         `/api/v1/analytics/projects${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate, sort_by: sortBy })}`,
       ),
+  })
+}
+
+export function useProjectWorkspace(
+  projectName: string,
+  teamId: string | null,
+  startDate?: string,
+  endDate?: string,
+) {
+  return useQuery({
+    queryKey: ["project-workspace", projectName, teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<ProjectWorkspaceResponse>(
+        `/api/v1/analytics/projects/${encodeURIComponent(projectName)}/workspace${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+      ),
+    enabled: !!projectName,
   })
 }
 

@@ -24,6 +24,8 @@ import { EngineerProfilePage } from "@/pages/engineer-profile"
 import { QualityPage } from "@/pages/quality"
 import { FrictionPage } from "@/pages/friction"
 import { GrowthPage } from "@/pages/growth"
+import { ProjectsPage } from "@/pages/projects"
+import { ProjectWorkspacePage } from "@/pages/project-workspace"
 import { NotFoundPage } from "@/pages/not-found"
 import { FloatingExplorer } from "@/components/explorer/floating-explorer"
 import type { DateRange } from "@/components/layout/date-range-picker"
@@ -44,6 +46,10 @@ function TeamDetailRoute({ dateRange }: { dateRange: DateRange | null }) {
 
 function EngineerProfileRoute({ dateRange }: { dateRange: DateRange | null }) {
   return <EngineerProfilePage dateRange={dateRange} />
+}
+
+function ProjectWorkspaceRoute({ teamId, dateRange }: { teamId: string | null; dateRange: DateRange | null }) {
+  return <ProjectWorkspacePage teamId={teamId} dateRange={dateRange} />
 }
 
 function RoleRedirect() {
@@ -99,6 +105,8 @@ function AuthenticatedApp() {
           <Route path="/quality" element={<QualityPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/friction" element={<FrictionPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/growth" element={<GrowthPage teamId={teamId} dateRange={dateRange} />} />
+          <Route path="/projects" element={<ProjectsPage teamId={teamId} dateRange={dateRange} />} />
+          <Route path="/projects/:projectName" element={<ProjectWorkspaceRoute teamId={teamId} dateRange={dateRange} />} />
 
           {/* Redirects for deprecated routes */}
           <Route path="/overview" element={<Navigate to="/" replace />} />
@@ -106,8 +114,6 @@ function AuthenticatedApp() {
           <Route path="/tool-adoption" element={<Navigate to="/maturity" replace />} />
           <Route path="/insights" element={<Navigate to="/synthesis" replace />} />
           <Route path="/session-insights" element={<Navigate to="/sessions" replace />} />
-          <Route path="/projects" element={<Navigate to="/maturity" replace />} />
-
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </AppShell>

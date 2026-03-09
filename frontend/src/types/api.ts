@@ -718,6 +718,48 @@ export interface QualityMetricsResponse {
   github_connected: boolean
 }
 
+export interface ProjectScorecard {
+  adoption_rate: number | null
+  effectiveness_rate: number | null
+  quality_rate: number | null
+  avg_cost_per_session: number | null
+  cost_per_successful_outcome: number | null
+  measurement_confidence: number | null
+}
+
+export interface ProjectRepositorySummary {
+  repository: string
+  session_count: number
+  default_branch: string | null
+  readiness_checked: boolean
+  ai_readiness_score: number | null
+  has_claude_md: boolean | null
+  has_agents_md: boolean | null
+  has_claude_dir: boolean | null
+}
+
+export interface ProjectEnablementSummary {
+  linked_repository_count: number
+  agent_type_counts: Record<string, number>
+  session_type_counts: Record<string, number>
+  permission_mode_counts: Record<string, number>
+  top_tools: string[]
+  top_models: string[]
+}
+
+export interface ProjectWorkspaceResponse {
+  project: ProjectStats
+  scorecard: ProjectScorecard
+  overview: OverviewStats
+  productivity: ProductivityMetrics
+  cost: CostAnalytics
+  quality: QualityMetricsResponse
+  friction: ProjectFriction | null
+  friction_impacts: FrictionImpact[]
+  repositories: ProjectRepositorySummary[]
+  enablement: ProjectEnablementSummary
+}
+
 export interface GitHubStatusResponse {
   configured: boolean
   app_id: number | null
