@@ -100,19 +100,10 @@ def interventions_update(
                 status_code=403,
                 detail="Engineers can only update status, due date, or claim ownership",
             )
-        if payload.owner_engineer_id is not None and payload.owner_engineer_id != auth.engineer_id:
+        if "owner_engineer_id" in touched_fields and payload.owner_engineer_id != auth.engineer_id:
             raise HTTPException(status_code=403, detail="Cannot assign to another engineer")
 
-    if auth.role == "team_lead":
-        _validate_team_payload(
-            db,
-            auth,
-            payload.team_id,
-            payload.engineer_id,
-            payload.owner_engineer_id,
-        )
-
-    if auth.role == "admin":
+    if auth.role in ("team_lead", "admin"):
         _validate_team_payload(
             db,
             auth,
