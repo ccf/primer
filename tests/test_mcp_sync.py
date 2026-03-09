@@ -160,7 +160,7 @@ def test_sync_uploads_missing(mock_list, mock_server_ids, mock_get_ext, mock_fac
 @patch("primer.mcp.sync.get_extractor_for")
 @patch("primer.mcp.sync.get_server_session_ids")
 @patch("primer.mcp.sync.list_local_sessions")
-def test_sync_updates_legacy_codex_rollout_row_without_duplicate(
+def test_sync_treats_legacy_codex_rollout_alias_as_already_synced(
     mock_list, mock_server_ids, mock_get_ext, mock_facets, mock_post
 ):
     mock_list.return_value = [
@@ -187,10 +187,11 @@ def test_sync_updates_legacy_codex_rollout_row_without_duplicate(
 
     result = sync_sessions("http://test:8000", "key")
 
-    assert result["synced"] == 1
-    assert result["already_synced"] == 0
-    payload = mock_post.call_args.kwargs.get("json") or mock_post.call_args[1].get("json")
-    assert payload["session_id"] == "rollout-2026-03-08-thread-uuid"
+    assert result["synced"] == 0
+    assert result["already_synced"] == 1
+    mock_get_ext.assert_not_called()
+    mock_facets.assert_not_called()
+    mock_post.assert_not_called()
 
 
 @patch("primer.mcp.sync.httpx.post")

@@ -169,7 +169,7 @@ class GeminiExtractor:
 
         # Try telemetry as a fallback for token data
         if not model_tokens:
-            telemetry_tokens = self._load_telemetry_tokens(path, meta.session_id)
+            telemetry_tokens = self._load_telemetry_tokens(meta.session_id)
             if telemetry_tokens:
                 model_tokens.update(telemetry_tokens)
                 for model_data in telemetry_tokens.values():
@@ -325,7 +325,7 @@ class GeminiExtractor:
             meta.duration_seconds = (last_ts - first_ts).total_seconds()
 
         if not model_tokens:
-            telemetry_tokens = self._load_telemetry_tokens(path, meta.session_id)
+            telemetry_tokens = self._load_telemetry_tokens(meta.session_id)
             if telemetry_tokens:
                 model_tokens.update(telemetry_tokens)
                 for model_data in telemetry_tokens.values():
@@ -450,11 +450,7 @@ class GeminiExtractor:
         meta.output_tokens += output_t
         meta.cache_read_tokens += cached_t
 
-    def _load_telemetry_tokens(
-        self,
-        session_path: Path,
-        session_id: str,
-    ) -> dict[str, dict[str, int]] | None:
+    def _load_telemetry_tokens(self, session_id: str) -> dict[str, dict[str, int]] | None:
         """Try to load token counts from ~/.gemini/telemetry.log (OpenTelemetry)."""
         telemetry_path = self.get_data_dir() / "telemetry.log"
         if not telemetry_path.exists():
