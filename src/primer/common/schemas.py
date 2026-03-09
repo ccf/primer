@@ -19,6 +19,7 @@ class PaginatedResponse[T](BaseModel):
 
 
 AgentType = Literal["claude_code", "codex_cli", "gemini_cli", "cursor"]
+TelemetryParity = Literal["required", "optional", "unavailable"]
 
 # --- Team ---
 
@@ -580,10 +581,15 @@ class SystemStats(BaseModel):
 class AgentSourceQuality(BaseModel):
     agent_type: AgentType
     session_count: int
+    transcript_parity: TelemetryParity
     transcript_coverage_pct: float
+    tool_call_parity: TelemetryParity
     tool_call_coverage_pct: float
+    model_usage_parity: TelemetryParity
     model_usage_coverage_pct: float
+    facet_parity: TelemetryParity
     facet_coverage_pct: float
+    native_discovery_parity: TelemetryParity
 
 
 class MeasurementIntegrityStats(BaseModel):
@@ -600,7 +606,7 @@ class MeasurementIntegrityStats(BaseModel):
     legacy_outcome_sessions: int
     legacy_goal_category_sessions: int
     remaining_legacy_rows: int
-    source_quality: list[AgentSourceQuality] = []
+    source_quality: list[AgentSourceQuality] = Field(default_factory=list)
 
 
 class FacetNormalizationSummary(BaseModel):

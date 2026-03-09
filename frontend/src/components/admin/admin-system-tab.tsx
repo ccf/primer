@@ -13,9 +13,111 @@ import { useMeasurementIntegrity, useSystemStats } from "@/hooks/use-api-queries
 import { StatCard } from "@/components/dashboard/stat-card"
 import { formatNumber } from "@/lib/utils"
 import { CardSkeleton } from "@/components/shared/loading-skeleton"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import type { AgentSourceQuality, TelemetryParity } from "@/types/api"
 
 function formatCoverage(value: number): string {
   return `${value.toFixed(1)}%`
+}
+
+function parityVariant(parity: TelemetryParity): "success" | "info" | "outline" {
+  if (parity === "required") return "success"
+  if (parity === "optional") return "info"
+  return "outline"
+}
+
+function parityLabel(parity: TelemetryParity): string {
+  if (parity === "required") return "Required"
+  if (parity === "optional") return "Optional"
+  return "Unavailable"
+}
+
+function CoverageCell({
+  parity,
+  coverage,
+}: {
+  parity: TelemetryParity
+  coverage?: number
+}) {
+  const coverageLabel =
+    parity === "unavailable" ? "Not expected" : coverage == null ? "-" : formatCoverage(coverage)
+
+  return (
+    <div className="space-y-1">
+      <Badge variant={parityVariant(parity)}>{parityLabel(parity)}</Badge>
+      <div className="text-xs text-muted-foreground">{coverageLabel}</div>
+    </div>
+  )
+}
+
+function SourceQualityTable({ rows }: { rows: AgentSourceQuality[] }) {
+  if (rows.length === 0) {
+    return <p className="text-sm text-muted-foreground">No source-quality data yet.</p>
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-4">
+        <CardTitle>Schema Parity by Source</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Required fields count against coverage. Unavailable fields are excluded from integrity
+          penalties.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="text-left text-muted-foreground">
+              <tr className="border-b border-border/60">
+                <th className="pb-3 pr-4 font-medium">Agent</th>
+                <th className="pb-3 pr-4 font-medium">Sessions</th>
+                <th className="pb-3 pr-4 font-medium">Transcript</th>
+                <th className="pb-3 pr-4 font-medium">Tool Calls</th>
+                <th className="pb-3 pr-4 font-medium">Model Usage</th>
+                <th className="pb-3 pr-4 font-medium">Facets</th>
+                <th className="pb-3 font-medium">Native Discovery</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.agent_type} className="border-b border-border/40 last:border-b-0">
+                  <td className="py-3 pr-4 font-medium">{row.agent_type}</td>
+                  <td className="py-3 pr-4 text-muted-foreground">
+                    {formatNumber(row.session_count)}
+                  </td>
+                  <td className="py-3 pr-4">
+                    <CoverageCell
+                      parity={row.transcript_parity}
+                      coverage={row.transcript_coverage_pct}
+                    />
+                  </td>
+                  <td className="py-3 pr-4">
+                    <CoverageCell
+                      parity={row.tool_call_parity}
+                      coverage={row.tool_call_coverage_pct}
+                    />
+                  </td>
+                  <td className="py-3 pr-4">
+                    <CoverageCell
+                      parity={row.model_usage_parity}
+                      coverage={row.model_usage_coverage_pct}
+                    />
+                  </td>
+                  <td className="py-3 pr-4">
+                    <CoverageCell parity={row.facet_parity} coverage={row.facet_coverage_pct} />
+                  </td>
+                  <td className="py-3">
+                    <CoverageCell parity={row.native_discovery_parity} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  )
 }
 
 export function AdminSystemTab() {
@@ -102,6 +204,7 @@ export function AdminSystemTab() {
         ) : (
           <p className="text-sm text-muted-foreground">Measurement integrity data is unavailable.</p>
         )}
+        {!isIntegrityLoading && integrity && <SourceQualityTable rows={integrity.source_quality} />}
       </section>
     </div>
   )

@@ -222,18 +222,28 @@ def test_measurement_integrity_stats_include_source_quality_breakdown(
     assert source_quality["claude_code"] == {
         "agent_type": "claude_code",
         "session_count": 1,
+        "transcript_parity": "required",
         "transcript_coverage_pct": 100.0,
+        "tool_call_parity": "required",
         "tool_call_coverage_pct": 100.0,
+        "model_usage_parity": "required",
         "model_usage_coverage_pct": 100.0,
+        "facet_parity": "required",
         "facet_coverage_pct": 100.0,
+        "native_discovery_parity": "required",
     }
     assert source_quality["cursor"] == {
         "agent_type": "cursor",
         "session_count": 2,
+        "transcript_parity": "required",
         "transcript_coverage_pct": 50.0,
+        "tool_call_parity": "unavailable",
         "tool_call_coverage_pct": 0.0,
+        "model_usage_parity": "unavailable",
         "model_usage_coverage_pct": 0.0,
+        "facet_parity": "unavailable",
         "facet_coverage_pct": 0.0,
+        "native_discovery_parity": "unavailable",
     }
 
 
@@ -279,8 +289,11 @@ def test_measurement_integrity_stats_count_missing_supported_tool_and_model_tele
     assert data["sessions_missing_model_telemetry"] == 1
 
     source_quality = {entry["agent_type"]: entry for entry in data["source_quality"]}
+    assert source_quality["claude_code"]["transcript_parity"] == "required"
     assert source_quality["claude_code"]["tool_call_coverage_pct"] == 50.0
     assert source_quality["claude_code"]["model_usage_coverage_pct"] == 50.0
+    assert source_quality["cursor"]["transcript_parity"] == "required"
+    assert source_quality["cursor"]["tool_call_parity"] == "unavailable"
     assert source_quality["cursor"]["tool_call_coverage_pct"] == 0.0
     assert source_quality["cursor"]["model_usage_coverage_pct"] == 0.0
 
@@ -316,6 +329,11 @@ def test_measurement_integrity_facet_coverage_pct_ignores_unsupported_sources(
     assert data["total_sessions"] == 2
     assert data["sessions_with_facets"] == 1
     assert data["facet_coverage_pct"] == 0.0
+    source_quality = {entry["agent_type"]: entry for entry in data["source_quality"]}
+    assert source_quality["claude_code"]["facet_parity"] == "required"
+    assert source_quality["claude_code"]["facet_coverage_pct"] == 0.0
+    assert source_quality["cursor"]["facet_parity"] == "unavailable"
+    assert source_quality["cursor"]["facet_coverage_pct"] == 0.0
 
 
 def test_normalize_facets_endpoint_dry_run_and_limit(

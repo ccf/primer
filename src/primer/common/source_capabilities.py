@@ -1,50 +1,88 @@
 from dataclasses import dataclass
+from typing import Literal
 
-from primer.common.schemas import AgentType
+from primer.common.schemas import AgentType, TelemetryParity
+
+TelemetryField = Literal[
+    "transcript",
+    "tool_calls",
+    "model_usage",
+    "facets",
+    "native_discovery",
+]
 
 
 @dataclass(frozen=True)
 class AgentCapability:
     agent_type: AgentType
-    supports_transcript: bool
-    supports_tool_calls: bool
-    supports_model_usage: bool
-    supports_facets: bool
-    supports_native_discovery: bool
+    transcript: TelemetryParity
+    tool_calls: TelemetryParity
+    model_usage: TelemetryParity
+    facets: TelemetryParity
+    native_discovery: TelemetryParity
+
+    def parity_for(self, field_name: TelemetryField) -> TelemetryParity:
+        return getattr(self, field_name)
+
+    def is_available(self, field_name: TelemetryField) -> bool:
+        return self.parity_for(field_name) != "unavailable"
+
+    def is_required(self, field_name: TelemetryField) -> bool:
+        return self.parity_for(field_name) == "required"
+
+    @property
+    def supports_transcript(self) -> bool:
+        return self.is_available("transcript")
+
+    @property
+    def supports_tool_calls(self) -> bool:
+        return self.is_available("tool_calls")
+
+    @property
+    def supports_model_usage(self) -> bool:
+        return self.is_available("model_usage")
+
+    @property
+    def supports_facets(self) -> bool:
+        return self.is_available("facets")
+
+    @property
+    def supports_native_discovery(self) -> bool:
+        return self.is_available("native_discovery")
 
 
 CAPABILITIES: dict[AgentType, AgentCapability] = {
     "claude_code": AgentCapability(
         agent_type="claude_code",
-        supports_transcript=True,
-        supports_tool_calls=True,
-        supports_model_usage=True,
-        supports_facets=True,
-        supports_native_discovery=True,
+        transcript="required",
+        tool_calls="required",
+        model_usage="required",
+        facets="required",
+        native_discovery="required",
     ),
     "codex_cli": AgentCapability(
         agent_type="codex_cli",
-        supports_transcript=True,
-        supports_tool_calls=True,
-        supports_model_usage=True,
-        supports_facets=False,
-        supports_native_discovery=True,
+        transcript="required",
+        tool_calls="required",
+        model_usage="required",
+        facets="unavailable",
+        native_discovery="required",
     ),
     "gemini_cli": AgentCapability(
         agent_type="gemini_cli",
-        supports_transcript=True,
-        supports_tool_calls=True,
-        supports_model_usage=True,
-        supports_facets=False,
-        supports_native_discovery=True,
+        transcript="required",
+        tool_calls="required",
+        model_usage="required",
+        facets="unavailable",
+        native_discovery="required",
     ),
     "cursor": AgentCapability(
         agent_type="cursor",
-        supports_transcript=True,
-        supports_tool_calls=False,
-        supports_model_usage=False,
-        supports_facets=False,
-        supports_native_discovery=False,
+        transcript="required",
+        tool_calls="unavailable",
+        model_usage="unavailable",
+        facets="unavailable",
+        native_discovery="unavailable",
     ),
 }
 
