@@ -24,18 +24,9 @@ interface ProjectWorkspacePageProps {
   dateRange: DateRange | null
 }
 
-function decodeProjectName(rawProjectName: string | undefined): string {
-  if (!rawProjectName) return ""
-  try {
-    return decodeURIComponent(rawProjectName)
-  } catch {
-    return rawProjectName
-  }
-}
-
 export function ProjectWorkspacePage({ teamId, dateRange }: ProjectWorkspacePageProps) {
   const { projectName: rawProjectName } = useParams<{ projectName: string }>()
-  const projectName = decodeProjectName(rawProjectName)
+  const projectName = rawProjectName ?? ""
   const startDate = dateRange?.startDate
   const endDate = dateRange?.endDate
   const { data, isLoading, error } = useProjectWorkspace(projectName, teamId, startDate, endDate)
