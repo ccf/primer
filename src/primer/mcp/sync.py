@@ -13,6 +13,8 @@ from primer.mcp.reader import list_local_sessions
 
 logger = logging.getLogger(__name__)
 
+_MAX_PAGES = 200
+
 
 def get_server_session_ids(server_url: str, api_key: str) -> set[str]:
     """Fetch the set of session IDs already on the server for this engineer."""
@@ -20,7 +22,7 @@ def get_server_session_ids(server_url: str, api_key: str) -> set[str]:
     limit = 1000
     offset = 0
 
-    while True:
+    for _page in range(_MAX_PAGES):
         try:
             resp = httpx.get(
                 f"{server_url}/api/v1/sessions",
@@ -47,6 +49,12 @@ def get_server_session_ids(server_url: str, api_key: str) -> set[str]:
             return session_ids
 
         offset += limit
+
+    logger.warning(
+        "Pagination safety limit (%d pages) reached; returning partial results",
+        _MAX_PAGES,
+    )
+    return session_ids
 
 
 def sync_sessions(server_url: str, api_key: str) -> dict:

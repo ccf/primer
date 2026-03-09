@@ -26,6 +26,19 @@ def _build_seed_auth_headers() -> dict[str, str]:
 
 ADMIN_HEADERS = _build_seed_auth_headers()
 
+
+def _parse_bool_env(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _should_force_facets() -> bool:
+    """Allow local refreshes to require facets for every seeded session."""
+    return _parse_bool_env("PRIMER_SEED_FORCE_FACETS")
+
+
 # ── Engineer personas ──────────────────────────────────────────────
 PERSONAS = {
     "power_user": {
@@ -1436,6 +1449,7 @@ def _build_facets(
     summary: str | None,
     friction_counts: dict[str, int] | None,
     friction_detail: str | None,
+    include_user_satisfaction: bool = True,
 ) -> dict:
     """Generate a complete facet payload for a synthetic session."""
     if outcome == "success":
@@ -1453,11 +1467,14 @@ def _build_facets(
 
     categories = GOAL_CATEGORIES_BY_TYPE[session_type]
     goal_categories = random.sample(categories, k=random.randint(1, min(2, len(categories))))
-    satisfaction_label = random.choices(
-        ["satisfied", "neutral", "dissatisfied"],
-        weights=satisfaction_weights,
-        k=1,
-    )[0]
+    satisfaction = None
+    if include_user_satisfaction:
+        satisfaction_label = random.choices(
+            ["satisfied", "neutral", "dissatisfied"],
+            weights=satisfaction_weights,
+            k=1,
+        )[0]
+        satisfaction = {satisfaction_label: 1}
 
     return {
         "underlying_goal": f"Working on {session_type} task for {project_name}",
@@ -1468,7 +1485,7 @@ def _build_facets(
         "friction_counts": friction_counts,
         "friction_detail": friction_detail,
         "primary_success": primary_success,
-        "user_satisfaction_counts": {satisfaction_label: 1},
+        "user_satisfaction_counts": satisfaction,
         "confidence_score": round(random.uniform(*confidence_range), 2),
     }
 
@@ -1499,6 +1516,7 @@ def _build_tool_usages(
 
 def main():
     random.seed(42)
+    force_facets = _should_force_facets()
     selected_agent_types = _parse_selected_agent_types()
 
     # Create or fetch teams
@@ -1777,14 +1795,17 @@ def main():
                 # Summary (80% of sessions have one)
                 summary = _generate_summary(session_type) if random.random() < 0.8 else None
 
-                facets = _build_facets(
-                    session_type=session_type,
-                    outcome=outcome,
-                    project_name=project_name,
-                    summary=summary,
-                    friction_counts=friction_counts,
-                    friction_detail=friction_detail,
-                )
+                facets = None
+                if force_facets or random.random() < 0.85:
+                    facets = _build_facets(
+                        session_type=session_type,
+                        outcome=outcome,
+                        project_name=project_name,
+                        summary=summary,
+                        friction_counts=friction_counts,
+                        friction_detail=friction_detail,
+                        include_user_satisfaction=random.random() < 0.6,
+                    )
 
                 # Generate transcript messages (agent-specific)
                 session_messages = _generate_messages(
