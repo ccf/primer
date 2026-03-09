@@ -65,7 +65,7 @@ CAPABILITIES: dict[AgentType, AgentCapability] = {
         transcript="required",
         tool_calls="required",
         model_usage="required",
-        facets="unavailable",
+        facets="optional",
         native_discovery="required",
     ),
     "gemini_cli": AgentCapability(
@@ -73,15 +73,15 @@ CAPABILITIES: dict[AgentType, AgentCapability] = {
         transcript="required",
         tool_calls="required",
         model_usage="required",
-        facets="unavailable",
+        facets="optional",
         native_discovery="required",
     ),
     "cursor": AgentCapability(
         agent_type="cursor",
         transcript="required",
-        tool_calls="unavailable",
-        model_usage="unavailable",
-        facets="unavailable",
+        tool_calls="optional",
+        model_usage="optional",
+        facets="optional",
         native_discovery="unavailable",
     ),
 }

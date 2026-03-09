@@ -179,6 +179,117 @@ def test_discover_sessions(tmp_path):
         Path.home = original_home
 
 
+def test_extract_shared_logs_session(tmp_path):
+    log_path = tmp_path / "logs.json"
+    log_path.write_text(
+        json.dumps(
+            [
+                {
+                    "sessionId": "gemini-log-1",
+                    "messageId": 0,
+                    "type": "user",
+                    "message": "Audit this repository",
+                    "timestamp": "2025-02-01T10:00:00Z",
+                },
+                {
+                    "sessionId": "gemini-log-1",
+                    "messageId": 1,
+                    "type": "assistant",
+                    "message": "I found a few issues.",
+                    "timestamp": "2025-02-01T10:00:05Z",
+                    "usageMetadata": {
+                        "input_token_count": 120,
+                        "output_token_count": 45,
+                    },
+                    "model": "gemini-2.5-pro",
+                },
+                {
+                    "sessionId": "gemini-log-1",
+                    "messageId": 2,
+                    "type": "tool_call",
+                    "name": "read_file",
+                    "timestamp": "2025-02-01T10:00:06Z",
+                },
+                {
+                    "sessionId": "gemini-log-1",
+                    "messageId": 3,
+                    "type": "tool_result",
+                    "toolName": "read_file",
+                    "message": "def test_example(): pass",
+                    "timestamp": "2025-02-01T10:00:08Z",
+                },
+                {
+                    "sessionId": "gemini-log-2",
+                    "messageId": 0,
+                    "type": "user",
+                    "message": "Ignore me",
+                    "timestamp": "2025-02-01T11:00:00Z",
+                },
+            ]
+        )
+    )
+
+    extractor = GeminiExtractor()
+    meta = extractor.extract(f"{log_path}::gemini-log-1")
+
+    assert meta.session_id == "gemini-log-1"
+    assert meta.message_count == 2
+    assert meta.user_message_count == 1
+    assert meta.assistant_message_count == 1
+    assert meta.tool_call_count == 1
+    assert meta.tool_counts == {"read_file": 1}
+    assert meta.first_prompt == "Audit this repository"
+    assert meta.input_tokens == 120
+    assert meta.output_tokens == 45
+    assert meta.primary_model == "gemini-2.5-pro"
+    assert meta.duration_seconds == 8.0
+
+
+def test_discover_sessions_from_shared_logs(tmp_path):
+    logs_dir = tmp_path / ".gemini" / "tmp" / "abc123hash"
+    logs_dir.mkdir(parents=True)
+    project_path = "/Users/example/current-gemini"
+    (logs_dir / "metadata.json").write_text(json.dumps({"project_path": project_path}))
+    (logs_dir / "logs.json").write_text(
+        json.dumps(
+            [
+                {
+                    "sessionId": "gemini-log-1",
+                    "type": "user",
+                    "message": "Hello",
+                    "timestamp": "2025-02-01T10:00:00Z",
+                },
+                {
+                    "sessionId": "gemini-log-2",
+                    "type": "user",
+                    "message": "Hi",
+                    "timestamp": "2025-02-01T10:05:00Z",
+                },
+            ]
+        )
+    )
+
+    from pathlib import Path
+
+    original_home = Path.home
+
+    def mock_home():
+        return tmp_path
+
+    Path.home = staticmethod(mock_home)
+    try:
+        extractor = GeminiExtractor()
+        sessions = extractor.discover_sessions()
+        assert len(sessions) == 2
+        sessions_by_id = {session.session_id: session for session in sessions}
+        assert sessions_by_id["gemini-log-1"].transcript_path.endswith("logs.json::gemini-log-1")
+        assert sessions_by_id["gemini-log-1"].project_path == project_path
+        assert sessions_by_id["gemini-log-1"].agent_type == "gemini_cli"
+        assert sessions_by_id["gemini-log-2"].transcript_path.endswith("logs.json::gemini-log-2")
+    finally:
+        Path.home = original_home
+
+
 def test_no_tokens_graceful():
     """Sessions without token data should still parse with zero counts."""
     data = {

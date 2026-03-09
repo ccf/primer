@@ -117,7 +117,8 @@ def main() -> None:
         if git_info.get("commits"):
             meta.commits = git_info["commits"]
 
-    # Facets are only available for Claude Code sessions
+    # Claude exposes native facet files; other agents rely on ingest-time
+    # transcript extraction when that feature is enabled on the server.
     facets = None
     if agent == "claude":
         facets = load_facets(session_id)

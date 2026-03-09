@@ -67,6 +67,24 @@ def _setup_gemini_session(tmp_path, session_id, project_path):
     metadata_path.write_text(json.dumps({"project_path": project_path}))
 
 
+def _setup_gemini_logs_sessions(tmp_path, session_ids, project_path):
+    logs_dir = tmp_path / ".gemini" / "tmp" / "current-project-hash"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    entries = []
+    for index, session_id in enumerate(session_ids):
+        entries.append(
+            {
+                "sessionId": session_id,
+                "messageId": index,
+                "type": "user",
+                "message": f"Gemini session {session_id}",
+                "timestamp": f"2025-02-01T10:0{index}:00Z",
+            }
+        )
+    (logs_dir / "logs.json").write_text(json.dumps(entries))
+    (logs_dir / "metadata.json").write_text(json.dumps({"project_path": project_path}))
+
+
 def _setup_cursor_import(tmp_path, session_id, project_path):
     sessions_dir = tmp_path / ".primer" / "cursor" / "sessions"
     sessions_dir.mkdir(parents=True, exist_ok=True)
@@ -191,6 +209,24 @@ def test_list_local_sessions_includes_imported_cursor_bundles(tmp_path, monkeypa
     assert cursor.project_path == "/home/user/cursor-project"
     assert cursor.has_facets is False
     assert cursor.facets_path is None
+
+
+def test_list_local_sessions_includes_current_gemini_logs_sessions(tmp_path, monkeypatch):
+    _setup_gemini_logs_sessions(
+        tmp_path,
+        ["gemini-log-1", "gemini-log-2"],
+        "/home/user/current-gemini-project",
+    )
+
+    _mock_home(tmp_path, monkeypatch)
+    result = reader.list_local_sessions()
+
+    sessions_by_id = {session.session_id: session for session in result}
+    assert set(sessions_by_id) == {"gemini-log-1", "gemini-log-2"}
+    assert sessions_by_id["gemini-log-1"].agent_type == "gemini_cli"
+    assert sessions_by_id["gemini-log-1"].project_path == "/home/user/current-gemini-project"
+    assert sessions_by_id["gemini-log-1"].transcript_path.endswith("logs.json::gemini-log-1")
+    assert sessions_by_id["gemini-log-2"].transcript_path.endswith("logs.json::gemini-log-2")
 
 
 def test_list_local_sessions_ignores_generic_cursor_workspace_storage_json(tmp_path, monkeypatch):

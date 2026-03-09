@@ -9,8 +9,22 @@ from datetime import datetime, timedelta
 import httpx
 
 SERVER_URL = os.environ.get("PRIMER_SERVER_URL", "http://localhost:8000")
-ADMIN_KEY = os.environ.get("PRIMER_ADMIN_API_KEY", "primer-admin-dev-key")
-ADMIN_HEADERS = {"x-admin-key": ADMIN_KEY}
+
+
+def _build_seed_auth_headers() -> dict[str, str]:
+    """Prefer an explicit admin key, but allow an admin-role API key for local seeding."""
+    admin_key = os.environ.get("PRIMER_ADMIN_API_KEY")
+    if admin_key:
+        return {"x-admin-key": admin_key}
+
+    api_key = os.environ.get("PRIMER_API_KEY")
+    if api_key:
+        return {"x-api-key": api_key}
+
+    return {"x-admin-key": "primer-admin-dev-key"}
+
+
+ADMIN_HEADERS = _build_seed_auth_headers()
 
 # ── Engineer personas ──────────────────────────────────────────────
 PERSONAS = {
@@ -130,11 +144,11 @@ AGENT_TYPE_CONFIG = {
     },
     "codex_cli": {
         "model_weights": {
-            "power_user": {"o3": 40, "o4-mini": 25, "codex-mini": 20, "gpt-4.1": 15},
-            "moderate": {"o3": 30, "o4-mini": 35, "codex-mini": 20, "gpt-4.1": 15},
-            "occasional": {"o4-mini": 45, "codex-mini": 30, "gpt-4.1": 25},
-            "new_hire": {"o4-mini": 40, "gpt-4.1": 35, "codex-mini": 25},
-            "ramping_up": {"o3": 25, "o4-mini": 35, "codex-mini": 25, "gpt-4.1": 15},
+            "power_user": {"gpt-5.4": 40, "gpt-5.3-codex": 30, "gpt-5-mini": 15, "gpt-4.1": 15},
+            "moderate": {"gpt-5.4": 30, "gpt-5.3-codex": 25, "gpt-5-mini": 25, "gpt-4.1": 20},
+            "occasional": {"gpt-5-mini": 45, "gpt-4.1": 30, "gpt-5.4": 15, "gpt-5.3-codex": 10},
+            "new_hire": {"gpt-5-mini": 45, "gpt-4.1": 30, "gpt-5.4": 15, "gpt-5.3-codex": 10},
+            "ramping_up": {"gpt-5.4": 25, "gpt-5.3-codex": 20, "gpt-5-mini": 35, "gpt-4.1": 20},
         },
         "tools": [
             "exec_command",
@@ -143,8 +157,8 @@ AGENT_TYPE_CONFIG = {
             "file_write",
             "function_call",
         ],
-        "versions": ["0.1.20250613", "0.1.20250530", "0.1.2025051"],
-        "permission_modes": ["auto", "suggest", "ask"],
+        "versions": ["0.111.0", "0.110.1", "0.110.0"],
+        "permission_modes": ["on-request", "on-failure", "never"],
     },
     "gemini_cli": {
         "model_weights": {
@@ -1341,6 +1355,53 @@ def _weighted_choice(options: dict[str, int]) -> str:
     return random.choices(keys, weights=weights, k=1)[0]
 
 
+def _parse_selected_agent_types() -> set[str] | None:
+    """Parse optional comma-separated agent-type filter from the environment."""
+    raw = os.environ.get("PRIMER_SEED_AGENT_TYPES")
+    if not raw:
+        return None
+
+    selected = {part.strip() for part in raw.split(",") if part.strip()}
+    invalid = sorted(selected - set(AGENT_TYPE_CONFIG))
+    if invalid:
+        valid = ", ".join(sorted(AGENT_TYPE_CONFIG))
+        raise ValueError(
+            f"Unknown agent types in PRIMER_SEED_AGENT_TYPES: {invalid}. Valid: {valid}"
+        )
+    return selected
+
+
+def _filter_agent_mix(
+    agent_mix: dict[str, int], selected_agents: set[str] | None
+) -> dict[str, int]:
+    """Restrict an engineer's agent mix to the requested agent types."""
+    if not selected_agents:
+        return dict(agent_mix)
+    return {
+        agent_type: weight
+        for agent_type, weight in agent_mix.items()
+        if agent_type in selected_agents
+    }
+
+
+def _scale_session_count_for_selected_agents(
+    session_count: int,
+    full_agent_mix: dict[str, int],
+    filtered_agent_mix: dict[str, int],
+) -> int:
+    """Preserve expected session volume when seeding only a subset of agent types."""
+    full_weight = sum(full_agent_mix.values())
+    filtered_weight = sum(filtered_agent_mix.values())
+    if full_weight <= 0 or filtered_weight <= 0:
+        return 0
+
+    scaled = session_count * (filtered_weight / full_weight)
+    whole = int(scaled)
+    if random.random() < scaled - whole:
+        whole += 1
+    return whole
+
+
 def _lognormal_tokens(mu: float, sigma: float, scale: float = 1.0) -> int:
     """Generate log-normally distributed token count."""
     return max(100, int(random.lognormvariate(mu, sigma) * scale))
@@ -1366,6 +1427,50 @@ def _generate_branch(session_type: str) -> str:
     template = random.choice(BRANCH_TEMPLATES[session_type])
     slug = random.choice(BRANCH_SLUGS)
     return template.format(slug=slug)
+
+
+def _build_facets(
+    session_type: str,
+    outcome: str,
+    project_name: str,
+    summary: str | None,
+    friction_counts: dict[str, int] | None,
+    friction_detail: str | None,
+) -> dict:
+    """Generate a complete facet payload for a synthetic session."""
+    if outcome == "success":
+        primary_success = random.choices(PRIMARY_SUCCESS_VALUES, weights=[75, 20, 5], k=1)[0]
+        satisfaction_weights = [70, 22, 8]
+        confidence_range = (0.84, 0.98)
+    elif outcome == "partial":
+        primary_success = random.choices(PRIMARY_SUCCESS_VALUES, weights=[15, 60, 25], k=1)[0]
+        satisfaction_weights = [25, 45, 30]
+        confidence_range = (0.7, 0.9)
+    else:
+        primary_success = random.choices(PRIMARY_SUCCESS_VALUES, weights=[5, 25, 70], k=1)[0]
+        satisfaction_weights = [5, 25, 70]
+        confidence_range = (0.58, 0.82)
+
+    categories = GOAL_CATEGORIES_BY_TYPE[session_type]
+    goal_categories = random.sample(categories, k=random.randint(1, min(2, len(categories))))
+    satisfaction_label = random.choices(
+        ["satisfied", "neutral", "dissatisfied"],
+        weights=satisfaction_weights,
+        k=1,
+    )[0]
+
+    return {
+        "underlying_goal": f"Working on {session_type} task for {project_name}",
+        "outcome": outcome,
+        "session_type": session_type,
+        "goal_categories": goal_categories,
+        "brief_summary": summary or f"Session for {project_name}",
+        "friction_counts": friction_counts,
+        "friction_detail": friction_detail,
+        "primary_success": primary_success,
+        "user_satisfaction_counts": {satisfaction_label: 1},
+        "confidence_score": round(random.uniform(*confidence_range), 2),
+    }
 
 
 def _build_tool_usages(
@@ -1394,6 +1499,7 @@ def _build_tool_usages(
 
 def main():
     random.seed(42)
+    selected_agent_types = _parse_selected_agent_types()
 
     # Create or fetch teams
     teams = []
@@ -1502,7 +1608,10 @@ def main():
         persona_type = eng_data["persona"]
         persona = PERSONAS[persona_type]
         preferred_projects = engineer_projects[eng_id]
-        eng_agent_mix = eng_data["agent_mix"]
+        full_agent_mix = eng_data["agent_mix"]
+        eng_agent_mix = _filter_agent_mix(full_agent_mix, selected_agent_types)
+        if not eng_agent_mix:
+            continue
         eng_sessions = 0
 
         for day_offset in range(90):
@@ -1517,6 +1626,11 @@ def main():
             if is_weekend:
                 lo, hi = 0, max(1, hi // 3)
             n_sessions = random.randint(lo, hi)
+            n_sessions = _scale_session_count_for_selected_agents(
+                n_sessions,
+                full_agent_mix=full_agent_mix,
+                filtered_agent_mix=eng_agent_mix,
+            )
 
             for _ in range(n_sessions):
                 session_id = str(uuid.uuid4())
@@ -1570,7 +1684,13 @@ def main():
                     token_scale *= 1.8
                 elif "haiku" in model:
                     token_scale *= 0.5
-                elif model in ("o3", "gemini-2.5-pro"):
+                elif (
+                    model == "gpt-5.3-codex"
+                    or model == "gpt-5.2"
+                    or model == "gpt-5.4"
+                    or (model.startswith("gpt-5") and "mini" not in model)
+                    or model == "gemini-2.5-pro"
+                ):
                     token_scale *= 1.6  # reasoning models produce more tokens
                 elif model in ("gpt-4.1-nano", "gemini-2.0-flash"):
                     token_scale *= 0.5
@@ -1657,56 +1777,14 @@ def main():
                 # Summary (80% of sessions have one)
                 summary = _generate_summary(session_type) if random.random() < 0.8 else None
 
-                # Facets (85% of sessions)
-                facets = None
-                if random.random() < 0.85:
-                    # Primary success — correlate with outcome
-                    if outcome == "success":
-                        ps = random.choices(PRIMARY_SUCCESS_VALUES, weights=[75, 20, 5], k=1)[0]
-                    elif outcome == "partial":
-                        ps = random.choices(PRIMARY_SUCCESS_VALUES, weights=[15, 60, 25], k=1)[0]
-                    else:
-                        ps = random.choices(PRIMARY_SUCCESS_VALUES, weights=[5, 25, 70], k=1)[0]
-
-                    # Goal categories (1-2 per session, type-specific)
-                    cats = GOAL_CATEGORIES_BY_TYPE[session_type]
-                    n_cats = random.randint(1, min(2, len(cats)))
-                    goal_cats = random.sample(cats, k=n_cats)
-
-                    # User satisfaction (60% of sessions with facets)
-                    satisfaction = None
-                    if random.random() < 0.6:
-                        if outcome == "success":
-                            sat = random.choices(
-                                ["satisfied", "neutral", "dissatisfied"],
-                                weights=[70, 22, 8],
-                                k=1,
-                            )[0]
-                        elif outcome == "partial":
-                            sat = random.choices(
-                                ["satisfied", "neutral", "dissatisfied"],
-                                weights=[25, 45, 30],
-                                k=1,
-                            )[0]
-                        else:
-                            sat = random.choices(
-                                ["satisfied", "neutral", "dissatisfied"],
-                                weights=[5, 25, 70],
-                                k=1,
-                            )[0]
-                        satisfaction = {sat: 1}
-
-                    facets = {
-                        "underlying_goal": f"Working on {session_type} task for {project_name}",
-                        "outcome": outcome,
-                        "session_type": session_type,
-                        "goal_categories": goal_cats,
-                        "brief_summary": summary or f"Session for {project_name}",
-                        "friction_counts": friction_counts,
-                        "friction_detail": friction_detail,
-                        "primary_success": ps,
-                        "user_satisfaction_counts": satisfaction,
-                    }
+                facets = _build_facets(
+                    session_type=session_type,
+                    outcome=outcome,
+                    project_name=project_name,
+                    summary=summary,
+                    friction_counts=friction_counts,
+                    friction_detail=friction_detail,
+                )
 
                 # Generate transcript messages (agent-specific)
                 session_messages = _generate_messages(

@@ -35,6 +35,8 @@ def test_get_server_session_ids_success(mock_get):
 
     ids = get_server_session_ids("http://test:8000", "key")
     assert ids == {"s1", "s2"}
+    assert mock_get.call_args.kwargs["headers"] == {"x-api-key": "key"}
+    assert mock_get.call_args.kwargs["params"] == {"limit": 1000, "offset": 0}
 
 
 @patch("primer.mcp.sync.httpx.get")
@@ -47,6 +49,32 @@ def test_get_server_session_ids_non_200(mock_get):
 
     ids = get_server_session_ids("http://test:8000", "key")
     assert ids == set()
+
+
+@patch("primer.mcp.sync.httpx.get")
+def test_get_server_session_ids_paginates(mock_get):
+    first = MagicMock()
+    first.status_code = 200
+    first.json.return_value = {
+        "items": [{"id": f"s{i}"} for i in range(1000)],
+        "total_count": 1002,
+    }
+    second = MagicMock()
+    second.status_code = 200
+    second.json.return_value = {
+        "items": [{"id": "s1000"}, {"id": "s1001"}],
+        "total_count": 1002,
+    }
+    mock_get.side_effect = [first, second]
+
+    from primer.mcp.sync import get_server_session_ids
+
+    ids = get_server_session_ids("http://test:8000", "key")
+
+    assert len(ids) == 1002
+    assert mock_get.call_count == 2
+    assert mock_get.call_args_list[0].kwargs["params"] == {"limit": 1000, "offset": 0}
+    assert mock_get.call_args_list[1].kwargs["params"] == {"limit": 1000, "offset": 1000}
 
 
 # --- sync_sessions ---
@@ -113,6 +141,44 @@ def test_sync_uploads_missing(mock_list, mock_server_ids, mock_get_ext, mock_fac
 @patch("primer.mcp.sync.get_extractor_for")
 @patch("primer.mcp.sync.get_server_session_ids")
 @patch("primer.mcp.sync.list_local_sessions")
+def test_sync_updates_legacy_codex_rollout_row_without_duplicate(
+    mock_list, mock_server_ids, mock_get_ext, mock_facets, mock_post
+):
+    mock_list.return_value = [
+        LocalSession(
+            session_id="thread-uuid",
+            transcript_path="/t/rollout-2026-03-08-thread-uuid.jsonl",
+            facets_path=None,
+            has_facets=False,
+            project_path=None,
+            agent_type="codex_cli",
+        ),
+    ]
+    mock_server_ids.return_value = {"rollout-2026-03-08-thread-uuid"}
+
+    meta = SessionMetadata(session_id="thread-uuid", agent_type="codex_cli")
+    mock_get_ext.return_value = _make_mock_extractor(meta)
+    mock_facets.return_value = None
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_post.return_value = mock_resp
+
+    from primer.mcp.sync import sync_sessions
+
+    result = sync_sessions("http://test:8000", "key")
+
+    assert result["synced"] == 1
+    assert result["already_synced"] == 0
+    payload = mock_post.call_args.kwargs.get("json") or mock_post.call_args[1].get("json")
+    assert payload["session_id"] == "rollout-2026-03-08-thread-uuid"
+
+
+@patch("primer.mcp.sync.httpx.post")
+@patch("primer.mcp.sync.load_facets")
+@patch("primer.mcp.sync.get_extractor_for")
+@patch("primer.mcp.sync.get_server_session_ids")
+@patch("primer.mcp.sync.list_local_sessions")
 def test_sync_uploads_imported_cursor_session_without_facets(
     mock_list, mock_server_ids, mock_get_ext, mock_facets, mock_post
 ):
@@ -152,7 +218,7 @@ def test_sync_uploads_imported_cursor_session_without_facets(
 @patch("primer.mcp.sync.get_extractor_for")
 @patch("primer.mcp.sync.get_server_session_ids")
 @patch("primer.mcp.sync.list_local_sessions")
-def test_sync_skips_cursor_facets_when_source_capability_disables_them(
+def test_sync_includes_cursor_facets_when_bundle_provides_them(
     mock_list, mock_server_ids, mock_get_ext, mock_facets, mock_post
 ):
     mock_list.return_value = [
@@ -180,10 +246,10 @@ def test_sync_skips_cursor_facets_when_source_capability_disables_them(
     result = sync_sessions("http://test:8000", "key")
 
     assert result["synced"] == 1
-    mock_facets.assert_not_called()
+    mock_facets.assert_called_once_with("cursor-2", "/workspace/cursor-2-facets.json")
     payload = mock_post.call_args.kwargs.get("json") or mock_post.call_args[1].get("json")
     assert payload["agent_type"] == "cursor"
-    assert "facets" not in payload
+    assert payload["facets"] == {"outcome": "success"}
 
 
 @patch("primer.mcp.sync.httpx.post")

@@ -113,6 +113,56 @@ def test_ingest_session_accepts_cursor_agent_type_and_persists(
     assert stored.has_facets is False
 
 
+def test_ingest_session_auto_extracts_facets_for_codex_transcripts(
+    client, engineer_with_key, monkeypatch
+):
+    from primer.server.routers import ingest as ingest_router
+    from primer.server.services import facet_extraction_service
+
+    _eng, api_key = engineer_with_key
+    session_id = str(uuid.uuid4())
+    observed: list[tuple[str, list[dict]]] = []
+
+    monkeypatch.setattr(ingest_router.settings, "facet_extraction_enabled", True)
+    monkeypatch.setattr(ingest_router.settings, "anthropic_api_key", "test-key")
+
+    def fake_extract_and_store_facets(target_session_id: str, messages: list[dict]) -> bool:
+        observed.append((target_session_id, messages))
+        return True
+
+    monkeypatch.setattr(
+        facet_extraction_service,
+        "extract_and_store_facets",
+        fake_extract_and_store_facets,
+    )
+
+    payload = {
+        "session_id": session_id,
+        "api_key": api_key,
+        "agent_type": "codex_cli",
+        "project_name": "codex-project",
+        "message_count": 2,
+        "user_message_count": 1,
+        "assistant_message_count": 1,
+        "messages": [
+            {"ordinal": 0, "role": "human", "content_text": "Fix the sync bug"},
+            {"ordinal": 1, "role": "assistant", "content_text": "I found the API limit issue"},
+        ],
+    }
+
+    response = client.post("/api/v1/ingest/session", json=payload)
+
+    assert response.status_code == 200
+    assert len(observed) == 1
+    observed_session_id, observed_messages = observed[0]
+    assert observed_session_id == session_id
+    assert [msg["content_text"] for msg in observed_messages] == [
+        "Fix the sync bug",
+        "I found the API limit issue",
+    ]
+    assert [msg["role"] for msg in observed_messages] == ["human", "assistant"]
+
+
 def test_session_response_accepts_cursor_agent_type():
     response = SessionResponse(
         id=str(uuid.uuid4()),
