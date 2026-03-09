@@ -592,12 +592,31 @@ class AgentSourceQuality(BaseModel):
     native_discovery_parity: TelemetryParity
 
 
+class RepositoryQuality(BaseModel):
+    repository_full_name: str
+    session_count: int
+    sessions_with_commits: int
+    sessions_with_linked_pull_requests: int
+    github_sync_coverage_pct: float | None = None
+    has_github_id: bool
+    has_default_branch: bool
+    metadata_coverage_pct: float
+    readiness_checked: bool
+
+
 class MeasurementIntegrityStats(BaseModel):
     total_sessions: int
     sessions_with_messages: int
     sessions_with_facets: int
     facet_coverage_pct: float
     transcript_coverage_pct: float
+    sessions_with_commit_sync_target: int
+    sessions_with_linked_pull_requests: int
+    github_sync_coverage_pct: float
+    repositories_in_scope: int
+    repositories_with_complete_metadata: int
+    repositories_with_readiness_check: int
+    repository_metadata_coverage_pct: float
     sessions_missing_transcript_telemetry: int
     sessions_missing_tool_telemetry: int
     sessions_missing_model_telemetry: int
@@ -607,6 +626,7 @@ class MeasurementIntegrityStats(BaseModel):
     legacy_goal_category_sessions: int
     remaining_legacy_rows: int
     source_quality: list[AgentSourceQuality] = Field(default_factory=list)
+    repository_quality: list[RepositoryQuality] = Field(default_factory=list)
 
 
 class FacetNormalizationSummary(BaseModel):

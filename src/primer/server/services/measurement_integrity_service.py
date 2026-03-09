@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 from primer.common.facet_taxonomy import canonical_outcome, normalize_goal_categories
 from primer.common.models import (
     Engineer,
+    GitRepository,
     ModelUsage,
+    SessionCommit,
     SessionFacets,
     SessionMessage,
     ToolUsage,
@@ -193,13 +195,21 @@ def _covered_session_count_for_field(
     )
 
 
+def _coverage_pct(covered_count: int, total_count: int) -> float:
+    return round((covered_count / total_count) * 100, 1) if total_count else 0.0
+
+
+def _optional_coverage_pct(covered_count: int, total_count: int) -> float | None:
+    return round((covered_count / total_count) * 100, 1) if total_count else None
+
+
 def get_measurement_integrity_stats(
     db: Session,
     team_id: str | None = None,
     engineer_id: str | None = None,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
-) -> dict[str, int | float | list[dict[str, str | int | float]]]:
+) -> dict[str, object]:
     scoped_session_ids = _scoped_session_ids_subquery(
         db,
         team_id=team_id,
@@ -310,19 +320,106 @@ def get_measurement_integrity_stats(
         facet_sessions_by_agent,
         "facets",
     )
-
-    facet_coverage_pct = (
-        round((required_facet_sessions_with_facets / required_facet_session_count) * 100, 1)
-        if required_facet_session_count
-        else 0.0
+    sessions_with_commit_sync_target = (
+        _apply_session_scope(
+            db.query(func.count(func.distinct(SessionCommit.session_id)))
+            .join(SessionModel, SessionCommit.session_id == SessionModel.id)
+            .filter(SessionModel.repository_id.isnot(None)),
+            team_id=team_id,
+            engineer_id=engineer_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).scalar()
+        or 0
     )
-    transcript_coverage_pct = (
-        round(
-            (required_transcript_sessions_with_messages / required_transcript_session_count) * 100,
-            1,
+    sessions_with_linked_pull_requests = (
+        _apply_session_scope(
+            db.query(func.count(func.distinct(SessionCommit.session_id)))
+            .join(SessionModel, SessionCommit.session_id == SessionModel.id)
+            .filter(
+                SessionModel.repository_id.isnot(None),
+                SessionCommit.pull_request_id.isnot(None),
+            ),
+            team_id=team_id,
+            engineer_id=engineer_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).scalar()
+        or 0
+    )
+    repository_rows = (
+        _apply_session_scope(
+            db.query(
+                SessionModel.repository_id.label("repository_id"),
+                GitRepository.full_name.label("repository_full_name"),
+                GitRepository.github_id.label("github_id"),
+                GitRepository.default_branch.label("default_branch"),
+                GitRepository.ai_readiness_checked_at.label("ai_readiness_checked_at"),
+                func.count(SessionModel.id).label("session_count"),
+            )
+            .join(GitRepository, SessionModel.repository_id == GitRepository.id)
+            .filter(SessionModel.repository_id.isnot(None)),
+            team_id=team_id,
+            engineer_id=engineer_id,
+            start_date=start_date,
+            end_date=end_date,
         )
-        if required_transcript_session_count
-        else 0.0
+        .group_by(
+            SessionModel.repository_id,
+            GitRepository.full_name,
+            GitRepository.github_id,
+            GitRepository.default_branch,
+            GitRepository.ai_readiness_checked_at,
+        )
+        .order_by(func.count(SessionModel.id).desc(), GitRepository.full_name.asc())
+        .all()
+    )
+    repository_commit_rows = (
+        _apply_session_scope(
+            db.query(
+                SessionModel.repository_id.label("repository_id"),
+                func.count(func.distinct(SessionCommit.session_id)).label("sessions_with_commits"),
+            )
+            .join(SessionCommit, SessionCommit.session_id == SessionModel.id)
+            .filter(SessionModel.repository_id.isnot(None)),
+            team_id=team_id,
+            engineer_id=engineer_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        .group_by(SessionModel.repository_id)
+        .all()
+    )
+    repository_linked_pr_rows = (
+        _apply_session_scope(
+            db.query(
+                SessionModel.repository_id.label("repository_id"),
+                func.count(func.distinct(SessionCommit.session_id)).label(
+                    "sessions_with_linked_pull_requests"
+                ),
+            )
+            .join(SessionCommit, SessionCommit.session_id == SessionModel.id)
+            .filter(
+                SessionModel.repository_id.isnot(None),
+                SessionCommit.pull_request_id.isnot(None),
+            ),
+            team_id=team_id,
+            engineer_id=engineer_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        .group_by(SessionModel.repository_id)
+        .all()
+    )
+
+    facet_coverage_pct = _coverage_pct(
+        required_facet_sessions_with_facets, required_facet_session_count
+    )
+    transcript_coverage_pct = _coverage_pct(
+        required_transcript_sessions_with_messages, required_transcript_session_count
+    )
+    github_sync_coverage_pct = _coverage_pct(
+        sessions_with_linked_pull_requests, sessions_with_commit_sync_target
     )
     sessions_missing_transcript_telemetry = max(
         required_transcript_session_count - required_transcript_sessions_with_messages,
@@ -337,6 +434,57 @@ def get_measurement_integrity_stats(
         0,
     )
     source_quality: list[dict[str, str | int | float]] = []
+    repository_commit_counts = {
+        row.repository_id: row.sessions_with_commits for row in repository_commit_rows
+    }
+    repository_linked_pr_counts = {
+        row.repository_id: row.sessions_with_linked_pull_requests
+        for row in repository_linked_pr_rows
+    }
+    repository_quality: list[dict[str, str | int | float | bool | None]] = []
+    for row in repository_rows:
+        has_github_id = row.github_id is not None
+        has_default_branch = row.default_branch is not None
+        readiness_checked = row.ai_readiness_checked_at is not None
+        sessions_with_commits = repository_commit_counts.get(row.repository_id, 0)
+        repo_sessions_with_linked_pull_requests = repository_linked_pr_counts.get(
+            row.repository_id, 0
+        )
+        metadata_coverage_pct = _coverage_pct(
+            int(has_github_id) + int(has_default_branch),
+            2,
+        )
+        repository_quality.append(
+            {
+                "repository_full_name": row.repository_full_name,
+                "session_count": row.session_count,
+                "sessions_with_commits": sessions_with_commits,
+                "sessions_with_linked_pull_requests": repo_sessions_with_linked_pull_requests,
+                "github_sync_coverage_pct": _optional_coverage_pct(
+                    repo_sessions_with_linked_pull_requests,
+                    sessions_with_commits,
+                ),
+                "has_github_id": has_github_id,
+                "has_default_branch": has_default_branch,
+                "metadata_coverage_pct": metadata_coverage_pct,
+                "readiness_checked": readiness_checked,
+            }
+        )
+
+    repositories_in_scope = len(repository_quality)
+    repositories_with_complete_metadata = sum(
+        1
+        for row in repository_quality
+        if bool(row["has_github_id"]) and bool(row["has_default_branch"])
+    )
+    repositories_with_readiness_check = sum(
+        1 for row in repository_quality if bool(row["readiness_checked"])
+    )
+    repository_metadata_coverage_pct = _coverage_pct(
+        repositories_with_complete_metadata,
+        repositories_in_scope,
+    )
+
     for agent_type in sorted(sessions_by_agent):
         session_count = sessions_by_agent[agent_type]
         capability = get_capability_for(agent_type)
@@ -382,6 +530,13 @@ def get_measurement_integrity_stats(
         "sessions_with_facets": sessions_with_facets,
         "facet_coverage_pct": facet_coverage_pct,
         "transcript_coverage_pct": transcript_coverage_pct,
+        "sessions_with_commit_sync_target": sessions_with_commit_sync_target,
+        "sessions_with_linked_pull_requests": sessions_with_linked_pull_requests,
+        "github_sync_coverage_pct": github_sync_coverage_pct,
+        "repositories_in_scope": repositories_in_scope,
+        "repositories_with_complete_metadata": repositories_with_complete_metadata,
+        "repositories_with_readiness_check": repositories_with_readiness_check,
+        "repository_metadata_coverage_pct": repository_metadata_coverage_pct,
         "low_confidence_sessions": low_confidence_sessions,
         "missing_confidence_sessions": missing_confidence_sessions,
         "legacy_outcome_sessions": legacy_outcome_sessions,
@@ -391,6 +546,7 @@ def get_measurement_integrity_stats(
         "sessions_missing_tool_telemetry": sessions_missing_tool_telemetry,
         "sessions_missing_model_telemetry": sessions_missing_model_telemetry,
         "source_quality": source_quality,
+        "repository_quality": repository_quality,
     }
 
 

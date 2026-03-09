@@ -72,7 +72,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 
 - [x] Facet taxonomy alignment across extraction, schemas, analytics, and UI
 - [x] Outcome normalization and historical backfill for previously ingested sessions
-- [ ] [P0] Coverage dashboard for facet extraction, transcript completeness, GitHub sync, and repository metadata
+- [x] Coverage dashboard for facet extraction, transcript completeness, GitHub sync, and repository metadata
 - [x] Confidence scoring for extracted facets and downstream recommendations
 - [x] Cross-agent schema parity matrix so Primer knows which session fields are required, optional, or unavailable per source
 - [x] Partial-telemetry handling for IDE-native agents like Cursor so missing transcript, tool, or model fields do not distort org-wide metrics
