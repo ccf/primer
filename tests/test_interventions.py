@@ -171,6 +171,42 @@ def test_team_lead_cannot_create_intervention_for_other_team(client, db_session)
     assert response.status_code == 403
 
 
+def test_team_lead_patch_keeps_org_scoped_intervention_when_team_id_is_omitted(
+    client, db_session, admin_headers
+):
+    team = Team(name="Lead Team")
+    db_session.add(team)
+    db_session.flush()
+    lead, lead_key = _make_engineer(db_session, team, name="Lead", role="team_lead")
+    engineer, _engineer_key = _make_engineer(db_session, team, name="Engineer")
+    db_session.commit()
+
+    created = client.post(
+        "/api/v1/interventions",
+        headers=admin_headers,
+        json={
+            "title": "Org-scoped intervention",
+            "description": "Should remain org scoped when a lead updates status only.",
+            "category": "workflow",
+            "engineer_id": engineer.id,
+            "owner_engineer_id": lead.id,
+            "team_id": None,
+        },
+    )
+    assert created.status_code == 201
+    intervention_id = created.json()["id"]
+    assert created.json()["team_id"] is None
+
+    patched = client.patch(
+        f"/api/v1/interventions/{intervention_id}",
+        headers={"x-api-key": lead_key},
+        json={"status": "in_progress"},
+    )
+    assert patched.status_code == 200
+    assert patched.json()["status"] == "in_progress"
+    assert patched.json()["team_id"] is None
+
+
 def test_engineer_patch_is_limited_to_workflow_fields(client, admin_headers, engineer_with_key):
     engineer, api_key = engineer_with_key
     created = client.post(
@@ -224,3 +260,28 @@ def test_recommendations_endpoint_accepts_engineer_scope_for_team_leads(client, 
     assert response.status_code == 200
     data = response.json()
     assert any(item["category"] == "friction" for item in data)
+
+
+def test_intervention_list_skips_expensive_current_metrics_computation(client, engineer_with_key):
+    _engineer, api_key = engineer_with_key
+    _ingest_measured_session(client, api_key, project_name="alpha")
+
+    created = client.post(
+        "/api/v1/interventions",
+        headers={"x-api-key": api_key},
+        json={
+            "title": "Track alpha improvements",
+            "description": "Use the intervention list without recomputing current metrics.",
+            "category": "workflow",
+            "project_name": "alpha",
+        },
+    )
+    assert created.status_code == 201
+    assert created.json()["current_metrics"] is not None
+
+    listed = client.get("/api/v1/interventions", headers={"x-api-key": api_key})
+    assert listed.status_code == 200
+    data = listed.json()
+    assert len(data) == 1
+    assert data[0]["baseline_metrics"] is not None
+    assert data[0]["current_metrics"] is None

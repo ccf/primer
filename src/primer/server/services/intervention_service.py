@@ -89,7 +89,7 @@ def create_intervention(
     )
     db.add(intervention)
     db.flush()
-    return _build_responses(db, [intervention])[0]
+    return _build_responses(db, [intervention], include_current_metrics=True)[0]
 
 
 def get_intervention(db: Session, intervention_id: str) -> Intervention | None:
@@ -135,7 +135,7 @@ def update_intervention(
         ).model_dump(mode="json")
 
     db.flush()
-    return _build_responses(db, [intervention])[0]
+    return _build_responses(db, [intervention], include_current_metrics=True)[0]
 
 
 def capture_metrics_snapshot(
@@ -215,14 +215,6 @@ def intervention_visible_to_team(db: Session, intervention: Intervention, team_i
     )
 
 
-def scopes_for_team_access(team_id: str) -> tuple[str, None, None]:
-    return team_id, None, None
-
-
-def scopes_for_engineer_access(engineer_id: str) -> tuple[None, None, str]:
-    return None, None, engineer_id
-
-
 def list_interventions_for_engineer(db: Session, engineer_id: str, status: str | None = None):
     query = db.query(Intervention).filter(
         or_(
@@ -242,6 +234,8 @@ def list_interventions_for_engineer(db: Session, engineer_id: str, status: str |
 def _build_responses(
     db: Session,
     interventions: list[Intervention],
+    *,
+    include_current_metrics: bool = False,
 ) -> list[InterventionResponse]:
     if not interventions:
         return []
@@ -271,7 +265,11 @@ def _build_responses(
             else None
         )
         current_metrics = None
-        if intervention.baseline_start_at and intervention.baseline_end_at:
+        if (
+            include_current_metrics
+            and intervention.baseline_start_at
+            and intervention.baseline_end_at
+        ):
             current_start, current_end = _current_measurement_window(
                 intervention.baseline_start_at,
                 intervention.baseline_end_at,
