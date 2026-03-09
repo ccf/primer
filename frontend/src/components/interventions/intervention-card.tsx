@@ -34,10 +34,12 @@ function formatStatus(status: InterventionStatus) {
 }
 
 function formatMetricDelta(
-  baseline: number | null | undefined,
-  current: number | null | undefined,
-  formatter: (value: number | null | undefined) => string,
+    baseline: number | null | undefined,
+    current: number | null | undefined,
+    formatter: (value: number | null | undefined) => string,
 ) {
+  if (baseline == null && current == null) return "-"
+  if (current == null) return `${formatter(baseline)} baseline`
   return `${formatter(baseline)} -> ${formatter(current)}`
 }
 
@@ -84,6 +86,7 @@ export function InterventionCard({
       ? "Organization"
       : null,
   ].filter(Boolean)
+  const hasCurrentMetrics = intervention.current_metrics != null
 
   function patch(payload: {
     status?: InterventionStatus
@@ -188,7 +191,14 @@ export function InterventionCard({
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <section className="space-y-3">
-            <h3 className="text-sm font-semibold text-muted-foreground">Before / After</h3>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-muted-foreground">Before / After</h3>
+              {!hasCurrentMetrics && (
+                <p className="text-xs text-muted-foreground">
+                  Current impact recalculates on direct updates.
+                </p>
+              )}
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
               {["Success rate", "Avg cost / session", "Friction events", "Findings / PR"].map((label) => (
                 <div key={label} className="rounded-xl border border-border/60 bg-background p-3">

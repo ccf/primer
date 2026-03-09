@@ -111,8 +111,6 @@ def interventions_update(
             payload.engineer_id,
             payload.owner_engineer_id,
         )
-        if payload.team_id is None:
-            payload = payload.model_copy(update={"team_id": auth.team_id})
 
     if auth.role == "admin":
         _validate_team_payload(
