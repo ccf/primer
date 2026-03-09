@@ -136,6 +136,54 @@ export interface Recommendation {
   evidence: Record<string, unknown>
 }
 
+export type InterventionStatus = "planned" | "in_progress" | "completed" | "dismissed"
+
+export interface InterventionMetricsSnapshot {
+  window_start: string
+  window_end: string
+  total_sessions: number
+  success_rate: number | null
+  avg_cost_per_session: number | null
+  cost_per_successful_outcome: number | null
+  friction_events: number
+  total_prs: number
+  findings_per_pr: number | null
+}
+
+export interface InterventionEngineerSummary {
+  id: string
+  name: string
+  email: string
+}
+
+export interface InterventionResponse {
+  id: string
+  team_id: string | null
+  team_name: string | null
+  engineer_id: string | null
+  engineer: InterventionEngineerSummary | null
+  owner_engineer_id: string | null
+  owner_engineer: InterventionEngineerSummary | null
+  created_by_engineer_id: string | null
+  project_name: string | null
+  category: string
+  severity: string
+  status: InterventionStatus
+  title: string
+  description: string
+  due_date: string | null
+  completed_at: string | null
+  source_type: string | null
+  source_title: string | null
+  evidence: Record<string, unknown> | null
+  baseline_start_at: string | null
+  baseline_end_at: string | null
+  baseline_metrics: InterventionMetricsSnapshot | null
+  current_metrics: InterventionMetricsSnapshot | null
+  created_at: string
+  updated_at: string
+}
+
 export interface DailyStatsResponse {
   date: string
   message_count: number

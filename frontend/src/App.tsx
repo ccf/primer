@@ -24,6 +24,7 @@ import { EngineerProfilePage } from "@/pages/engineer-profile"
 import { QualityPage } from "@/pages/quality"
 import { FrictionPage } from "@/pages/friction"
 import { GrowthPage } from "@/pages/growth"
+import { InterventionsPage } from "@/pages/interventions"
 import { ProjectsPage } from "@/pages/projects"
 import { ProjectWorkspacePage } from "@/pages/project-workspace"
 import { NotFoundPage } from "@/pages/not-found"
@@ -104,6 +105,7 @@ function AuthenticatedApp() {
 
           <Route path="/quality" element={<QualityPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/friction" element={<FrictionPage teamId={teamId} dateRange={dateRange} />} />
+          <Route path="/interventions" element={<InterventionsPage teamId={teamId} />} />
           <Route path="/growth" element={<GrowthPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/projects" element={<ProjectsPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/projects/:projectName" element={<ProjectWorkspaceRoute teamId={teamId} dateRange={dateRange} />} />

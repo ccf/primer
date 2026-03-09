@@ -151,7 +151,18 @@ export function DashboardPage({ teamId, dateRange }: DashboardPageProps) {
 
       {/* Recommendations */}
       <section>
-        {loadingRecs ? <ChartSkeleton /> : recs && <RecommendationsPanel data={recs} />}
+        {loadingRecs ? (
+          <ChartSkeleton />
+        ) : (
+          recs && (
+            <RecommendationsPanel
+              data={recs}
+              teamId={teamId}
+              startDate={startDate}
+              endDate={endDate}
+            />
+          )
+        )}
       </section>
     </div>
   )

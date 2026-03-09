@@ -625,6 +625,7 @@ def get_friction_report(
     engineer_id: str | None = None,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
+    project_name: str | None = None,
 ) -> list[FrictionReport]:
     facets_q = db.query(SessionFacets).join(SessionModel)
     facets_q = _filter_sessions_by_capability(facets_q, "supports_facets")
@@ -636,6 +637,8 @@ def get_friction_report(
         facets_q = facets_q.filter(SessionModel.started_at >= start_date)
     if end_date:
         facets_q = facets_q.filter(SessionModel.started_at <= end_date)
+    if project_name:
+        facets_q = facets_q.filter(SessionModel.project_name == project_name)
 
     friction_counter: Counter[str] = Counter()
     friction_details: dict[str, list[str]] = {}

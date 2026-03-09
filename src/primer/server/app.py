@@ -23,6 +23,7 @@ from primer.server.routers import (
     finops,
     health,
     ingest,
+    interventions,
     notifications,
     sessions,
     teams,
@@ -94,6 +95,7 @@ def create_app() -> FastAPI:
     app.include_router(ingest.router)
     app.include_router(sessions.router)
     app.include_router(analytics.router)
+    app.include_router(interventions.router)
     app.include_router(alerts.router)
     app.include_router(alert_configs.router)
     app.include_router(notifications.router)

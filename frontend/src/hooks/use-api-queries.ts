@@ -21,6 +21,7 @@ import type {
   EngineerResponse,
   FrictionReport,
   IngestEventResponse,
+  InterventionResponse,
   LearningPathsResponse,
   MeasurementIntegrityStats,
   MaturityAnalyticsResponse,
@@ -140,12 +141,37 @@ export function useModelRankings(teamId: string | null, startDate?: string, endD
   })
 }
 
-export function useRecommendations(teamId: string | null, startDate?: string, endDate?: string) {
+export function useRecommendations(
+  teamId: string | null,
+  startDate?: string,
+  endDate?: string,
+  engineerId?: string,
+) {
   return useQuery({
-    queryKey: ["recommendations", teamId, startDate, endDate],
+    queryKey: ["recommendations", teamId, startDate, endDate, engineerId],
     queryFn: () =>
       apiFetch<Recommendation[]>(
-        `/api/v1/analytics/recommendations${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
+        `/api/v1/analytics/recommendations${buildParams({ team_id: teamId, engineer_id: engineerId, start_date: startDate, end_date: endDate })}`,
+      ),
+  })
+}
+
+export function useInterventions(params: {
+  teamId: string | null
+  engineerId?: string
+  projectName?: string
+  status?: string
+}) {
+  return useQuery({
+    queryKey: ["interventions", params],
+    queryFn: () =>
+      apiFetch<InterventionResponse[]>(
+        `/api/v1/interventions${buildParams({
+          team_id: params.teamId,
+          engineer_id: params.engineerId,
+          project_name: params.projectName,
+          status: params.status,
+        })}`,
       ),
   })
 }

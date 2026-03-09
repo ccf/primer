@@ -17,6 +17,7 @@ import {
   useToolRankings,
   useModelRankings,
   useRecommendations,
+  useInterventions,
   useSessions,
   useSessionDetail,
 } from "../use-api-queries"
@@ -129,6 +130,33 @@ describe("useRecommendations", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(mockApiFetch).toHaveBeenCalledWith("/api/v1/analytics/recommendations?team_id=t1")
+  })
+
+  it("includes engineer scope when provided", async () => {
+    mockApiFetch.mockResolvedValue([])
+    const { result } = renderHook(() => useRecommendations("t1", undefined, undefined, "e1"), {
+      wrapper: createWrapper(),
+    })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      "/api/v1/analytics/recommendations?team_id=t1&engineer_id=e1",
+    )
+  })
+})
+
+describe("useInterventions", () => {
+  it("calls apiFetch with intervention filters", async () => {
+    mockApiFetch.mockResolvedValue([])
+    const { result } = renderHook(
+      () => useInterventions({ teamId: "t1", engineerId: "e1", status: "planned" }),
+      { wrapper: createWrapper() },
+    )
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      "/api/v1/interventions?team_id=t1&engineer_id=e1&status=planned",
+    )
   })
 })
 

@@ -412,3 +412,38 @@ class Budget(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )
+
+
+class Intervention(Base):
+    __tablename__ = "interventions"
+    __table_args__ = (
+        Index("ix_interventions_team_status", "team_id", "status"),
+        Index("ix_interventions_engineer_status", "engineer_id", "status"),
+        Index("ix_interventions_owner_status", "owner_engineer_id", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    team_id: Mapped[str | None] = mapped_column(ForeignKey("teams.id"), nullable=True)
+    engineer_id: Mapped[str | None] = mapped_column(ForeignKey("engineers.id"), nullable=True)
+    owner_engineer_id: Mapped[str | None] = mapped_column(ForeignKey("engineers.id"), nullable=True)
+    created_by_engineer_id: Mapped[str | None] = mapped_column(
+        ForeignKey("engineers.id"), nullable=True
+    )
+    project_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    category: Mapped[str] = mapped_column(String(50), nullable=False)
+    severity: Mapped[str] = mapped_column(String(20), nullable=False, server_default="info")
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="planned")
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    source_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    source_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    evidence: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    baseline_start_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    baseline_end_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    baseline_metrics: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )

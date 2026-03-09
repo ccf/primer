@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -20,6 +20,7 @@ class PaginatedResponse[T](BaseModel):
 
 AgentType = Literal["claude_code", "codex_cli", "gemini_cli", "cursor"]
 TelemetryParity = Literal["required", "optional", "unavailable"]
+InterventionStatus = Literal["planned", "in_progress", "completed", "dismissed"]
 
 # --- Team ---
 
@@ -362,6 +363,86 @@ class Recommendation(BaseModel):
     description: str
     severity: str  # info, warning, critical
     evidence: dict
+
+
+class InterventionMetricsSnapshot(BaseModel):
+    window_start: datetime
+    window_end: datetime
+    total_sessions: int
+    success_rate: float | None = None
+    avg_cost_per_session: float | None = None
+    cost_per_successful_outcome: float | None = None
+    friction_events: int = 0
+    total_prs: int = 0
+    findings_per_pr: float | None = None
+
+
+class InterventionEngineerSummary(BaseModel):
+    id: str
+    name: str
+    email: str
+
+
+class InterventionCreate(BaseModel):
+    title: str
+    description: str
+    category: str
+    severity: str = "info"
+    team_id: str | None = None
+    engineer_id: str | None = None
+    owner_engineer_id: str | None = None
+    project_name: str | None = None
+    due_date: date | None = None
+    status: InterventionStatus = "planned"
+    source_type: str | None = None
+    source_title: str | None = None
+    evidence: dict[str, Any] | None = None
+    baseline_start_at: datetime | None = None
+    baseline_end_at: datetime | None = None
+
+
+class InterventionUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    category: str | None = None
+    severity: str | None = None
+    team_id: str | None = None
+    engineer_id: str | None = None
+    owner_engineer_id: str | None = None
+    project_name: str | None = None
+    due_date: date | None = None
+    status: InterventionStatus | None = None
+    source_type: str | None = None
+    source_title: str | None = None
+    evidence: dict[str, Any] | None = None
+
+
+class InterventionResponse(BaseModel):
+    id: str
+    team_id: str | None
+    team_name: str | None = None
+    engineer_id: str | None
+    engineer: InterventionEngineerSummary | None = None
+    owner_engineer_id: str | None
+    owner_engineer: InterventionEngineerSummary | None = None
+    created_by_engineer_id: str | None
+    project_name: str | None
+    category: str
+    severity: str
+    status: InterventionStatus
+    title: str
+    description: str
+    due_date: date | None
+    completed_at: datetime | None
+    source_type: str | None
+    source_title: str | None
+    evidence: dict[str, Any] | None
+    baseline_start_at: datetime | None
+    baseline_end_at: datetime | None
+    baseline_metrics: InterventionMetricsSnapshot | None = None
+    current_metrics: InterventionMetricsSnapshot | None = None
+    created_at: datetime
+    updated_at: datetime
 
 
 # --- Daily Stats ---
