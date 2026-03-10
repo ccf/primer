@@ -62,7 +62,7 @@ def get_quality_metrics(
         [] if project_name else _compute_github_prs(db, team_id, engineer_id, start_date, end_date)
     )
     findings_overview = (
-        _compute_findings_overview_for_session_scope(db, session_id_q)
+        _compute_findings_overview_for_session_scope(db, session_id_subq)
         if project_name
         else _compute_findings_overview(db, team_id, engineer_id, start_date, end_date)
     )
@@ -97,12 +97,20 @@ def get_quality_metrics(
             github_connected=is_configured(),
         )
 
-    overview = _compute_overview(db, session_id_q)
-    daily_volume = _compute_daily_volume(db, session_id_q)
-    by_session_type = _compute_by_session_type(db, session_id_q)
-    engineer_quality = _compute_engineer_quality(db, session_id_q)
-    attribution = _compute_quality_attribution(db, session_id_q)
-    session_prs = _compute_recent_prs(db, session_id_q)
+    if project_name:
+        overview = _compute_overview_for_session_scope(db, session_id_subq)
+        daily_volume = _compute_daily_volume_for_session_scope(db, session_id_subq)
+        by_session_type = _compute_by_session_type_for_session_scope(db, session_id_subq)
+        engineer_quality = _compute_engineer_quality_for_session_scope(db, session_id_subq)
+        attribution = _compute_quality_attribution_for_session_scope(db, session_id_subq)
+        session_prs = _compute_recent_prs_for_session_scope(db, session_id_subq)
+    else:
+        overview = _compute_overview(db, session_id_q)
+        daily_volume = _compute_daily_volume(db, session_id_q)
+        by_session_type = _compute_by_session_type(db, session_id_q)
+        engineer_quality = _compute_engineer_quality(db, session_id_q)
+        attribution = _compute_quality_attribution(db, session_id_q)
+        session_prs = _compute_recent_prs(db, session_id_q)
 
     # Always use GitHub-synced PR stats for the overview so counts match the
     # merged PR list.  This avoids the inconsistency where overview.total_prs
@@ -236,6 +244,96 @@ def _compute_overview(db: Session, session_id_q) -> QualityOverview:
     )
 
 
+def _compute_overview_for_session_scope(db: Session, session_scope) -> QualityOverview:
+    """Compute overview metrics from an explicit scoped-session join."""
+    commit_stats = (
+        db.query(
+            func.count(distinct(SessionCommit.session_id)).label("sessions_with_commits"),
+            func.count(SessionCommit.id).label("total_commits"),
+            func.coalesce(func.sum(SessionCommit.lines_added), 0).label("total_lines_added"),
+            func.coalesce(func.sum(SessionCommit.lines_deleted), 0).label("total_lines_deleted"),
+        )
+        .join(session_scope, SessionCommit.session_id == session_scope.c.id)
+        .first()
+    )
+
+    sessions_with_commits = commit_stats[0] or 0
+    total_commits = commit_stats[1] or 0
+    total_lines_added = commit_stats[2] or 0
+    total_lines_deleted = commit_stats[3] or 0
+
+    pr_ids = (
+        db.query(distinct(SessionCommit.pull_request_id))
+        .join(session_scope, SessionCommit.session_id == session_scope.c.id)
+        .filter(SessionCommit.pull_request_id.isnot(None))
+        .all()
+    )
+    pr_id_list = [pid[0] for pid in pr_ids]
+
+    total_prs = len(pr_id_list)
+    pr_merge_rate = None
+    avg_review_comments = None
+    avg_time_to_merge_hours = None
+
+    if pr_id_list:
+        pr_stats = (
+            db.query(
+                func.count(PullRequest.id).label("total"),
+                func.sum(case((PullRequest.state == "merged", 1), else_=0)).label("merged"),
+                func.sum(case((PullRequest.state == "closed", 1), else_=0)).label(
+                    "closed_not_merged"
+                ),
+                func.avg(PullRequest.review_comments_count).label("avg_comments"),
+            )
+            .filter(PullRequest.id.in_(pr_id_list))
+            .first()
+        )
+
+        merged = pr_stats[1] or 0
+        closed_not_merged = pr_stats[2] or 0
+        denominator = merged + closed_not_merged
+        if denominator > 0:
+            pr_merge_rate = merged / denominator
+        avg_review_comments = float(pr_stats[3]) if pr_stats[3] is not None else None
+
+        merge_rows = (
+            db.query(PullRequest.merged_at, PullRequest.pr_created_at)
+            .filter(
+                PullRequest.id.in_(pr_id_list),
+                PullRequest.merged_at.isnot(None),
+                PullRequest.pr_created_at.isnot(None),
+            )
+            .all()
+        )
+        if merge_rows:
+            total_secs = sum(
+                (row.merged_at - row.pr_created_at).total_seconds() for row in merge_rows
+            )
+            avg_time_to_merge_hours = total_secs / len(merge_rows) / 3600
+
+    avg_commits_per_session = (
+        total_commits / sessions_with_commits if sessions_with_commits else None
+    )
+    avg_lines = (
+        (total_lines_added + total_lines_deleted) / sessions_with_commits
+        if sessions_with_commits
+        else None
+    )
+
+    return QualityOverview(
+        sessions_with_commits=sessions_with_commits,
+        total_commits=total_commits,
+        total_lines_added=total_lines_added,
+        total_lines_deleted=total_lines_deleted,
+        total_prs=total_prs,
+        pr_merge_rate=pr_merge_rate,
+        avg_commits_per_session=avg_commits_per_session,
+        avg_lines_per_session=avg_lines,
+        avg_review_comments_per_pr=avg_review_comments,
+        avg_time_to_merge_hours=avg_time_to_merge_hours,
+    )
+
+
 def _compute_daily_volume(db: Session, session_id_q) -> list[DailyCodeVolume]:
     """Aggregate code volume by day."""
     date_expr = func.date(SessionCommit.committed_at)
@@ -251,6 +349,37 @@ def _compute_daily_volume(db: Session, session_id_q) -> list[DailyCodeVolume]:
             SessionCommit.session_id.in_(session_id_q),
             SessionCommit.committed_at.isnot(None),
         )
+        .group_by(date_expr)
+        .order_by(date_expr)
+        .all()
+    )
+
+    return [
+        DailyCodeVolume(
+            date=str(row.date),
+            lines_added=row.lines_added or 0,
+            lines_deleted=row.lines_deleted or 0,
+            commits=row.commits or 0,
+            sessions=row.sessions or 0,
+        )
+        for row in rows
+        if row.date
+    ]
+
+
+def _compute_daily_volume_for_session_scope(db: Session, session_scope) -> list[DailyCodeVolume]:
+    """Aggregate code volume by day from an explicit scoped-session join."""
+    date_expr = func.date(SessionCommit.committed_at)
+    rows = (
+        db.query(
+            date_expr.label("date"),
+            func.sum(SessionCommit.lines_added).label("lines_added"),
+            func.sum(SessionCommit.lines_deleted).label("lines_deleted"),
+            func.count(SessionCommit.id).label("commits"),
+            func.count(distinct(SessionCommit.session_id)).label("sessions"),
+        )
+        .join(session_scope, SessionCommit.session_id == session_scope.c.id)
+        .filter(SessionCommit.committed_at.isnot(None))
         .group_by(date_expr)
         .order_by(date_expr)
         .all()
@@ -301,6 +430,58 @@ def _compute_by_session_type(db: Session, session_id_q) -> list[QualityByType]:
             SessionModel.id.in_(session_id_q),
             SessionCommit.pull_request_id.isnot(None),
         )
+        .group_by(session_type_expr)
+        .all()
+    )
+    pr_count_map = {row.session_type: row.pr_count for row in pr_count_rows}
+
+    results = []
+    for row in rows:
+        session_count = row.session_count or 1
+        results.append(
+            QualityByType(
+                session_type=row.session_type,
+                session_count=session_count,
+                avg_commits=row.total_commits / session_count,
+                avg_lines_added=row.total_lines_added / session_count,
+                avg_lines_deleted=row.total_lines_deleted / session_count,
+                pr_count=pr_count_map.get(row.session_type, 0),
+                merge_rate=None,
+            )
+        )
+
+    return results
+
+
+def _compute_by_session_type_for_session_scope(db: Session, session_scope) -> list[QualityByType]:
+    """Quality metrics grouped by session type from an explicit scoped-session join."""
+    session_type_expr = func.coalesce(SessionFacets.session_type, "unknown")
+    rows = (
+        db.query(
+            session_type_expr.label("session_type"),
+            func.count(distinct(SessionModel.id)).label("session_count"),
+            func.count(SessionCommit.id).label("total_commits"),
+            func.coalesce(func.sum(SessionCommit.lines_added), 0).label("total_lines_added"),
+            func.coalesce(func.sum(SessionCommit.lines_deleted), 0).label("total_lines_deleted"),
+        )
+        .select_from(SessionModel)
+        .join(session_scope, SessionModel.id == session_scope.c.id)
+        .outerjoin(SessionFacets, SessionFacets.session_id == SessionModel.id)
+        .join(SessionCommit, SessionCommit.session_id == SessionModel.id)
+        .group_by(session_type_expr)
+        .all()
+    )
+
+    pr_count_rows = (
+        db.query(
+            session_type_expr.label("session_type"),
+            func.count(distinct(SessionCommit.pull_request_id)).label("pr_count"),
+        )
+        .select_from(SessionCommit)
+        .join(session_scope, SessionCommit.session_id == session_scope.c.id)
+        .join(SessionModel, SessionModel.id == SessionCommit.session_id)
+        .outerjoin(SessionFacets, SessionFacets.session_id == SessionModel.id)
+        .filter(SessionCommit.pull_request_id.isnot(None))
         .group_by(session_type_expr)
         .all()
     )
@@ -403,6 +584,85 @@ def _compute_engineer_quality(db: Session, session_id_q) -> list[EngineerQuality
     return results
 
 
+def _compute_engineer_quality_for_session_scope(
+    db: Session, session_scope
+) -> list[EngineerQuality]:
+    """Per-engineer quality metrics from an explicit scoped-session join."""
+    rows = (
+        db.query(
+            SessionModel.engineer_id,
+            Engineer.name,
+            func.count(distinct(SessionModel.id)).label("sessions_with_commits"),
+            func.count(SessionCommit.id).label("total_commits"),
+            func.coalesce(func.sum(SessionCommit.lines_added), 0).label("total_lines_added"),
+            func.coalesce(func.sum(SessionCommit.lines_deleted), 0).label("total_lines_deleted"),
+        )
+        .select_from(SessionModel)
+        .join(session_scope, SessionModel.id == session_scope.c.id)
+        .join(SessionCommit, SessionCommit.session_id == SessionModel.id)
+        .join(Engineer, Engineer.id == SessionModel.engineer_id)
+        .group_by(SessionModel.engineer_id, Engineer.name)
+        .all()
+    )
+
+    engineer_pr_rows = (
+        db.query(SessionModel.engineer_id, SessionCommit.pull_request_id)
+        .select_from(SessionModel)
+        .join(session_scope, SessionModel.id == session_scope.c.id)
+        .join(SessionCommit, SessionCommit.session_id == SessionModel.id)
+        .filter(SessionCommit.pull_request_id.isnot(None))
+        .distinct()
+        .all()
+    )
+    engineer_prs: dict[str, set[str]] = {}
+    all_pr_ids: set[str] = set()
+    for eng_id, pr_id in engineer_pr_rows:
+        engineer_prs.setdefault(eng_id, set()).add(pr_id)
+        all_pr_ids.add(pr_id)
+
+    pr_stats_map: dict[str, tuple[str, int]] = {}
+    if all_pr_ids:
+        pr_detail_rows = (
+            db.query(PullRequest.id, PullRequest.state, PullRequest.review_comments_count)
+            .filter(PullRequest.id.in_(list(all_pr_ids)))
+            .all()
+        )
+        for pr in pr_detail_rows:
+            pr_stats_map[pr.id] = (pr.state, pr.review_comments_count)
+
+    results = []
+    for row in rows:
+        pr_id_set = engineer_prs.get(row.engineer_id, set())
+        pr_count = len(pr_id_set)
+        merge_rate = None
+        avg_review_comments = None
+
+        if pr_id_set:
+            merged = sum(1 for pid in pr_id_set if pr_stats_map.get(pid, ("",))[0] == "merged")
+            closed = sum(1 for pid in pr_id_set if pr_stats_map.get(pid, ("",))[0] == "closed")
+            if merged + closed > 0:
+                merge_rate = merged / (merged + closed)
+            comment_counts = [pr_stats_map[pid][1] for pid in pr_id_set if pid in pr_stats_map]
+            if comment_counts:
+                avg_review_comments = sum(comment_counts) / len(comment_counts)
+
+        results.append(
+            EngineerQuality(
+                engineer_id=row.engineer_id,
+                name=row.name,
+                sessions_with_commits=row.sessions_with_commits,
+                total_commits=row.total_commits,
+                total_lines_added=row.total_lines_added,
+                total_lines_deleted=row.total_lines_deleted,
+                pr_count=pr_count,
+                merge_rate=merge_rate,
+                avg_review_comments=avg_review_comments,
+            )
+        )
+
+    return results
+
+
 def _compute_recent_prs(db: Session, session_id_q) -> list[PRSummary]:
     """Recent pull requests linked to sessions."""
     # Get PRs linked to sessions via commits
@@ -440,6 +700,64 @@ def _compute_recent_prs(db: Session, session_id_q) -> list[PRSummary]:
             SessionCommit.pull_request_id.in_(fetched_pr_ids),
             SessionCommit.session_id.in_(session_id_q),
         )
+        .group_by(SessionCommit.pull_request_id)
+        .all()
+    )
+    linked_map = {row.pull_request_id: row.linked for row in linked_rows}
+
+    results = []
+    for pr, repo_name, author_name in prs:
+        results.append(
+            PRSummary(
+                repository=repo_name,
+                pr_number=pr.github_pr_number,
+                title=pr.title,
+                state=pr.state,
+                head_branch=pr.head_branch,
+                additions=pr.additions,
+                deletions=pr.deletions,
+                review_comments_count=pr.review_comments_count,
+                author=author_name,
+                linked_sessions=linked_map.get(pr.id, 0),
+                pr_created_at=pr.pr_created_at.isoformat() if pr.pr_created_at else None,
+                merged_at=pr.merged_at.isoformat() if pr.merged_at else None,
+            )
+        )
+
+    return results
+
+
+def _compute_recent_prs_for_session_scope(db: Session, session_scope) -> list[PRSummary]:
+    """Recent pull requests linked to an explicit scoped-session join."""
+    pr_ids = (
+        db.query(distinct(SessionCommit.pull_request_id))
+        .join(session_scope, SessionCommit.session_id == session_scope.c.id)
+        .filter(SessionCommit.pull_request_id.isnot(None))
+        .all()
+    )
+    pr_id_list = [p[0] for p in pr_ids]
+
+    if not pr_id_list:
+        return []
+
+    prs = (
+        db.query(PullRequest, GitRepository.full_name, Engineer.name.label("author_name"))
+        .join(GitRepository, GitRepository.id == PullRequest.repository_id)
+        .outerjoin(Engineer, Engineer.id == PullRequest.engineer_id)
+        .filter(PullRequest.id.in_(pr_id_list))
+        .order_by(PullRequest.pr_created_at.desc())
+        .limit(20)
+        .all()
+    )
+
+    fetched_pr_ids = [pr.id for pr, _, _ in prs]
+    linked_rows = (
+        db.query(
+            SessionCommit.pull_request_id,
+            func.count(distinct(SessionCommit.session_id)).label("linked"),
+        )
+        .join(session_scope, SessionCommit.session_id == session_scope.c.id)
+        .filter(SessionCommit.pull_request_id.in_(fetched_pr_ids))
         .group_by(SessionCommit.pull_request_id)
         .all()
     )
@@ -657,15 +975,13 @@ def _compute_findings_overview(
 
 
 def _compute_findings_overview_for_session_scope(
-    db: Session, session_id_q
+    db: Session, session_scope
 ) -> FindingsOverview | None:
     """Compute findings overview from PRs directly linked to the scoped sessions."""
     pr_id_q = (
         db.query(distinct(SessionCommit.pull_request_id).label("pull_request_id"))
-        .filter(
-            SessionCommit.session_id.in_(session_id_q),
-            SessionCommit.pull_request_id.isnot(None),
-        )
+        .join(session_scope, SessionCommit.session_id == session_scope.c.id)
+        .filter(SessionCommit.pull_request_id.isnot(None))
         .subquery()
     )
 
@@ -742,6 +1058,154 @@ def _compute_quality_attribution(db: Session, session_id_q) -> list[QualityAttri
             SessionModel.id.in_(session_id_q),
             SessionCommit.pull_request_id.isnot(None),
         )
+        .distinct()
+        .all()
+    )
+
+    if not session_pr_rows:
+        return []
+
+    pr_ids = {row.pull_request_id for row in session_pr_rows if row.pull_request_id}
+    pr_rows = (
+        db.query(
+            PullRequest.id,
+            PullRequest.state,
+            PullRequest.review_comments_count,
+            PullRequest.pr_created_at,
+            PullRequest.merged_at,
+        )
+        .filter(PullRequest.id.in_(pr_ids))
+        .all()
+    )
+    pr_map = {pr.id: pr for pr in pr_rows}
+
+    finding_rows = (
+        db.query(
+            ReviewFinding.pull_request_id,
+            func.count(ReviewFinding.id).label("total_findings"),
+            func.sum(case((ReviewFinding.severity == "high", 1), else_=0)).label("high_findings"),
+            func.sum(case((ReviewFinding.status == "fixed", 1), else_=0)).label("fixed_findings"),
+        )
+        .filter(ReviewFinding.pull_request_id.in_(pr_ids))
+        .group_by(ReviewFinding.pull_request_id)
+        .all()
+    )
+    finding_map = {
+        row.pull_request_id: {
+            "total": row.total_findings or 0,
+            "high": row.high_findings or 0,
+            "fixed": row.fixed_findings or 0,
+        }
+        for row in finding_rows
+    }
+
+    groups: dict[tuple[str, str], dict[str, set[str]]] = {}
+    for row in session_pr_rows:
+        tool_breadth = _tool_breadth_label(tool_counts.get(row.session_id, 0))
+        behaviors = (
+            ("session_type", row.session_type or "unknown"),
+            ("agent_type", row.agent_type or "unknown"),
+            ("permission_mode", row.permission_mode or "unknown"),
+            ("tool_breadth", tool_breadth),
+        )
+        for dimension, label in behaviors:
+            group = groups.setdefault(
+                (dimension, label),
+                {"sessions": set(), "prs": set()},
+            )
+            group["sessions"].add(row.session_id)
+            if row.pull_request_id:
+                group["prs"].add(row.pull_request_id)
+
+    dimension_order = {
+        "session_type": 0,
+        "agent_type": 1,
+        "permission_mode": 2,
+        "tool_breadth": 3,
+    }
+
+    results: list[QualityAttributionRow] = []
+    for (dimension, label), refs in groups.items():
+        pr_id_set = refs["prs"]
+        if not pr_id_set:
+            continue
+
+        prs = [pr_map[pr_id] for pr_id in pr_id_set if pr_id in pr_map]
+        if not prs:
+            continue
+
+        merged = sum(1 for pr in prs if pr.state == "merged")
+        closed = sum(1 for pr in prs if pr.state == "closed")
+        denominator = merged + closed
+        merge_rate = merged / denominator if denominator else None
+
+        avg_review_comments = sum(pr.review_comments_count or 0 for pr in prs) / len(prs)
+
+        total_findings = sum(finding_map.get(pr.id, {}).get("total", 0) for pr in prs)
+        high_findings = sum(finding_map.get(pr.id, {}).get("high", 0) for pr in prs)
+        fixed_findings = sum(finding_map.get(pr.id, {}).get("fixed", 0) for pr in prs)
+
+        merge_times = [
+            (pr.merged_at - pr.pr_created_at).total_seconds() / 3600
+            for pr in prs
+            if pr.merged_at and pr.pr_created_at
+        ]
+
+        results.append(
+            QualityAttributionRow(
+                dimension=dimension,
+                label=label,
+                linked_sessions=len(refs["sessions"]),
+                linked_prs=len(prs),
+                merge_rate=merge_rate,
+                avg_review_comments_per_pr=avg_review_comments,
+                avg_findings_per_pr=total_findings / len(prs),
+                high_severity_findings_per_pr=high_findings / len(prs),
+                avg_time_to_merge_hours=(
+                    sum(merge_times) / len(merge_times) if merge_times else None
+                ),
+                findings_fix_rate=(fixed_findings / total_findings if total_findings else None),
+            )
+        )
+
+    return sorted(
+        results,
+        key=lambda row: (
+            dimension_order.get(row.dimension, 99),
+            -row.linked_prs,
+            row.label,
+        ),
+    )
+
+
+def _compute_quality_attribution_for_session_scope(
+    db: Session, session_scope
+) -> list[QualityAttributionRow]:
+    """Attribute PR outcomes and review findings from an explicit scoped-session join."""
+    tool_rows = (
+        db.query(
+            ToolUsage.session_id,
+            func.count(distinct(ToolUsage.tool_name)).label("tool_count"),
+        )
+        .join(session_scope, ToolUsage.session_id == session_scope.c.id)
+        .group_by(ToolUsage.session_id)
+        .all()
+    )
+    tool_counts = {row.session_id: row.tool_count or 0 for row in tool_rows}
+
+    session_pr_rows = (
+        db.query(
+            SessionModel.id.label("session_id"),
+            SessionModel.agent_type,
+            SessionModel.permission_mode,
+            SessionFacets.session_type,
+            SessionCommit.pull_request_id,
+        )
+        .select_from(SessionModel)
+        .join(session_scope, SessionModel.id == session_scope.c.id)
+        .outerjoin(SessionFacets, SessionFacets.session_id == SessionModel.id)
+        .join(SessionCommit, SessionCommit.session_id == SessionModel.id)
+        .filter(SessionCommit.pull_request_id.isnot(None))
         .distinct()
         .all()
     )
