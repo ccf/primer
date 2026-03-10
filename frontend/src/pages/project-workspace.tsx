@@ -11,6 +11,7 @@ import { CardSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleto
 import { ProjectScorecard } from "@/components/projects/project-scorecard"
 import { ProjectEnablementCard } from "@/components/projects/project-enablement-card"
 import { ProjectRepositoriesCard } from "@/components/projects/project-repositories-card"
+import { ProjectWorkflowSection } from "@/components/projects/project-workflow-section"
 import { PRTable } from "@/components/quality/pr-table"
 import { QualityAttributionTable } from "@/components/quality/quality-attribution-table"
 import { Button } from "@/components/ui/button"
@@ -233,6 +234,8 @@ export function ProjectWorkspacePage({ teamId, dateRange }: ProjectWorkspacePage
           </CardContent>
         </Card>
       </div>
+
+      <ProjectWorkflowSection workflowSummary={data.workflow_summary} />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Card>
