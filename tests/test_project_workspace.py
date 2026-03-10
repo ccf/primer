@@ -95,17 +95,25 @@ def _ingest_project_session(
     return payload["session_id"]
 
 
-def _ensure_project_facets(db_session, session_id: str, *, session_type: str) -> None:
+def _ensure_project_facets(
+    db_session,
+    session_id: str,
+    *,
+    session_type: str,
+    outcome: str = "success",
+    friction_counts: dict[str, int] | None = None,
+    friction_detail: str = "Needed to reconcile two competing approaches.",
+) -> None:
     record = db_session.query(SessionFacets).filter(SessionFacets.session_id == session_id).first()
     if record is None:
         record = SessionFacets(session_id=session_id)
         db_session.add(record)
 
-    record.outcome = "success"
+    record.outcome = outcome
     record.session_type = session_type
     record.primary_success = "complete"
-    record.friction_counts = {"context_switching": 1}
-    record.friction_detail = "Needed to reconcile two competing approaches."
+    record.friction_counts = friction_counts or {"context_switching": 1}
+    record.friction_detail = friction_detail
 
 
 def test_project_workspace_endpoint_returns_composed_views(
@@ -151,7 +159,14 @@ def test_project_workspace_endpoint_returns_composed_views(
         with_commit=True,
     )
     _ensure_project_facets(db_session, workspace_session_id, session_type="implementation")
-    _ensure_project_facets(db_session, codex_session_id, session_type="debugging")
+    _ensure_project_facets(
+        db_session,
+        codex_session_id,
+        session_type="debugging",
+        outcome="failure",
+        friction_counts={"tool_error": 2, "context_switching": 1},
+        friction_detail="Tooling failed mid-session.",
+    )
 
     workspace_repo = (
         db_session.query(GitRepository).filter(GitRepository.full_name == "acme/workspace").one()
@@ -250,7 +265,7 @@ def test_project_workspace_endpoint_returns_composed_views(
     assert {"Edit", "Read"}.issubset(set(data["project"]["top_tools"]))
     assert data["scorecard"]["adoption_rate"] is not None
     assert data["scorecard"]["effectiveness_score"]["score"] is not None
-    assert data["scorecard"]["effectiveness_score"]["breakdown"]["success_rate"] == 1.0
+    assert data["scorecard"]["effectiveness_score"]["breakdown"]["success_rate"] == 0.5
     assert data["scorecard"]["effectiveness_score"]["breakdown"]["quality_outcomes"] == 1.0
     assert data["scorecard"]["effectiveness_score"]["breakdown"]["follow_through"] == 0.5
     assert data["scorecard"]["effectiveness_score"]["breakdown"]["cost_efficiency"] is not None
