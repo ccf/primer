@@ -52,9 +52,11 @@ def get_quality_metrics(
         end_date=end_date,
         project_name=project_name,
     )
-    # Use subquery instead of materializing IDs to avoid SQLite 999-variable limit
-    session_id_q = base_q.with_entities(SessionModel.id)
-    total_sessions = session_id_q.count()
+    # Use a real subquery instead of materializing IDs to avoid SQLite's
+    # variable limit while keeping project-scoped quality filters deterministic.
+    session_id_subq = base_q.with_entities(SessionModel.id).subquery()
+    session_id_q = db.query(session_id_subq.c.id)
+    total_sessions = db.query(func.count()).select_from(session_id_subq).scalar() or 0
 
     github_prs = (
         [] if project_name else _compute_github_prs(db, team_id, engineer_id, start_date, end_date)

@@ -35,3 +35,17 @@ def test_effectiveness_score_blends_success_quality_follow_through_and_cost():
     assert score.breakdown.cost_efficiency == 1.0
     assert score.breakdown.quality_outcomes == 0.75
     assert score.breakdown.follow_through == 0.6
+
+
+def test_effectiveness_score_is_capped_at_100():
+    score = build_effectiveness_score(
+        success_rate=1.2,
+        cost_per_successful_outcome=0.25,
+        benchmark_cost_per_successful_outcome=2.0,
+        pr_merge_rate=1.0,
+        findings_fix_rate=1.0,
+        total_sessions=2,
+        sessions_with_commits=4,
+    )
+
+    assert score.score == 100.0
