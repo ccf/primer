@@ -169,6 +169,91 @@ def test_extract_current_session_messages_payload(tmp_path, monkeypatch):
     assert meta.messages[1]["tool_results"][0]["name"] == "read_file"
 
 
+def test_extract_current_session_messages_payload_uses_top_level_start_time(tmp_path):
+    gemini_home = tmp_path / ".gemini"
+    chats_dir = gemini_home / "tmp" / "current-project" / "chats"
+    chats_dir.mkdir(parents=True)
+
+    session_file = chats_dir / "session-2026-03-09T11-16-abc123.json"
+    session_file.write_text(
+        json.dumps(
+            {
+                "sessionId": "gemini-uuid-top-level-time",
+                "startTime": "2026-03-09T11:22:43.485Z",
+                "lastUpdated": "2026-03-09T11:22:47.704Z",
+                "messages": [
+                    {
+                        "id": "user-1",
+                        "type": "user",
+                        "content": [{"text": "Review the repository"}],
+                    },
+                    {
+                        "id": "assistant-1",
+                        "type": "gemini",
+                        "content": "I'll inspect the project structure first.",
+                        "tokens": {"input": 120, "output": 30, "cached": 10, "total": 160},
+                        "model": "gemini-3-flash-preview",
+                    },
+                ],
+            }
+        )
+    )
+
+    from pathlib import Path
+
+    original_home = Path.home
+    Path.home = staticmethod(lambda: tmp_path)
+    try:
+        extractor = GeminiExtractor()
+        meta = extractor.extract(str(session_file))
+    finally:
+        Path.home = original_home
+
+    assert meta.started_at is not None
+    assert meta.started_at.isoformat() == "2026-03-09T11:22:43.485000+00:00"
+    assert meta.ended_at is not None
+    assert meta.ended_at.isoformat() == "2026-03-09T11:22:47.704000+00:00"
+
+
+def test_extract_current_session_messages_payload_handles_null_tool_result(tmp_path):
+    session_file = tmp_path / "session-abc123.json"
+    session_file.write_text(
+        json.dumps(
+            {
+                "sessionId": "gemini-null-tool-result",
+                "messages": [
+                    {
+                        "id": "assistant-1",
+                        "timestamp": "2026-03-09T11:22:47.665Z",
+                        "type": "gemini",
+                        "content": "I'll inspect the project structure first.",
+                        "tokens": {"input": 120, "output": 30, "cached": 10, "total": 160},
+                        "model": "gemini-3-flash-preview",
+                        "toolCalls": [
+                            {
+                                "id": "read_file_1",
+                                "name": "read_file",
+                                "args": {"file_path": "README.md"},
+                                "result": None,
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+    )
+
+    extractor = GeminiExtractor()
+    meta = extractor.extract(str(session_file))
+
+    assert meta.session_id == "gemini-null-tool-result"
+    assert meta.tool_call_count == 1
+    assert meta.tool_counts == {"read_file": 1}
+    assert len(meta.messages) == 1
+    assert meta.messages[0]["tool_calls"][0]["name"] == "read_file"
+    assert "tool_results" not in meta.messages[0]
+
+
 def test_extract_contents_as_list():
     """Handle case where the file is just a list of contents (no wrapper)."""
     data = [
