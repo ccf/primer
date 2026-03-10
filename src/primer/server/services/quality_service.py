@@ -541,7 +541,7 @@ def _compute_engineer_quality(db: Session, session_id_q) -> list[EngineerQuality
         all_pr_ids.add(pr_id)
 
     # Batch: get PR stats for all relevant PRs at once
-    pr_stats_map: dict[str, tuple[str, int]] = {}
+    pr_stats_map: dict[str, tuple[str, int | None]] = {}
     if all_pr_ids:
         pr_detail_rows = (
             db.query(PullRequest.id, PullRequest.state, PullRequest.review_comments_count)
@@ -563,7 +563,7 @@ def _compute_engineer_quality(db: Session, session_id_q) -> list[EngineerQuality
             closed = sum(1 for pid in pr_id_set if pr_stats_map.get(pid, ("",))[0] == "closed")
             if merged + closed > 0:
                 merge_rate = merged / (merged + closed)
-            comment_counts = [pr_stats_map[pid][1] for pid in pr_id_set if pid in pr_stats_map]
+            comment_counts = [pr_stats_map[pid][1] or 0 for pid in pr_id_set if pid in pr_stats_map]
             if comment_counts:
                 avg_review_comments = sum(comment_counts) / len(comment_counts)
 
@@ -620,7 +620,7 @@ def _compute_engineer_quality_for_session_scope(
         engineer_prs.setdefault(eng_id, set()).add(pr_id)
         all_pr_ids.add(pr_id)
 
-    pr_stats_map: dict[str, tuple[str, int]] = {}
+    pr_stats_map: dict[str, tuple[str, int | None]] = {}
     if all_pr_ids:
         pr_detail_rows = (
             db.query(PullRequest.id, PullRequest.state, PullRequest.review_comments_count)
@@ -642,7 +642,7 @@ def _compute_engineer_quality_for_session_scope(
             closed = sum(1 for pid in pr_id_set if pr_stats_map.get(pid, ("",))[0] == "closed")
             if merged + closed > 0:
                 merge_rate = merged / (merged + closed)
-            comment_counts = [pr_stats_map[pid][1] for pid in pr_id_set if pid in pr_stats_map]
+            comment_counts = [pr_stats_map[pid][1] or 0 for pid in pr_id_set if pid in pr_stats_map]
             if comment_counts:
                 avg_review_comments = sum(comment_counts) / len(comment_counts)
 

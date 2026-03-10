@@ -186,7 +186,7 @@ def test_project_workspace_endpoint_returns_composed_views(
         head_branch="feat/workspace",
         additions=120,
         deletions=18,
-        review_comments_count=2,
+        review_comments_count=None,
         commits_count=1,
         pr_created_at=datetime.now(UTC) - timedelta(days=1),
         merged_at=datetime.now(UTC) - timedelta(hours=12),
