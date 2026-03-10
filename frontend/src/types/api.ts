@@ -443,10 +443,26 @@ export interface FrictionTrend {
   total_sessions: number
 }
 
+export interface RootCauseCluster {
+  cluster_id: string
+  title: string
+  cause_category: string
+  workflow_stage: string
+  session_count: number
+  occurrence_count: number
+  success_rate: number | null
+  avg_impact_score: number | null
+  top_friction_types: string[]
+  common_tools: string[]
+  transcript_cues: string[]
+  sample_details: string[]
+}
+
 export interface BottleneckAnalytics {
   friction_impacts: FrictionImpact[]
   project_friction: ProjectFriction[]
   friction_trends: FrictionTrend[]
+  root_cause_clusters: RootCauseCluster[]
   total_sessions_analyzed: number
   sessions_with_any_friction: number
   overall_friction_rate: number

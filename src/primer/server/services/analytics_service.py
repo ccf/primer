@@ -1,4 +1,4 @@
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import UTC, datetime
 from datetime import date as date_type
 
@@ -41,12 +41,126 @@ from primer.common.schemas import (
     ProjectAnalytics,
     ProjectFriction,
     ProjectStats,
+    RootCauseCluster,
     ToolAdoptionAnalytics,
     ToolAdoptionEntry,
     ToolRanking,
     ToolTrendEntry,
 )
 from primer.common.source_capabilities import CAPABILITIES
+from primer.common.tool_classification import classify_tool
+
+_ROOT_CAUSE_FRICTION_MAP: dict[str, str] = {
+    "permission_denied": "permission_boundary",
+    "user_rejected_action": "permission_boundary",
+    "tool_error": "tool_or_integration_failure",
+    "tool_failed": "tool_or_integration_failure",
+    "external_tool_issue": "tool_or_integration_failure",
+    "timeout": "tool_or_integration_failure",
+    "exec_error": "verification_failure",
+    "compile_error": "verification_failure",
+    "buggy_code": "verification_failure",
+    "context_switching": "context_fragmentation",
+    "context_limit": "context_fragmentation",
+    "slow_or_verbose": "context_fragmentation",
+    "edit_conflict": "repo_state_conflict",
+    "wrong_file_or_location": "repo_state_conflict",
+    "assistant_got_blocked": "environment_readiness",
+    "wrong_approach": "task_misalignment",
+    "misunderstood_request": "task_misalignment",
+    "excessive_changes": "task_misalignment",
+}
+
+_ROOT_CAUSE_LABELS: dict[str, str] = {
+    "permission_boundary": "Permission boundaries",
+    "tool_or_integration_failure": "Tool and integration failures",
+    "verification_failure": "Verification and command failures",
+    "context_fragmentation": "Context fragmentation",
+    "repo_state_conflict": "Repository state conflicts",
+    "environment_readiness": "Environment and dependency gaps",
+    "task_misalignment": "Task and scope misalignment",
+    "unknown": "Repeated friction pattern",
+}
+
+_ROOT_CAUSE_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "permission_boundary": (
+        "permission",
+        "access denied",
+        "forbidden",
+        "unauthorized",
+        "sandbox",
+        "approval",
+        "read-only",
+    ),
+    "tool_or_integration_failure": (
+        "mcp",
+        "network",
+        "connection",
+        "timeout",
+        "tool failed",
+        "tooling failed",
+        "service unavailable",
+        "webhook",
+        "api",
+        "rate limit",
+    ),
+    "verification_failure": (
+        "test failed",
+        "failing test",
+        "build failed",
+        "compile",
+        "lint",
+        "typecheck",
+        "assertion",
+        "command failed",
+    ),
+    "context_fragmentation": (
+        "context",
+        "multiple files",
+        "too many files",
+        "lost track",
+        "switch",
+        "token limit",
+        "verbose",
+    ),
+    "repo_state_conflict": (
+        "merge conflict",
+        "rebase",
+        "branch",
+        "worktree",
+        "conflict",
+        "dirty tree",
+        "unstaged",
+    ),
+    "environment_readiness": (
+        "module not found",
+        "dependency",
+        "import",
+        "package",
+        "missing file",
+        "missing directory",
+        "environment",
+        "env var",
+        "config",
+        "path",
+    ),
+    "task_misalignment": (
+        "wrong file",
+        "wrong approach",
+        "misunderstood",
+        "rejected",
+        "too much",
+        "over-engineered",
+    ),
+}
+
+_STAGE_TOOL_WEIGHTS: dict[str, tuple[str, ...]] = {
+    "search": ("Glob", "Grep", "WebSearch", "WebFetch"),
+    "read": ("Read",),
+    "edit": ("Edit", "Write", "NotebookEdit"),
+    "execute": ("Bash",),
+    "delegate": ("Task", "Agent", "EnterPlanMode", "ExitPlanMode", "AskUserQuestion"),
+}
 
 
 def base_session_query(
@@ -108,6 +222,73 @@ def _apply_session_scope_filters(
     if project_name:
         query = query.filter(SessionModel.project_name == project_name)
     return query
+
+
+def _infer_workflow_stage(tool_counts: Counter[str]) -> str:
+    if not tool_counts:
+        return "general"
+
+    stage_counts: Counter[str] = Counter()
+    for tool_name, count in tool_counts.items():
+        matched_stage = None
+        for stage, tool_names in _STAGE_TOOL_WEIGHTS.items():
+            if tool_name in tool_names or any(
+                tool_name.startswith(f"{prefix}:") for prefix in tool_names if prefix in {"Task"}
+            ):
+                matched_stage = stage
+                break
+        if matched_stage is None:
+            category = classify_tool(tool_name)
+            if category == "search":
+                matched_stage = "search"
+            elif category == "orchestration" or category == "skill":
+                matched_stage = "delegate"
+            elif category == "mcp":
+                matched_stage = "integrate"
+            else:
+                matched_stage = "general"
+        stage_counts[matched_stage] += count
+
+    primary_stage, _ = stage_counts.most_common(1)[0]
+    return primary_stage
+
+
+def _derive_root_cause_category(
+    friction_counts: dict[str, int] | None,
+    combined_text: str,
+) -> str:
+    category_scores: Counter[str] = Counter()
+    for friction_type, count in (friction_counts or {}).items():
+        category = _ROOT_CAUSE_FRICTION_MAP.get(friction_type)
+        if category:
+            category_scores[category] += max(count, 1)
+
+    normalized_text = combined_text.lower()
+    for category, keywords in _ROOT_CAUSE_KEYWORDS.items():
+        for keyword in keywords:
+            if keyword in normalized_text:
+                category_scores[category] += 1
+
+    if category_scores:
+        return category_scores.most_common(1)[0][0]
+    return "unknown"
+
+
+def _extract_transcript_cues(combined_text: str) -> list[str]:
+    normalized_text = combined_text.lower()
+    cues: list[str] = []
+    for keywords in _ROOT_CAUSE_KEYWORDS.values():
+        for keyword in keywords:
+            if keyword in normalized_text and keyword not in cues:
+                cues.append(keyword)
+    return cues[:5]
+
+
+def _root_cause_title(category: str, workflow_stage: str) -> str:
+    base = _ROOT_CAUSE_LABELS.get(category, _ROOT_CAUSE_LABELS["unknown"])
+    if workflow_stage == "general":
+        return base
+    return f"{base} during {workflow_stage} work"
 
 
 def _message_backed_stats(
@@ -1516,10 +1697,35 @@ def get_bottleneck_analytics(
             friction_impacts=[],
             project_friction=[],
             friction_trends=[],
+            root_cause_clusters=[],
             total_sessions_analyzed=0,
             sessions_with_any_friction=0,
             overall_friction_rate=0.0,
         )
+
+    session_ids = [session.id for session, _ in rows]
+    tool_counts_by_session: dict[str, Counter[str]] = defaultdict(Counter)
+    for session_id, tool_name, call_count in (
+        db.query(ToolUsage.session_id, ToolUsage.tool_name, ToolUsage.call_count)
+        .filter(ToolUsage.session_id.in_(session_ids))
+        .all()
+    ):
+        tool_counts_by_session[session_id][tool_name] += call_count
+
+    transcript_rows = (
+        db.query(SessionMessage.session_id, SessionMessage.content_text)
+        .filter(
+            SessionMessage.session_id.in_(session_ids),
+            SessionMessage.ordinal <= 4,
+            SessionMessage.content_text.isnot(None),
+        )
+        .order_by(SessionMessage.session_id.asc(), SessionMessage.ordinal.asc())
+        .all()
+    )
+    transcript_text_by_session: dict[str, list[str]] = defaultdict(list)
+    for session_id, content_text in transcript_rows:
+        if content_text and len(transcript_text_by_session[session_id]) < 4:
+            transcript_text_by_session[session_id].append(content_text)
 
     # --- Friction Impact Analysis ---
     # Track per friction type: occurrences, sessions, outcomes, details
@@ -1641,6 +1847,110 @@ def get_bottleneck_analytics(
             )
         )
 
+    impact_by_type = {
+        item.friction_type: item.impact_score
+        for item in friction_impacts
+        if item.impact_score is not None
+    }
+
+    cluster_buckets: dict[str, dict] = {}
+    for session, facets in rows:
+        friction_counts = facets.friction_counts if facets else None
+        if not friction_counts:
+            continue
+
+        positive_counts = {
+            friction_type: count
+            for friction_type, count in friction_counts.items()
+            if count and count > 0
+        }
+        if not positive_counts:
+            continue
+
+        tool_counts = tool_counts_by_session.get(session.id, Counter())
+        workflow_stage = _infer_workflow_stage(tool_counts)
+        combined_text = " ".join(
+            part
+            for part in [
+                facets.friction_detail or "",
+                *transcript_text_by_session.get(session.id, []),
+            ]
+            if part
+        )
+        cause_category = _derive_root_cause_category(positive_counts, combined_text)
+        cluster_id = f"{cause_category}::{workflow_stage}"
+        bucket = cluster_buckets.setdefault(
+            cluster_id,
+            {
+                "cause_category": cause_category,
+                "workflow_stage": workflow_stage,
+                "session_ids": set(),
+                "occurrence_count": 0,
+                "success_count": 0,
+                "outcome_count": 0,
+                "friction_type_counts": Counter(),
+                "tool_counts": Counter(),
+                "cue_counts": Counter(),
+                "sample_details": [],
+            },
+        )
+
+        if session.id not in bucket["session_ids"]:
+            bucket["session_ids"].add(session.id)
+            if (outcome := canonical_outcome(facets.outcome)) is not None:
+                bucket["outcome_count"] += 1
+                if is_success_outcome(outcome):
+                    bucket["success_count"] += 1
+
+        bucket["occurrence_count"] += sum(positive_counts.values())
+        bucket["friction_type_counts"].update(positive_counts)
+        bucket["tool_counts"].update(tool_counts)
+        bucket["cue_counts"].update(_extract_transcript_cues(combined_text))
+        if facets.friction_detail and facets.friction_detail not in bucket["sample_details"]:
+            bucket["sample_details"].append(facets.friction_detail)
+
+    root_cause_clusters = [
+        RootCauseCluster(
+            cluster_id=cluster_id,
+            title=_root_cause_title(bucket["cause_category"], bucket["workflow_stage"]),
+            cause_category=bucket["cause_category"],
+            workflow_stage=bucket["workflow_stage"],
+            session_count=len(bucket["session_ids"]),
+            occurrence_count=bucket["occurrence_count"],
+            success_rate=(
+                round(bucket["success_count"] / bucket["outcome_count"], 3)
+                if bucket["outcome_count"] > 0
+                else None
+            ),
+            avg_impact_score=(
+                round(
+                    sum(
+                        (impact_by_type.get(friction_type) or 0.0) * count
+                        for friction_type, count in bucket["friction_type_counts"].items()
+                    )
+                    / sum(bucket["friction_type_counts"].values()),
+                    3,
+                )
+                if bucket["friction_type_counts"]
+                else None
+            ),
+            top_friction_types=[
+                friction_type for friction_type, _ in bucket["friction_type_counts"].most_common(3)
+            ],
+            common_tools=[tool_name for tool_name, _ in bucket["tool_counts"].most_common(3)],
+            transcript_cues=[cue for cue, _ in bucket["cue_counts"].most_common(3)],
+            sample_details=bucket["sample_details"][:3],
+        )
+        for cluster_id, bucket in sorted(
+            cluster_buckets.items(),
+            key=lambda item: (
+                len(item[1]["session_ids"]),
+                item[1]["occurrence_count"],
+            ),
+            reverse=True,
+        )[:8]
+    ]
+
     # Build project friction
     project_friction_list: list[ProjectFriction] = []
     for proj, total in project_sessions.items():
@@ -1681,6 +1991,7 @@ def get_bottleneck_analytics(
         friction_impacts=friction_impacts,
         project_friction=project_friction_list,
         friction_trends=friction_trends,
+        root_cause_clusters=root_cause_clusters,
         total_sessions_analyzed=total_sessions,
         sessions_with_any_friction=sessions_with_count,
         overall_friction_rate=round(sessions_with_count / total_sessions, 3)

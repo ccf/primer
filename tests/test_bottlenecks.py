@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from primer.common.models import Session, SessionFacets
+from primer.common.models import Session, SessionFacets, SessionMessage, ToolUsage
 
 
 def _create_session(db_session, engineer, **kwargs):
@@ -34,6 +34,7 @@ def test_bottlenecks_empty(client, admin_headers):
     assert data["friction_impacts"] == []
     assert data["project_friction"] == []
     assert data["friction_trends"] == []
+    assert data["root_cause_clusters"] == []
 
 
 def test_bottlenecks_with_friction(client, db_session, engineer_with_key, admin_headers):
@@ -55,6 +56,15 @@ def test_bottlenecks_with_friction(client, db_session, engineer_with_key, admin_
         friction_detail="Permission was denied on file write",
     )
     db_session.add(f1)
+    db_session.add(ToolUsage(session_id=s1.id, tool_name="Bash", call_count=2))
+    db_session.add(
+        SessionMessage(
+            session_id=s1.id,
+            ordinal=1,
+            role="human",
+            content_text="Please run the verification command and fix the issue.",
+        )
+    )
 
     # Session 2: with friction, failure
     s2 = _create_session(
@@ -70,6 +80,16 @@ def test_bottlenecks_with_friction(client, db_session, engineer_with_key, admin_
         friction_detail="Could not access directory",
     )
     db_session.add(f2)
+    db_session.add(ToolUsage(session_id=s2.id, tool_name="Bash", call_count=1))
+    db_session.add(ToolUsage(session_id=s2.id, tool_name="Edit", call_count=1))
+    db_session.add(
+        SessionMessage(
+            session_id=s2.id,
+            ordinal=1,
+            role="human",
+            content_text="Permission errors keep blocking the command.",
+        )
+    )
 
     # Session 3: no friction, success
     s3 = _create_session(
@@ -113,6 +133,21 @@ def test_bottlenecks_with_friction(client, db_session, engineer_with_key, admin_
     assert proj_a["sessions_with_friction"] == 2
     assert proj_a["total_sessions"] == 2
     assert "permission_denied" in proj_a["top_friction_types"]
+
+    clusters = data["root_cause_clusters"]
+    assert len(clusters) >= 1
+    permission_cluster = next(
+        (cluster for cluster in clusters if cluster["cause_category"] == "permission_boundary"),
+        None,
+    )
+    assert permission_cluster is not None
+    assert permission_cluster["workflow_stage"] == "execute"
+    assert permission_cluster["session_count"] == 2
+    assert permission_cluster["occurrence_count"] == 6
+    assert "permission_denied" in permission_cluster["top_friction_types"]
+    assert "Bash" in permission_cluster["common_tools"]
+    assert "permission" in permission_cluster["transcript_cues"]
+    assert "Permission was denied on file write" in permission_cluster["sample_details"]
 
     # Friction trends
     assert len(data["friction_trends"]) > 0
