@@ -4,6 +4,7 @@ import { BottleneckSummary } from "@/components/bottlenecks/bottleneck-summary"
 import { FrictionTrendChart } from "@/components/bottlenecks/friction-trend-chart"
 import { FrictionImpactTable } from "@/components/bottlenecks/friction-impact-table"
 import { ProjectFrictionTable } from "@/components/bottlenecks/project-friction-table"
+import { RootCauseClusterList } from "@/components/bottlenecks/root-cause-cluster-list"
 import { CardSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleton"
 import { AlertTriangle } from "lucide-react"
 import type { DateRange } from "@/components/layout/date-range-picker"
@@ -48,6 +49,8 @@ export function FrictionPage({ teamId, dateRange }: FrictionPageProps) {
         <FrictionTrendChart data={data.friction_trends} />
         <FrictionImpactTable data={data.friction_impacts} />
       </div>
+
+      <RootCauseClusterList data={data.root_cause_clusters} />
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-muted-foreground">By Project</h2>

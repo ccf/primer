@@ -761,10 +761,26 @@ class FrictionTrend(BaseModel):
     total_sessions: int
 
 
+class RootCauseCluster(BaseModel):
+    cluster_id: str
+    title: str
+    cause_category: str
+    workflow_stage: str
+    session_count: int
+    occurrence_count: int
+    success_rate: float | None
+    avg_impact_score: float | None
+    top_friction_types: list[str]
+    common_tools: list[str]
+    transcript_cues: list[str]
+    sample_details: list[str]
+
+
 class BottleneckAnalytics(BaseModel):
     friction_impacts: list[FrictionImpact]
     project_friction: list[ProjectFriction]
     friction_trends: list[FrictionTrend]
+    root_cause_clusters: list[RootCauseCluster]
     total_sessions_analyzed: int
     sessions_with_any_friction: int
     overall_friction_rate: float

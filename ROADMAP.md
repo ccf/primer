@@ -111,7 +111,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Project-level friction breakdown
 - [x] Friction cluster analysis with sample details
 - [x] Anomaly detection for friction spikes
-- [ ] [P0] Root-cause clustering from transcripts, tool traces, and repeated failure motifs
+- [x] [P0] Root-cause clustering from transcripts, tool traces, and repeated failure motifs
 - [ ] [P1] Time-lost estimation per friction type, engineer, and project
 - [ ] [P1] Toolchain reliability analytics for MCP servers, built-in tools, and external services
 - [ ] [P1] Friction recovery analysis: what engineers tried after failure and which recoveries worked
