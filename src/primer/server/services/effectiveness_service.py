@@ -64,7 +64,10 @@ def build_effectiveness_score(
     else:
         total_weight = sum(weight for _, _, weight in weighted)
         score = round(
-            sum(value * weight for _, value, weight in weighted) / total_weight * 100,
+            min(
+                sum(value * weight for _, value, weight in weighted) / total_weight * 100,
+                100.0,
+            ),
             1,
         )
 
