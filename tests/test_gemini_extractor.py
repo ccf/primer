@@ -254,6 +254,86 @@ def test_extract_current_session_messages_payload_handles_null_tool_result(tmp_p
     assert "tool_results" not in meta.messages[0]
 
 
+def test_extract_current_session_messages_payload_preserves_top_level_last_updated(tmp_path):
+    session_file = tmp_path / "session-abc123.json"
+    session_file.write_text(
+        json.dumps(
+            {
+                "sessionId": "gemini-top-level-end-time",
+                "startTime": "2026-03-09T11:22:43.485Z",
+                "lastUpdated": "2026-03-09T11:29:00.015Z",
+                "messages": [
+                    {
+                        "id": "user-1",
+                        "timestamp": "2026-03-09T11:22:43.485Z",
+                        "type": "user",
+                        "content": [{"text": "Review the repository"}],
+                    },
+                    {
+                        "id": "assistant-1",
+                        "timestamp": "2026-03-09T11:28:52.841Z",
+                        "type": "gemini",
+                        "content": "I'll inspect the project structure first.",
+                        "tokens": {"input": 120, "output": 30, "cached": 10, "total": 160},
+                        "model": "gemini-3-flash-preview",
+                    },
+                ],
+            }
+        )
+    )
+
+    extractor = GeminiExtractor()
+    meta = extractor.extract(str(session_file))
+
+    assert meta.ended_at is not None
+    assert meta.ended_at.isoformat() == "2026-03-09T11:29:00.015000+00:00"
+    assert meta.duration_seconds == 376.53
+
+
+def test_extract_current_session_messages_payload_uses_project_hash_name_resolution(
+    tmp_path,
+):
+    gemini_home = tmp_path / ".gemini"
+    chats_dir = gemini_home / "tmp" / "current-project" / "chats"
+    chats_dir.mkdir(parents=True)
+
+    resolved_project_dir = gemini_home / "tmp" / "project-hash-123"
+    resolved_project_dir.mkdir(parents=True)
+    project_path = "/Users/example/primer-project"
+    (resolved_project_dir / ".project_root").write_text(project_path)
+    (gemini_home / "projects.json").write_text(json.dumps({"projects": {project_path: "primer"}}))
+
+    session_file = chats_dir / "session-2026-03-09T11-16-abc123.json"
+    session_file.write_text(
+        json.dumps(
+            {
+                "sessionId": "gemini-project-hash-1",
+                "projectHash": "project-hash-123",
+                "messages": [
+                    {
+                        "id": "user-1",
+                        "type": "user",
+                        "content": [{"text": "Review the repository"}],
+                    }
+                ],
+            }
+        )
+    )
+
+    from pathlib import Path
+
+    original_home = Path.home
+    Path.home = staticmethod(lambda: tmp_path)
+    try:
+        extractor = GeminiExtractor()
+        meta = extractor.extract(str(session_file))
+    finally:
+        Path.home = original_home
+
+    assert meta.project_path == project_path
+    assert meta.project_name == "primer"
+
+
 def test_extract_contents_as_list():
     """Handle case where the file is just a list of contents (no wrapper)."""
     data = [

@@ -242,7 +242,7 @@ class GeminiExtractor:
             if ts:
                 if first_ts is None:
                     first_ts = ts
-                last_ts = ts
+                last_ts = max(last_ts, ts) if last_ts else ts
 
             message_type = str(message.get("type") or "").lower()
             if message_type == "user":
@@ -704,9 +704,6 @@ class GeminiExtractor:
         if not project_name and project_path:
             project_name = Path(project_path).name
 
-        if not project_name:
-            project_name = project_dir.name or None
-
         if not project_path and isinstance(payload, dict):
             project_hash = payload.get("projectHash") or payload.get("project_hash")
             if isinstance(project_hash, str) and project_hash:
@@ -715,6 +712,9 @@ class GeminiExtractor:
                     project_name = (
                         self._lookup_project_name(project_path) or Path(project_path).name
                     )
+
+        if not project_name:
+            project_name = project_dir.name or None
 
         return project_path, project_name
 
