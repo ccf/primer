@@ -152,7 +152,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Dedicated project workspace with readiness, friction, quality, cost, and enablement views
 - [x] Project AI-readiness scoring (CLAUDE.md, AGENTS.md, .claude/ detection)
 - [x] Project scorecard that combines adoption, effectiveness, quality, and cost efficiency
-- [ ] [P0] Project-level workflow fingerprints and friction hotspots
+- [x] [P0] Project-level workflow fingerprints and friction hotspots
 - [ ] [P1] Project-level agent mix comparison, including Cursor sessions alongside CLI agents
 - [ ] [P1] Repository context model: language mix, test maturity, repo size, and AI-enablement signals
 - [ ] [P1] Project enablement recommendations tied to observed bottlenecks

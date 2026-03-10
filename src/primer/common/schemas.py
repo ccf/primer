@@ -1130,6 +1130,37 @@ class ProjectEnablementSummary(BaseModel):
     top_models: list[str] = []
 
 
+class ProjectWorkflowFingerprint(BaseModel):
+    fingerprint_id: str
+    label: str
+    session_type: str | None = None
+    steps: list[str] = Field(default_factory=list)
+    session_count: int
+    share_of_sessions: float
+    success_rate: float | None = None
+    avg_duration_seconds: float | None = None
+    top_tools: list[str] = Field(default_factory=list)
+    top_friction_types: list[str] = Field(default_factory=list)
+
+
+class ProjectFrictionHotspot(BaseModel):
+    friction_type: str
+    session_count: int
+    share_of_sessions: float
+    total_occurrences: int
+    impact_score: float | None = None
+    linked_fingerprints: list[str] = Field(default_factory=list)
+    sample_details: list[str] = Field(default_factory=list)
+
+
+class ProjectWorkflowSummary(BaseModel):
+    fingerprinted_sessions: int
+    total_sessions: int
+    coverage_pct: float
+    fingerprints: list[ProjectWorkflowFingerprint] = Field(default_factory=list)
+    friction_hotspots: list[ProjectFrictionHotspot] = Field(default_factory=list)
+
+
 class ProjectWorkspaceResponse(BaseModel):
     project: ProjectStats
     scorecard: ProjectScorecard
@@ -1141,6 +1172,7 @@ class ProjectWorkspaceResponse(BaseModel):
     friction_impacts: list[FrictionImpact] = []
     repositories: list[ProjectRepositorySummary] = []
     enablement: ProjectEnablementSummary
+    workflow_summary: ProjectWorkflowSummary
 
 
 class GitHubSyncResponse(BaseModel):

@@ -13,9 +13,13 @@ def _ingest_project_session(
     agent_type: str = "claude_code",
     model_name: str = "claude-sonnet-4",
     tool_name: str = "Edit",
+    tool_usages: list[dict] | None = None,
     git_remote_url: str | None = None,
     with_commit: bool = False,
     session_type: str = "implementation",
+    outcome: str = "success",
+    friction_counts: dict[str, int] | None = None,
+    friction_detail: str = "Needed to reconcile two competing approaches.",
 ):
     now = datetime.now(UTC)
     payload = {
@@ -49,7 +53,7 @@ def _ingest_project_session(
                 "token_count": 200,
             },
         ],
-        "tool_usages": [{"tool_name": tool_name, "call_count": 3}],
+        "tool_usages": tool_usages or [{"tool_name": tool_name, "call_count": 3}],
         "model_usages": [
             {
                 "model_name": model_name,
@@ -58,11 +62,11 @@ def _ingest_project_session(
             }
         ],
         "facets": {
-            "outcome": "success",
+            "outcome": outcome,
             "session_type": session_type,
             "primary_success": "complete",
-            "friction_counts": {"context_switching": 1},
-            "friction_detail": "Needed to reconcile two competing approaches.",
+            "friction_counts": friction_counts or {"context_switching": 1},
+            "friction_detail": friction_detail,
         },
         "git_remote_url": git_remote_url,
         "commits": (
@@ -94,6 +98,10 @@ def test_project_workspace_endpoint_returns_composed_views(
         client,
         api_key,
         project_name="workspace-proj",
+        tool_usages=[
+            {"tool_name": "Edit", "call_count": 2},
+            {"tool_name": "Bash", "call_count": 1},
+        ],
         git_remote_url="https://github.com/acme/workspace.git",
         with_commit=True,
         session_type="implementation",
@@ -105,8 +113,16 @@ def test_project_workspace_endpoint_returns_composed_views(
         agent_type="codex_cli",
         model_name="gpt-5.3-codex",
         tool_name="Read",
+        tool_usages=[
+            {"tool_name": "Grep", "call_count": 2},
+            {"tool_name": "Read", "call_count": 2},
+            {"tool_name": "Bash", "call_count": 1},
+        ],
         git_remote_url="https://github.com/acme/workspace.git",
         session_type="debugging",
+        outcome="failure",
+        friction_counts={"tool_error": 2, "context_switching": 1},
+        friction_detail="Tooling failed mid-session.",
     )
     other_session_id = _ingest_project_session(
         client,
@@ -210,7 +226,7 @@ def test_project_workspace_endpoint_returns_composed_views(
 
     assert data["project"]["project_name"] == "workspace-proj"
     assert data["project"]["total_sessions"] == 2
-    assert set(data["project"]["top_tools"]) == {"Edit", "Read"}
+    assert {"Edit", "Read"}.issubset(set(data["project"]["top_tools"]))
     assert data["scorecard"]["adoption_rate"] is not None
     assert data["scorecard"]["quality_rate"] == 1.0
     assert data["scorecard"]["measurement_confidence"] == 1.0
@@ -223,6 +239,32 @@ def test_project_workspace_endpoint_returns_composed_views(
     assert data["quality"]["overview"]["total_prs"] == 1
     assert data["quality"]["findings_overview"]["total_findings"] == 1
     assert data["quality"]["recent_prs"][0]["title"] == "Add project workspace"
+    assert data["workflow_summary"]["fingerprinted_sessions"] == 2
+    assert data["workflow_summary"]["coverage_pct"] == 1.0
+
+    implementation = next(
+        item
+        for item in data["workflow_summary"]["fingerprints"]
+        if item["session_type"] == "implementation"
+    )
+    assert implementation["steps"] == ["edit", "execute", "ship"]
+    assert "context_switching" in implementation["top_friction_types"]
+
+    debugging = next(
+        item
+        for item in data["workflow_summary"]["fingerprints"]
+        if item["session_type"] == "debugging"
+    )
+    assert debugging["steps"] == ["search", "read", "execute"]
+    assert debugging["success_rate"] == 0.0
+
+    tool_error = next(
+        item
+        for item in data["workflow_summary"]["friction_hotspots"]
+        if item["friction_type"] == "tool_error"
+    )
+    assert tool_error["linked_fingerprints"] == ["debugging: search -> read -> execute"]
+    assert tool_error["sample_details"] == ["Tooling failed mid-session."]
 
 
 def test_project_workspace_missing_project_returns_404(client, admin_headers):
