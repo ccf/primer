@@ -31,7 +31,7 @@ def build_effectiveness_score(
 ) -> EffectivenessScore:
     quality_outcomes = _quality_outcomes(pr_merge_rate, findings_fix_rate)
     breakdown = EffectivenessBreakdown(
-        success_rate=_round_component(success_rate),
+        success_rate=_round_component(_clamp_unit_interval(success_rate)),
         cost_efficiency=_round_component(
             _cost_efficiency(cost_per_successful_outcome, benchmark_cost_per_successful_outcome)
         ),
@@ -176,7 +176,11 @@ def _grouped_cost_per_success(db: Session, session_q, group_column) -> dict[str,
 
 
 def _quality_outcomes(pr_merge_rate: float | None, findings_fix_rate: float | None) -> float | None:
-    signals = [signal for signal in (pr_merge_rate, findings_fix_rate) if signal is not None]
+    signals = [
+        _clamp_unit_interval(signal)
+        for signal in (pr_merge_rate, findings_fix_rate)
+        if signal is not None
+    ]
     if not signals:
         return None
     return sum(signals) / len(signals)
@@ -185,7 +189,7 @@ def _quality_outcomes(pr_merge_rate: float | None, findings_fix_rate: float | No
 def _follow_through(total_sessions: int, sessions_with_commits: int) -> float | None:
     if total_sessions <= 0:
         return None
-    return sessions_with_commits / total_sessions
+    return _clamp_unit_interval(sessions_with_commits / total_sessions)
 
 
 def _cost_efficiency(
@@ -200,6 +204,12 @@ def _cost_efficiency(
         return None
     ratio = cost_per_successful_outcome / benchmark_cost_per_successful_outcome
     return max(0.0, min(1.0, 1.0 - (ratio - 0.5) / 1.5))
+
+
+def _clamp_unit_interval(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return max(0.0, min(1.0, value))
 
 
 def _round_component(value: float | None) -> float | None:

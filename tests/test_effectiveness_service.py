@@ -49,3 +49,21 @@ def test_effectiveness_score_is_capped_at_100():
     )
 
     assert score.score == 100.0
+    assert score.breakdown.success_rate == 1.0
+    assert score.breakdown.follow_through == 1.0
+
+
+def test_effectiveness_score_clamps_follow_through_before_weighting():
+    score = build_effectiveness_score(
+        success_rate=0.5,
+        cost_per_successful_outcome=None,
+        benchmark_cost_per_successful_outcome=None,
+        pr_merge_rate=None,
+        findings_fix_rate=None,
+        total_sessions=2,
+        sessions_with_commits=4,
+    )
+
+    assert score.score == pytest.approx(68.2, abs=0.1)
+    assert score.breakdown.success_rate == 0.5
+    assert score.breakdown.follow_through == 1.0

@@ -425,6 +425,61 @@ class TestQualityMetrics:
         assert len(engineers) >= 1
         assert any(e["engineer_id"] == eng.id for e in engineers)
 
+    def test_engineer_quality_treats_null_review_comments_as_zero(
+        self, client, engineer_with_key, admin_headers, db_session
+    ):
+        eng, key = engineer_with_key
+
+        payload = _ingest_payload(
+            key,
+            session_id="eq-null-comments",
+            git_remote_url="https://github.com/acme/null-comments.git",
+            commits=[
+                {
+                    "sha": "eq_null_comments_commit",
+                    "message": "eng quality null comments test",
+                    "committed_at": datetime.utcnow().isoformat(),
+                    "files_changed": 1,
+                    "lines_added": 25,
+                    "lines_deleted": 3,
+                },
+            ],
+        )
+        resp = client.post("/api/v1/ingest/session", json=payload)
+        assert resp.status_code == 200
+
+        repo = (
+            db_session.query(GitRepository)
+            .filter(GitRepository.full_name == "acme/null-comments")
+            .one()
+        )
+        pr = PullRequest(
+            repository_id=repo.id,
+            engineer_id=eng.id,
+            github_pr_number=303,
+            title="Null comment count PR",
+            state="merged",
+            review_comments_count=None,
+            pr_created_at=datetime.utcnow() - timedelta(hours=4),
+            merged_at=datetime.utcnow() - timedelta(hours=1),
+        )
+        db_session.add(pr)
+        db_session.flush()
+
+        commit = (
+            db_session.query(SessionCommit)
+            .filter(SessionCommit.commit_sha == "eq_null_comments_commit")
+            .one()
+        )
+        commit.pull_request_id = pr.id
+        db_session.flush()
+
+        resp = client.get("/api/v1/analytics/quality-metrics", headers=admin_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        engineer_row = next(row for row in data["engineer_quality"] if row["engineer_id"] == eng.id)
+        assert engineer_row["avg_review_comments"] == 0.0
+
     def test_quality_by_session_type(self, client, engineer_with_key, admin_headers, db_session):
         _eng, key = engineer_with_key
 
