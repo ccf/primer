@@ -511,7 +511,7 @@ class GeminiExtractor:
 
     @staticmethod
     def _parse_content_timestamp(content: dict) -> datetime | None:
-        for key in ("timestamp", "createTime", "create_time"):
+        for key in ("timestamp", "startTime", "createTime", "create_time"):
             ts_str = content.get(key)
             if ts_str:
                 try:
@@ -791,7 +791,10 @@ class GeminiExtractor:
             if not isinstance(tool_call, dict):
                 continue
             default_name = tool_call.get("name") or "tool_result"
-            for result in tool_call.get("result", []):
+            raw_results = tool_call.get("result")
+            if not isinstance(raw_results, list):
+                continue
+            for result in raw_results:
                 if not isinstance(result, dict):
                     continue
                 function_response = result.get("functionResponse")
