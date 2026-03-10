@@ -25,6 +25,14 @@ export function ProjectScorecard({ scorecard, overview }: ProjectScorecardProps)
     scorecard.cost_per_successful_outcome != null
       ? "Cost per successful outcome"
       : "Average cost per session"
+  const effectivenessValue =
+    scorecard.effectiveness_score?.score != null
+      ? scorecard.effectiveness_score.score.toFixed(1)
+      : formatPercent(scorecard.effectiveness_rate)
+  const effectivenessSubtitle =
+    scorecard.effectiveness_score?.score != null
+      ? "Composite of success, quality, follow-through, and cost"
+      : "Successful outcomes across facet-capable sessions"
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -36,8 +44,8 @@ export function ProjectScorecard({ scorecard, overview }: ProjectScorecardProps)
       />
       <StatCard
         label="Effectiveness"
-        value={formatPercent(scorecard.effectiveness_rate)}
-        subtitle="Successful outcomes across facet-capable sessions"
+        value={effectivenessValue}
+        subtitle={effectivenessSubtitle}
         icon={BadgeCheck}
       />
       <StatCard

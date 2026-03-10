@@ -22,6 +22,10 @@ from primer.server.services.analytics_service import (
     get_overview,
     get_productivity_metrics,
 )
+from primer.server.services.effectiveness_service import (
+    build_effectiveness_score,
+    get_peer_cost_per_success_benchmark,
+)
 from primer.server.services.quality_service import get_quality_metrics
 
 
@@ -98,9 +102,29 @@ def get_project_workspace(
         outcome_distribution=overview.outcome_counts,
         top_tools=enablement.top_tools,
     )
+    effectiveness_score = build_effectiveness_score(
+        success_rate=overview.success_rate,
+        cost_per_successful_outcome=productivity.cost_per_successful_outcome,
+        benchmark_cost_per_successful_outcome=get_peer_cost_per_success_benchmark(
+            db,
+            group_by="project_name",
+            target_value=project_name,
+            team_id=team_id,
+            engineer_id=engineer_id,
+            start_date=start_date,
+            end_date=end_date,
+        ),
+        pr_merge_rate=quality.overview.pr_merge_rate,
+        findings_fix_rate=(
+            quality.findings_overview.fix_rate if quality.findings_overview else None
+        ),
+        total_sessions=overview.total_sessions,
+        sessions_with_commits=quality.overview.sessions_with_commits,
+    )
     scorecard = ProjectScorecard(
         adoption_rate=productivity.adoption_rate,
         effectiveness_rate=overview.success_rate,
+        effectiveness_score=effectiveness_score,
         quality_rate=(
             quality.findings_overview.fix_rate
             if quality.findings_overview and quality.findings_overview.fix_rate is not None

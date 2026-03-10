@@ -212,6 +212,11 @@ def test_project_workspace_endpoint_returns_composed_views(
     assert data["project"]["total_sessions"] == 2
     assert set(data["project"]["top_tools"]) == {"Edit", "Read"}
     assert data["scorecard"]["adoption_rate"] is not None
+    assert data["scorecard"]["effectiveness_score"]["score"] is not None
+    assert data["scorecard"]["effectiveness_score"]["breakdown"]["success_rate"] == 1.0
+    assert data["scorecard"]["effectiveness_score"]["breakdown"]["quality_outcomes"] == 1.0
+    assert data["scorecard"]["effectiveness_score"]["breakdown"]["follow_through"] == 0.5
+    assert data["scorecard"]["effectiveness_score"]["breakdown"]["cost_efficiency"] is not None
     assert data["scorecard"]["quality_rate"] == 1.0
     assert data["scorecard"]["measurement_confidence"] == 1.0
     assert data["repositories"][0]["repository"] == "acme/workspace"

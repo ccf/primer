@@ -14,7 +14,12 @@ from primer.common.schemas import (
 from primer.server.services.analytics_service import (
     _build_overview,
     get_friction_report,
+    get_productivity_metrics,
     get_tool_rankings,
+)
+from primer.server.services.effectiveness_service import (
+    build_effectiveness_score,
+    get_peer_cost_per_success_benchmark,
 )
 from primer.server.services.insights_service import (
     get_config_optimization,
@@ -188,13 +193,14 @@ def get_engineer_profile(
 
     # Quality data from PR/commit tracking
     quality: dict = {}
+    quality_metrics = None
     try:
         from primer.server.services.quality_service import get_quality_metrics
 
-        qm = get_quality_metrics(
+        quality_metrics = get_quality_metrics(
             db, engineer_id=engineer_id, start_date=start_date, end_date=end_date
         )
-        ov = qm.overview
+        ov = quality_metrics.overview
         if ov.total_commits > 0 or ov.total_prs > 0:
             merge_rate = f"{ov.pr_merge_rate * 100:.0f}%" if ov.pr_merge_rate is not None else None
             merge_time = (
@@ -210,15 +216,19 @@ def get_engineer_profile(
                 "merge_rate": merge_rate,
                 "avg_time_to_merge": merge_time,
             }
-            if qm.findings_overview:
-                quality["findings_overview"] = qm.findings_overview.model_dump()
-        elif qm.github_connected:
+            if quality_metrics.findings_overview:
+                quality["findings_overview"] = quality_metrics.findings_overview.model_dump()
+        elif quality_metrics.github_connected:
             quality = {"github_connected": True, "no_data_yet": True}
-        if qm.findings_overview and "findings_overview" not in quality:
-            quality["findings_overview"] = qm.findings_overview.model_dump()
+        if quality_metrics.findings_overview and "findings_overview" not in quality:
+            quality["findings_overview"] = quality_metrics.findings_overview.model_dump()
     except Exception:
         logger.exception("Failed to compute quality data for engineer %s", engineer_id)
         quality = {}
+
+    productivity = get_productivity_metrics(
+        db, engineer_id=engineer_id, start_date=start_date, end_date=end_date
+    )
 
     # Tool rankings
     tool_rankings = get_tool_rankings(
@@ -252,6 +262,29 @@ def get_engineer_profile(
     except Exception:
         leverage_score = None
 
+    effectiveness = build_effectiveness_score(
+        success_rate=overview.success_rate,
+        cost_per_successful_outcome=productivity.cost_per_successful_outcome,
+        benchmark_cost_per_successful_outcome=get_peer_cost_per_success_benchmark(
+            db,
+            group_by="engineer_id",
+            target_value=engineer_id,
+            team_id=engineer.team_id,
+            start_date=start_date,
+            end_date=end_date,
+        ),
+        pr_merge_rate=quality_metrics.overview.pr_merge_rate if quality_metrics else None,
+        findings_fix_rate=(
+            quality_metrics.findings_overview.fix_rate
+            if quality_metrics and quality_metrics.findings_overview
+            else None
+        ),
+        total_sessions=overview.total_sessions,
+        sessions_with_commits=(
+            quality_metrics.overview.sessions_with_commits if quality_metrics else 0
+        ),
+    )
+
     return EngineerProfileResponse(
         engineer_id=engineer.id,
         name=engineer.name,
@@ -270,6 +303,7 @@ def get_engineer_profile(
         learning_paths=eng_paths,
         quality=quality,
         leverage_score=leverage_score,
+        effectiveness=effectiveness,
         projects=projects,
         tool_rankings=tool_rankings,
     )

@@ -3,7 +3,17 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from primer.common.models import Engineer, Session, Team, ToolUsage
+from primer.common.models import (
+    Engineer,
+    GitRepository,
+    ModelUsage,
+    PullRequest,
+    Session,
+    SessionCommit,
+    SessionFacets,
+    Team,
+    ToolUsage,
+)
 
 
 @pytest.fixture()
@@ -102,6 +112,78 @@ def test_maturity_with_data(client, admin_headers, seeded_maturity_data):
     assert alice["orchestration_calls"] == 3
     assert alice["skill_calls"] == 2
     assert bob["orchestration_calls"] == 0
+
+
+def test_maturity_effectiveness_scores_reflect_quality_and_follow_through(
+    client, admin_headers, seeded_maturity_data, db_session
+):
+    now = datetime.now(tz=UTC)
+    team = seeded_maturity_data["team"]
+    alice = seeded_maturity_data["eng1"]
+    alice_session = seeded_maturity_data["s1"]
+    bob_session = seeded_maturity_data["s2"]
+
+    repo = GitRepository(full_name=f"acme/{uuid.uuid4().hex[:8]}")
+    db_session.add(repo)
+    db_session.flush()
+
+    db_session.add_all(
+        [
+            SessionFacets(session_id=alice_session.id, outcome="success", session_type="feature"),
+            SessionFacets(session_id=bob_session.id, outcome="failure", session_type="debugging"),
+            ModelUsage(
+                session_id=alice_session.id,
+                model_name="claude-sonnet-4-5-20250929",
+                input_tokens=1000,
+                output_tokens=500,
+                cache_read_tokens=0,
+                cache_creation_tokens=0,
+            ),
+            ModelUsage(
+                session_id=bob_session.id,
+                model_name="claude-sonnet-4-5-20250929",
+                input_tokens=4000,
+                output_tokens=2000,
+                cache_read_tokens=0,
+                cache_creation_tokens=0,
+            ),
+        ]
+    )
+
+    pr = PullRequest(
+        repository_id=repo.id,
+        engineer_id=alice.id,
+        github_pr_number=101,
+        title="Ship maturity work",
+        state="merged",
+        pr_created_at=now - timedelta(days=1),
+        merged_at=now - timedelta(hours=8),
+    )
+    db_session.add(pr)
+    db_session.flush()
+    db_session.add(
+        SessionCommit(
+            session_id=alice_session.id,
+            repository_id=repo.id,
+            pull_request_id=pr.id,
+            commit_sha=uuid.uuid4().hex[:12],
+            commit_message="feat: improve maturity",
+            committed_at=now - timedelta(hours=12),
+        )
+    )
+    db_session.flush()
+
+    response = client.get(f"/api/v1/analytics/maturity?team_id={team.id}", headers=admin_headers)
+    assert response.status_code == 200
+    data = response.json()
+
+    alice_profile = next(item for item in data["engineer_profiles"] if item["name"] == "Alice")
+    bob_profile = next(item for item in data["engineer_profiles"] if item["name"] == "Bob")
+
+    assert alice_profile["effectiveness_score"] is not None
+    assert bob_profile["effectiveness_score"] is not None
+    assert alice_profile["effectiveness_score"] > bob_profile["effectiveness_score"]
+    assert data["avg_effectiveness_score"] is not None
 
 
 def test_maturity_orchestration_adoption(client, admin_headers, seeded_maturity_data):

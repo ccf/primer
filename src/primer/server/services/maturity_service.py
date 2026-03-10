@@ -12,6 +12,8 @@ from primer.common.models import (
     Engineer,
     GitRepository,
     ModelUsage,
+    PullRequest,
+    SessionCommit,
     SessionFacets,
     ToolUsage,
 )
@@ -29,10 +31,10 @@ from primer.common.schemas import (
 from primer.common.tool_classification import (
     CATEGORIES,
     classify_tools,
-    compute_effectiveness_score,
     compute_leverage_score,
 )
 from primer.server.services.analytics_service import base_session_query
+from primer.server.services.effectiveness_service import build_effectiveness_score
 
 
 def get_maturity_analytics(
@@ -152,6 +154,48 @@ def get_maturity_analytics(
         eng_success_counts[eid] = successes
         eng_success_rates[eid] = successes / len(outcomes) if outcomes else 0.0
 
+    eng_session_counts = {
+        eid: count
+        for eid, count in sessions_q.with_entities(
+            SessionModel.engineer_id, func.count(SessionModel.id)
+        )
+        .group_by(SessionModel.engineer_id)
+        .all()
+    }
+
+    eng_sessions_with_commits = {
+        eid: count
+        for eid, count in db.query(
+            SessionModel.engineer_id,
+            func.count(func.distinct(SessionCommit.session_id)),
+        )
+        .join(SessionCommit, SessionCommit.session_id == SessionModel.id)
+        .filter(SessionModel.id.in_(db.query(session_id_subq.c.id)))
+        .group_by(SessionModel.engineer_id)
+        .all()
+    }
+
+    eng_pr_state_rows = (
+        db.query(SessionModel.engineer_id, SessionCommit.pull_request_id, PullRequest.state)
+        .join(SessionCommit, SessionCommit.session_id == SessionModel.id)
+        .join(PullRequest, PullRequest.id == SessionCommit.pull_request_id)
+        .filter(
+            SessionModel.id.in_(db.query(session_id_subq.c.id)),
+            SessionCommit.pull_request_id.isnot(None),
+        )
+        .all()
+    )
+    eng_pr_states: dict[str, dict[str, str]] = defaultdict(dict)
+    for eid, pr_id, state in eng_pr_state_rows:
+        eng_pr_states[eid][pr_id] = state
+
+    eng_merge_rates: dict[str, float | None] = {}
+    for eid, pr_states in eng_pr_states.items():
+        merged = sum(1 for state in pr_states.values() if state == "merged")
+        closed = sum(1 for state in pr_states.values() if state == "closed")
+        denominator = merged + closed
+        eng_merge_rates[eid] = merged / denominator if denominator > 0 else None
+
     # Cost per engineer — use actual per-model pricing from ModelUsage rows
     eng_total_cost: dict[str, float] = {}
     for sid, model_name, input_tok, output_tok in model_rows:
@@ -186,10 +230,6 @@ def get_maturity_analytics(
             eng_cost_per_success[eid] = cost / successes
         else:
             eng_cost_per_success[eid] = None
-
-    # Team median cost per success for effectiveness normalization
-    valid_costs = [c for c in eng_cost_per_success.values() if c is not None]
-    team_median_cps = median(valid_costs) if valid_costs else None
 
     # 2. Per-engineer leverage + effectiveness profiles
     engineer_profiles: list[EngineerLeverageProfile] = []
@@ -226,14 +266,23 @@ def get_maturity_analytics(
             engineers_using_teams += 1
 
         # Effectiveness
-        eff_score, _eff_breakdown = compute_effectiveness_score(
+        peer_costs = [
+            cost
+            for other_eid, cost in eng_cost_per_success.items()
+            if other_eid != eid and cost is not None
+        ]
+        peer_median_cps = median(peer_costs) if peer_costs else None
+        effectiveness = build_effectiveness_score(
             success_rate=eng_success_rates.get(eid),
-            cost_per_success=eng_cost_per_success.get(eid),
-            team_median_cost_per_success=team_median_cps,
-            avg_health_score=None,  # health computed dynamically, not stored
+            cost_per_successful_outcome=eng_cost_per_success.get(eid),
+            benchmark_cost_per_successful_outcome=peer_median_cps,
+            pr_merge_rate=eng_merge_rates.get(eid),
+            findings_fix_rate=None,
+            total_sessions=eng_session_counts.get(eid, 0),
+            sessions_with_commits=eng_sessions_with_commits.get(eid, 0),
         )
-        if eng_success_rates.get(eid) is not None:
-            all_effectiveness_scores.append(eff_score)
+        if effectiveness.score is not None:
+            all_effectiveness_scores.append(effectiveness.score)
 
         # Top agents/skills/models
         orch = classified_eng["orchestration"]
@@ -254,7 +303,7 @@ def get_maturity_analytics(
                 engineer_id=eid,
                 name=engineer_names.get(eid, "Unknown"),
                 leverage_score=score,
-                effectiveness_score=eff_score if eng_success_rates.get(eid) is not None else None,
+                effectiveness_score=effectiveness.score,
                 leverage_breakdown=LeverageBreakdown(**breakdown) if breakdown else None,
                 total_tool_calls=total_calls,
                 orchestration_calls=orch_calls,
