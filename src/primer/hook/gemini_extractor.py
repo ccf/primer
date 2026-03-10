@@ -45,13 +45,12 @@ class GeminiExtractor:
         seen_ids: set[str] = set()
 
         for session_file in tmp_dir.glob("*/chats/session-*.json"):
-            session_id = session_file.stem
+            session_id = self._discover_chat_session_id(session_file)
             if session_id in seen_ids:
                 continue
             seen_ids.add(session_id)
 
-            # Try to infer project path from parent directory structure
-            project_path = self._infer_project_path(session_file)
+            project_path, _project_name = self._infer_project_context(session_file)
 
             results.append(
                 LocalSession(
@@ -70,27 +69,48 @@ class GeminiExtractor:
 
     def extract(self, transcript_path: str) -> SessionMetadata:
         """Parse a Gemini CLI session JSON file into SessionMetadata."""
-        meta = SessionMetadata(agent_type=self.agent_type)
-        tool_counter: Counter[str] = Counter()
-        model_tokens: dict[str, dict[str, int]] = {}
-        ordinal = 0
-
         path, selected_session_id = self._split_transcript_ref(transcript_path)
         if not path.exists():
-            return meta
+            return SessionMetadata(agent_type=self.agent_type)
 
         try:
             with open(path) as f:
                 data = json.load(f)
         except (json.JSONDecodeError, OSError):
-            return meta
+            return SessionMetadata(agent_type=self.agent_type)
 
         if self._looks_like_logs_payload(data):
             return self._extract_logs_payload(path, data, selected_session_id)
 
-        meta.session_id = selected_session_id or path.stem
+        if self._looks_like_chat_messages_payload(data):
+            return self._extract_messages_payload(path, data, selected_session_id)
 
-        # Extract content array
+        return self._extract_contents_payload(path, data, selected_session_id)
+
+    def _extract_contents_payload(
+        self,
+        path: Path,
+        data: dict | list,
+        selected_session_id: str | None,
+    ) -> SessionMetadata:
+        meta = SessionMetadata(agent_type=self.agent_type)
+        tool_counter: Counter[str] = Counter()
+        model_tokens: dict[str, dict[str, int]] = {}
+        ordinal = 0
+
+        if isinstance(data, dict):
+            meta.session_id = str(
+                selected_session_id or data.get("sessionId") or data.get("session_id") or path.stem
+            )
+        else:
+            meta.session_id = selected_session_id or path.stem
+
+        project_path, project_name = self._infer_project_context(path, data)
+        if project_path:
+            meta.project_path = project_path
+        if project_name:
+            meta.project_name = project_name
+
         contents = data if isinstance(data, list) else data.get("contents", data.get("Content", []))
         if not isinstance(contents, list):
             return meta
@@ -186,6 +206,120 @@ class GeminiExtractor:
 
         return meta
 
+    def _extract_messages_payload(
+        self,
+        path: Path,
+        data: dict,
+        selected_session_id: str | None,
+    ) -> SessionMetadata:
+        meta = SessionMetadata(agent_type=self.agent_type)
+        tool_counter: Counter[str] = Counter()
+        model_tokens: dict[str, dict[str, int]] = {}
+        ordinal = 0
+
+        meta.session_id = str(
+            selected_session_id or data.get("sessionId") or data.get("session_id") or path.stem
+        )
+
+        project_path, project_name = self._infer_project_context(path, data)
+        if project_path:
+            meta.project_path = project_path
+        if project_name:
+            meta.project_name = project_name
+
+        messages = data.get("messages", [])
+        if not isinstance(messages, list):
+            return meta
+
+        first_ts = self._parse_content_timestamp(data)
+        last_ts = self._parse_content_timestamp({"timestamp": data.get("lastUpdated")})
+
+        for message in messages:
+            if not isinstance(message, dict):
+                continue
+
+            ts = self._parse_content_timestamp(message)
+            if ts:
+                if first_ts is None:
+                    first_ts = ts
+                last_ts = ts
+
+            message_type = str(message.get("type") or "").lower()
+            if message_type == "user":
+                text = self._extract_message_text(message.get("content"))
+                meta.message_count += 1
+                meta.user_message_count += 1
+                if text and not meta.first_prompt:
+                    meta.first_prompt = text[:500]
+
+                msg = {
+                    "ordinal": ordinal,
+                    "role": "human",
+                    "content_text": text[:2000] if text else None,
+                }
+                meta.messages.append(msg)
+                ordinal += 1
+                continue
+
+            if message_type not in {"gemini", "assistant", "model"}:
+                continue
+
+            tool_calls = self._extract_tool_calls(message.get("toolCalls"))
+            tool_results = self._extract_tool_results(message.get("toolCalls"))
+            text = self._extract_message_text(message.get("content"))
+            model = message.get("model")
+
+            if text or tool_calls:
+                meta.message_count += 1
+                meta.assistant_message_count += 1
+                msg: dict = {"ordinal": ordinal, "role": "assistant"}
+                if text:
+                    msg["content_text"] = text[:2000]
+                if tool_calls:
+                    msg["tool_calls"] = tool_calls
+                if tool_results:
+                    msg["tool_results"] = tool_results
+                total_tokens = self._extract_token_count(message.get("tokens"))
+                if total_tokens is not None:
+                    msg["token_count"] = total_tokens
+                if model:
+                    msg["model"] = str(model)
+                meta.messages.append(msg)
+                ordinal += 1
+
+            for tool_call in tool_calls:
+                tool_name = tool_call.get("name", "tool_call")
+                tool_counter[tool_name] += 1
+                meta.tool_call_count += 1
+
+            tokens = message.get("tokens")
+            if isinstance(tokens, dict) and model:
+                self._apply_usage(meta, model_tokens, str(model), tokens)
+
+        meta.tool_counts = dict(tool_counter)
+        meta.started_at = first_ts
+        meta.ended_at = last_ts
+        if first_ts and last_ts:
+            meta.duration_seconds = (last_ts - first_ts).total_seconds()
+
+        if not model_tokens:
+            telemetry_tokens = self._load_telemetry_tokens(meta.session_id)
+            if telemetry_tokens:
+                model_tokens.update(telemetry_tokens)
+                for model_data in telemetry_tokens.values():
+                    meta.input_tokens += model_data.get("input", 0)
+                    meta.output_tokens += model_data.get("output", 0)
+                    meta.cache_read_tokens += model_data.get("cache_read", 0)
+
+        meta.model_tokens = model_tokens
+        if model_tokens:
+            meta.primary_model = max(
+                model_tokens,
+                key=lambda m: model_tokens[m].get("input", 0) + model_tokens[m].get("output", 0),
+            )
+
+        return meta
+
     def _discover_log_sessions(self, log_file: Path, seen_ids: set[str]) -> list:
         from primer.mcp.reader import LocalSession
 
@@ -199,7 +333,7 @@ class GeminiExtractor:
             return []
 
         results: list[LocalSession] = []
-        project_path = self._infer_project_path(log_file)
+        project_path, _project_name = self._infer_project_context(log_file)
         ordered_session_ids: list[str] = []
         seen_in_file: set[str] = set()
         for entry in data:
@@ -252,6 +386,11 @@ class GeminiExtractor:
             return meta
 
         meta.session_id = selected_session_id or str(entries[0].get("sessionId") or "")
+        project_path, project_name = self._infer_project_context(path)
+        if project_path:
+            meta.project_path = project_path
+        if project_name:
+            meta.project_name = project_name
 
         for entry in entries:
             entry_type = str(entry.get("type") or "").lower()
@@ -363,6 +502,14 @@ class GeminiExtractor:
         )
 
     @staticmethod
+    def _looks_like_chat_messages_payload(data: object) -> bool:
+        return (
+            isinstance(data, dict)
+            and isinstance(data.get("messages"), list)
+            and any(isinstance(message, dict) for message in data.get("messages", []))
+        )
+
+    @staticmethod
     def _parse_content_timestamp(content: dict) -> datetime | None:
         for key in ("timestamp", "createTime", "create_time"):
             ts_str = content.get(key)
@@ -438,9 +585,18 @@ class GeminiExtractor:
         if model not in model_tokens:
             model_tokens[model] = {"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0}
 
-        input_t = usage.get("input_token_count", usage.get("promptTokenCount", 0))
-        output_t = usage.get("output_token_count", usage.get("candidatesTokenCount", 0))
-        cached_t = usage.get("cached_content_token_count", usage.get("cachedContentTokenCount", 0))
+        input_t = usage.get(
+            "input_token_count",
+            usage.get("promptTokenCount", usage.get("input", 0)),
+        )
+        output_t = usage.get(
+            "output_token_count",
+            usage.get("candidatesTokenCount", usage.get("output", 0)),
+        )
+        cached_t = usage.get(
+            "cached_content_token_count",
+            usage.get("cachedContentTokenCount", usage.get("cached", 0)),
+        )
 
         model_tokens[model]["input"] += input_t
         model_tokens[model]["output"] += output_t
@@ -494,24 +650,173 @@ class GeminiExtractor:
 
         return model_tokens if model_tokens else None
 
-    @staticmethod
-    def _infer_project_path(session_file: Path) -> str | None:
-        """Try to infer project path from the hash directory structure.
+    def _discover_chat_session_id(self, session_file: Path) -> str:
+        try:
+            with open(session_file) as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return session_file.stem
 
-        Gemini stores sessions under ~/.gemini/tmp/<project_hash>/... — the hash
-        isn't reversible, so we return None unless we find a metadata file.
-        """
+        if isinstance(data, dict):
+            session_id = data.get("sessionId") or data.get("session_id")
+            if isinstance(session_id, str) and session_id:
+                return session_id
+        return session_file.stem
+
+    def _infer_project_context(
+        self,
+        session_file: Path,
+        payload: dict | list | None = None,
+    ) -> tuple[str | None, str | None]:
         project_dir = (
             session_file.parent.parent
             if session_file.parent.name == "chats"
             else session_file.parent
         )
+
         meta_file = project_dir / "metadata.json"
+        project_path: str | None = None
+        project_name: str | None = None
+
         if meta_file.exists():
             try:
                 with open(meta_file) as f:
                     data = json.load(f)
-                return data.get("project_path") or data.get("cwd")
+                if isinstance(data, dict):
+                    project_path = data.get("project_path") or data.get("cwd")
+                    project_name = data.get("project_name")
             except (json.JSONDecodeError, OSError):
                 pass
+
+        if not project_path:
+            project_root_file = project_dir / ".project_root"
+            if project_root_file.exists():
+                try:
+                    raw_path = project_root_file.read_text().strip()
+                    if raw_path:
+                        project_path = raw_path
+                except OSError:
+                    pass
+
+        if not project_name and project_path:
+            project_name = self._lookup_project_name(project_path)
+
+        if not project_name and project_path:
+            project_name = Path(project_path).name
+
+        if not project_name:
+            project_name = project_dir.name or None
+
+        if not project_path and isinstance(payload, dict):
+            project_hash = payload.get("projectHash") or payload.get("project_hash")
+            if isinstance(project_hash, str) and project_hash:
+                project_path = self._resolve_project_path_from_hash(project_hash)
+                if project_path and not project_name:
+                    project_name = (
+                        self._lookup_project_name(project_path) or Path(project_path).name
+                    )
+
+        return project_path, project_name
+
+    def _lookup_project_name(self, project_path: str) -> str | None:
+        projects_file = self.get_data_dir() / "projects.json"
+        if not projects_file.exists():
+            return None
+
+        try:
+            with open(projects_file) as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return None
+
+        projects = data.get("projects") if isinstance(data, dict) else None
+        if not isinstance(projects, dict):
+            return None
+
+        project_name = projects.get(project_path)
+        return project_name if isinstance(project_name, str) and project_name else None
+
+    def _resolve_project_path_from_hash(self, project_hash: str) -> str | None:
+        for session_dir in self.get_data_dir().glob("tmp/*"):
+            if session_dir.name == project_hash:
+                project_root = session_dir / ".project_root"
+                if project_root.exists():
+                    try:
+                        raw_path = project_root.read_text().strip()
+                    except OSError:
+                        continue
+                    if raw_path:
+                        return raw_path
+        return None
+
+    @staticmethod
+    def _extract_message_text(content: object) -> str:
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            texts: list[str] = []
+            for part in content:
+                if isinstance(part, str):
+                    texts.append(part)
+                elif isinstance(part, dict) and isinstance(part.get("text"), str):
+                    texts.append(part["text"])
+            return " ".join(texts)
+        return ""
+
+    @staticmethod
+    def _extract_tool_calls(tool_calls: object) -> list[dict]:
+        if not isinstance(tool_calls, list):
+            return []
+
+        extracted_calls: list[dict] = []
+        for tool_call in tool_calls:
+            if not isinstance(tool_call, dict):
+                continue
+            tool_name = tool_call.get("name") or "tool_call"
+            args = tool_call.get("args", {})
+            try:
+                input_preview = json.dumps(args)
+            except (TypeError, ValueError):
+                input_preview = str(args)
+            extracted_calls.append({"name": tool_name, "input_preview": input_preview[:500]})
+        return extracted_calls
+
+    @staticmethod
+    def _extract_tool_results(tool_calls: object) -> list[dict]:
+        if not isinstance(tool_calls, list):
+            return []
+
+        tool_results: list[dict] = []
+        for tool_call in tool_calls:
+            if not isinstance(tool_call, dict):
+                continue
+            default_name = tool_call.get("name") or "tool_result"
+            for result in tool_call.get("result", []):
+                if not isinstance(result, dict):
+                    continue
+                function_response = result.get("functionResponse")
+                if not isinstance(function_response, dict):
+                    continue
+                response = function_response.get("response", {})
+                try:
+                    output_preview = json.dumps(response)
+                except (TypeError, ValueError):
+                    output_preview = str(response)
+                tool_results.append(
+                    {
+                        "name": function_response.get("name") or default_name,
+                        "output_preview": output_preview[:500],
+                    }
+                )
+        return tool_results
+
+    @staticmethod
+    def _extract_token_count(tokens: object) -> int | None:
+        if not isinstance(tokens, dict):
+            return None
+        total = tokens.get("total")
+        if isinstance(total, int):
+            return total
+        if isinstance(total, float):
+            return int(total)
         return None

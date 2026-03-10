@@ -87,6 +87,88 @@ def test_extract_basic_session(tmp_path):
     assert meta.duration_seconds == 10.0
 
 
+def test_extract_current_session_messages_payload(tmp_path, monkeypatch):
+    gemini_home = tmp_path / ".gemini"
+    chats_dir = gemini_home / "tmp" / "current-project" / "chats"
+    chats_dir.mkdir(parents=True)
+
+    project_path = "/Users/example/current-gemini"
+    (chats_dir.parent / ".project_root").write_text(project_path)
+    (gemini_home / "projects.json").write_text(json.dumps({"projects": {project_path: "primer"}}))
+
+    session_file = chats_dir / "session-2026-03-09T11-16-abc123.json"
+    session_file.write_text(
+        json.dumps(
+            {
+                "sessionId": "gemini-uuid-1",
+                "projectHash": "hash-1",
+                "startTime": "2026-03-09T11:22:43.485Z",
+                "lastUpdated": "2026-03-09T11:22:47.704Z",
+                "messages": [
+                    {
+                        "id": "user-1",
+                        "timestamp": "2026-03-09T11:22:43.485Z",
+                        "type": "user",
+                        "content": [{"text": "Review the repository"}],
+                    },
+                    {
+                        "id": "assistant-1",
+                        "timestamp": "2026-03-09T11:22:47.665Z",
+                        "type": "gemini",
+                        "content": "I'll inspect the project structure first.",
+                        "tokens": {"input": 120, "output": 30, "cached": 10, "total": 160},
+                        "model": "gemini-3-flash-preview",
+                        "toolCalls": [
+                            {
+                                "id": "read_file_1",
+                                "name": "read_file",
+                                "args": {"file_path": "README.md"},
+                                "result": [
+                                    {
+                                        "functionResponse": {
+                                            "id": "read_file_1",
+                                            "name": "read_file",
+                                            "response": {"output": "Primer README"},
+                                        }
+                                    }
+                                ],
+                            }
+                        ],
+                    },
+                ],
+            }
+        )
+    )
+
+    from pathlib import Path
+
+    original_home = Path.home
+    Path.home = staticmethod(lambda: tmp_path)
+    try:
+        extractor = GeminiExtractor()
+        meta = extractor.extract(str(session_file))
+    finally:
+        Path.home = original_home
+
+    assert meta.session_id == "gemini-uuid-1"
+    assert meta.project_path == project_path
+    assert meta.project_name == "primer"
+    assert meta.message_count == 2
+    assert meta.user_message_count == 1
+    assert meta.assistant_message_count == 1
+    assert meta.tool_call_count == 1
+    assert meta.tool_counts == {"read_file": 1}
+    assert meta.first_prompt == "Review the repository"
+    assert meta.input_tokens == 120
+    assert meta.output_tokens == 30
+    assert meta.cache_read_tokens == 10
+    assert meta.primary_model == "gemini-3-flash-preview"
+    assert meta.messages[1]["model"] == "gemini-3-flash-preview"
+    assert meta.messages[1]["token_count"] == 160
+    assert meta.messages[1]["tool_calls"][0]["name"] == "read_file"
+    assert meta.messages[1]["tool_results"][0]["name"] == "read_file"
+
+
 def test_extract_contents_as_list():
     """Handle case where the file is just a list of contents (no wrapper)."""
     data = [
@@ -177,6 +259,55 @@ def test_discover_sessions(tmp_path):
         assert sessions[0].has_facets is False
     finally:
         Path.home = original_home
+
+
+def test_discover_sessions_prefers_chat_file_over_logs_for_same_session_id(tmp_path):
+    chats_dir = tmp_path / ".gemini" / "tmp" / "current-project" / "chats"
+    chats_dir.mkdir(parents=True)
+
+    session_file = chats_dir / "session-2026-03-09T11-16-abc123.json"
+    session_file.write_text(
+        json.dumps(
+            {
+                "sessionId": "gemini-chat-1",
+                "messages": [{"type": "user", "content": [{"text": "Hello"}]}],
+            }
+        )
+    )
+
+    (chats_dir.parent / "logs.json").write_text(
+        json.dumps(
+            [
+                {
+                    "sessionId": "gemini-chat-1",
+                    "type": "user",
+                    "message": "Thin duplicate log entry",
+                    "timestamp": "2025-02-01T10:00:00Z",
+                },
+                {
+                    "sessionId": "gemini-log-2",
+                    "type": "user",
+                    "message": "Second session",
+                    "timestamp": "2025-02-01T10:01:00Z",
+                },
+            ]
+        )
+    )
+
+    from pathlib import Path
+
+    original_home = Path.home
+    Path.home = staticmethod(lambda: tmp_path)
+    try:
+        extractor = GeminiExtractor()
+        sessions = extractor.discover_sessions()
+    finally:
+        Path.home = original_home
+
+    sessions_by_id = {session.session_id: session for session in sessions}
+    assert set(sessions_by_id) == {"gemini-chat-1", "gemini-log-2"}
+    assert sessions_by_id["gemini-chat-1"].transcript_path == str(session_file)
+    assert sessions_by_id["gemini-log-2"].transcript_path.endswith("logs.json::gemini-log-2")
 
 
 def test_extract_shared_logs_session(tmp_path):
