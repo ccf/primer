@@ -826,6 +826,37 @@ export interface ProjectEnablementSummary {
   top_models: string[]
 }
 
+export interface ProjectWorkflowFingerprint {
+  fingerprint_id: string
+  label: string
+  session_type: string | null
+  steps: string[]
+  session_count: number
+  share_of_sessions: number
+  success_rate: number | null
+  avg_duration_seconds: number | null
+  top_tools: string[]
+  top_friction_types: string[]
+}
+
+export interface ProjectFrictionHotspot {
+  friction_type: string
+  session_count: number
+  share_of_sessions: number
+  total_occurrences: number
+  impact_score: number | null
+  linked_fingerprints: string[]
+  sample_details: string[]
+}
+
+export interface ProjectWorkflowSummary {
+  fingerprinted_sessions: number
+  total_sessions: number
+  coverage_pct: number
+  fingerprints: ProjectWorkflowFingerprint[]
+  friction_hotspots: ProjectFrictionHotspot[]
+}
+
 export interface ProjectWorkspaceResponse {
   project: ProjectStats
   scorecard: ProjectScorecard
@@ -837,6 +868,7 @@ export interface ProjectWorkspaceResponse {
   friction_impacts: FrictionImpact[]
   repositories: ProjectRepositorySummary[]
   enablement: ProjectEnablementSummary
+  workflow_summary: ProjectWorkflowSummary
 }
 
 export interface GitHubStatusResponse {
