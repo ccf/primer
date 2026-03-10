@@ -1117,9 +1117,24 @@ class QualityMetricsResponse(BaseModel):
     github_connected: bool
 
 
+class EffectivenessBreakdown(BaseModel):
+    success_rate: float | None = None
+    cost_efficiency: float | None = None
+    quality_outcomes: float | None = None
+    follow_through: float | None = None
+
+
+class EffectivenessScore(BaseModel):
+    score: float | None = None
+    breakdown: EffectivenessBreakdown = Field(default_factory=EffectivenessBreakdown)
+    cost_per_successful_outcome: float | None = None
+    benchmark_cost_per_successful_outcome: float | None = None
+
+
 class ProjectScorecard(BaseModel):
     adoption_rate: float | None = None
     effectiveness_rate: float | None = None
+    effectiveness_score: EffectivenessScore | None = None
     quality_rate: float | None = None
     avg_cost_per_session: float | None = None
     cost_per_successful_outcome: float | None = None
@@ -1346,6 +1361,7 @@ class EngineerProfileResponse(BaseModel):
     learning_paths: list[EngineerLearningPath]
     quality: dict  # flexible dict for quality metrics
     leverage_score: float | None = None
+    effectiveness: EffectivenessScore | None = None
     projects: list[str] = []
     tool_rankings: list[ToolRanking] = []
 

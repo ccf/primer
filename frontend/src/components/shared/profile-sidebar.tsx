@@ -1,4 +1,4 @@
-import { Activity, Target, DollarSign, Clock, Zap } from "lucide-react"
+import { Activity, BadgeCheck, Target, DollarSign, Clock, Zap } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { InlineStat } from "@/components/ui/inline-stat"
 import { formatNumber, formatPercent, formatCost, formatDuration } from "@/lib/utils"
@@ -12,6 +12,9 @@ interface ProfileSidebarProps {
     github_username: string | null
     team_name: string | null
     leverage_score?: number | null
+    effectiveness?: {
+      score: number | null
+    } | null
     projects?: string[]
     overview: {
       total_sessions: number
@@ -43,6 +46,14 @@ export function ProfileSidebar({ profile }: ProfileSidebarProps) {
       label: "Leverage",
       value: profile.leverage_score.toFixed(1),
       icon: Zap,
+    })
+  }
+
+  if (profile.effectiveness?.score != null) {
+    stats.push({
+      label: "Effectiveness",
+      value: profile.effectiveness.score.toFixed(1),
+      icon: BadgeCheck,
     })
   }
 

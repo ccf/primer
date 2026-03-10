@@ -19,7 +19,7 @@ export function MaturitySummary({ data }: MaturitySummaryProps) {
       <StatCard
         label="Avg Effectiveness"
         value={data.avg_effectiveness_score != null ? data.avg_effectiveness_score.toFixed(1) : "N/A"}
-        subtitle="Success rate, cost efficiency"
+        subtitle="Success, quality, follow-through, and cost"
         icon={Target}
       />
       <StatCard

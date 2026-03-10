@@ -782,9 +782,24 @@ export interface QualityMetricsResponse {
   github_connected: boolean
 }
 
+export interface EffectivenessBreakdown {
+  success_rate: number | null
+  cost_efficiency: number | null
+  quality_outcomes: number | null
+  follow_through: number | null
+}
+
+export interface EffectivenessScore {
+  score: number | null
+  breakdown: EffectivenessBreakdown
+  cost_per_successful_outcome: number | null
+  benchmark_cost_per_successful_outcome: number | null
+}
+
 export interface ProjectScorecard {
   adoption_rate: number | null
   effectiveness_rate: number | null
+  effectiveness_score: EffectivenessScore | null
   quality_rate: number | null
   avg_cost_per_session: number | null
   cost_per_successful_outcome: number | null
@@ -1003,6 +1018,7 @@ export interface EngineerProfileResponse {
   learning_paths: EngineerLearningPath[]
   quality: Record<string, unknown>
   leverage_score: number | null
+  effectiveness: EffectivenessScore | null
   projects: string[]
   tool_rankings: ToolRanking[]
 }
