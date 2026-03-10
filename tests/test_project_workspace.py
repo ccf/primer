@@ -2,7 +2,13 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
-from primer.common.models import GitRepository, PullRequest, ReviewFinding, SessionCommit
+from primer.common.models import (
+    GitRepository,
+    PullRequest,
+    ReviewFinding,
+    SessionCommit,
+    SessionFacets,
+)
 
 
 def _ingest_project_session(
@@ -85,6 +91,19 @@ def _ingest_project_session(
     return payload["session_id"]
 
 
+def _ensure_project_facets(db_session, session_id: str, *, session_type: str) -> None:
+    record = db_session.query(SessionFacets).filter(SessionFacets.session_id == session_id).first()
+    if record is None:
+        record = SessionFacets(session_id=session_id)
+        db_session.add(record)
+
+    record.outcome = "success"
+    record.session_type = session_type
+    record.primary_success = "complete"
+    record.friction_counts = {"context_switching": 1}
+    record.friction_detail = "Needed to reconcile two competing approaches."
+
+
 def test_project_workspace_endpoint_returns_composed_views(
     client, engineer_with_key, admin_headers, db_session
 ):
@@ -98,7 +117,7 @@ def test_project_workspace_endpoint_returns_composed_views(
         with_commit=True,
         session_type="implementation",
     )
-    _ingest_project_session(
+    codex_session_id = _ingest_project_session(
         client,
         api_key,
         project_name="workspace-proj",
@@ -115,6 +134,8 @@ def test_project_workspace_endpoint_returns_composed_views(
         git_remote_url="https://github.com/acme/other.git",
         with_commit=True,
     )
+    _ensure_project_facets(db_session, workspace_session_id, session_type="implementation")
+    _ensure_project_facets(db_session, codex_session_id, session_type="debugging")
 
     workspace_repo = (
         db_session.query(GitRepository).filter(GitRepository.full_name == "acme/workspace").one()
@@ -199,7 +220,7 @@ def test_project_workspace_endpoint_returns_composed_views(
             detected_at=datetime.now(UTC) - timedelta(days=1),
         )
     )
-    db_session.commit()
+    db_session.flush()
 
     response = client.get(
         "/api/v1/analytics/projects/workspace-proj/workspace",
