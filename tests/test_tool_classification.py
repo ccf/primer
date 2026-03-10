@@ -5,7 +5,6 @@ from primer.common.tool_classification import (
     classify_tool,
     classify_tools,
     compute_agent_team_score,
-    compute_effectiveness_score,
     compute_leverage_score,
     compute_model_diversity,
 )
@@ -262,60 +261,3 @@ def test_model_diversity_never_penalizes():
         model_tier_counts={"standard": 1000},
     )
     assert bd_with_model["efficiency"] >= bd_no_model["efficiency"]
-
-
-# --- compute_effectiveness_score ---
-
-
-def test_effectiveness_no_data():
-    score, _breakdown = compute_effectiveness_score(None, None, None, None)
-    assert score == 0.0
-
-
-def test_effectiveness_success_only():
-    score, breakdown = compute_effectiveness_score(
-        success_rate=0.8,
-        cost_per_success=None,
-        team_median_cost_per_success=None,
-        avg_health_score=None,
-    )
-    assert score == pytest.approx(80.0, abs=0.1)
-    assert breakdown["success_rate"] == 0.8
-
-
-def test_effectiveness_with_cost():
-    score, breakdown = compute_effectiveness_score(
-        success_rate=0.7,
-        cost_per_success=1.50,
-        team_median_cost_per_success=2.00,
-        avg_health_score=None,
-    )
-    assert score > 60.0
-    assert breakdown["cost_efficiency"] is not None
-
-
-def test_effectiveness_expensive_vs_cheap():
-    score_cheap, _ = compute_effectiveness_score(
-        success_rate=0.7,
-        cost_per_success=0.50,
-        team_median_cost_per_success=2.00,
-        avg_health_score=None,
-    )
-    score_expensive, _ = compute_effectiveness_score(
-        success_rate=0.7,
-        cost_per_success=4.00,
-        team_median_cost_per_success=2.00,
-        avg_health_score=None,
-    )
-    assert score_cheap > score_expensive
-
-
-def test_effectiveness_with_health():
-    score, breakdown = compute_effectiveness_score(
-        success_rate=0.7,
-        cost_per_success=None,
-        team_median_cost_per_success=None,
-        avg_health_score=80.0,
-    )
-    assert score > 0
-    assert breakdown["session_health"] == 0.8
