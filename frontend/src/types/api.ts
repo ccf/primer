@@ -1000,6 +1000,25 @@ export interface WeeklyMetricPoint {
   session_count: number
 }
 
+export interface WorkflowPlaybook {
+  playbook_id: string
+  title: string
+  summary: string
+  scope: string
+  adoption_state: string
+  session_type: string | null
+  steps: string[]
+  recommended_tools: string[]
+  caution_friction_types: string[]
+  example_projects: string[]
+  supporting_session_count: number
+  supporting_peer_count: number
+  success_rate: number | null
+  friction_free_rate: number | null
+  avg_duration_seconds: number | null
+  engineer_usage_count: number
+}
+
 export interface EngineerProfileResponse {
   engineer_id: string
   name: string
@@ -1021,6 +1040,7 @@ export interface EngineerProfileResponse {
   effectiveness: EffectivenessScore | null
   projects: string[]
   tool_rankings: ToolRanking[]
+  workflow_playbooks: WorkflowPlaybook[]
 }
 
 // --- Similar Sessions ---

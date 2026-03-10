@@ -251,6 +251,75 @@ class TestEngineerProfileOverview:
         assert data["effectiveness"]["breakdown"]["follow_through"] == 1.0
         assert data["effectiveness"]["breakdown"]["cost_efficiency"] is not None
 
+    def test_profile_includes_workflow_playbooks_from_peer_patterns(
+        self, client, db_session, engineer_with_key, admin_headers
+    ):
+        eng, _key = engineer_with_key
+        now = datetime.now(UTC)
+        team = db_session.query(Team).filter(Team.id == eng.team_id).one()
+        peer_one, _peer_key = _make_engineer(db_session, team, name="Peer One")
+        peer_two, _peer_key_two = _make_engineer(db_session, team, name="Peer Two")
+
+        target_session = _create_session(
+            db_session,
+            eng,
+            started_at=now - timedelta(hours=1),
+            project_name="primer",
+        )
+        db_session.add(
+            SessionFacets(
+                session_id=target_session.id,
+                session_type="debugging",
+                outcome="partial",
+                friction_counts={"context_switching": 1},
+            )
+        )
+        db_session.add(ToolUsage(session_id=target_session.id, tool_name="Read", call_count=2))
+
+        for idx, peer in enumerate((peer_one, peer_two, peer_one), start=1):
+            session = _create_session(
+                db_session,
+                peer,
+                started_at=now - timedelta(hours=idx + 1),
+                project_name="primer" if idx < 3 else "sdk",
+                duration_seconds=1800 + (idx * 120),
+            )
+            db_session.add(
+                SessionFacets(
+                    session_id=session.id,
+                    session_type="implementation",
+                    outcome="success",
+                    friction_counts=({"context_switching": 1} if idx == 3 else {}),
+                )
+            )
+            db_session.add(ToolUsage(session_id=session.id, tool_name="Grep", call_count=2))
+            db_session.add(ToolUsage(session_id=session.id, tool_name="Read", call_count=3))
+            db_session.add(ToolUsage(session_id=session.id, tool_name="Edit", call_count=2))
+            db_session.add(ToolUsage(session_id=session.id, tool_name="Bash", call_count=1))
+
+        db_session.flush()
+
+        response = client.get(
+            f"/api/v1/analytics/engineers/{eng.id}/profile",
+            headers=admin_headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+
+        assert len(data["workflow_playbooks"]) == 1
+        playbook = data["workflow_playbooks"][0]
+        assert playbook["scope"] == "team"
+        assert playbook["adoption_state"] == "not_used"
+        assert playbook["session_type"] == "implementation"
+        assert playbook["steps"] == ["search", "read", "edit", "execute"]
+        assert playbook["supporting_session_count"] == 3
+        assert playbook["supporting_peer_count"] == 2
+        assert playbook["success_rate"] == 1.0
+        assert playbook["friction_free_rate"] == 0.667
+        assert playbook["recommended_tools"][:3] == ["Read", "Grep", "Edit"]
+        assert playbook["caution_friction_types"] == ["context_switching"]
+        assert playbook["example_projects"] == ["primer", "sdk"]
+
     def test_profile_overview_treats_legacy_outcomes_as_canonical(
         self, client, db_session, engineer_with_key, admin_headers
     ):

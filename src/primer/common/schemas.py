@@ -1343,6 +1343,25 @@ class WeeklyMetricPoint(BaseModel):
     session_count: int
 
 
+class WorkflowPlaybook(BaseModel):
+    playbook_id: str
+    title: str
+    summary: str
+    scope: str
+    adoption_state: str
+    session_type: str | None = None
+    steps: list[str] = Field(default_factory=list)
+    recommended_tools: list[str] = Field(default_factory=list)
+    caution_friction_types: list[str] = Field(default_factory=list)
+    example_projects: list[str] = Field(default_factory=list)
+    supporting_session_count: int
+    supporting_peer_count: int
+    success_rate: float | None = None
+    friction_free_rate: float | None = None
+    avg_duration_seconds: float | None = None
+    engineer_usage_count: int = 0
+
+
 class EngineerProfileResponse(BaseModel):
     engineer_id: str
     name: str
@@ -1364,6 +1383,7 @@ class EngineerProfileResponse(BaseModel):
     effectiveness: EffectivenessScore | None = None
     projects: list[str] = []
     tool_rankings: list[ToolRanking] = []
+    workflow_playbooks: list[WorkflowPlaybook] = []
 
 
 # --- Similar Sessions ---
