@@ -85,6 +85,28 @@ def test_repository_context_transient_error_returns_none():
     assert result is None
 
 
+def test_repository_context_short_circuits_after_positive_match():
+    def fake_check(full_name, path, ref=None, expected_type=None):
+        if path == "tests":
+            return True
+        if path == "pytest.ini":
+            return None
+        return path == ".github/workflows"
+
+    with (
+        patch(
+            "primer.server.services.github_service.get_repository_languages",
+            return_value={"Python": 100},
+        ),
+        patch("primer.server.services.github_service.check_file_exists", side_effect=fake_check),
+    ):
+        result = check_repository_context("org/repo")
+
+    assert result["has_test_harness"] is True
+    assert result["has_ci_pipeline"] is True
+    assert result["test_maturity_score"] == 100.0
+
+
 def test_readiness_transient_error_skips_caching(db_session):
     """sync_repository should not cache readiness results on transient errors."""
     from primer.common.models import GitRepository
