@@ -9,6 +9,8 @@ from primer.common.models import (
     SessionCommit,
     SessionFacets,
 )
+from primer.common.schemas import LanguageShare, ProjectRepositorySummary
+from primer.server.services.project_workspace_service import _build_repository_context_summary
 
 
 def _ingest_project_session(
@@ -338,3 +340,42 @@ def test_project_workspace_missing_project_returns_404(client, admin_headers):
         headers=admin_headers,
     )
     assert response.status_code == 404
+
+
+def test_repository_context_language_mix_ignores_repos_without_language_data():
+    summary = _build_repository_context_summary(
+        [
+            ProjectRepositorySummary(
+                repository="acme/workspace",
+                session_count=2,
+                readiness_checked=True,
+                ai_readiness_score=45.0,
+                primary_language="Python",
+                language_mix=[
+                    LanguageShare(language="Python", share_pct=0.7),
+                    LanguageShare(language="TypeScript", share_pct=0.3),
+                ],
+                repo_size_kb=12_500,
+                repo_size_bucket="medium",
+                has_test_harness=True,
+                has_ci_pipeline=True,
+                test_maturity_score=100.0,
+            ),
+            ProjectRepositorySummary(
+                repository="acme/ops",
+                session_count=1,
+                readiness_checked=False,
+                repo_size_kb=4_000,
+                repo_size_bucket="small",
+                has_test_harness=False,
+                has_ci_pipeline=True,
+                test_maturity_score=30.0,
+            ),
+        ]
+    )
+
+    assert summary.repositories_with_context == 2
+    assert summary.language_mix == [
+        LanguageShare(language="Python", share_pct=0.7),
+        LanguageShare(language="TypeScript", share_pct=0.3),
+    ]
