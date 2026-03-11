@@ -1,17 +1,16 @@
-import { useEffect, useMemo, useState } from "react"
-import { GraduationCap, UserRoundSearch } from "lucide-react"
+import { useState } from "react"
+import { GraduationCap } from "lucide-react"
 import { useSearchParams } from "react-router-dom"
 import {
   useEngineerProfile,
-  useEngineers,
   useOnboardingAcceleration,
   usePatternSharing,
   useSkillInventory,
   useLearningPaths,
 } from "@/hooks/use-api-queries"
-import { useAuth } from "@/lib/auth-context"
-import { getApiKey } from "@/lib/api"
+import { useEngineerChooser } from "@/hooks/use-engineer-chooser"
 import { PageTabs } from "@/components/ui/page-tabs"
+import { EngineerChooserCard } from "@/components/shared/engineer-chooser-card"
 import { PageHeader } from "@/components/shared/page-header"
 import { ChartSkeleton } from "@/components/shared/loading-skeleton"
 import { CohortComparison } from "@/components/growth/cohort-comparison"
@@ -26,7 +25,7 @@ import { TeamSkillGaps } from "@/components/insights/team-skill-gaps"
 import { SkillUniverseChart } from "@/components/growth/skill-universe-chart"
 import { WorkflowPlaybookCards } from "@/components/growth/workflow-playbook-cards"
 import { EngineerSkillTable } from "@/components/insights/engineer-skill-table"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
@@ -38,7 +37,6 @@ const tabs = [
 ] as const
 
 type TabId = (typeof tabs)[number]["id"]
-const PROFILE_ENGINEER_STORAGE_KEY = "primer_profile_engineer_id"
 
 interface TabProps {
   teamId: string | null
@@ -98,51 +96,30 @@ function SkillsTab({ teamId, startDate, endDate }: TabProps) {
 }
 
 function PlaybooksTab({ startDate, endDate }: Omit<TabProps, "teamId">) {
-  const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
-  const isApiKeyUser = !user && !!getApiKey()
   const rawEngineerId = searchParams.get("engineer_id")
-  const rememberedEngineerId =
-    isApiKeyUser && typeof window !== "undefined"
-      ? window.localStorage.getItem(PROFILE_ENGINEER_STORAGE_KEY) ?? ""
-      : ""
-  const engineerId = user?.engineer_id ?? rawEngineerId ?? rememberedEngineerId
+  const {
+    isApiKeyUser,
+    engineerId,
+    selectableEngineers,
+    loadingEngineers,
+    selectEngineer,
+    resetEngineer,
+  } = useEngineerChooser({
+    rawEngineerId,
+    createSearchParams: (nextEngineerId) => {
+      const nextParams = new URLSearchParams(searchParams)
+      if (nextEngineerId) {
+        nextParams.set("engineer_id", nextEngineerId)
+      } else {
+        nextParams.delete("engineer_id")
+      }
+      return nextParams
+    },
+    setSearchParams,
+  })
 
   const { data: profile, isLoading } = useEngineerProfile(engineerId, startDate, endDate)
-  const { data: engineers, isLoading: loadingEngineers } = useEngineers(false, isApiKeyUser)
-
-  useEffect(() => {
-    if (!isApiKeyUser || !rawEngineerId || typeof window === "undefined") return
-    window.localStorage.setItem(PROFILE_ENGINEER_STORAGE_KEY, rawEngineerId)
-  }, [isApiKeyUser, rawEngineerId])
-
-  const selectableEngineers = useMemo(
-    () =>
-      (engineers ?? [])
-        .filter((engineer) => engineer.is_active)
-        .sort((a, b) =>
-          (a.display_name ?? a.name).localeCompare(b.display_name ?? b.name),
-        ),
-    [engineers],
-  )
-
-  const handleEngineerSelect = (nextEngineerId: string) => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(PROFILE_ENGINEER_STORAGE_KEY, nextEngineerId)
-    }
-    const nextParams = new URLSearchParams(searchParams)
-    nextParams.set("engineer_id", nextEngineerId)
-    setSearchParams(nextParams)
-  }
-
-  const handleEngineerReset = () => {
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(PROFILE_ENGINEER_STORAGE_KEY)
-    }
-    const nextParams = new URLSearchParams(searchParams)
-    nextParams.delete("engineer_id")
-    setSearchParams(nextParams)
-  }
 
   if (isLoading || (isApiKeyUser && !engineerId && loadingEngineers)) {
     return <ChartSkeleton />
@@ -150,38 +127,12 @@ function PlaybooksTab({ startDate, endDate }: Omit<TabProps, "teamId">) {
 
   if (isApiKeyUser && !engineerId) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <UserRoundSearch className="h-4 w-4" />
-            Choose an engineer for playbooks
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Workflow playbooks are personalized from peer patterns, so pick an engineer context to
-            see the right recommendations.
-          </p>
-
-          {selectableEngineers.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No active engineers are available.</p>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {selectableEngineers.map((engineer) => (
-                <button
-                  key={engineer.id}
-                  type="button"
-                  onClick={() => handleEngineerSelect(engineer.id)}
-                  className="rounded-xl border border-border/60 bg-card p-4 text-left transition-colors hover:bg-accent hover:text-accent-foreground"
-                >
-                  <p className="font-medium">{engineer.display_name ?? engineer.name}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{engineer.email}</p>
-                </button>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <EngineerChooserCard
+        title="Choose an engineer for playbooks"
+        description="Workflow playbooks are personalized from peer patterns, so pick an engineer context to see the right recommendations."
+        engineers={selectableEngineers}
+        onSelect={selectEngineer}
+      />
     )
   }
 
@@ -192,7 +143,7 @@ function PlaybooksTab({ startDate, endDate }: Omit<TabProps, "teamId">) {
           <p>Primer could not load workflow playbooks for the current engineer context.</p>
           {isApiKeyUser && (
             <div>
-              <Button variant="outline" onClick={handleEngineerReset}>
+              <Button variant="outline" onClick={resetEngineer}>
                 Choose another engineer
               </Button>
             </div>
@@ -214,7 +165,7 @@ function PlaybooksTab({ startDate, endDate }: Omit<TabProps, "teamId">) {
 
       {isApiKeyUser && (
         <div>
-          <Button variant="outline" size="sm" onClick={handleEngineerReset}>
+          <Button variant="outline" size="sm" onClick={resetEngineer}>
             Change engineer
           </Button>
         </div>
