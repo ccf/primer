@@ -21,6 +21,47 @@ def _write_bundle(tmp_path, bundle: dict, name: str = "cursor-bundle.json") -> P
     return bundle_path
 
 
+def _write_native_transcript(
+    tmp_path,
+    session_id: str,
+    project_path: Path,
+    *,
+    name: str | None = None,
+) -> Path:
+    transcript_path = tmp_path / (name or f"{session_id}.jsonl")
+    transcript_path.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "role": "user",
+                        "message": {
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": (
+                                        f"<git_status>\nGit repo: {project_path}\n</git_status>"
+                                    ),
+                                }
+                            ]
+                        },
+                    }
+                ),
+                json.dumps(
+                    {
+                        "role": "assistant",
+                        "message": {
+                            "content": [{"type": "text", "text": "I found the project context."}]
+                        },
+                    }
+                ),
+            ]
+        )
+        + "\n"
+    )
+    return transcript_path
+
+
 def test_cursor_import_copies_valid_bundle_into_primer_store(tmp_path, monkeypatch):
     primer_home = _mock_primer_home(tmp_path, monkeypatch)
     bundle = {
@@ -43,6 +84,34 @@ def test_cursor_import_copies_valid_bundle_into_primer_store(tmp_path, monkeypat
     assert result.exit_code == 0
     assert stored_path.exists()
     assert json.loads(stored_path.read_text()) == bundle
+
+
+def test_cursor_import_preserves_jsonl_native_transcripts_for_rediscovery(tmp_path, monkeypatch):
+    primer_home = _mock_primer_home(tmp_path, monkeypatch)
+    project_path = tmp_path / "demo"
+    transcript_path = _write_native_transcript(tmp_path, "cursor-native-1", project_path)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["cursor", "import", str(transcript_path)])
+
+    stored_jsonl = primer_home / "cursor" / "sessions" / "cursor-native-1.jsonl"
+    stored_json = primer_home / "cursor" / "sessions" / "cursor-native-1.json"
+
+    assert result.exit_code == 0
+    assert stored_jsonl.exists()
+    assert not stored_json.exists()
+
+    from primer.hook.cursor_extractor import CursorExtractor
+
+    extractor = CursorExtractor()
+    sessions = extractor.discover_sessions()
+    assert [
+        session.session_id for session in sessions if session.transcript_path == str(stored_jsonl)
+    ] == ["cursor-native-1"]
+
+    meta = extractor.extract(str(stored_jsonl))
+    assert meta.project_path == str(project_path)
+    assert meta.message_count == 2
 
 
 def test_cursor_import_rejects_missing_session_id(tmp_path, monkeypatch):

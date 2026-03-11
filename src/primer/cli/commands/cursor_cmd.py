@@ -21,17 +21,23 @@ def import_bundle(bundle_path: Path) -> None:
     extractor = CursorExtractor()
     try:
         meta = extractor.extract(str(bundle_path))
-        store_path = extractor.get_session_path(meta.session_id)
+        session_id = extractor.validate_session_id(meta.session_id)
     except Exception as exc:
         raise click.ClickException(f"Invalid Cursor bundle: {exc}") from exc
 
     if meta.message_count == 0:
         raise click.ClickException("Invalid Cursor bundle: file contains no messages")
 
-    if store_path.exists():
-        console.warn(f"Cursor session already imported: {meta.session_id}")
+    store_suffix = ".jsonl" if bundle_path.suffix.lower() == ".jsonl" else ".json"
+    store_path = extractor.get_sessions_dir() / f"{session_id}{store_suffix}"
+    existing_paths = (
+        extractor.get_sessions_dir() / f"{session_id}.json",
+        extractor.get_sessions_dir() / f"{session_id}.jsonl",
+    )
+    if any(path.exists() for path in existing_paths):
+        console.warn(f"Cursor session already imported: {session_id}")
         return
 
     store_path.parent.mkdir(parents=True, exist_ok=True)
     store_path.write_bytes(bundle_path.read_bytes())
-    console.success(f"Imported Cursor session: {meta.session_id}")
+    console.success(f"Imported Cursor session: {session_id}")

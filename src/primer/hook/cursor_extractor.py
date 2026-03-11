@@ -7,6 +7,7 @@ import logging
 import re
 from collections import Counter
 from datetime import UTC, datetime
+from itertools import chain
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import unquote, urlparse
@@ -71,7 +72,7 @@ class CursorExtractor:
         if not sessions_dir.exists():
             return []
         return self._discover_bundle_paths(
-            sessions_dir.glob("*.json"),
+            chain(sessions_dir.glob("*.json"), sessions_dir.glob("*.jsonl")),
             seen_ids,
             "imported Cursor bundle",
         )
@@ -81,7 +82,6 @@ class CursorExtractor:
         if not projects_dir.exists():
             return []
 
-        workspace_paths = self._load_workspace_project_paths()
         results = []
 
         for project_dir in sorted(projects_dir.iterdir()):
@@ -89,7 +89,6 @@ class CursorExtractor:
             if not transcripts_dir.is_dir():
                 continue
 
-            inferred_project_path = workspace_paths.get(project_dir.name)
             for session_dir in sorted(transcripts_dir.iterdir()):
                 if not session_dir.is_dir():
                     continue
@@ -101,7 +100,6 @@ class CursorExtractor:
                         [transcript_path],
                         seen_ids,
                         "native Cursor transcript",
-                        inferred_project_path,
                     )
                 )
 
@@ -112,7 +110,6 @@ class CursorExtractor:
         bundle_paths,
         seen_ids: set[str],
         source_label: str,
-        inferred_project_path: str | None = None,
     ) -> list:
         from primer.mcp.reader import LocalSession
 
@@ -135,14 +132,13 @@ class CursorExtractor:
             if session_id in seen_ids:
                 continue
             seen_ids.add(session_id)
-            project_path = meta.project_path or inferred_project_path
             results.append(
                 LocalSession(
                     session_id=session_id,
                     transcript_path=str(bundle_path),
                     facets_path=None,
                     has_facets=False,
-                    project_path=project_path or None,
+                    project_path=meta.project_path or None,
                     agent_type=self.agent_type,
                 )
             )
