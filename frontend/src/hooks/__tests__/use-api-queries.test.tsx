@@ -55,6 +55,15 @@ describe("useEngineers", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(mockApiFetch).toHaveBeenCalledWith("/api/v1/engineers")
   })
+
+  it("does not fetch when disabled", async () => {
+    const { result } = renderHook(() => useEngineers(false, false), {
+      wrapper: createWrapper(),
+    })
+
+    await waitFor(() => expect(result.current.fetchStatus).toBe("idle"))
+    expect(mockApiFetch).not.toHaveBeenCalled()
+  })
 })
 
 describe("useOverview", () => {
