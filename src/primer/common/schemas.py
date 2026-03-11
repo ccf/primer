@@ -1159,6 +1159,7 @@ class ProjectEnablementSummary(BaseModel):
     permission_mode_counts: dict[str, int] = {}
     top_tools: list[str] = []
     top_models: list[str] = []
+    recommendations: list[Recommendation] = Field(default_factory=list)
 
 
 class ProjectWorkflowFingerprint(BaseModel):

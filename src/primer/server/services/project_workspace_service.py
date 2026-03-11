@@ -24,6 +24,7 @@ from primer.common.schemas import (
     ProjectWorkflowFingerprint,
     ProjectWorkflowSummary,
     ProjectWorkspaceResponse,
+    Recommendation,
 )
 from primer.common.source_capabilities import CAPABILITIES
 from primer.server.services.analytics_service import (
@@ -44,6 +45,9 @@ from primer.server.services.workflow_patterns import (
     workflow_fingerprint_id,
     workflow_fingerprint_label,
 )
+
+_PROJECT_CONTEXT_FRICTION = {"context_switching", "edit_conflict"}
+_PROJECT_TOOLING_FRICTION = {"tool_error", "timeout", "exec_error"}
 
 
 def get_project_workspace(
@@ -115,6 +119,20 @@ def get_project_workspace(
         session_q,
         bottlenecks.friction_impacts,
     )
+    friction = next(
+        (item for item in bottlenecks.project_friction if item.project_name == project_name),
+        None,
+    )
+    enablement = enablement.model_copy(
+        update={
+            "recommendations": _build_project_enablement_recommendations(
+                enablement,
+                repositories,
+                workflow_summary,
+                friction,
+            )
+        }
+    )
     project = ProjectStats(
         project_name=project_name,
         total_sessions=overview.total_sessions,
@@ -155,11 +173,6 @@ def get_project_workspace(
         avg_cost_per_session=productivity.avg_cost_per_session,
         cost_per_successful_outcome=productivity.cost_per_successful_outcome,
         measurement_confidence=_compute_measurement_confidence(db, session_q),
-    )
-
-    friction = next(
-        (item for item in bottlenecks.project_friction if item.project_name == project_name),
-        None,
     )
 
     return ProjectWorkspaceResponse(
@@ -254,6 +267,152 @@ def _build_enablement_summary(db: Session, session_q) -> ProjectEnablementSummar
         top_tools=top_tools,
         top_models=top_models,
     )
+
+
+def _build_project_enablement_recommendations(
+    enablement: ProjectEnablementSummary,
+    repositories: list[ProjectRepositorySummary],
+    workflow_summary: ProjectWorkflowSummary,
+    friction,
+) -> list[Recommendation]:
+    recommendations: list[Recommendation] = []
+    hotspots = {item.friction_type: item for item in workflow_summary.friction_hotspots}
+
+    context_hotspot = _select_hotspot(hotspots, _PROJECT_CONTEXT_FRICTION)
+    tooling_hotspot = _select_hotspot(hotspots, _PROJECT_TOOLING_FRICTION)
+    permission_hotspot = hotspots.get("permission_denied")
+
+    repos_missing_guidance = [
+        repo.repository
+        for repo in repositories
+        if repo.readiness_checked and not (repo.has_claude_md or repo.has_agents_md)
+    ]
+
+    if context_hotspot and repos_missing_guidance:
+        recommendations.append(
+            Recommendation(
+                category="project_context",
+                title="Codify project context for agents",
+                description=(
+                    f"{context_hotspot.friction_type.replace('_', ' ')} is showing up in "
+                    f"{context_hotspot.session_count} "
+                    f"{_pluralize('session', context_hotspot.session_count)}, "
+                    f"and {len(repos_missing_guidance)} linked "
+                    f"{_pluralize('repository', len(repos_missing_guidance))} still lack "
+                    "CLAUDE.md or AGENTS.md. Capture the preferred commands, file boundaries, "
+                    "and handoff conventions so agents stop rediscovering project context."
+                ),
+                severity="warning",
+                evidence={
+                    "friction_type": context_hotspot.friction_type,
+                    "session_count": context_hotspot.session_count,
+                    "repositories_missing_guidance": repos_missing_guidance,
+                },
+            )
+        )
+
+    if tooling_hotspot and tooling_hotspot.total_occurrences >= 2:
+        recommendations.append(
+            Recommendation(
+                category="tooling",
+                title="Stabilize recurring tooling failures",
+                description=(
+                    f"{tooling_hotspot.friction_type.replace('_', ' ')} is recurring across "
+                    f"{tooling_hotspot.session_count} "
+                    f"{_pluralize('session', tooling_hotspot.session_count)}. "
+                    "Audit the commands, MCP servers, or build/test steps used in these workflows, "
+                    "then document the happy path and recovery path in the project workspace."
+                ),
+                severity="warning",
+                evidence={
+                    "friction_type": tooling_hotspot.friction_type,
+                    "session_count": tooling_hotspot.session_count,
+                    "total_occurrences": tooling_hotspot.total_occurrences,
+                    "linked_fingerprints": tooling_hotspot.linked_fingerprints,
+                    "sample_details": tooling_hotspot.sample_details,
+                },
+            )
+        )
+
+    dominant_permission_mode = None
+    if enablement.permission_mode_counts:
+        dominant_permission_mode = max(
+            enablement.permission_mode_counts.items(),
+            key=lambda item: item[1],
+        )[0]
+    if permission_hotspot and permission_hotspot.total_occurrences >= 2:
+        recommendations.append(
+            Recommendation(
+                category="permissions",
+                title="Reduce permission friction in common workflows",
+                description=(
+                    f"Permission-denied friction affected {permission_hotspot.session_count} "
+                    f"{_pluralize('session', permission_hotspot.session_count)}"
+                    + (
+                        f" while `{dominant_permission_mode}` is the dominant permission mode."
+                        if dominant_permission_mode
+                        else "."
+                    )
+                    + " Pre-approve safe commands, or document approval boundaries for the "
+                    "project's most common workflows."
+                ),
+                severity="info",
+                evidence={
+                    "friction_type": "permission_denied",
+                    "session_count": permission_hotspot.session_count,
+                    "total_occurrences": permission_hotspot.total_occurrences,
+                    "dominant_permission_mode": dominant_permission_mode,
+                },
+            )
+        )
+
+    best_fingerprint = _select_best_fingerprint(workflow_summary.fingerprints)
+    if (
+        best_fingerprint
+        and best_fingerprint.session_count >= 2
+        and best_fingerprint.success_rate is not None
+        and best_fingerprint.success_rate >= 0.75
+        and workflow_summary.friction_hotspots
+    ):
+        recommendations.append(
+            Recommendation(
+                category="workflow",
+                title="Turn the best workflow into a project playbook",
+                description=(
+                    f"The strongest observed pattern, '{best_fingerprint.label}', succeeds "
+                    f"{best_fingerprint.success_rate:.0%} of the time across "
+                    f"{best_fingerprint.session_count} sessions. Capture it in repo guidance or "
+                    "a project playbook so more work follows the same path."
+                ),
+                severity="info",
+                evidence={
+                    "fingerprint_id": best_fingerprint.fingerprint_id,
+                    "label": best_fingerprint.label,
+                    "session_count": best_fingerprint.session_count,
+                    "success_rate": best_fingerprint.success_rate,
+                },
+            )
+        )
+
+    if not recommendations and friction and friction.total_friction_count > 0:
+        recommendations.append(
+            Recommendation(
+                category="workflow",
+                title="Review the highest-friction project workflows",
+                description=(
+                    "This project is showing repeated friction, but the patterns do not yet map "
+                    "to a specific enablement recommendation. Review the workflow fingerprints "
+                    "and recent sessions, then convert the best recovery path into guidance."
+                ),
+                severity="info",
+                evidence={
+                    "friction_rate": friction.friction_rate,
+                    "total_friction_count": friction.total_friction_count,
+                },
+            )
+        )
+
+    return recommendations[:3]
 
 
 def _build_repository_summary(db: Session, session_q) -> list[ProjectRepositorySummary]:
@@ -351,6 +510,38 @@ def _compute_measurement_confidence(db: Session, session_q) -> float | None:
     if not coverage_values:
         return None
     return round(sum(coverage_values) / len(coverage_values), 3)
+
+
+def _select_hotspot(
+    hotspots: dict[str, ProjectFrictionHotspot],
+    allowed_types: set[str],
+) -> ProjectFrictionHotspot | None:
+    candidates = [
+        hotspots[friction_type] for friction_type in allowed_types if friction_type in hotspots
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda item: (item.session_count, item.total_occurrences))
+
+
+def _select_best_fingerprint(
+    fingerprints: list[ProjectWorkflowFingerprint],
+) -> ProjectWorkflowFingerprint | None:
+    candidates = [item for item in fingerprints if item.success_rate is not None]
+    if not candidates:
+        return None
+    return max(
+        candidates,
+        key=lambda item: (
+            item.success_rate,
+            item.session_count,
+            item.share_of_sessions,
+        ),
+    )
+
+
+def _pluralize(noun: str, count: int) -> str:
+    return noun if count == 1 else f"{noun}s"
 
 
 def _build_workflow_summary(

@@ -172,10 +172,10 @@ def test_project_workspace_endpoint_returns_composed_views(
         db_session.query(GitRepository).filter(GitRepository.full_name == "acme/workspace").one()
     )
     workspace_repo.default_branch = "main"
-    workspace_repo.has_claude_md = True
-    workspace_repo.has_agents_md = True
+    workspace_repo.has_claude_md = False
+    workspace_repo.has_agents_md = False
     workspace_repo.has_claude_dir = False
-    workspace_repo.ai_readiness_score = 75.0
+    workspace_repo.ai_readiness_score = 45.0
     workspace_repo.ai_readiness_checked_at = datetime.now(UTC)
     workspace_pr = PullRequest(
         repository_id=workspace_repo.id,
@@ -273,9 +273,12 @@ def test_project_workspace_endpoint_returns_composed_views(
     assert data["scorecard"]["measurement_confidence"] == 1.0
     assert data["repositories"][0]["repository"] == "acme/workspace"
     assert data["repositories"][0]["default_branch"] == "main"
-    assert data["repositories"][0]["ai_readiness_score"] == 75.0
+    assert data["repositories"][0]["ai_readiness_score"] == 45.0
     assert data["enablement"]["agent_type_counts"] == {"claude_code": 1, "codex_cli": 1}
     assert set(data["enablement"]["top_models"]) == {"claude-sonnet-4", "gpt-5.3-codex"}
+    recommendation_titles = {item["title"] for item in data["enablement"]["recommendations"]}
+    assert "Codify project context for agents" in recommendation_titles
+    assert "Stabilize recurring tooling failures" in recommendation_titles
     assert data["friction"]["project_name"] == "workspace-proj"
     assert data["quality"]["overview"]["total_prs"] == 1
     assert data["quality"]["findings_overview"]["total_findings"] == 1

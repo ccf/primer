@@ -162,7 +162,13 @@ export function ProjectWorkspacePage({ teamId, dateRange }: ProjectWorkspacePage
           </CardContent>
         </Card>
 
-        <ProjectEnablementCard enablement={data.enablement} />
+        <ProjectEnablementCard
+          enablement={data.enablement}
+          teamId={teamId}
+          projectName={data.project.project_name}
+          startDate={startDate}
+          endDate={endDate}
+        />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
