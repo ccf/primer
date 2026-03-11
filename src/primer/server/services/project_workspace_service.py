@@ -534,16 +534,20 @@ def _language_mix_from_breakdown(
     primary_language: str | None,
 ) -> list[LanguageShare]:
     if breakdown:
-        total = sum(bytes_of_code for bytes_of_code in breakdown.values() if bytes_of_code > 0)
-        if total > 0:
+        top_languages = [
+            (language, bytes_of_code)
+            for language, bytes_of_code in sorted(
+                breakdown.items(),
+                key=lambda item: item[1],
+                reverse=True,
+            )[:3]
+            if bytes_of_code > 0
+        ]
+        top_total = sum(bytes_of_code for _, bytes_of_code in top_languages)
+        if top_total > 0:
             return [
-                LanguageShare(language=language, share_pct=round(bytes_of_code / total, 3))
-                for language, bytes_of_code in sorted(
-                    breakdown.items(),
-                    key=lambda item: item[1],
-                    reverse=True,
-                )[:3]
-                if bytes_of_code > 0
+                LanguageShare(language=language, share_pct=round(bytes_of_code / top_total, 3))
+                for language, bytes_of_code in top_languages
             ]
     if primary_language:
         return [LanguageShare(language=primary_language, share_pct=1.0)]

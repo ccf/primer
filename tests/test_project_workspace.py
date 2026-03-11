@@ -10,7 +10,10 @@ from primer.common.models import (
     SessionFacets,
 )
 from primer.common.schemas import LanguageShare, ProjectRepositorySummary
-from primer.server.services.project_workspace_service import _build_repository_context_summary
+from primer.server.services.project_workspace_service import (
+    _build_repository_context_summary,
+    _language_mix_from_breakdown,
+)
 
 
 def _ingest_project_session(
@@ -378,4 +381,22 @@ def test_repository_context_language_mix_ignores_repos_without_language_data():
     assert summary.language_mix == [
         LanguageShare(language="Python", share_pct=0.7),
         LanguageShare(language="TypeScript", share_pct=0.3),
+    ]
+
+
+def test_language_mix_from_breakdown_renormalizes_top_languages():
+    language_mix = _language_mix_from_breakdown(
+        {
+            "Python": 50,
+            "TypeScript": 30,
+            "Shell": 20,
+            "CSS": 10,
+        },
+        primary_language="Python",
+    )
+
+    assert language_mix == [
+        LanguageShare(language="Python", share_pct=0.5),
+        LanguageShare(language="TypeScript", share_pct=0.3),
+        LanguageShare(language="Shell", share_pct=0.2),
     ]
