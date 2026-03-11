@@ -490,17 +490,27 @@ def _build_repository_context_summary(
         if repo.test_maturity_score is not None
     ]
 
+    repos_with_languages = 0
     for repo in context_repositories:
+        if repo.language_mix:
+            repos_with_languages += 1
         for item in repo.language_mix:
             language_totals[item.language] += item.share_pct
         if repo.repo_size_bucket:
             size_distribution[repo.repo_size_bucket] += 1
 
     repo_count = len(context_repositories)
-    language_mix = [
-        LanguageShare(language=language, share_pct=round(total / repo_count, 3))
-        for language, total in language_totals.most_common(5)
-    ]
+    language_mix = (
+        [
+            LanguageShare(
+                language=language,
+                share_pct=round(total / repos_with_languages, 3),
+            )
+            for language, total in language_totals.most_common(5)
+        ]
+        if repos_with_languages
+        else []
+    )
 
     return ProjectRepositoryContextSummary(
         repositories_with_context=repo_count,
