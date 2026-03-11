@@ -28,23 +28,35 @@ def _make_engineer(
     return engineer, raw_key
 
 
-def _ingest_measured_session(client, api_key: str, *, project_name: str | None = None):
-    now = datetime.now(UTC)
+def _ingest_measured_session(
+    client,
+    api_key: str,
+    *,
+    project_name: str | None = None,
+    started_at: datetime | None = None,
+    duration_seconds: int = 1200,
+    outcome: str = "success",
+    friction_events: int = 1,
+    input_tokens: int = 1200,
+    output_tokens: int = 600,
+):
+    start = started_at or (datetime.now(UTC) - timedelta(days=2))
+    end = start + timedelta(seconds=duration_seconds)
     response = client.post(
         "/api/v1/ingest/session",
         json={
             "session_id": str(uuid4()),
             "api_key": api_key,
             "project_name": project_name,
-            "started_at": (now - timedelta(days=2)).isoformat(),
-            "ended_at": (now - timedelta(days=2, minutes=-20)).isoformat(),
-            "duration_seconds": 1200,
+            "started_at": start.isoformat(),
+            "ended_at": end.isoformat(),
+            "duration_seconds": duration_seconds,
             "message_count": 2,
             "user_message_count": 1,
             "assistant_message_count": 1,
             "tool_call_count": 2,
-            "input_tokens": 1200,
-            "output_tokens": 600,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
             "primary_model": "claude-sonnet-4-5-20250929",
             "messages": [
                 {"ordinal": 1, "role": "human", "content_text": "Please fix the failing tests"},
@@ -59,16 +71,18 @@ def _ingest_measured_session(client, api_key: str, *, project_name: str | None =
             "model_usages": [
                 {
                     "model_name": "claude-sonnet-4-5-20250929",
-                    "input_tokens": 1200,
-                    "output_tokens": 600,
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
                 }
             ],
             "tool_usages": [{"tool_name": "Edit", "call_count": 2}],
             "facets": {
-                "outcome": "success",
+                "outcome": outcome,
                 "session_type": "implementation",
-                "primary_success": "complete",
-                "friction_counts": {"context_switching": 1},
+                "primary_success": "complete" if outcome == "success" else "blocked",
+                "friction_counts": (
+                    {"context_switching": friction_events} if friction_events else {}
+                ),
                 "friction_detail": "Needed to reconcile failing tests with a migration change.",
             },
         },
@@ -308,3 +322,126 @@ def test_intervention_list_skips_expensive_current_metrics_computation(client, e
     assert len(data) == 1
     assert data[0]["baseline_metrics"] is not None
     assert data[0]["current_metrics"] is None
+
+
+def test_intervention_effectiveness_endpoint_groups_by_scope_and_cohort(client, engineer_with_key):
+    engineer, api_key = engineer_with_key
+    now = datetime.now(UTC)
+    baseline_end = now - timedelta(days=120)
+    baseline_start = baseline_end - timedelta(days=30)
+
+    _ingest_measured_session(
+        client,
+        api_key,
+        project_name="alpha",
+        started_at=now - timedelta(days=135),
+        outcome="failure",
+        friction_events=5,
+        input_tokens=3600,
+        output_tokens=1800,
+    )
+    _ingest_measured_session(
+        client,
+        api_key,
+        project_name="alpha",
+        started_at=now - timedelta(days=5),
+        outcome="success",
+        friction_events=1,
+        input_tokens=600,
+        output_tokens=300,
+    )
+
+    created = client.post(
+        "/api/v1/interventions",
+        headers={"x-api-key": api_key},
+        json={
+            "title": "Stabilize implementation workflow",
+            "description": "Measure whether the new triage checklist reduced friction.",
+            "category": "workflow",
+            "project_name": "alpha",
+            "status": "completed",
+            "baseline_start_at": baseline_start.isoformat(),
+            "baseline_end_at": baseline_end.isoformat(),
+        },
+    )
+    assert created.status_code == 201
+
+    response = client.get("/api/v1/interventions/effectiveness", headers={"x-api-key": api_key})
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["summary"]["total_interventions"] == 1
+    assert data["summary"]["completed_interventions"] == 1
+    assert data["summary"]["measured_interventions"] == 1
+    assert data["summary"]["improved_interventions"] == 1
+    assert data["summary"]["improvement_rate"] == 1.0
+    assert data["summary"]["avg_success_rate_delta"] == 1.0
+    assert data["summary"]["avg_friction_delta"] == 4.0
+    assert data["summary"]["avg_cost_per_session_delta"] is not None
+
+    assert data["by_project"][0]["key"] == "alpha"
+    assert data["by_project"][0]["improvement_rate"] == 1.0
+    assert data["by_team"][0]["key"] == engineer.team_id
+    assert data["by_engineer_cohort"][0]["key"] == "experienced"
+
+
+def test_team_lead_lists_and_reports_org_scoped_team_interventions(
+    client, db_session, admin_headers
+):
+    team = Team(name="Lead Team")
+    db_session.add(team)
+    db_session.flush()
+    lead, lead_key = _make_engineer(db_session, team, name="Lead", role="team_lead")
+    engineer, engineer_key = _make_engineer(db_session, team, name="Engineer")
+    db_session.commit()
+
+    now = datetime.now(UTC)
+    baseline_end = now - timedelta(days=60)
+    baseline_start = baseline_end - timedelta(days=30)
+    _ingest_measured_session(
+        client,
+        engineer_key,
+        project_name="primer",
+        started_at=now - timedelta(days=75),
+        outcome="failure",
+        friction_events=3,
+    )
+    _ingest_measured_session(
+        client,
+        engineer_key,
+        project_name="primer",
+        started_at=now - timedelta(days=3),
+        outcome="success",
+        friction_events=0,
+    )
+
+    created = client.post(
+        "/api/v1/interventions",
+        headers=admin_headers,
+        json={
+            "title": "Org scoped but team relevant",
+            "description": (
+                "Should remain visible to the team lead because the target engineer is on the team."
+            ),
+            "category": "workflow",
+            "engineer_id": engineer.id,
+            "owner_engineer_id": lead.id,
+            "team_id": None,
+            "status": "completed",
+            "project_name": "primer",
+            "baseline_start_at": baseline_start.isoformat(),
+            "baseline_end_at": baseline_end.isoformat(),
+        },
+    )
+    assert created.status_code == 201
+    intervention_id = created.json()["id"]
+
+    listed = client.get("/api/v1/interventions", headers={"x-api-key": lead_key})
+    assert listed.status_code == 200
+    assert any(item["id"] == intervention_id for item in listed.json())
+
+    report = client.get("/api/v1/interventions/effectiveness", headers={"x-api-key": lead_key})
+    assert report.status_code == 200
+    report_data = report.json()
+    assert report_data["summary"]["total_interventions"] == 1
+    assert report_data["summary"]["completed_interventions"] == 1

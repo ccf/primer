@@ -18,6 +18,7 @@ vi.mock("@/lib/auth-context", () => ({
 
 vi.mock("@/hooks/use-api-queries", () => ({
   useInterventions: vi.fn(),
+  useInterventionEffectiveness: vi.fn(),
   useEngineers: vi.fn(),
 }))
 
@@ -26,10 +27,15 @@ vi.mock("@/hooks/use-api-mutations", () => ({
   useUpdateIntervention: vi.fn(() => ({ mutate: vi.fn() })),
 }))
 
-import { useInterventions, useEngineers } from "@/hooks/use-api-queries"
+import {
+  useInterventionEffectiveness,
+  useInterventions,
+  useEngineers,
+} from "@/hooks/use-api-queries"
 import { InterventionsPage } from "../interventions"
 
 const mockUseInterventions = vi.mocked(useInterventions)
+const mockUseInterventionEffectiveness = vi.mocked(useInterventionEffectiveness)
 const mockUseEngineers = vi.mocked(useEngineers)
 
 describe("InterventionsPage", () => {
@@ -52,6 +58,40 @@ describe("InterventionsPage", () => {
       ],
       isLoading: false,
     } as unknown as ReturnType<typeof useEngineers>)
+    mockUseInterventionEffectiveness.mockReturnValue({
+      data: {
+        summary: {
+          total_interventions: 1,
+          completed_interventions: 1,
+          measured_interventions: 1,
+          improved_interventions: 1,
+          improvement_rate: 1,
+          avg_completion_days: 3.5,
+          avg_success_rate_delta: 0.2,
+          avg_friction_delta: 2,
+          avg_findings_per_pr_delta: 0.5,
+          avg_cost_per_session_delta: 0.3,
+        },
+        by_team: [
+          {
+            key: "team-1",
+            label: "Team One",
+            completed_interventions: 1,
+            measured_interventions: 1,
+            improved_interventions: 1,
+            improvement_rate: 1,
+            avg_completion_days: 3.5,
+            avg_success_rate_delta: 0.2,
+            avg_friction_delta: 2,
+            avg_findings_per_pr_delta: 0.5,
+            avg_cost_per_session_delta: 0.3,
+          },
+        ],
+        by_project: [],
+        by_engineer_cohort: [],
+      },
+      isLoading: false,
+    } as unknown as ReturnType<typeof useInterventionEffectiveness>)
   })
 
   it("renders intervention counts and cards", () => {
@@ -111,10 +151,13 @@ describe("InterventionsPage", () => {
     render(<InterventionsPage teamId="team-1" />)
 
     expect(screen.getByText("Interventions")).toBeInTheDocument()
+    expect(screen.getByText("Effectiveness")).toBeInTheDocument()
     expect(screen.getByText("Reduce triage churn")).toBeInTheDocument()
     expect(screen.getAllByText("Planned").length).toBeGreaterThan(0)
     expect(screen.getByText("Tracked follow-through for recommendations, coaching, and workflow changes")).toBeInTheDocument()
     expect(screen.getByText(/Recurring friction/)).toBeInTheDocument()
+    expect(screen.getByText("By Team")).toBeInTheDocument()
+    expect(screen.getByText("Team One")).toBeInTheDocument()
   })
 
   it("shows empty state when there are no interventions", () => {

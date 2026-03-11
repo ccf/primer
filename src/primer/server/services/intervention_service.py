@@ -1,11 +1,16 @@
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from primer.common.models import Engineer, Intervention, Team
+from primer.common.models import Session as SessionModel
 from primer.common.schemas import (
     InterventionCreate,
+    InterventionEffectivenessGroup,
+    InterventionEffectivenessResponse,
+    InterventionEffectivenessSummary,
     InterventionEngineerSummary,
     InterventionMetricsSnapshot,
     InterventionResponse,
@@ -19,6 +24,49 @@ from primer.server.services.analytics_service import (
 from primer.server.services.quality_service import get_quality_metrics
 
 DEFAULT_MEASUREMENT_WINDOW = timedelta(days=30)
+SUCCESS_RATE_EPSILON = 0.01
+DECIMAL_DELTA_EPSILON = 0.01
+
+
+@dataclass
+class _EffectivenessRollup:
+    key: str
+    label: str
+    completed_interventions: int = 0
+    measured_interventions: int = 0
+    improved_interventions: int = 0
+    completion_days: list[float] = field(default_factory=list)
+    success_rate_deltas: list[float] = field(default_factory=list)
+    friction_deltas: list[float] = field(default_factory=list)
+    findings_per_pr_deltas: list[float] = field(default_factory=list)
+    avg_cost_per_session_deltas: list[float] = field(default_factory=list)
+
+    def add(
+        self,
+        *,
+        completion_days: float | None,
+        success_rate_delta: float | None,
+        friction_delta: float | None,
+        findings_per_pr_delta: float | None,
+        avg_cost_per_session_delta: float | None,
+        improved: bool,
+        measured: bool,
+    ) -> None:
+        self.completed_interventions += 1
+        if completion_days is not None:
+            self.completion_days.append(completion_days)
+        if measured:
+            self.measured_interventions += 1
+            if improved:
+                self.improved_interventions += 1
+        if success_rate_delta is not None:
+            self.success_rate_deltas.append(success_rate_delta)
+        if friction_delta is not None:
+            self.friction_deltas.append(friction_delta)
+        if findings_per_pr_delta is not None:
+            self.findings_per_pr_deltas.append(findings_per_pr_delta)
+        if avg_cost_per_session_delta is not None:
+            self.avg_cost_per_session_deltas.append(avg_cost_per_session_delta)
 
 
 def list_interventions(
@@ -107,8 +155,8 @@ def update_intervention(
         intervention.project_name,
     )
     updates = payload.model_dump(exclude_unset=True)
-    for field, value in updates.items():
-        setattr(intervention, field, value)
+    for update_field, value in updates.items():
+        setattr(intervention, update_field, value)
 
     if payload.status is not None:
         intervention.completed_at = datetime.now(UTC) if payload.status == "completed" else None
@@ -231,6 +279,79 @@ def list_interventions_for_engineer(db: Session, engineer_id: str, status: str |
     return _build_responses(db, interventions)
 
 
+def list_interventions_for_team(
+    db: Session,
+    team_id: str,
+    *,
+    engineer_id: str | None = None,
+    project_name: str | None = None,
+    status: str | None = None,
+) -> list[InterventionResponse]:
+    interventions = _query_interventions_visible_to_team(
+        db,
+        team_id,
+        engineer_id=engineer_id,
+        project_name=project_name,
+        status=status,
+    ).all()
+    return _build_responses(db, interventions)
+
+
+def get_intervention_effectiveness_report(
+    db: Session,
+    *,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    owner_engineer_id: str | None = None,
+    project_name: str | None = None,
+) -> InterventionEffectivenessResponse:
+    interventions = _query_interventions(
+        db,
+        team_id=team_id,
+        engineer_id=engineer_id,
+        owner_engineer_id=owner_engineer_id,
+        project_name=project_name,
+    ).all()
+    return _build_effectiveness_report(db, interventions)
+
+
+def get_intervention_effectiveness_report_for_engineer(
+    db: Session,
+    engineer_id: str,
+    *,
+    project_name: str | None = None,
+) -> InterventionEffectivenessResponse:
+    query = db.query(Intervention).filter(
+        or_(
+            Intervention.engineer_id == engineer_id,
+            Intervention.owner_engineer_id == engineer_id,
+        )
+    )
+    if project_name:
+        query = query.filter(Intervention.project_name == project_name)
+    interventions = query.order_by(
+        Intervention.updated_at.desc(),
+        Intervention.created_at.desc(),
+    ).all()
+    return _build_effectiveness_report(db, interventions)
+
+
+def get_intervention_effectiveness_report_for_team(
+    db: Session,
+    team_id: str,
+    *,
+    engineer_id: str | None = None,
+    project_name: str | None = None,
+) -> InterventionEffectivenessResponse:
+    interventions = _query_interventions_visible_to_team(
+        db,
+        team_id,
+        engineer_id=engineer_id,
+        project_name=project_name,
+    ).all()
+    return _build_effectiveness_report(db, interventions)
+
+
 def _build_responses(
     db: Session,
     interventions: list[Intervention],
@@ -315,6 +436,196 @@ def _build_responses(
     return responses
 
 
+def _query_interventions(
+    db: Session,
+    *,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    owner_engineer_id: str | None = None,
+    project_name: str | None = None,
+    status: str | None = None,
+):
+    query = db.query(Intervention)
+    if team_id:
+        query = query.filter(Intervention.team_id == team_id)
+    if engineer_id:
+        query = query.filter(Intervention.engineer_id == engineer_id)
+    if owner_engineer_id:
+        query = query.filter(Intervention.owner_engineer_id == owner_engineer_id)
+    if project_name:
+        query = query.filter(Intervention.project_name == project_name)
+    if status:
+        query = query.filter(Intervention.status == status)
+    return query.order_by(
+        Intervention.updated_at.desc(),
+        Intervention.created_at.desc(),
+    )
+
+
+def _query_interventions_visible_to_team(
+    db: Session,
+    team_id: str,
+    *,
+    engineer_id: str | None = None,
+    project_name: str | None = None,
+    status: str | None = None,
+):
+    team_engineers = select(Engineer.id).where(Engineer.team_id == team_id)
+    query = db.query(Intervention).filter(
+        or_(
+            Intervention.team_id == team_id,
+            Intervention.engineer_id.in_(team_engineers),
+            Intervention.owner_engineer_id.in_(team_engineers),
+        )
+    )
+    if engineer_id:
+        query = query.filter(Intervention.engineer_id == engineer_id)
+    if project_name:
+        query = query.filter(Intervention.project_name == project_name)
+    if status:
+        query = query.filter(Intervention.status == status)
+    return query.order_by(
+        Intervention.updated_at.desc(),
+        Intervention.created_at.desc(),
+    )
+
+
+def _build_effectiveness_report(
+    db: Session,
+    interventions: list[Intervention],
+) -> InterventionEffectivenessResponse:
+    completed = [
+        intervention for intervention in interventions if intervention.status == "completed"
+    ]
+    if not completed:
+        empty_summary = InterventionEffectivenessSummary(
+            total_interventions=len(interventions),
+            completed_interventions=0,
+            measured_interventions=0,
+            improved_interventions=0,
+        )
+        return InterventionEffectivenessResponse(
+            summary=empty_summary,
+            by_team=[],
+            by_project=[],
+            by_engineer_cohort=[],
+        )
+
+    team_ids = {intervention.team_id for intervention in completed if intervention.team_id}
+    engineer_ids = {
+        engineer_id
+        for intervention in completed
+        for engineer_id in (
+            intervention.engineer_id,
+            intervention.owner_engineer_id,
+        )
+        if engineer_id
+    }
+    team_map = {team.id: team for team in db.query(Team).filter(Team.id.in_(team_ids)).all()}
+    engineer_map = {
+        engineer.id: engineer
+        for engineer in db.query(Engineer).filter(Engineer.id.in_(engineer_ids)).all()
+    }
+    first_session_rows = (
+        db.query(SessionModel.engineer_id, func.min(SessionModel.started_at))
+        .filter(SessionModel.engineer_id.in_(engineer_ids))
+        .group_by(SessionModel.engineer_id)
+        .all()
+    )
+    first_session_by_engineer = {
+        engineer_id: _ensure_utc(first_started_at)
+        for engineer_id, first_started_at in first_session_rows
+        if engineer_id and first_started_at
+    }
+
+    now = datetime.now(UTC)
+    summary_rollup = _EffectivenessRollup(key="summary", label="Summary")
+    team_rollups: dict[str, _EffectivenessRollup] = {}
+    project_rollups: dict[str, _EffectivenessRollup] = {}
+    cohort_rollups: dict[str, _EffectivenessRollup] = {}
+
+    for intervention in completed:
+        baseline_metrics = (
+            InterventionMetricsSnapshot.model_validate(intervention.baseline_metrics)
+            if intervention.baseline_metrics
+            else None
+        )
+        current_metrics = None
+        if intervention.baseline_start_at and intervention.baseline_end_at:
+            current_start, current_end = _current_measurement_window(
+                intervention.baseline_start_at,
+                intervention.baseline_end_at,
+                now=now,
+            )
+            current_metrics = capture_metrics_snapshot(
+                db,
+                team_id=intervention.team_id,
+                engineer_id=intervention.engineer_id,
+                project_name=intervention.project_name,
+                window_start=current_start,
+                window_end=current_end,
+            )
+
+        measured = baseline_metrics is not None and current_metrics is not None
+        success_rate_delta = _higher_is_better_delta(
+            baseline_metrics.success_rate if baseline_metrics else None,
+            current_metrics.success_rate if current_metrics else None,
+        )
+        friction_delta = _lower_is_better_delta(
+            baseline_metrics.friction_events if baseline_metrics else None,
+            current_metrics.friction_events if current_metrics else None,
+        )
+        findings_per_pr_delta = _lower_is_better_delta(
+            baseline_metrics.findings_per_pr if baseline_metrics else None,
+            current_metrics.findings_per_pr if current_metrics else None,
+        )
+        avg_cost_per_session_delta = _lower_is_better_delta(
+            baseline_metrics.avg_cost_per_session if baseline_metrics else None,
+            current_metrics.avg_cost_per_session if current_metrics else None,
+        )
+        improved = _is_improved(
+            success_rate_delta=success_rate_delta,
+            friction_delta=friction_delta,
+            findings_per_pr_delta=findings_per_pr_delta,
+            avg_cost_per_session_delta=avg_cost_per_session_delta,
+        )
+        completion_days = _completion_days(intervention)
+        team_key, team_label = _team_group(intervention, engineer_map, team_map)
+        project_key, project_label = _project_group(intervention)
+        cohort_key, cohort_label = _cohort_group(
+            intervention.engineer_id,
+            first_session_by_engineer,
+            now,
+        )
+
+        rollup_kwargs = {
+            "completion_days": completion_days,
+            "success_rate_delta": success_rate_delta,
+            "friction_delta": friction_delta,
+            "findings_per_pr_delta": findings_per_pr_delta,
+            "avg_cost_per_session_delta": avg_cost_per_session_delta,
+            "improved": improved,
+            "measured": measured,
+        }
+        summary_rollup.add(**rollup_kwargs)
+        team_rollups.setdefault(team_key, _EffectivenessRollup(team_key, team_label)).add(
+            **rollup_kwargs
+        )
+        project_rollups.setdefault(
+            project_key, _EffectivenessRollup(project_key, project_label)
+        ).add(**rollup_kwargs)
+        cohort_rollups.setdefault(cohort_key, _EffectivenessRollup(cohort_key, cohort_label)).add(
+            **rollup_kwargs
+        )
+
+    return InterventionEffectivenessResponse(
+        summary=_rollup_to_summary(summary_rollup, total_interventions=len(interventions)),
+        by_team=_sorted_group_rollups(team_rollups),
+        by_project=_sorted_group_rollups(project_rollups),
+        by_engineer_cohort=_sorted_group_rollups(cohort_rollups),
+    )
+
+
 def _resolve_measurement_window(
     baseline_start_at: datetime | None,
     baseline_end_at: datetime | None,
@@ -347,6 +658,160 @@ def _ensure_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
+
+
+def _completion_days(intervention: Intervention) -> float | None:
+    if intervention.completed_at is None:
+        return None
+    created_at = _ensure_utc(intervention.created_at)
+    completed_at = _ensure_utc(intervention.completed_at)
+    return max((completed_at - created_at).total_seconds() / 86400, 0.0)
+
+
+def _higher_is_better_delta(
+    baseline: float | None,
+    current: float | None,
+) -> float | None:
+    if baseline is None or current is None:
+        return None
+    return current - baseline
+
+
+def _lower_is_better_delta(
+    baseline: float | int | None,
+    current: float | int | None,
+) -> float | None:
+    if baseline is None or current is None:
+        return None
+    return float(baseline) - float(current)
+
+
+def _is_improved(
+    *,
+    success_rate_delta: float | None,
+    friction_delta: float | None,
+    findings_per_pr_delta: float | None,
+    avg_cost_per_session_delta: float | None,
+) -> bool:
+    positive = 0
+    negative = 0
+    for delta, epsilon in (
+        (success_rate_delta, SUCCESS_RATE_EPSILON),
+        (friction_delta, 0.0),
+        (findings_per_pr_delta, DECIMAL_DELTA_EPSILON),
+        (avg_cost_per_session_delta, DECIMAL_DELTA_EPSILON),
+    ):
+        if delta is None:
+            continue
+        if delta > epsilon:
+            positive += 1
+        elif delta < -epsilon:
+            negative += 1
+    return positive > negative and positive > 0
+
+
+def _team_group(
+    intervention: Intervention,
+    engineer_map: dict[str, Engineer],
+    team_map: dict[str, Team],
+) -> tuple[str, str]:
+    team_id = intervention.team_id
+    if team_id is None and intervention.engineer_id:
+        target_engineer = engineer_map.get(intervention.engineer_id)
+        team_id = target_engineer.team_id if target_engineer else None
+    if team_id is None and intervention.owner_engineer_id:
+        team_id = (
+            engineer_map.get(intervention.owner_engineer_id).team_id
+            if engineer_map.get(intervention.owner_engineer_id)
+            else None
+        )
+    if team_id is None:
+        return "organization", "Organization"
+    return team_id, team_map.get(team_id).name if team_map.get(team_id) else "Unknown team"
+
+
+def _project_group(intervention: Intervention) -> tuple[str, str]:
+    if not intervention.project_name:
+        return "unscoped", "Unscoped"
+    return intervention.project_name, intervention.project_name
+
+
+def _cohort_group(
+    engineer_id: str | None,
+    first_session_by_engineer: dict[str, datetime],
+    now: datetime,
+) -> tuple[str, str]:
+    if not engineer_id:
+        return "unscoped", "Unscoped"
+    first_session = first_session_by_engineer.get(engineer_id)
+    if first_session is None:
+        return "experienced", "Experienced"
+    days = (now - first_session).days
+    if days <= 30:
+        return "new_hire", "New Hire"
+    if days <= 90:
+        return "ramping", "Ramping"
+    return "experienced", "Experienced"
+
+
+def _rollup_to_summary(
+    rollup: _EffectivenessRollup,
+    *,
+    total_interventions: int,
+) -> InterventionEffectivenessSummary:
+    return InterventionEffectivenessSummary(
+        total_interventions=total_interventions,
+        completed_interventions=rollup.completed_interventions,
+        measured_interventions=rollup.measured_interventions,
+        improved_interventions=rollup.improved_interventions,
+        improvement_rate=_ratio(rollup.improved_interventions, rollup.measured_interventions),
+        avg_completion_days=_average(rollup.completion_days),
+        avg_success_rate_delta=_average(rollup.success_rate_deltas),
+        avg_friction_delta=_average(rollup.friction_deltas),
+        avg_findings_per_pr_delta=_average(rollup.findings_per_pr_deltas),
+        avg_cost_per_session_delta=_average(rollup.avg_cost_per_session_deltas),
+    )
+
+
+def _sorted_group_rollups(
+    rollups: dict[str, _EffectivenessRollup],
+) -> list[InterventionEffectivenessGroup]:
+    groups = [
+        InterventionEffectivenessGroup(
+            key=rollup.key,
+            label=rollup.label,
+            completed_interventions=rollup.completed_interventions,
+            measured_interventions=rollup.measured_interventions,
+            improved_interventions=rollup.improved_interventions,
+            improvement_rate=_ratio(rollup.improved_interventions, rollup.measured_interventions),
+            avg_completion_days=_average(rollup.completion_days),
+            avg_success_rate_delta=_average(rollup.success_rate_deltas),
+            avg_friction_delta=_average(rollup.friction_deltas),
+            avg_findings_per_pr_delta=_average(rollup.findings_per_pr_deltas),
+            avg_cost_per_session_delta=_average(rollup.avg_cost_per_session_deltas),
+        )
+        for rollup in rollups.values()
+    ]
+    return sorted(
+        groups,
+        key=lambda item: (
+            -item.measured_interventions,
+            -item.completed_interventions,
+            item.label.lower(),
+        ),
+    )
+
+
+def _average(values: list[float]) -> float | None:
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def _ratio(numerator: int, denominator: int) -> float | None:
+    if denominator == 0:
+        return None
+    return numerator / denominator
 
 
 def _engineer_summary(engineer: Engineer | None) -> InterventionEngineerSummary | None:

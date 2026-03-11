@@ -3,15 +3,24 @@ from sqlalchemy.orm import Session
 
 from primer.common.database import get_db
 from primer.common.models import Engineer
-from primer.common.schemas import InterventionCreate, InterventionResponse, InterventionUpdate
+from primer.common.schemas import (
+    InterventionCreate,
+    InterventionEffectivenessResponse,
+    InterventionResponse,
+    InterventionUpdate,
+)
 from primer.server.deps import AuthContext, get_auth_context
 from primer.server.services.intervention_service import (
     create_intervention,
     get_intervention,
+    get_intervention_effectiveness_report,
+    get_intervention_effectiveness_report_for_engineer,
+    get_intervention_effectiveness_report_for_team,
     intervention_visible_to_engineer,
     intervention_visible_to_team,
     list_interventions,
     list_interventions_for_engineer,
+    list_interventions_for_team,
     update_intervention,
 )
 
@@ -45,9 +54,9 @@ def interventions_list(
             engineer = _require_engineer(db, engineer_id)
             if engineer.team_id != auth.team_id:
                 raise HTTPException(status_code=403, detail="Cannot view other teams")
-        return list_interventions(
+        return list_interventions_for_team(
             db,
-            team_id=auth.team_id,
+            auth.team_id or "",
             engineer_id=engineer_id,
             project_name=project_name,
             status=status,
@@ -79,6 +88,45 @@ def interventions_create(
     )
     db.commit()
     return result
+
+
+@router.get("/effectiveness", response_model=InterventionEffectivenessResponse)
+def interventions_effectiveness(
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    project_name: str | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    if auth.role == "admin":
+        return get_intervention_effectiveness_report(
+            db,
+            team_id=team_id,
+            engineer_id=engineer_id,
+            project_name=project_name,
+        )
+
+    if auth.role == "team_lead":
+        if team_id and team_id != auth.team_id:
+            raise HTTPException(status_code=403, detail="Cannot view interventions for other teams")
+        if engineer_id:
+            engineer = _require_engineer(db, engineer_id)
+            if engineer.team_id != auth.team_id:
+                raise HTTPException(status_code=403, detail="Cannot view other teams")
+        return get_intervention_effectiveness_report_for_team(
+            db,
+            auth.team_id or "",
+            engineer_id=engineer_id,
+            project_name=project_name,
+        )
+
+    if engineer_id and engineer_id != auth.engineer_id:
+        raise HTTPException(status_code=403, detail="Cannot view other engineers")
+    return get_intervention_effectiveness_report_for_engineer(
+        db,
+        auth.engineer_id or "",
+        project_name=project_name,
+    )
 
 
 @router.patch("/{intervention_id}", response_model=InterventionResponse)
