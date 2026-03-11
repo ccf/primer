@@ -7,7 +7,7 @@ describe("ProjectScorecard", () => {
     render(
       <ProjectScorecard
         scorecard={{
-          adoption_rate: 0.75,
+          adoption_rate: 75,
           effectiveness_rate: 0.5,
           effectiveness_score: {
             score: 68.4,

@@ -15,6 +15,8 @@ interface ProjectScorecardProps {
 }
 
 export function ProjectScorecard({ scorecard, overview }: ProjectScorecardProps) {
+  const adoptionValue =
+    scorecard.adoption_rate != null ? `${scorecard.adoption_rate.toFixed(0)}%` : "-"
   const costValue =
     scorecard.cost_per_successful_outcome != null
       ? formatCost(scorecard.cost_per_successful_outcome)
@@ -38,7 +40,7 @@ export function ProjectScorecard({ scorecard, overview }: ProjectScorecardProps)
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
       <StatCard
         label="Adoption"
-        value={formatPercent(scorecard.adoption_rate)}
+        value={adoptionValue}
         subtitle={`${overview.total_engineers} engineers active on this project`}
         icon={Activity}
       />
