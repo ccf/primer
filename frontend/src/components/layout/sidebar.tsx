@@ -43,6 +43,7 @@ const engineerLinks: NavItem[] = [
 ]
 
 const leadershipLinks: NavItem[] = [
+  { to: "/profile", label: "My Profile", icon: User },
   { to: "/dashboard", label: "Organization", icon: LayoutDashboard },
   { to: "/synthesis", label: "Synthesis", icon: Sparkles },
   { to: "/maturity", label: "AI Maturity", icon: TrendingUp },
