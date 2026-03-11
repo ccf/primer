@@ -62,6 +62,14 @@ def _proficiency_level(call_count: int) -> str:
     return "novice"
 
 
+def _sortable_started_at(value: datetime | None) -> datetime:
+    if value is None:
+        return datetime.min.replace(tzinfo=UTC)
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 # ---------------------------------------------------------------------------
 # Config Optimization
 # ---------------------------------------------------------------------------
@@ -779,7 +787,7 @@ def get_learning_paths(
                 )
 
         # 4. Complexity progression
-        sorted_sessions = sorted(sess_list, key=lambda s: s.started_at or datetime.min)
+        sorted_sessions = sorted(sess_list, key=lambda s: _sortable_started_at(s.started_at))
         complexity_trend = "flat"
         if len(sorted_sessions) >= 5:
             first_chunk = sorted_sessions[: min(10, len(sorted_sessions) // 2)]
@@ -1635,14 +1643,14 @@ def get_time_to_team_average(
             continue
 
         # Sort by started_at
-        sess_list.sort(key=lambda s: s.started_at or datetime.min)
+        sess_list.sort(key=lambda s: _sortable_started_at(s.started_at))
 
         # Group into weekly buckets by offset from first session
         weekly_buckets: dict[int, list[str]] = defaultdict(list)
         for s in sess_list:
             if not s.started_at:
                 continue
-            delta = s.started_at - first_dt
+            delta = _sortable_started_at(s.started_at) - _sortable_started_at(first_dt)
             if hasattr(delta, "total_seconds"):
                 week_num = int(delta.total_seconds() / (7 * 86400))
             else:

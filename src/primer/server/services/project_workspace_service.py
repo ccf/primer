@@ -26,7 +26,6 @@ from primer.common.schemas import (
     ProjectWorkspaceResponse,
 )
 from primer.common.source_capabilities import CAPABILITIES
-from primer.common.tool_classification import classify_tool
 from primer.server.services.analytics_service import (
     _filter_sessions_by_capability,
     base_session_query,
@@ -40,6 +39,11 @@ from primer.server.services.effectiveness_service import (
     get_peer_cost_per_success_benchmark,
 )
 from primer.server.services.quality_service import get_quality_metrics
+from primer.server.services.workflow_patterns import (
+    infer_workflow_steps,
+    workflow_fingerprint_id,
+    workflow_fingerprint_label,
+)
 
 
 def get_project_workspace(
@@ -415,13 +419,13 @@ def _build_workflow_summary(
         facets = facets_by_session.get(session_id, {})
         session_type = facets.get("session_type")
         tool_counts = tool_counts_by_session.get(session_id, Counter())
-        steps = _infer_workflow_steps(tool_counts, session_id in commit_session_ids)
+        steps = infer_workflow_steps(tool_counts, session_id in commit_session_ids)
         if not session_type and not steps:
             continue
 
         fingerprinted_sessions += 1
-        fingerprint_id = _fingerprint_id(session_type, steps)
-        label = _fingerprint_label(session_type, steps)
+        fingerprint_id = workflow_fingerprint_id(session_type, steps)
+        label = workflow_fingerprint_label(session_type, steps)
         label_by_key[fingerprint_id] = label
 
         bucket = fingerprints.setdefault(
@@ -531,35 +535,3 @@ def _build_workflow_summary(
         fingerprints=fingerprint_rows,
         friction_hotspots=hotspot_rows,
     )
-
-
-def _infer_workflow_steps(tool_counts: Counter[str], has_commit: bool) -> list[str]:
-    tool_names = set(tool_counts)
-    steps: list[str] = []
-    if any(classify_tool(name) == "search" for name in tool_names):
-        steps.append("search")
-    if tool_names.intersection({"Read", "WebFetch"}):
-        steps.append("read")
-    if tool_names.intersection({"Edit", "Write", "NotebookEdit"}):
-        steps.append("edit")
-    if "Bash" in tool_names:
-        steps.append("execute")
-    if any(classify_tool(name) in {"orchestration", "skill"} for name in tool_names):
-        steps.append("delegate")
-    if any(classify_tool(name) == "mcp" for name in tool_names):
-        steps.append("integrate")
-    if has_commit:
-        steps.append("ship")
-    return steps
-
-
-def _fingerprint_id(session_type: str | None, steps: list[str]) -> str:
-    normalized_type = session_type or "general"
-    normalized_steps = "+".join(steps) if steps else "reasoning"
-    return f"{normalized_type}::{normalized_steps}"
-
-
-def _fingerprint_label(session_type: str | None, steps: list[str]) -> str:
-    type_label = (session_type or "general").replace("_", " ")
-    step_label = " -> ".join(steps) if steps else "reasoning"
-    return f"{type_label}: {step_label}"

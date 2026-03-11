@@ -26,6 +26,7 @@ from primer.server.services.insights_service import (
     get_learning_paths,
     get_skill_inventory,
 )
+from primer.server.services.workflow_playbook_service import get_workflow_playbooks
 
 logger = logging.getLogger(__name__)
 
@@ -235,6 +236,14 @@ def get_engineer_profile(
         db, engineer_id=engineer_id, limit=10, start_date=start_date, end_date=end_date
     )
 
+    workflow_playbooks = get_workflow_playbooks(
+        db,
+        engineer_id,
+        team_id=engineer.team_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
     # Distinct project names
     project_rows = (
         db.query(SessionModel.project_name)
@@ -306,4 +315,5 @@ def get_engineer_profile(
         effectiveness=effectiveness,
         projects=projects,
         tool_rankings=tool_rankings,
+        workflow_playbooks=workflow_playbooks,
     )
