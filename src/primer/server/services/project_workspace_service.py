@@ -16,8 +16,10 @@ from primer.common.models import (
 from primer.common.models import Session as SessionModel
 from primer.common.schemas import (
     FrictionImpact,
+    LanguageShare,
     ProjectEnablementSummary,
     ProjectFrictionHotspot,
+    ProjectRepositoryContextSummary,
     ProjectRepositorySummary,
     ProjectScorecard,
     ProjectStats,
@@ -114,6 +116,7 @@ def get_project_workspace(
 
     enablement = _build_enablement_summary(db, session_q)
     repositories = _build_repository_summary(db, session_q)
+    repository_context = _build_repository_context_summary(repositories)
     workflow_summary = _build_workflow_summary(
         db,
         session_q,
@@ -186,6 +189,7 @@ def get_project_workspace(
         friction_impacts=bottlenecks.friction_impacts[:5],
         repositories=repositories,
         enablement=enablement,
+        repository_context=repository_context,
         workflow_summary=workflow_summary,
     )
 
@@ -446,9 +450,104 @@ def _build_repository_summary(db: Session, session_q) -> list[ProjectRepositoryS
             has_claude_md=repo.has_claude_md,
             has_agents_md=repo.has_agents_md,
             has_claude_dir=repo.has_claude_dir,
+            primary_language=repo.primary_language,
+            language_mix=_language_mix_from_breakdown(
+                repo.language_breakdown, repo.primary_language
+            ),
+            repo_size_kb=repo.repo_size_kb,
+            repo_size_bucket=_repo_size_bucket(repo.repo_size_kb),
+            has_test_harness=repo.has_test_harness,
+            has_ci_pipeline=repo.has_ci_pipeline,
+            test_maturity_score=repo.test_maturity_score,
         )
         for repo in repos
     ]
+
+
+def _build_repository_context_summary(
+    repositories: list[ProjectRepositorySummary],
+) -> ProjectRepositoryContextSummary:
+    context_repositories = [
+        repo
+        for repo in repositories
+        if repo.language_mix
+        or repo.repo_size_kb is not None
+        or repo.test_maturity_score is not None
+        or repo.has_test_harness is not None
+        or repo.has_ci_pipeline is not None
+    ]
+    if not context_repositories:
+        return ProjectRepositoryContextSummary()
+
+    language_totals: Counter[str] = Counter()
+    size_distribution: Counter[str] = Counter()
+    repo_sizes = [
+        repo.repo_size_kb for repo in context_repositories if repo.repo_size_kb is not None
+    ]
+    test_scores = [
+        repo.test_maturity_score
+        for repo in context_repositories
+        if repo.test_maturity_score is not None
+    ]
+
+    for repo in context_repositories:
+        for item in repo.language_mix:
+            language_totals[item.language] += item.share_pct
+        if repo.repo_size_bucket:
+            size_distribution[repo.repo_size_bucket] += 1
+
+    repo_count = len(context_repositories)
+    language_mix = [
+        LanguageShare(language=language, share_pct=round(total / repo_count, 3))
+        for language, total in language_totals.most_common(5)
+    ]
+
+    return ProjectRepositoryContextSummary(
+        repositories_with_context=repo_count,
+        avg_repo_size_kb=round(sum(repo_sizes) / len(repo_sizes), 1) if repo_sizes else None,
+        avg_test_maturity_score=(
+            round(sum(test_scores) / len(test_scores), 3) if test_scores else None
+        ),
+        repositories_with_test_harness=sum(
+            1 for repo in context_repositories if repo.has_test_harness is True
+        ),
+        repositories_with_ci_pipeline=sum(
+            1 for repo in context_repositories if repo.has_ci_pipeline is True
+        ),
+        language_mix=language_mix,
+        size_distribution=dict(size_distribution),
+    )
+
+
+def _language_mix_from_breakdown(
+    breakdown: dict[str, int] | None,
+    primary_language: str | None,
+) -> list[LanguageShare]:
+    if breakdown:
+        total = sum(bytes_of_code for bytes_of_code in breakdown.values() if bytes_of_code > 0)
+        if total > 0:
+            return [
+                LanguageShare(language=language, share_pct=round(bytes_of_code / total, 3))
+                for language, bytes_of_code in sorted(
+                    breakdown.items(),
+                    key=lambda item: item[1],
+                    reverse=True,
+                )[:3]
+                if bytes_of_code > 0
+            ]
+    if primary_language:
+        return [LanguageShare(language=primary_language, share_pct=1.0)]
+    return []
+
+
+def _repo_size_bucket(repo_size_kb: int | None) -> str | None:
+    if repo_size_kb is None:
+        return None
+    if repo_size_kb < 5_000:
+        return "small"
+    if repo_size_kb < 50_000:
+        return "medium"
+    return "large"
 
 
 def _compute_measurement_confidence(db: Session, session_q) -> float | None:

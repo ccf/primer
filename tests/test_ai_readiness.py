@@ -1,7 +1,11 @@
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
-from primer.server.services.github_service import check_ai_readiness, sync_repository
+from primer.server.services.github_service import (
+    check_ai_readiness,
+    check_repository_context,
+    sync_repository,
+)
 
 
 def test_readiness_all_files():
@@ -41,6 +45,43 @@ def test_readiness_transient_error():
 
     with patch("primer.server.services.github_service.check_file_exists", side_effect=fake_check):
         result = check_ai_readiness("org/repo")
+    assert result is None
+
+
+def test_repository_context_detects_languages_and_test_signals():
+    def fake_check(full_name, path, ref=None, expected_type=None):
+        return path in {"tests", ".github/workflows"}
+
+    with (
+        patch(
+            "primer.server.services.github_service.get_repository_languages",
+            return_value={"Python": 7000, "TypeScript": 3000},
+        ),
+        patch("primer.server.services.github_service.check_file_exists", side_effect=fake_check),
+    ):
+        result = check_repository_context("org/repo", "main")
+
+    assert result["language_breakdown"] == {"Python": 7000, "TypeScript": 3000}
+    assert result["has_test_harness"] is True
+    assert result["has_ci_pipeline"] is True
+    assert result["test_maturity_score"] == 100.0
+
+
+def test_repository_context_transient_error_returns_none():
+    def fake_check(full_name, path, ref=None, expected_type=None):
+        if path == ".github/workflows":
+            return None
+        return False
+
+    with (
+        patch(
+            "primer.server.services.github_service.get_repository_languages",
+            return_value={"Python": 100},
+        ),
+        patch("primer.server.services.github_service.check_file_exists", side_effect=fake_check),
+    ):
+        result = check_repository_context("org/repo")
+
     assert result is None
 
 
@@ -95,3 +136,58 @@ def test_readiness_cooldown(db_session):
     ):
         sync_repository(db_session, "org/cooldown-test")
         mock_readiness.assert_not_called()
+
+
+def test_sync_repository_persists_repo_context(db_session):
+    from primer.common.models import GitRepository
+
+    repo = GitRepository(full_name="org/context-test")
+    db_session.add(repo)
+    db_session.flush()
+
+    with (
+        patch("primer.server.services.github_service.is_configured", return_value=True),
+        patch(
+            "primer.server.services.github_service.get_repository",
+            return_value={
+                "id": 123,
+                "default_branch": "main",
+                "language": "Python",
+                "size": 12500,
+            },
+        ),
+        patch("primer.server.services.github_service.list_pull_requests", return_value=[]),
+        patch(
+            "primer.server.services.github_service.check_ai_readiness",
+            return_value={
+                "has_claude_md": True,
+                "has_agents_md": False,
+                "has_claude_dir": True,
+                "ai_readiness_score": 80.0,
+            },
+        ),
+        patch(
+            "primer.server.services.github_service.check_repository_context",
+            return_value={
+                "language_breakdown": {"Python": 7000, "TypeScript": 3000},
+                "has_test_harness": True,
+                "has_ci_pipeline": True,
+                "test_maturity_score": 100.0,
+            },
+        ),
+        patch(
+            "primer.server.services.github_service.find_or_create_repository",
+            return_value=repo,
+        ),
+    ):
+        sync_repository(db_session, "org/context-test")
+
+    assert repo.github_id == 123
+    assert repo.default_branch == "main"
+    assert repo.primary_language == "Python"
+    assert repo.repo_size_kb == 12500
+    assert repo.language_breakdown == {"Python": 7000, "TypeScript": 3000}
+    assert repo.has_test_harness is True
+    assert repo.has_ci_pipeline is True
+    assert repo.test_maturity_score == 100.0
+    assert repo.repo_context_checked_at is not None
