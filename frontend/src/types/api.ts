@@ -824,6 +824,7 @@ export interface ProjectEnablementSummary {
   permission_mode_counts: Record<string, number>
   top_tools: string[]
   top_models: string[]
+  recommendations: Recommendation[]
 }
 
 export interface ProjectWorkflowFingerprint {

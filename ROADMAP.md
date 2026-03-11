@@ -129,7 +129,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Skill inventory with proficiency levels per tool
 - [x] Learning paths generated from high-performer patterns
 - [x] [P0] Effectiveness score: success rate, cost efficiency, quality outcomes, and follow-through
-- [ ] [P0] Workflow playbooks derived from high-performing peer patterns
+- [x] [P0] Workflow playbooks derived from high-performing peer patterns
 - [ ] [P1] Plugin and tool recommendation engine based on task type, project context, and similar successful sessions
 - [ ] [P1] Model selection coach for cost-appropriate model choice by task
 - [ ] [P1] Personal impact review that combines trajectory, quality, cost, and workflow maturity
@@ -155,7 +155,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] [P0] Project-level workflow fingerprints and friction hotspots
 - [ ] [P1] Project-level agent mix comparison, including Cursor sessions alongside CLI agents
 - [ ] [P1] Repository context model: language mix, test maturity, repo size, and AI-enablement signals
-- [ ] [P1] Project enablement recommendations tied to observed bottlenecks
+- [x] [P1] Project enablement recommendations tied to observed bottlenecks
 - [ ] [P1] Cross-project comparison: which repos are easiest or hardest to use AI effectively in
 - [ ] [P2] Project playbook templates for greenfield, legacy, high-compliance, and test-poor repos
 
