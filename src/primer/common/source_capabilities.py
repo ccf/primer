@@ -82,7 +82,7 @@ CAPABILITIES: dict[AgentType, AgentCapability] = {
         tool_calls="optional",
         model_usage="optional",
         facets="optional",
-        native_discovery="unavailable",
+        native_discovery="required",
     ),
 }
 

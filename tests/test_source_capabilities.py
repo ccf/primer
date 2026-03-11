@@ -11,7 +11,7 @@ def test_cursor_capability_exists():
         tool_calls="optional",
         model_usage="optional",
         facets="optional",
-        native_discovery="unavailable",
+        native_discovery="required",
     )
     assert cap.supports_transcript is True
     assert cap.supports_tool_calls is True

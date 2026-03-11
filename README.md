@@ -38,7 +38,7 @@
 
 Your team adopted AI coding tools. Now what?
 
-Primer is an open-source intelligence platform that captures session data from [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), and [Gemini CLI](https://github.com/google-gemini/gemini-cli) — then answers the questions that no other tool can. Self-hosted. Privacy-first. Your data never leaves your network.
+Primer is an open-source intelligence platform that captures session data from [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), [Gemini CLI](https://github.com/google-gemini/gemini-cli), and Cursor — then answers the questions that no other tool can. Self-hosted. Privacy-first. Your data never leaves your network.
 
 ## Questions Primer Answers
 
@@ -95,7 +95,7 @@ Primer is an open-source intelligence platform that captures session data from [
 | **Conversational Explorer** | Natural language queries over your data via SSE-streamed tool-use chat |
 | **Session Browser** | Full-text search, outcome/model/type filters, transcript viewer, message-level detail |
 | **MCP Sidecar** | Engineers query their own stats mid-session: trends, friction reports, recommendations |
-| **Multi-Agent Support** | Claude Code, Codex CLI, and Gemini CLI sessions in one platform |
+| **Multi-Agent Support** | Claude Code, Codex CLI, Gemini CLI, and Cursor sessions in one platform |
 | **GitHub Integration** | OAuth SSO, PR sync, commit correlation, repository AI-readiness scoring |
 
 ## Quickstart
@@ -126,10 +126,11 @@ See the [Installation guide](https://useprimer.dev/docs/installation/) for full 
 ## How It Works
 
 ```
-AI Coding Tools ──SessionEnd Hook──▶ Primer API ◀──MCP Sidecar
+AI Coding Tools ──Hooks / Sync──▶ Primer API ◀──MCP Sidecar
  (Claude Code,                           │
   Codex CLI,                             ▼
-  Gemini CLI)                    PostgreSQL / SQLite
+  Gemini CLI,
+  Cursor)                        PostgreSQL / SQLite
                                          │
                                          ▼
                                   React Dashboard
