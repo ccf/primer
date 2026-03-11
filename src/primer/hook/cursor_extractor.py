@@ -1,13 +1,15 @@
-"""Extract structured metadata from Primer-owned Cursor session bundles."""
+"""Extract structured metadata from imported and native Cursor sessions."""
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 from collections import Counter
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
+from urllib.parse import unquote, urlparse
 
 from primer.hook.extractor import SessionMetadata
 
@@ -15,10 +17,11 @@ if TYPE_CHECKING:
     from primer.mcp.reader import LocalSession
 
 logger = logging.getLogger(__name__)
+_GIT_REPO_PATTERN = re.compile(r"^Git repo:\s+(.+)$", re.MULTILINE)
 
 
 class CursorExtractor:
-    """Extractor for imported Cursor session bundles."""
+    """Extractor for imported Cursor bundles and native Cursor transcripts."""
 
     agent_type = "cursor"
 
@@ -32,6 +35,9 @@ class CursorExtractor:
         return (
             Path.home() / "Library" / "Application Support" / "Cursor" / "User" / "workspaceStorage"
         )
+
+    def get_native_projects_dir(self) -> Path:
+        return Path.home() / ".cursor" / "projects"
 
     def get_session_path(self, session_id: str) -> Path:
         return self.get_sessions_dir() / f"{self.validate_session_id(session_id)}.json"
@@ -71,12 +77,35 @@ class CursorExtractor:
         )
 
     def _discover_native_sessions(self, seen_ids: set[str]) -> list:
-        # Cursor workspaceStorage currently exposes workspace metadata we can use
-        # for future project-path inference, but not a reliable native session
-        # transcript contract. Until that exists, imported bundles remain the only
-        # supported discovery path.
-        _ = seen_ids
-        return []
+        projects_dir = self.get_native_projects_dir()
+        if not projects_dir.exists():
+            return []
+
+        workspace_paths = self._load_workspace_project_paths()
+        results = []
+
+        for project_dir in sorted(projects_dir.iterdir()):
+            transcripts_dir = project_dir / "agent-transcripts"
+            if not transcripts_dir.is_dir():
+                continue
+
+            inferred_project_path = workspace_paths.get(project_dir.name)
+            for session_dir in sorted(transcripts_dir.iterdir()):
+                if not session_dir.is_dir():
+                    continue
+                transcript_path = session_dir / f"{session_dir.name}.jsonl"
+                if not transcript_path.exists():
+                    continue
+                results.extend(
+                    self._discover_bundle_paths(
+                        [transcript_path],
+                        seen_ids,
+                        "native Cursor transcript",
+                        inferred_project_path,
+                    )
+                )
+
+        return results
 
     def _discover_bundle_paths(
         self,
@@ -99,6 +128,10 @@ class CursorExtractor:
                 logger.exception("Error reading %s: %s", source_label, bundle_path)
                 continue
 
+            if meta.message_count <= 0:
+                logger.warning("Skipping %s with no messages: %s", source_label, bundle_path)
+                continue
+
             if session_id in seen_ids:
                 continue
             seen_ids.add(session_id)
@@ -116,8 +149,11 @@ class CursorExtractor:
         return results
 
     def extract(self, transcript_path: str) -> SessionMetadata:
-        meta = SessionMetadata(agent_type=self.agent_type)
         path = Path(transcript_path)
+        if path.suffix == ".jsonl":
+            return self._extract_native_transcript(path)
+
+        meta = SessionMetadata(agent_type=self.agent_type)
         if not path.exists():
             return meta
 
@@ -217,6 +253,70 @@ class CursorExtractor:
 
         return meta
 
+    def _extract_native_transcript(self, transcript_path: Path) -> SessionMetadata:
+        meta = SessionMetadata(agent_type=self.agent_type)
+        if not transcript_path.exists():
+            return meta
+
+        meta.session_id = transcript_path.stem
+        meta.messages = _load_native_messages(transcript_path)
+        meta.message_count = len(meta.messages)
+        meta.user_message_count = sum(
+            1 for message in meta.messages if message.get("role") == "human"
+        )
+        meta.assistant_message_count = sum(
+            1 for message in meta.messages if message.get("role") == "assistant"
+        )
+        meta.first_prompt = _extract_first_prompt(meta.messages)
+        meta.summary = _extract_last_assistant_summary(meta.messages)
+
+        project_path = self._resolve_native_project_path(transcript_path, meta.messages)
+        meta.project_path = project_path or ""
+        if meta.project_path:
+            meta.project_name = Path(meta.project_path).name
+        else:
+            meta.project_name = _native_project_slug(transcript_path)
+
+        started_at, ended_at = _native_session_time_bounds(transcript_path.parent)
+        meta.started_at = started_at
+        meta.ended_at = ended_at
+        if meta.started_at and meta.ended_at:
+            duration_seconds = (meta.ended_at - meta.started_at).total_seconds()
+            meta.duration_seconds = duration_seconds if duration_seconds >= 0 else None
+
+        return meta
+
+    def _resolve_native_project_path(
+        self,
+        transcript_path: Path,
+        messages: list[dict],
+    ) -> str | None:
+        explicit_project_path = _extract_git_repo_path(messages)
+        if explicit_project_path:
+            return explicit_project_path
+
+        return self._load_workspace_project_paths().get(_native_project_slug(transcript_path))
+
+    def _load_workspace_project_paths(self) -> dict[str, str]:
+        cached = getattr(self, "_workspace_project_paths", None)
+        if cached is not None:
+            return cached
+
+        workspace_paths: dict[str, str] = {}
+        workspace_storage_dir = self.get_native_workspace_storage_dir()
+        if workspace_storage_dir.exists():
+            for workspace_dir in workspace_storage_dir.iterdir():
+                workspace_json_path = workspace_dir / "workspace.json"
+                if not workspace_json_path.exists():
+                    continue
+                folder_path = _load_workspace_folder_path(workspace_json_path)
+                if not folder_path:
+                    continue
+                workspace_paths.setdefault(_project_slug_from_path(folder_path), folder_path)
+
+        self._workspace_project_paths = workspace_paths
+        return workspace_paths
+
 
 def _parse_timestamp(value: object) -> datetime | None:
     if not isinstance(value, str) or not value:
@@ -230,6 +330,16 @@ def _parse_timestamp(value: object) -> datetime | None:
 def _extract_first_prompt(messages: list[dict]) -> str:
     for message in messages:
         if message.get("role") != "human":
+            continue
+        content = message.get("content_text")
+        if isinstance(content, str) and content:
+            return content[:500]
+    return ""
+
+
+def _extract_last_assistant_summary(messages: list[dict]) -> str:
+    for message in reversed(messages):
+        if message.get("role") != "assistant":
             continue
         content = message.get("content_text")
         if isinstance(content, str) and content:
@@ -288,6 +398,126 @@ def _normalize_role(role: object) -> str:
     if normalized in {"human", "assistant", "tool_result"}:
         return normalized
     return normalized or "assistant"
+
+
+def _load_native_messages(transcript_path: Path) -> list[dict]:
+    normalized: list[dict] = []
+    next_ordinal = 0
+
+    try:
+        lines = transcript_path.read_text().splitlines()
+    except OSError:
+        return normalized
+
+    for line in lines:
+        if not line.strip():
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict):
+            continue
+
+        role = _normalize_role(payload.get("role"))
+        message = payload.get("message")
+        if not isinstance(message, dict):
+            continue
+
+        content_text = _extract_native_content_text(message.get("content"))
+        if not content_text:
+            continue
+
+        normalized.append(
+            {
+                "ordinal": next_ordinal,
+                "role": role,
+                "content_text": content_text,
+            }
+        )
+        next_ordinal += 1
+
+    return normalized
+
+
+def _extract_native_content_text(content: object) -> str:
+    if not isinstance(content, list):
+        return ""
+
+    text_parts: list[str] = []
+    for part in content:
+        if not isinstance(part, dict):
+            continue
+        if part.get("type") != "text":
+            continue
+        text = part.get("text")
+        if isinstance(text, str) and text:
+            text_parts.append(text)
+
+    return "\n\n".join(text_parts)
+
+
+def _extract_git_repo_path(messages: list[dict]) -> str | None:
+    for message in messages:
+        content = message.get("content_text")
+        if not isinstance(content, str):
+            continue
+        match = _GIT_REPO_PATTERN.search(content)
+        if match:
+            return match.group(1).strip()
+    return None
+
+
+def _native_project_slug(transcript_path: Path) -> str:
+    try:
+        return transcript_path.parents[2].name
+    except IndexError:
+        return ""
+
+
+def _native_session_time_bounds(session_dir: Path) -> tuple[datetime | None, datetime | None]:
+    jsonl_paths = [path for path in session_dir.rglob("*.jsonl") if path.is_file()]
+    if not jsonl_paths:
+        return None, None
+
+    start_timestamp = min(_birth_or_change_timestamp(path) for path in jsonl_paths)
+    end_timestamp = max(path.stat().st_mtime for path in jsonl_paths)
+    return (
+        datetime.fromtimestamp(start_timestamp, UTC),
+        datetime.fromtimestamp(end_timestamp, UTC),
+    )
+
+
+def _birth_or_change_timestamp(path: Path) -> float:
+    stat = path.stat()
+    return getattr(stat, "st_birthtime", stat.st_ctime)
+
+
+def _load_workspace_folder_path(workspace_json_path: Path) -> str | None:
+    try:
+        workspace_data = json.loads(workspace_json_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    if not isinstance(workspace_data, dict):
+        return None
+
+    folder = workspace_data.get("folder")
+    if not isinstance(folder, str) or not folder:
+        return None
+
+    parsed = urlparse(folder)
+    if parsed.scheme == "file":
+        return unquote(parsed.path)
+    return folder
+
+
+def _project_slug_from_path(project_path: str) -> str:
+    normalized = project_path.replace("\\", "/").strip()
+    if normalized.startswith("file://"):
+        normalized = normalized[7:]
+    normalized = normalized.lstrip("/")
+    return normalized.replace("/", "-").replace(":", "")
 
 
 def _safe_int(value: object) -> int:

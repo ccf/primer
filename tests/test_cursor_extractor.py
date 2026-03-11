@@ -46,6 +46,89 @@ def _setup_cursor_workspace_json(
     return native_path
 
 
+def _project_slug(project_path: Path) -> str:
+    return project_path.as_posix().lstrip("/").replace("/", "-")
+
+
+def _setup_cursor_workspace_storage_entry(
+    tmp_path,
+    project_path: Path,
+    *,
+    workspace_id: str = "workspace-1",
+) -> None:
+    workspace_dir = (
+        tmp_path
+        / "Library"
+        / "Application Support"
+        / "Cursor"
+        / "User"
+        / "workspaceStorage"
+        / workspace_id
+    )
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    (workspace_dir / "workspace.json").write_text(json.dumps({"folder": project_path.as_uri()}))
+
+
+def _setup_native_cursor_transcript(
+    tmp_path,
+    session_id: str,
+    project_path: Path,
+    *,
+    include_git_repo: bool = False,
+    add_workspace_mapping: bool = False,
+) -> Path:
+    project_dir = tmp_path / ".cursor" / "projects" / _project_slug(project_path)
+    session_dir = project_dir / "agent-transcripts" / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+
+    transcript_lines = [
+        {
+            "role": "user",
+            "message": {"content": [{"type": "text", "text": "Please add native Cursor capture"}]},
+        },
+        {
+            "role": "assistant",
+            "message": {
+                "content": [{"type": "text", "text": "I'll inspect the local transcript format."}]
+            },
+        },
+    ]
+    if include_git_repo:
+        transcript_lines.append(
+            {
+                "role": "user",
+                "message": {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"<git_status>\nGit repo: {project_path}\n</git_status>",
+                        }
+                    ]
+                },
+            }
+        )
+
+    transcript_path = session_dir / f"{session_id}.jsonl"
+    transcript_path.write_text("\n".join(json.dumps(line) for line in transcript_lines) + "\n")
+
+    subagent_dir = session_dir / "subagents"
+    subagent_dir.mkdir(parents=True, exist_ok=True)
+    (subagent_dir / "child.jsonl").write_text(
+        json.dumps(
+            {
+                "role": "assistant",
+                "message": {"content": [{"type": "text", "text": "Subagent note"}]},
+            }
+        )
+        + "\n"
+    )
+
+    if add_workspace_mapping:
+        _setup_cursor_workspace_storage_entry(tmp_path, project_path)
+
+    return transcript_path
+
+
 def test_extract_cursor_bundle_reads_core_metadata(tmp_path):
     project_path = tmp_path / "demo"
     bundle = {
@@ -249,6 +332,97 @@ def test_discover_sessions_ignores_generic_workspace_storage_json(tmp_path, monk
     sessions = CursorExtractor().discover_sessions()
 
     assert sessions == []
+
+
+def test_extract_native_cursor_transcript_reads_messages_and_repo_context(tmp_path, monkeypatch):
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+    project_path = tmp_path / "demo-project"
+    transcript_path = _setup_native_cursor_transcript(
+        tmp_path,
+        "cursor-native-1",
+        project_path,
+        include_git_repo=True,
+    )
+
+    meta = CursorExtractor().extract(str(transcript_path))
+
+    assert meta.session_id == "cursor-native-1"
+    assert meta.agent_type == "cursor"
+    assert meta.project_path == str(project_path)
+    assert meta.project_name == "demo-project"
+    assert meta.messages == [
+        {"ordinal": 0, "role": "human", "content_text": "Please add native Cursor capture"},
+        {
+            "ordinal": 1,
+            "role": "assistant",
+            "content_text": "I'll inspect the local transcript format.",
+        },
+        {
+            "ordinal": 2,
+            "role": "human",
+            "content_text": f"<git_status>\nGit repo: {project_path}\n</git_status>",
+        },
+    ]
+    assert meta.message_count == 3
+    assert meta.user_message_count == 2
+    assert meta.assistant_message_count == 1
+    assert meta.first_prompt == "Please add native Cursor capture"
+    assert meta.summary == "I'll inspect the local transcript format."
+    assert meta.started_at is not None
+    assert meta.ended_at is not None
+    assert meta.duration_seconds is not None
+    assert meta.ended_at >= meta.started_at
+
+
+def test_discover_sessions_includes_native_cursor_transcripts_with_workspace_mapping(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+    project_path = tmp_path / "native-project"
+    transcript_path = _setup_native_cursor_transcript(
+        tmp_path,
+        "cursor-native-2",
+        project_path,
+        add_workspace_mapping=True,
+    )
+
+    sessions = CursorExtractor().discover_sessions()
+
+    assert [
+        (session.session_id, session.transcript_path, session.project_path) for session in sessions
+    ] == [("cursor-native-2", str(transcript_path), str(project_path))]
+
+
+def test_discover_sessions_prefers_imported_bundle_over_native_transcript_with_same_session_id(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+    project_path = tmp_path / "native-project"
+    native_transcript_path = _setup_native_cursor_transcript(
+        tmp_path,
+        "cursor-duplicate",
+        project_path,
+        add_workspace_mapping=True,
+    )
+    sessions_dir = tmp_path / ".primer" / "cursor" / "sessions"
+    sessions_dir.mkdir(parents=True, exist_ok=True)
+    imported_bundle_path = sessions_dir / "cursor-duplicate.json"
+    imported_bundle_path.write_text(
+        json.dumps(
+            {
+                "session_id": "cursor-duplicate",
+                "project_path": str(project_path),
+                "messages": [{"role": "human", "content_text": "Imported bundle wins"}],
+            }
+        )
+    )
+
+    sessions = CursorExtractor().discover_sessions()
+
+    assert [(session.session_id, session.transcript_path) for session in sessions] == [
+        ("cursor-duplicate", str(imported_bundle_path))
+    ]
+    assert native_transcript_path.exists()
 
 
 def test_extract_cursor_bundle_clamps_negative_duration_to_none(tmp_path):

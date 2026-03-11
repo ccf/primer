@@ -101,6 +101,76 @@ def _setup_cursor_import(tmp_path, session_id, project_path):
     return bundle_path
 
 
+def _project_slug(project_path: str) -> str:
+    return project_path.lstrip("/").replace("/", "-")
+
+
+def _setup_cursor_native_session(
+    tmp_path,
+    session_id,
+    project_path,
+    *,
+    include_git_repo=False,
+    workspace_id="workspace-1",
+):
+    project_dir = (
+        tmp_path
+        / ".cursor"
+        / "projects"
+        / _project_slug(project_path)
+        / "agent-transcripts"
+        / session_id
+    )
+    project_dir.mkdir(parents=True, exist_ok=True)
+    transcript_lines = [
+        {
+            "role": "user",
+            "message": {"content": [{"type": "text", "text": "Ship native Cursor support"}]},
+        },
+        {
+            "role": "assistant",
+            "message": {"content": [{"type": "text", "text": "I'll inspect the transcript."}]},
+        },
+    ]
+    if include_git_repo:
+        transcript_lines.append(
+            {
+                "role": "user",
+                "message": {"content": [{"type": "text", "text": f"Git repo: {project_path}"}]},
+            }
+        )
+
+    transcript_path = project_dir / f"{session_id}.jsonl"
+    transcript_path.write_text("\n".join(json.dumps(line) for line in transcript_lines) + "\n")
+
+    subagent_dir = project_dir / "subagents"
+    subagent_dir.mkdir(parents=True, exist_ok=True)
+    (subagent_dir / "child.jsonl").write_text(
+        json.dumps(
+            {
+                "role": "assistant",
+                "message": {"content": [{"type": "text", "text": "Subagent note"}]},
+            }
+        )
+        + "\n"
+    )
+
+    workspace_dir = (
+        tmp_path
+        / "Library"
+        / "Application Support"
+        / "Cursor"
+        / "User"
+        / "workspaceStorage"
+        / workspace_id
+    )
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    (workspace_dir / "workspace.json").write_text(
+        json.dumps({"folder": Path(project_path).as_uri()})
+    )
+    return transcript_path
+
+
 def _setup_cursor_workspace_storage_json(
     tmp_path,
     session_id,
@@ -207,6 +277,27 @@ def test_list_local_sessions_includes_imported_cursor_bundles(tmp_path, monkeypa
     assert cursor.agent_type == "cursor"
     assert cursor.transcript_path == str(cursor_bundle)
     assert cursor.project_path == "/home/user/cursor-project"
+    assert cursor.has_facets is False
+    assert cursor.facets_path is None
+
+
+def test_list_local_sessions_includes_native_cursor_transcripts(tmp_path, monkeypatch):
+    native_transcript = _setup_cursor_native_session(
+        tmp_path,
+        "cursor-native-1",
+        "/home/user/native-cursor-project",
+    )
+
+    _mock_home(tmp_path, monkeypatch)
+    result = reader.list_local_sessions()
+
+    sessions_by_id = {session.session_id: session for session in result}
+    assert set(sessions_by_id) == {"cursor-native-1"}
+
+    cursor = sessions_by_id["cursor-native-1"]
+    assert cursor.agent_type == "cursor"
+    assert cursor.transcript_path == str(native_transcript)
+    assert cursor.project_path == "/home/user/native-cursor-project"
     assert cursor.has_facets is False
     assert cursor.facets_path is None
 

@@ -288,7 +288,7 @@ def test_measurement_integrity_stats_include_source_quality_breakdown(
         "model_usage_coverage_pct": 0.0,
         "facet_parity": "optional",
         "facet_coverage_pct": 0.0,
-        "native_discovery_parity": "unavailable",
+        "native_discovery_parity": "required",
     }
 
 

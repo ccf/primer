@@ -94,7 +94,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Permission mode analysis (success rate by permission level)
 - [x] Satisfaction trend tracking (satisfied / neutral / dissatisfied over time)
 - [x] Similar sessions panel with 3-tier relevance matching
-- [ ] [P0] Cursor session ingestion and discovery pipeline
+- [x] [P0] Cursor session ingestion and discovery pipeline
 - [ ] [P0] Cursor transcript, tool-call, and model-usage extraction mapped onto the normalized session model
 - [ ] [P1] Workflow fingerprinting: infer common sequences like search -> read -> edit -> test -> fix
 - [ ] [P1] Cursor-specific workflow fingerprinting and session archetype mapping
@@ -257,13 +257,13 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 
 ## Platform & Infrastructure
 
-- [x] Multi-agent support (Claude Code, Codex CLI, Gemini CLI)
+- [x] Multi-agent support (Claude Code, Codex CLI, Gemini CLI, Cursor)
 - [x] SessionEnd hook system with agent-specific installers
 - [x] `primer sync --watch` for agents without hook systems
 - [x] Docker Compose and Kubernetes Helm deployment
 - [x] PostgreSQL and SQLite support
 - [x] Alembic migration bundling in pip package
-- [ ] [P0] Cursor `agent_type` support across capture, sync, ingest, and analytics filters
+- [x] [P0] Cursor `agent_type` support across capture, sync, ingest, and analytics filters
 - [ ] [P0] Durable background job system for sync, facet extraction, narratives, and alerts
 - [ ] [P0] Scalable API key lookup and verification strategy
 - [ ] [P1] Source-capability registry so Primer can safely gate analytics by what each agent source actually provides

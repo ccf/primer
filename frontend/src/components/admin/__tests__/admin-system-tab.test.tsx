@@ -74,7 +74,7 @@ describe("AdminSystemTab", () => {
             model_usage_coverage_pct: 0,
             facet_parity: "optional",
             facet_coverage_pct: 0,
-            native_discovery_parity: "unavailable",
+            native_discovery_parity: "required",
           },
         ],
         repository_quality: [
@@ -116,7 +116,7 @@ describe("AdminSystemTab", () => {
     expect(screen.getByText("acme/complete-repo")).toBeInTheDocument()
     expect(screen.getByText("acme/pending-repo")).toBeInTheDocument()
     expect(screen.getByText("Native Discovery")).toBeInTheDocument()
-    expect(screen.getAllByText("Unavailable").length).toBeGreaterThan(0)
+    expect(screen.getAllByText("Required").length).toBeGreaterThan(0)
     expect(screen.getAllByText("-").length).toBeGreaterThan(0)
     expect(screen.getByText("73.3%")).toBeInTheDocument()
     expect(screen.getAllByText("Not expected").length).toBeGreaterThan(0)
