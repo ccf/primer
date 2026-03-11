@@ -104,6 +104,7 @@ describe("App", () => {
     render(<App />)
     // Sidebar navigation links (leadership role for API key users)
     expect(screen.getByText("Primer")).toBeInTheDocument()
+    expect(screen.getByText("My Profile")).toBeInTheDocument()
     expect(screen.getByText("Organization")).toBeInTheDocument()
     expect(screen.getByText("Sessions")).toBeInTheDocument()
     expect(screen.getByText("Engineers")).toBeInTheDocument()
