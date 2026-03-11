@@ -225,7 +225,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] [P0] Recommendation-to-intervention workflow with owner, status, due date, and linked evidence
 - [x] [P0] Before-and-after measurement for coaching, tooling, or repo changes
 - [ ] [P1] Experimentation layer for training rollouts, tool changes, and enablement playbooks
-- [ ] [P1] Intervention effectiveness reporting by team, project, and engineer cohort
+- [x] [P1] Intervention effectiveness reporting by team, project, and engineer cohort
 - [ ] [P2] Auto-generated next-step plans from alerts, narratives, and project findings
 
 ## Real-Time Engineer Experience

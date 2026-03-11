@@ -4,10 +4,15 @@ import { PageHeader } from "@/components/shared/page-header"
 import { CardSkeleton } from "@/components/shared/loading-skeleton"
 import { EmptyState } from "@/components/shared/empty-state"
 import { InterventionCard } from "@/components/interventions/intervention-card"
+import { InterventionEffectivenessSection } from "@/components/interventions/intervention-effectiveness-section"
 import { InterventionFormModal } from "@/components/interventions/intervention-form-modal"
 import { InlineStat } from "@/components/ui/inline-stat"
 import { Button } from "@/components/ui/button"
-import { useEngineers, useInterventions } from "@/hooks/use-api-queries"
+import {
+  useEngineers,
+  useInterventionEffectiveness,
+  useInterventions,
+} from "@/hooks/use-api-queries"
 import { useAuth } from "@/lib/auth-context"
 import { getEffectiveRole } from "@/lib/role-utils"
 
@@ -25,6 +30,10 @@ export function InterventionsPage({ teamId }: InterventionsPageProps) {
     teamId,
     engineerId: !isLeadership ? user?.engineer_id : undefined,
   })
+  const { data: effectiveness, isLoading: loadingEffectiveness } = useInterventionEffectiveness({
+    teamId,
+    engineerId: !isLeadership ? user?.engineer_id : undefined,
+  })
   const { data: engineers } = useEngineers()
 
   const ownerOptions = useMemo(
@@ -32,7 +41,7 @@ export function InterventionsPage({ teamId }: InterventionsPageProps) {
     [engineers, teamId],
   )
 
-  if (isLoading) {
+  if (isLoading || loadingEffectiveness) {
     return (
       <div className="space-y-6">
         <CardSkeleton />
@@ -72,6 +81,8 @@ export function InterventionsPage({ teamId }: InterventionsPageProps) {
         <InlineStat label="Completed" value={String(completedCount)} icon={CheckCircle2} />
         <InlineStat label="Assigned" value={String(assignedCount)} icon={ClipboardList} />
       </div>
+
+      {effectiveness && <InterventionEffectivenessSection data={effectiveness} />}
 
       {interventions.length === 0 ? (
         <EmptyState message="No interventions yet. Create one from a recommendation or start a manual experiment." />

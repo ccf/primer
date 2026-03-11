@@ -22,6 +22,7 @@ import type {
   FrictionReport,
   IngestEventResponse,
   InterventionResponse,
+  InterventionEffectivenessResponse,
   LearningPathsResponse,
   MeasurementIntegrityStats,
   MaturityAnalyticsResponse,
@@ -172,6 +173,24 @@ export function useInterventions(params: {
           engineer_id: params.engineerId,
           project_name: params.projectName,
           status: params.status,
+        })}`,
+      ),
+  })
+}
+
+export function useInterventionEffectiveness(params: {
+  teamId: string | null
+  engineerId?: string
+  projectName?: string
+}) {
+  return useQuery({
+    queryKey: ["intervention-effectiveness", params],
+    queryFn: () =>
+      apiFetch<InterventionEffectivenessResponse>(
+        `/api/v1/interventions/effectiveness${buildParams({
+          team_id: params.teamId,
+          engineer_id: params.engineerId,
+          project_name: params.projectName,
         })}`,
       ),
   })

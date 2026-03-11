@@ -445,6 +445,40 @@ class InterventionResponse(BaseModel):
     updated_at: datetime
 
 
+class InterventionEffectivenessSummary(BaseModel):
+    total_interventions: int
+    completed_interventions: int
+    measured_interventions: int
+    improved_interventions: int
+    improvement_rate: float | None = None
+    avg_completion_days: float | None = None
+    avg_success_rate_delta: float | None = None
+    avg_friction_delta: float | None = None
+    avg_findings_per_pr_delta: float | None = None
+    avg_cost_per_session_delta: float | None = None
+
+
+class InterventionEffectivenessGroup(BaseModel):
+    key: str
+    label: str
+    completed_interventions: int
+    measured_interventions: int
+    improved_interventions: int
+    improvement_rate: float | None = None
+    avg_completion_days: float | None = None
+    avg_success_rate_delta: float | None = None
+    avg_friction_delta: float | None = None
+    avg_findings_per_pr_delta: float | None = None
+    avg_cost_per_session_delta: float | None = None
+
+
+class InterventionEffectivenessResponse(BaseModel):
+    summary: InterventionEffectivenessSummary
+    by_team: list[InterventionEffectivenessGroup]
+    by_project: list[InterventionEffectivenessGroup]
+    by_engineer_cohort: list[InterventionEffectivenessGroup]
+
+
 # --- Daily Stats ---
 
 

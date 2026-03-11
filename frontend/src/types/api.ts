@@ -184,6 +184,40 @@ export interface InterventionResponse {
   updated_at: string
 }
 
+export interface InterventionEffectivenessSummary {
+  total_interventions: number
+  completed_interventions: number
+  measured_interventions: number
+  improved_interventions: number
+  improvement_rate: number | null
+  avg_completion_days: number | null
+  avg_success_rate_delta: number | null
+  avg_friction_delta: number | null
+  avg_findings_per_pr_delta: number | null
+  avg_cost_per_session_delta: number | null
+}
+
+export interface InterventionEffectivenessGroup {
+  key: string
+  label: string
+  completed_interventions: number
+  measured_interventions: number
+  improved_interventions: number
+  improvement_rate: number | null
+  avg_completion_days: number | null
+  avg_success_rate_delta: number | null
+  avg_friction_delta: number | null
+  avg_findings_per_pr_delta: number | null
+  avg_cost_per_session_delta: number | null
+}
+
+export interface InterventionEffectivenessResponse {
+  summary: InterventionEffectivenessSummary
+  by_team: InterventionEffectivenessGroup[]
+  by_project: InterventionEffectivenessGroup[]
+  by_engineer_cohort: InterventionEffectivenessGroup[]
+}
+
 export interface DailyStatsResponse {
   date: string
   message_count: number

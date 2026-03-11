@@ -18,6 +18,7 @@ import {
   useModelRankings,
   useRecommendations,
   useInterventions,
+  useInterventionEffectiveness,
   useSessions,
   useSessionDetail,
 } from "../use-api-queries"
@@ -165,6 +166,21 @@ describe("useInterventions", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(mockApiFetch).toHaveBeenCalledWith(
       "/api/v1/interventions?team_id=t1&engineer_id=e1&status=planned",
+    )
+  })
+})
+
+describe("useInterventionEffectiveness", () => {
+  it("calls apiFetch with effectiveness filters", async () => {
+    mockApiFetch.mockResolvedValue({})
+    const { result } = renderHook(
+      () => useInterventionEffectiveness({ teamId: "t1", engineerId: "e1", projectName: "primer" }),
+      { wrapper: createWrapper() },
+    )
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      "/api/v1/interventions/effectiveness?team_id=t1&engineer_id=e1&project_name=primer",
     )
   })
 })
