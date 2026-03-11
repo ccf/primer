@@ -1218,6 +1218,26 @@ class ProjectRepositoryContextSummary(BaseModel):
     size_distribution: dict[str, int] = Field(default_factory=dict)
 
 
+class ProjectAgentMixEntry(BaseModel):
+    agent_type: AgentType
+    session_count: int
+    share_of_sessions: float
+    unique_engineers: int
+    success_rate: float | None = None
+    friction_rate: float | None = None
+    avg_health_score: float | None = None
+    avg_cost_per_session: float | None = None
+    top_tools: list[str] = Field(default_factory=list)
+    top_models: list[str] = Field(default_factory=list)
+
+
+class ProjectAgentMixSummary(BaseModel):
+    total_sessions: int
+    compared_agents: int
+    dominant_agent_type: AgentType | None = None
+    entries: list[ProjectAgentMixEntry] = Field(default_factory=list)
+
+
 class ProjectWorkflowFingerprint(BaseModel):
     fingerprint_id: str
     label: str
@@ -1260,6 +1280,7 @@ class ProjectWorkspaceResponse(BaseModel):
     friction_impacts: list[FrictionImpact] = []
     repositories: list[ProjectRepositorySummary] = []
     enablement: ProjectEnablementSummary
+    agent_mix: ProjectAgentMixSummary
     repository_context: ProjectRepositoryContextSummary
     workflow_summary: ProjectWorkflowSummary
 

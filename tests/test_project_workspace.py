@@ -156,6 +156,23 @@ def test_project_workspace_endpoint_returns_composed_views(
         friction_counts={"tool_error": 2, "context_switching": 1},
         friction_detail="Tooling failed mid-session.",
     )
+    cursor_session_id = _ingest_project_session(
+        client,
+        api_key,
+        project_name="workspace-proj",
+        agent_type="cursor",
+        model_name="gpt-5-mini",
+        tool_name="Read",
+        tool_usages=[
+            {"tool_name": "Read", "call_count": 2},
+            {"tool_name": "Bash", "call_count": 1},
+        ],
+        git_remote_url="https://github.com/acme/workspace.git",
+        session_type="investigation",
+        outcome="success",
+        friction_counts={},
+        friction_detail="",
+    )
     other_session_id = _ingest_project_session(
         client,
         api_key,
@@ -172,6 +189,7 @@ def test_project_workspace_endpoint_returns_composed_views(
         friction_counts={"tool_error": 2, "context_switching": 1},
         friction_detail="Tooling failed mid-session.",
     )
+    db_session.query(SessionFacets).filter(SessionFacets.session_id == cursor_session_id).delete()
 
     workspace_repo = (
         db_session.query(GitRepository).filter(GitRepository.full_name == "acme/workspace").one()
@@ -273,16 +291,16 @@ def test_project_workspace_endpoint_returns_composed_views(
     data = response.json()
 
     assert data["project"]["project_name"] == "workspace-proj"
-    assert data["project"]["total_sessions"] == 2
+    assert data["project"]["total_sessions"] == 3
     assert {"Edit", "Read"}.issubset(set(data["project"]["top_tools"]))
     assert data["scorecard"]["adoption_rate"] is not None
     assert data["scorecard"]["effectiveness_score"]["score"] is not None
     assert data["scorecard"]["effectiveness_score"]["breakdown"]["success_rate"] == 0.5
     assert data["scorecard"]["effectiveness_score"]["breakdown"]["quality_outcomes"] == 1.0
-    assert data["scorecard"]["effectiveness_score"]["breakdown"]["follow_through"] == 0.5
+    assert data["scorecard"]["effectiveness_score"]["breakdown"]["follow_through"] == 0.333
     assert data["scorecard"]["effectiveness_score"]["breakdown"]["cost_efficiency"] is not None
     assert data["scorecard"]["quality_rate"] == 1.0
-    assert data["scorecard"]["measurement_confidence"] == 1.0
+    assert data["scorecard"]["measurement_confidence"] == 0.917
     assert data["repositories"][0]["repository"] == "acme/workspace"
     assert data["repositories"][0]["default_branch"] == "main"
     assert data["repositories"][0]["ai_readiness_score"] == 45.0
@@ -300,8 +318,27 @@ def test_project_workspace_endpoint_returns_composed_views(
         "language": "Python",
         "share_pct": 0.7,
     }
-    assert data["enablement"]["agent_type_counts"] == {"claude_code": 1, "codex_cli": 1}
-    assert set(data["enablement"]["top_models"]) == {"claude-sonnet-4", "gpt-5.3-codex"}
+    assert data["enablement"]["agent_type_counts"] == {
+        "claude_code": 1,
+        "codex_cli": 1,
+        "cursor": 1,
+    }
+    assert set(data["enablement"]["top_models"]) == {
+        "claude-sonnet-4",
+        "gpt-5.3-codex",
+        "gpt-5-mini",
+    }
+    assert data["agent_mix"]["compared_agents"] == 3
+    assert data["agent_mix"]["total_sessions"] == 3
+    cursor_mix = next(
+        item for item in data["agent_mix"]["entries"] if item["agent_type"] == "cursor"
+    )
+    assert cursor_mix["share_of_sessions"] == 0.333
+    assert cursor_mix["unique_engineers"] == 1
+    assert cursor_mix["success_rate"] is None
+    assert cursor_mix["friction_rate"] is None
+    assert cursor_mix["top_tools"] == ["Read", "Bash"]
+    assert cursor_mix["top_models"] == ["gpt-5-mini"]
     recommendation_titles = {item["title"] for item in data["enablement"]["recommendations"]}
     assert "Codify project context for agents" in recommendation_titles
     assert "Stabilize recurring tooling failures" in recommendation_titles
@@ -309,7 +346,7 @@ def test_project_workspace_endpoint_returns_composed_views(
     assert data["quality"]["overview"]["total_prs"] == 1
     assert data["quality"]["findings_overview"]["total_findings"] == 1
     assert data["quality"]["recent_prs"][0]["title"] == "Add project workspace"
-    assert data["workflow_summary"]["fingerprinted_sessions"] == 2
+    assert data["workflow_summary"]["fingerprinted_sessions"] == 3
     assert data["workflow_summary"]["coverage_pct"] == 1.0
 
     implementation = next(
@@ -327,6 +364,11 @@ def test_project_workspace_endpoint_returns_composed_views(
     )
     assert debugging["steps"] == ["search", "read", "execute"]
     assert debugging["success_rate"] == 0.0
+
+    cursor_workflow = next(
+        item for item in data["workflow_summary"]["fingerprints"] if item["session_type"] is None
+    )
+    assert cursor_workflow["steps"] == ["read", "execute"]
 
     tool_error = next(
         item

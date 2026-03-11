@@ -883,6 +883,26 @@ export interface ProjectRepositoryContextSummary {
   size_distribution: Record<string, number>
 }
 
+export interface ProjectAgentMixEntry {
+  agent_type: AgentType
+  session_count: number
+  share_of_sessions: number
+  unique_engineers: number
+  success_rate: number | null
+  friction_rate: number | null
+  avg_health_score: number | null
+  avg_cost_per_session: number | null
+  top_tools: string[]
+  top_models: string[]
+}
+
+export interface ProjectAgentMixSummary {
+  total_sessions: number
+  compared_agents: number
+  dominant_agent_type: AgentType | null
+  entries: ProjectAgentMixEntry[]
+}
+
 export interface ProjectWorkflowFingerprint {
   fingerprint_id: string
   label: string
@@ -925,6 +945,7 @@ export interface ProjectWorkspaceResponse {
   friction_impacts: FrictionImpact[]
   repositories: ProjectRepositorySummary[]
   enablement: ProjectEnablementSummary
+  agent_mix: ProjectAgentMixSummary
   repository_context: ProjectRepositoryContextSummary
   workflow_summary: ProjectWorkflowSummary
 }

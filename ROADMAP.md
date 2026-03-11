@@ -153,7 +153,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Project AI-readiness scoring (CLAUDE.md, AGENTS.md, .claude/ detection)
 - [x] Project scorecard that combines adoption, effectiveness, quality, and cost efficiency
 - [x] [P0] Project-level workflow fingerprints and friction hotspots
-- [ ] [P1] Project-level agent mix comparison, including Cursor sessions alongside CLI agents
+- [x] [P1] Project-level agent mix comparison, including Cursor sessions alongside CLI agents
 - [x] [P1] Repository context model: language mix, test maturity, repo size, and AI-enablement signals
 - [x] [P1] Project enablement recommendations tied to observed bottlenecks
 - [ ] [P1] Cross-project comparison: which repos are easiest or hardest to use AI effectively in

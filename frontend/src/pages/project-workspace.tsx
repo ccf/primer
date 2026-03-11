@@ -9,6 +9,7 @@ import { useProjectWorkspace } from "@/hooks/use-api-queries"
 import { PageHeader } from "@/components/shared/page-header"
 import { CardSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleton"
 import { ProjectScorecard } from "@/components/projects/project-scorecard"
+import { ProjectAgentMixCard } from "@/components/projects/project-agent-mix-card"
 import { ProjectEnablementCard } from "@/components/projects/project-enablement-card"
 import { ProjectRepositoriesCard } from "@/components/projects/project-repositories-card"
 import { ProjectWorkflowSection } from "@/components/projects/project-workflow-section"
@@ -98,6 +99,8 @@ export function ProjectWorkspacePage({ teamId, dateRange }: ProjectWorkspacePage
       </PageHeader>
 
       <ProjectScorecard scorecard={data.scorecard} overview={data.overview} />
+
+      <ProjectAgentMixCard agentMix={data.agent_mix} />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
         <Card>
