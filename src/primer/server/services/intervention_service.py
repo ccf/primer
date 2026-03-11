@@ -78,20 +78,13 @@ def list_interventions(
     project_name: str | None = None,
     status: str | None = None,
 ) -> list[InterventionResponse]:
-    query = db.query(Intervention)
-    if team_id:
-        query = query.filter(Intervention.team_id == team_id)
-    if engineer_id:
-        query = query.filter(Intervention.engineer_id == engineer_id)
-    if owner_engineer_id:
-        query = query.filter(Intervention.owner_engineer_id == owner_engineer_id)
-    if project_name:
-        query = query.filter(Intervention.project_name == project_name)
-    if status:
-        query = query.filter(Intervention.status == status)
-    interventions = query.order_by(
-        Intervention.updated_at.desc(),
-        Intervention.created_at.desc(),
+    interventions = _query_interventions(
+        db,
+        team_id=team_id,
+        engineer_id=engineer_id,
+        owner_engineer_id=owner_engineer_id,
+        project_name=project_name,
+        status=status,
     ).all()
     return _build_responses(db, interventions)
 
@@ -521,11 +514,12 @@ def _build_effectiveness_report(
         )
         if engineer_id
     }
-    team_map = {team.id: team for team in db.query(Team).filter(Team.id.in_(team_ids)).all()}
     engineer_map = {
         engineer.id: engineer
         for engineer in db.query(Engineer).filter(Engineer.id.in_(engineer_ids)).all()
     }
+    team_ids |= {engineer.team_id for engineer in engineer_map.values() if engineer.team_id}
+    team_map = {team.id: team for team in db.query(Team).filter(Team.id.in_(team_ids)).all()}
     first_session_rows = (
         db.query(SessionModel.engineer_id, func.min(SessionModel.started_at))
         .filter(SessionModel.engineer_id.in_(engineer_ids))

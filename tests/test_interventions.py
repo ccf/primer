@@ -382,6 +382,7 @@ def test_intervention_effectiveness_endpoint_groups_by_scope_and_cohort(client, 
     assert data["by_project"][0]["key"] == "alpha"
     assert data["by_project"][0]["improvement_rate"] == 1.0
     assert data["by_team"][0]["key"] == engineer.team_id
+    assert data["by_team"][0]["label"] == "Test Team"
     assert data["by_engineer_cohort"][0]["key"] == "experienced"
 
 
@@ -445,3 +446,4 @@ def test_team_lead_lists_and_reports_org_scoped_team_interventions(
     report_data = report.json()
     assert report_data["summary"]["total_interventions"] == 1
     assert report_data["summary"]["completed_interventions"] == 1
+    assert report_data["by_team"][0]["label"] == "Lead Team"
