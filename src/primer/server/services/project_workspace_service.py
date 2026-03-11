@@ -14,9 +14,12 @@ from primer.common.models import (
     ToolUsage,
 )
 from primer.common.models import Session as SessionModel
+from primer.common.pricing import estimate_cost
 from primer.common.schemas import (
     FrictionImpact,
     LanguageShare,
+    ProjectAgentMixEntry,
+    ProjectAgentMixSummary,
     ProjectEnablementSummary,
     ProjectFrictionHotspot,
     ProjectRepositoryContextSummary,
@@ -115,6 +118,7 @@ def get_project_workspace(
     )
 
     enablement = _build_enablement_summary(db, session_q)
+    agent_mix = _build_project_agent_mix(db, session_q)
     repositories = _build_repository_summary(db, session_q)
     repository_context = _build_repository_context_summary(repositories)
     workflow_summary = _build_workflow_summary(
@@ -189,6 +193,7 @@ def get_project_workspace(
         friction_impacts=bottlenecks.friction_impacts[:5],
         repositories=repositories,
         enablement=enablement,
+        agent_mix=agent_mix,
         repository_context=repository_context,
         workflow_summary=workflow_summary,
     )
@@ -270,6 +275,227 @@ def _build_enablement_summary(db: Session, session_q) -> ProjectEnablementSummar
         permission_mode_counts=dict(permission_counts),
         top_tools=top_tools,
         top_models=top_models,
+    )
+
+
+def _build_project_agent_mix(db: Session, session_q) -> ProjectAgentMixSummary:
+    from primer.server.services.session_insights_service import compute_session_health_score
+
+    session_rows = session_q.with_entities(
+        SessionModel.id,
+        SessionModel.agent_type,
+        SessionModel.engineer_id,
+    ).all()
+    if not session_rows:
+        return ProjectAgentMixSummary(total_sessions=0, compared_agents=0)
+
+    session_ids = [session_id for session_id, _, _ in session_rows]
+    session_counts: Counter[str] = Counter()
+    engineer_ids_by_agent: defaultdict[str, set[str]] = defaultdict(set)
+    for _session_id, agent_type, engineer_id in session_rows:
+        if not agent_type:
+            continue
+        session_counts[agent_type] += 1
+        engineer_ids_by_agent[agent_type].add(engineer_id)
+
+    health_inputs_by_agent: defaultdict[str, list[tuple]] = defaultdict(list)
+    facet_rows = (
+        db.query(
+            SessionModel.agent_type,
+            SessionFacets.outcome,
+            SessionFacets.friction_counts,
+            SessionFacets.user_satisfaction_counts,
+            SessionFacets.primary_success,
+            SessionModel.duration_seconds,
+        )
+        .join(SessionFacets, SessionFacets.session_id == SessionModel.id)
+        .filter(
+            SessionModel.id.in_(session_ids),
+            SessionModel.agent_type.isnot(None),
+        )
+    )
+    facet_rows = _filter_sessions_by_capability(facet_rows, "supports_facets")
+    for (
+        agent_type,
+        outcome,
+        friction_counts,
+        satisfaction_counts,
+        primary_success,
+        duration,
+    ) in facet_rows.all():
+        if not agent_type:
+            continue
+        health_inputs_by_agent[agent_type].append(
+            (
+                outcome,
+                friction_counts,
+                satisfaction_counts,
+                primary_success,
+                duration,
+            )
+        )
+
+    tool_counts_by_agent: defaultdict[str, Counter[str]] = defaultdict(Counter)
+    tool_rows = (
+        db.query(
+            SessionModel.agent_type,
+            ToolUsage.tool_name,
+            func.sum(ToolUsage.call_count).label("total_calls"),
+        )
+        .join(SessionModel, ToolUsage.session_id == SessionModel.id)
+        .filter(
+            SessionModel.id.in_(session_ids),
+            SessionModel.agent_type.isnot(None),
+        )
+        .group_by(SessionModel.agent_type, ToolUsage.tool_name)
+        .all()
+    )
+    for agent_type, tool_name, total_calls in tool_rows:
+        if agent_type and tool_name and total_calls:
+            tool_counts_by_agent[agent_type][tool_name] = int(total_calls)
+
+    model_tokens_by_agent: defaultdict[str, Counter[str]] = defaultdict(Counter)
+    session_costs_by_agent: defaultdict[str, dict[str, float]] = defaultdict(dict)
+    model_rows = (
+        db.query(
+            SessionModel.agent_type,
+            ModelUsage.session_id,
+            ModelUsage.model_name,
+            func.coalesce(func.sum(ModelUsage.input_tokens), 0).label("input_tokens"),
+            func.coalesce(func.sum(ModelUsage.output_tokens), 0).label("output_tokens"),
+            func.coalesce(func.sum(ModelUsage.cache_read_tokens), 0).label("cache_read_tokens"),
+            func.coalesce(
+                func.sum(ModelUsage.cache_creation_tokens),
+                0,
+            ).label("cache_creation_tokens"),
+        )
+        .join(SessionModel, ModelUsage.session_id == SessionModel.id)
+        .filter(
+            SessionModel.id.in_(session_ids),
+            SessionModel.agent_type.isnot(None),
+        )
+        .group_by(SessionModel.agent_type, ModelUsage.session_id, ModelUsage.model_name)
+        .all()
+    )
+    for (
+        agent_type,
+        session_id,
+        model_name,
+        input_tokens,
+        output_tokens,
+        cache_read_tokens,
+        cache_creation_tokens,
+    ) in model_rows:
+        if not agent_type or not model_name:
+            continue
+        total_tokens = (input_tokens or 0) + (output_tokens or 0)
+        model_tokens_by_agent[agent_type][model_name] += total_tokens
+        session_costs_by_agent[agent_type][session_id] = session_costs_by_agent[agent_type].get(
+            session_id, 0.0
+        ) + estimate_cost(
+            model_name,
+            input_tokens or 0,
+            output_tokens or 0,
+            cache_read_tokens or 0,
+            cache_creation_tokens or 0,
+        )
+
+    entries: list[ProjectAgentMixEntry] = []
+    total_sessions = len(session_rows)
+    for agent_type, session_count in sorted(
+        session_counts.items(),
+        key=lambda item: (-item[1], item[0]),
+    ):
+        health_inputs = health_inputs_by_agent.get(agent_type, [])
+        outcomes = [
+            canonical_outcome(outcome)
+            for outcome, *_rest in health_inputs
+            if isinstance(outcome, str) and outcome
+        ]
+        success_rate = None
+        if outcomes:
+            success_rate = round(
+                sum(1 for outcome in outcomes if is_success_outcome(outcome)) / len(outcomes),
+                3,
+            )
+
+        friction_rate = None
+        avg_health_score = None
+        if health_inputs:
+            sessions_with_friction = sum(
+                1
+                for _, friction_counts, *_rest in health_inputs
+                if isinstance(friction_counts, dict) and sum(friction_counts.values()) > 0
+            )
+            friction_rate = round(sessions_with_friction / len(health_inputs), 3)
+
+            durations = [duration for *_, duration in health_inputs if duration is not None]
+            median_duration = None
+            if durations:
+                sorted_durations = sorted(durations)
+                midpoint = len(sorted_durations) // 2
+                median_duration = (
+                    sorted_durations[midpoint]
+                    if len(sorted_durations) % 2 == 1
+                    else (sorted_durations[midpoint - 1] + sorted_durations[midpoint]) / 2
+                )
+
+            health_scores = [
+                compute_session_health_score(
+                    outcome=outcome,
+                    friction_counts=friction_counts,
+                    duration_seconds=duration,
+                    median_duration=median_duration,
+                    satisfaction_counts=satisfaction_counts,
+                    primary_success=primary_success,
+                )
+                for outcome, friction_counts, satisfaction_counts, primary_success, duration in (
+                    health_inputs
+                )
+            ]
+            avg_health_score = round(sum(health_scores) / len(health_scores), 1)
+
+        agent_costs = session_costs_by_agent.get(agent_type, {})
+        avg_cost_per_session = None
+        if agent_costs:
+            avg_cost_per_session = round(
+                sum(agent_costs.values()) / len(agent_costs),
+                4,
+            )
+
+        entries.append(
+            ProjectAgentMixEntry(
+                agent_type=agent_type,
+                session_count=session_count,
+                share_of_sessions=round(session_count / total_sessions, 3),
+                unique_engineers=len(engineer_ids_by_agent.get(agent_type, set())),
+                success_rate=success_rate,
+                friction_rate=friction_rate,
+                avg_health_score=avg_health_score,
+                avg_cost_per_session=avg_cost_per_session,
+                top_tools=[
+                    tool_name
+                    for tool_name, _count in tool_counts_by_agent.get(
+                        agent_type,
+                        Counter(),
+                    ).most_common(3)
+                ],
+                top_models=[
+                    model_name
+                    for model_name, _tokens in model_tokens_by_agent.get(
+                        agent_type,
+                        Counter(),
+                    ).most_common(3)
+                ],
+            )
+        )
+
+    dominant_agent_type = entries[0].agent_type if entries else None
+    return ProjectAgentMixSummary(
+        total_sessions=total_sessions,
+        compared_agents=len(entries),
+        dominant_agent_type=dominant_agent_type,
+        entries=entries,
     )
 
 
