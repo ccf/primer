@@ -76,13 +76,14 @@ export function useTeam(teamId: string) {
   })
 }
 
-export function useEngineers(includeInactive = false) {
+export function useEngineers(includeInactive = false, enabled = true) {
   return useQuery({
-    queryKey: ["engineers", includeInactive],
+    queryKey: ["engineers", includeInactive, enabled],
     queryFn: () =>
       apiFetch<EngineerResponse[]>(
         `/api/v1/engineers${includeInactive ? "?include_inactive=true" : ""}`,
       ),
+    enabled,
   })
 }
 

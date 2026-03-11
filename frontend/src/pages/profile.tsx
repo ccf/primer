@@ -48,7 +48,7 @@ export function ProfilePage({ teamId, dateRange }: ProfilePageProps) {
   const startDate = dateRange?.startDate
   const endDate = dateRange?.endDate
   const { data: profile, isLoading } = useEngineerProfile(engineerId, startDate, endDate)
-  const { data: engineers, isLoading: loadingEngineers } = useEngineers()
+  const { data: engineers, isLoading: loadingEngineers } = useEngineers(false, isApiKeyUser)
 
   useEffect(() => {
     if (!isApiKeyUser || !rawEngineerId || typeof window === "undefined") return
