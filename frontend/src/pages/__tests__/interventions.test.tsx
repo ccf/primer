@@ -70,7 +70,7 @@ describe("InterventionsPage", () => {
           avg_success_rate_delta: 0.2,
           avg_friction_delta: 2,
           avg_findings_per_pr_delta: 0.5,
-          avg_cost_per_session_delta: 0.3,
+          avg_cost_per_session_delta: -0.3,
         },
         by_team: [
           {
@@ -84,7 +84,7 @@ describe("InterventionsPage", () => {
             avg_success_rate_delta: 0.2,
             avg_friction_delta: 2,
             avg_findings_per_pr_delta: 0.5,
-            avg_cost_per_session_delta: 0.3,
+            avg_cost_per_session_delta: -0.3,
           },
         ],
         by_project: [],
@@ -158,6 +158,7 @@ describe("InterventionsPage", () => {
     expect(screen.getByText(/Recurring friction/)).toBeInTheDocument()
     expect(screen.getByText("By Team")).toBeInTheDocument()
     expect(screen.getByText("Team One")).toBeInTheDocument()
+    expect(screen.getByText("-$0.30")).toBeInTheDocument()
   })
 
   it("shows empty state when there are no interventions", () => {

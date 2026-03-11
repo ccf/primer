@@ -26,8 +26,8 @@ function formatSignedPercentPoints(value: number | null | undefined): string {
 
 function formatSignedCost(value: number | null | undefined): string {
   if (value == null) return "-"
-  const sign = value > 0 ? "+" : ""
-  return `${sign}${formatCost(value)}`
+  const sign = value > 0 ? "+" : value < 0 ? "-" : ""
+  return `${sign}${formatCost(Math.abs(value))}`
 }
 
 function formatCompletionDays(value: number | null | undefined): string {
