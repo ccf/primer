@@ -537,7 +537,11 @@ def _select_best_fingerprint(
 
 
 def _pluralize(noun: str, count: int) -> str:
-    return noun if count == 1 else f"{noun}s"
+    if count == 1:
+        return noun
+    if noun.endswith("y") and noun[-2:] not in ("ay", "ey", "oy", "uy"):
+        return f"{noun[:-1]}ies"
+    return f"{noun}s"
 
 
 def _build_workflow_summary(
