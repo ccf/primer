@@ -85,3 +85,8 @@ Primer has three entry points:
 - **React Dashboard** visualizes everything with role-based views
 
 Read the full [Architecture guide](architecture.md) for details.
+
+## Product Guides
+
+- [Product Flow](product-flow.md) explains how capture, insights, projects, growth, and interventions fit together as one product loop.
+- [User Journeys](user-journeys.md) maps Primer's main engineer, team lead, and platform workflows and outlines the future interactive tour.
