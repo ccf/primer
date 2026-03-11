@@ -423,16 +423,15 @@ def check_repository_context(full_name: str, default_branch: str | None = None) 
         return None
 
     def _check_paths(paths: tuple[tuple[str, str | None], ...]) -> bool | None:
-        seen_positive = False
         for path, expected_type in paths:
             exists = check_file_exists(
                 full_name, path, ref=default_branch or None, expected_type=expected_type
             )
+            if exists:
+                return True
             if exists is None:
                 return None
-            if exists:
-                seen_positive = True
-        return seen_positive
+        return False
 
     has_test_harness = _check_paths(TEST_SIGNAL_PATHS)
     has_ci_pipeline = _check_paths(CI_SIGNAL_PATHS)
