@@ -840,6 +840,11 @@ export interface ProjectScorecard {
   measurement_confidence: number | null
 }
 
+export interface LanguageShare {
+  language: string
+  share_pct: number
+}
+
 export interface ProjectRepositorySummary {
   repository: string
   session_count: number
@@ -849,6 +854,13 @@ export interface ProjectRepositorySummary {
   has_claude_md: boolean | null
   has_agents_md: boolean | null
   has_claude_dir: boolean | null
+  primary_language: string | null
+  language_mix: LanguageShare[]
+  repo_size_kb: number | null
+  repo_size_bucket: string | null
+  has_test_harness: boolean | null
+  has_ci_pipeline: boolean | null
+  test_maturity_score: number | null
 }
 
 export interface ProjectEnablementSummary {
@@ -859,6 +871,16 @@ export interface ProjectEnablementSummary {
   top_tools: string[]
   top_models: string[]
   recommendations: Recommendation[]
+}
+
+export interface ProjectRepositoryContextSummary {
+  repositories_with_context: number
+  avg_repo_size_kb: number | null
+  avg_test_maturity_score: number | null
+  repositories_with_test_harness: number
+  repositories_with_ci_pipeline: number
+  language_mix: LanguageShare[]
+  size_distribution: Record<string, number>
 }
 
 export interface ProjectWorkflowFingerprint {
@@ -903,6 +925,7 @@ export interface ProjectWorkspaceResponse {
   friction_impacts: FrictionImpact[]
   repositories: ProjectRepositorySummary[]
   enablement: ProjectEnablementSummary
+  repository_context: ProjectRepositoryContextSummary
   workflow_summary: ProjectWorkflowSummary
 }
 

@@ -75,6 +75,13 @@ class GitRepository(Base):
     has_claude_dir: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     ai_readiness_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     ai_readiness_checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    primary_language: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    language_breakdown: Mapped[dict[str, int] | None] = mapped_column(JSON, nullable=True)
+    repo_size_kb: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    has_test_harness: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    has_ci_pipeline: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    test_maturity_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    repo_context_checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     sessions: Mapped[list["Session"]] = relationship(back_populates="repository")
     pull_requests: Mapped[list["PullRequest"]] = relationship(back_populates="repository")

@@ -172,7 +172,10 @@ export function ProjectWorkspacePage({ teamId, dateRange }: ProjectWorkspacePage
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <ProjectRepositoriesCard repositories={data.repositories} />
+        <ProjectRepositoriesCard
+          repositories={data.repositories}
+          repositoryContext={data.repository_context}
+        />
 
         <Card>
           <CardHeader>

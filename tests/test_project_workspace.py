@@ -177,6 +177,13 @@ def test_project_workspace_endpoint_returns_composed_views(
     workspace_repo.has_claude_dir = False
     workspace_repo.ai_readiness_score = 45.0
     workspace_repo.ai_readiness_checked_at = datetime.now(UTC)
+    workspace_repo.primary_language = "Python"
+    workspace_repo.language_breakdown = {"Python": 7000, "TypeScript": 3000}
+    workspace_repo.repo_size_kb = 12_500
+    workspace_repo.has_test_harness = True
+    workspace_repo.has_ci_pipeline = True
+    workspace_repo.test_maturity_score = 100.0
+    workspace_repo.repo_context_checked_at = datetime.now(UTC)
     workspace_pr = PullRequest(
         repository_id=workspace_repo.id,
         engineer_id=engineer.id,
@@ -274,6 +281,20 @@ def test_project_workspace_endpoint_returns_composed_views(
     assert data["repositories"][0]["repository"] == "acme/workspace"
     assert data["repositories"][0]["default_branch"] == "main"
     assert data["repositories"][0]["ai_readiness_score"] == 45.0
+    assert data["repositories"][0]["primary_language"] == "Python"
+    assert data["repositories"][0]["repo_size_bucket"] == "medium"
+    assert data["repositories"][0]["has_test_harness"] is True
+    assert data["repositories"][0]["has_ci_pipeline"] is True
+    assert data["repositories"][0]["language_mix"][0] == {"language": "Python", "share_pct": 0.7}
+    assert data["repository_context"]["repositories_with_context"] == 1
+    assert data["repository_context"]["avg_repo_size_kb"] == 12500.0
+    assert data["repository_context"]["avg_test_maturity_score"] == 100.0
+    assert data["repository_context"]["repositories_with_test_harness"] == 1
+    assert data["repository_context"]["repositories_with_ci_pipeline"] == 1
+    assert data["repository_context"]["language_mix"][0] == {
+        "language": "Python",
+        "share_pct": 0.7,
+    }
     assert data["enablement"]["agent_type_counts"] == {"claude_code": 1, "codex_cli": 1}
     assert set(data["enablement"]["top_models"]) == {"claude-sonnet-4", "gpt-5.3-codex"}
     recommendation_titles = {item["title"] for item in data["enablement"]["recommendations"]}

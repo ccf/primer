@@ -1175,6 +1175,11 @@ class ProjectScorecard(BaseModel):
     measurement_confidence: float | None = None
 
 
+class LanguageShare(BaseModel):
+    language: str
+    share_pct: float
+
+
 class ProjectRepositorySummary(BaseModel):
     repository: str
     session_count: int
@@ -1184,6 +1189,13 @@ class ProjectRepositorySummary(BaseModel):
     has_claude_md: bool | None = None
     has_agents_md: bool | None = None
     has_claude_dir: bool | None = None
+    primary_language: str | None = None
+    language_mix: list[LanguageShare] = Field(default_factory=list)
+    repo_size_kb: int | None = None
+    repo_size_bucket: str | None = None
+    has_test_harness: bool | None = None
+    has_ci_pipeline: bool | None = None
+    test_maturity_score: float | None = None
 
 
 class ProjectEnablementSummary(BaseModel):
@@ -1194,6 +1206,16 @@ class ProjectEnablementSummary(BaseModel):
     top_tools: list[str] = []
     top_models: list[str] = []
     recommendations: list[Recommendation] = Field(default_factory=list)
+
+
+class ProjectRepositoryContextSummary(BaseModel):
+    repositories_with_context: int = 0
+    avg_repo_size_kb: float | None = None
+    avg_test_maturity_score: float | None = None
+    repositories_with_test_harness: int = 0
+    repositories_with_ci_pipeline: int = 0
+    language_mix: list[LanguageShare] = Field(default_factory=list)
+    size_distribution: dict[str, int] = Field(default_factory=dict)
 
 
 class ProjectWorkflowFingerprint(BaseModel):
@@ -1238,6 +1260,7 @@ class ProjectWorkspaceResponse(BaseModel):
     friction_impacts: list[FrictionImpact] = []
     repositories: list[ProjectRepositorySummary] = []
     enablement: ProjectEnablementSummary
+    repository_context: ProjectRepositoryContextSummary
     workflow_summary: ProjectWorkflowSummary
 
 

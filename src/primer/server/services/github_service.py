@@ -23,6 +23,22 @@ from primer.server.services.ingest_service import find_or_create_repository
 logger = logging.getLogger(__name__)
 
 GITHUB_API = "https://api.github.com"
+TEST_SIGNAL_PATHS: tuple[tuple[str, str | None], ...] = (
+    ("tests", "dir"),
+    ("test", "dir"),
+    ("spec", "dir"),
+    ("__tests__", "dir"),
+    ("pytest.ini", "file"),
+    ("vitest.config.ts", "file"),
+    ("vitest.config.js", "file"),
+    ("jest.config.ts", "file"),
+    ("jest.config.js", "file"),
+)
+CI_SIGNAL_PATHS: tuple[tuple[str, str | None], ...] = (
+    (".github/workflows", "dir"),
+    (".circleci", "dir"),
+    (".gitlab-ci.yml", "file"),
+)
 
 # Module-level token cache (protected by lock for thread safety)
 _token_cache: dict[str, object] = {"access_token": None, "expires_at": 0.0}
@@ -162,6 +178,26 @@ def get_repository(full_name: str) -> dict | None:
         return resp.json()
     except httpx.HTTPError:
         logger.exception("Failed to fetch repo %s", full_name)
+        return None
+
+
+def get_repository_languages(full_name: str) -> dict[str, int] | None:
+    """Fetch repository language bytes from GitHub."""
+    if not is_configured():
+        return None
+    try:
+        resp = httpx.get(
+            f"{GITHUB_API}/repos/{full_name}/languages",
+            headers=_github_headers(),
+            timeout=10.0,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if not isinstance(data, dict):
+            return {}
+        return {str(language): int(bytes_of_code) for language, bytes_of_code in data.items()}
+    except httpx.HTTPError:
+        logger.warning("Failed to fetch languages for %s", full_name)
         return None
 
 
@@ -380,6 +416,43 @@ def check_ai_readiness(full_name: str, default_branch: str | None = None) -> dic
     }
 
 
+def check_repository_context(full_name: str, default_branch: str | None = None) -> dict | None:
+    """Check language mix and repo-level test signals."""
+    languages = get_repository_languages(full_name)
+    if languages is None:
+        return None
+
+    def _check_paths(paths: tuple[tuple[str, str | None], ...]) -> bool | None:
+        seen_positive = False
+        for path, expected_type in paths:
+            exists = check_file_exists(
+                full_name, path, ref=default_branch or None, expected_type=expected_type
+            )
+            if exists is None:
+                return None
+            if exists:
+                seen_positive = True
+        return seen_positive
+
+    has_test_harness = _check_paths(TEST_SIGNAL_PATHS)
+    has_ci_pipeline = _check_paths(CI_SIGNAL_PATHS)
+    if has_test_harness is None or has_ci_pipeline is None:
+        return None
+
+    score = 0.0
+    if has_test_harness:
+        score += 70.0
+    if has_ci_pipeline:
+        score += 30.0
+
+    return {
+        "language_breakdown": languages,
+        "has_test_harness": has_test_harness,
+        "has_ci_pipeline": has_ci_pipeline,
+        "test_maturity_score": score,
+    }
+
+
 def sync_repository(db: Session, full_name: str, since_days: int = 30) -> dict:
     """Sync PRs from GitHub for a repository and correlate commits."""
     from datetime import datetime, timedelta
@@ -397,6 +470,8 @@ def sync_repository(db: Session, full_name: str, since_days: int = 30) -> dict:
     if gh_repo:
         repo.github_id = gh_repo.get("id")
         repo.default_branch = gh_repo.get("default_branch")
+        repo.primary_language = gh_repo.get("language")
+        repo.repo_size_kb = gh_repo.get("size")
 
     # AI readiness check with 24h cooldown
     now = datetime.now(tz=UTC)
@@ -412,6 +487,21 @@ def sync_repository(db: Session, full_name: str, since_days: int = 30) -> dict:
             repo.has_claude_dir = readiness["has_claude_dir"]
             repo.ai_readiness_score = readiness["ai_readiness_score"]
             repo.ai_readiness_checked_at = now
+
+    context_checked_at = repo.repo_context_checked_at
+    if context_checked_at is not None and context_checked_at.tzinfo is None:
+        context_checked_at = context_checked_at.replace(tzinfo=UTC)
+    should_check_context = (
+        context_checked_at is None or (now - context_checked_at).total_seconds() > 86400
+    )
+    if should_check_context:
+        context = check_repository_context(full_name, repo.default_branch)
+        if context is not None:
+            repo.language_breakdown = context["language_breakdown"]
+            repo.has_test_harness = context["has_test_harness"]
+            repo.has_ci_pipeline = context["has_ci_pipeline"]
+            repo.test_maturity_score = context["test_maturity_score"]
+            repo.repo_context_checked_at = now
 
     since = (now - timedelta(days=since_days)).isoformat()
     prs = list_pull_requests(full_name, state="all", since=since)
