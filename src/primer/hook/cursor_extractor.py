@@ -273,7 +273,13 @@ class CursorExtractor:
         else:
             meta.project_name = _native_project_slug(transcript_path)
 
-        started_at, ended_at = _native_session_time_bounds(transcript_path.parent)
+        if transcript_path.parent == self.get_sessions_dir():
+            started_at, ended_at = _native_session_time_bounds(
+                transcript_path.parent,
+                single_file=transcript_path,
+            )
+        else:
+            started_at, ended_at = _native_session_time_bounds(transcript_path.parent)
         meta.started_at = started_at
         meta.ended_at = ended_at
         if meta.started_at and meta.ended_at:
@@ -466,13 +472,22 @@ def _extract_git_repo_path(messages: list[dict]) -> str | None:
 
 def _native_project_slug(transcript_path: Path) -> str:
     try:
+        if transcript_path.parents[1].name != "agent-transcripts":
+            return ""
         return transcript_path.parents[2].name
     except IndexError:
         return ""
 
 
-def _native_session_time_bounds(session_dir: Path) -> tuple[datetime | None, datetime | None]:
-    jsonl_paths = [path for path in session_dir.rglob("*.jsonl") if path.is_file()]
+def _native_session_time_bounds(
+    session_dir: Path,
+    *,
+    single_file: Path | None = None,
+) -> tuple[datetime | None, datetime | None]:
+    if single_file is not None:
+        jsonl_paths = [single_file] if single_file.is_file() else []
+    else:
+        jsonl_paths = [path for path in session_dir.rglob("*.jsonl") if path.is_file()]
     if not jsonl_paths:
         return None, None
 

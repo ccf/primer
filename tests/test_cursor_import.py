@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -111,7 +112,65 @@ def test_cursor_import_preserves_jsonl_native_transcripts_for_rediscovery(tmp_pa
 
     meta = extractor.extract(str(stored_jsonl))
     assert meta.project_path == str(project_path)
+    assert meta.project_name == "demo"
     assert meta.message_count == 2
+
+
+def test_imported_jsonl_does_not_fallback_to_dot_primer_project_name(tmp_path, monkeypatch):
+    _mock_primer_home(tmp_path, monkeypatch)
+    sessions_dir = tmp_path / ".primer" / "cursor" / "sessions"
+    sessions_dir.mkdir(parents=True, exist_ok=True)
+    transcript_path = sessions_dir / "cursor-native-2.jsonl"
+    transcript_path.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "role": "user",
+                        "message": {"content": [{"type": "text", "text": "No repo context here"}]},
+                    }
+                ),
+                json.dumps(
+                    {
+                        "role": "assistant",
+                        "message": {"content": [{"type": "text", "text": "Still a valid session"}]},
+                    }
+                ),
+            ]
+        )
+        + "\n"
+    )
+
+    from primer.hook.cursor_extractor import CursorExtractor
+
+    meta = CursorExtractor().extract(str(transcript_path))
+
+    assert meta.project_path == ""
+    assert meta.project_name == ""
+
+
+def test_imported_jsonl_time_bounds_only_use_the_target_file(tmp_path, monkeypatch):
+    _mock_primer_home(tmp_path, monkeypatch)
+    sessions_dir = tmp_path / ".primer" / "cursor" / "sessions"
+    sessions_dir.mkdir(parents=True, exist_ok=True)
+
+    first_path = _write_native_transcript(tmp_path, "cursor-native-3", tmp_path / "demo")
+    imported_path = sessions_dir / "cursor-native-3.jsonl"
+    imported_path.write_bytes(first_path.read_bytes())
+
+    second_path = _write_native_transcript(tmp_path, "cursor-native-4", tmp_path / "demo")
+    other_imported_path = sessions_dir / "cursor-native-4.jsonl"
+    other_imported_path.write_bytes(second_path.read_bytes())
+
+    os.utime(imported_path, (1_700_000_000, 1_700_000_000))
+    os.utime(other_imported_path, (1_800_000_000, 1_800_000_000))
+
+    from primer.hook.cursor_extractor import CursorExtractor
+
+    meta = CursorExtractor().extract(str(imported_path))
+
+    assert meta.ended_at is not None
+    assert meta.ended_at.timestamp() == 1_700_000_000
 
 
 def test_cursor_import_rejects_missing_session_id(tmp_path, monkeypatch):
