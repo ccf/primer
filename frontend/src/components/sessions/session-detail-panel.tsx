@@ -18,9 +18,32 @@ const OUTCOME_BADGE: Record<string, { variant: "success" | "destructive" | "warn
   abandoned: { variant: "secondary", label: "Abandoned" },
 }
 
+const EXECUTION_EVIDENCE_LABELS = {
+  test: "Tests",
+  lint: "Lint",
+  build: "Build",
+  verification: "Verification",
+} as const
+
+const EXECUTION_STATUS_BADGE: Record<
+  string,
+  "success" | "destructive" | "secondary"
+> = {
+  passed: "success",
+  failed: "destructive",
+  unknown: "secondary",
+}
+
 export function SessionDetailPanel({ session }: SessionDetailPanelProps) {
   const { facets } = session
   const outcomeBadge = facets?.outcome ? OUTCOME_BADGE[facets.outcome] : null
+  const executionEvidenceCounts = session.execution_evidence.reduce<Record<string, number>>(
+    (acc, evidence) => {
+      acc[evidence.evidence_type] = (acc[evidence.evidence_type] || 0) + 1
+      return acc
+    },
+    {},
+  )
 
   return (
     <div className="space-y-6">
@@ -190,6 +213,58 @@ export function SessionDetailPanel({ session }: SessionDetailPanelProps) {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {session.execution_evidence.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Execution Evidence</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(EXECUTION_EVIDENCE_LABELS).map(([key, label]) => {
+                const count = executionEvidenceCounts[key] || 0
+                if (!count) return null
+                return (
+                  <Badge key={key} variant="secondary" className="gap-1">
+                    <span>{label}</span>
+                    <span>{count}</span>
+                  </Badge>
+                )
+              })}
+            </div>
+            <div className="space-y-3">
+              {session.execution_evidence.map((evidence, index) => (
+                <div
+                  key={`${evidence.ordinal}-${evidence.evidence_type}-${index}`}
+                  className="rounded-lg border border-border/70 p-3"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="secondary">
+                      {EXECUTION_EVIDENCE_LABELS[evidence.evidence_type]}
+                    </Badge>
+                    <Badge variant={EXECUTION_STATUS_BADGE[evidence.status]}>
+                      {evidence.status}
+                    </Badge>
+                    {evidence.tool_name && (
+                      <span className="text-xs text-muted-foreground">{evidence.tool_name}</span>
+                    )}
+                  </div>
+                  {evidence.command && (
+                    <p className="mt-2 break-all rounded bg-muted px-2 py-1 font-mono text-xs">
+                      {evidence.command}
+                    </p>
+                  )}
+                  {evidence.output_preview && (
+                    <p className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">
+                      {evidence.output_preview}
+                    </p>
+                  )}
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

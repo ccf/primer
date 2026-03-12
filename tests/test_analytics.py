@@ -685,6 +685,18 @@ def test_session_detail(client, engineer_with_key, admin_headers):
         client,
         api_key,
         tool_usages=[{"tool_name": "Read", "call_count": 5}],
+        messages=[
+            {
+                "ordinal": 0,
+                "role": "assistant",
+                "tool_calls": [{"name": "Bash", "input_preview": '{"command":"pytest -q"}'}],
+            },
+            {
+                "ordinal": 1,
+                "role": "tool_result",
+                "tool_results": [{"name": "Bash", "output_preview": "2 passed in 0.12s"}],
+            },
+        ],
         facets={"outcome": "success", "brief_summary": "Fixed it"},
     )
 
@@ -695,6 +707,9 @@ def test_session_detail(client, engineer_with_key, admin_headers):
     assert data["has_facets"] is True
     assert data["facets"]["outcome"] == "success"
     assert len(data["tool_usages"]) == 1
+    assert len(data["execution_evidence"]) == 1
+    assert data["execution_evidence"][0]["evidence_type"] == "test"
+    assert data["execution_evidence"][0]["status"] == "passed"
 
 
 def test_cost_analytics(client, engineer_with_key, admin_headers):

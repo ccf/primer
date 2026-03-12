@@ -76,7 +76,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Confidence scoring for extracted facets and downstream recommendations
 - [x] Cross-agent schema parity matrix so Primer knows which session fields are required, optional, or unavailable per source
 - [x] Partial-telemetry handling for IDE-native agents like Cursor so missing transcript, tool, or model fields do not distort org-wide metrics
-- [ ] [P1] Execution evidence capture: lint, test, build, and verification signals per session
+- [x] [P1] Execution evidence capture: lint, test, build, and verification signals per session
 - [ ] [P1] Change-shape capture: files touched, diff size, churn, and rewrite/revert indicators
 - [ ] [P1] Recovery-path tracking: detect whether engineers recover after friction or abandon the attempt
 - [ ] [P1] Derived analytics tables and materialized rollups for heavy longitudinal queries

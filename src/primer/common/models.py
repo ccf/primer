@@ -139,6 +139,9 @@ class Session(Base):
     messages: Mapped[list["SessionMessage"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )
+    execution_evidence: Mapped[list["SessionExecutionEvidence"]] = relationship(
+        back_populates="session", cascade="all, delete-orphan"
+    )
     commits: Mapped[list["SessionCommit"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )
@@ -290,6 +293,29 @@ class SessionMessage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     session: Mapped[Session] = relationship(back_populates="messages")
+
+
+class SessionExecutionEvidence(Base):
+    __tablename__ = "session_execution_evidence"
+    __table_args__ = (
+        Index(
+            "ix_session_execution_evidence_session_ordinal",
+            "session_id",
+            "ordinal",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), nullable=False)
+    ordinal: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    evidence_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="unknown")
+    tool_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    command: Mapped[str | None] = mapped_column(Text, nullable=True)
+    output_preview: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    session: Mapped[Session] = relationship(back_populates="execution_evidence")
 
 
 class Alert(Base):

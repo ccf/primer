@@ -83,10 +83,23 @@ export interface ModelUsageResponse {
   cache_creation_tokens: number
 }
 
+export type ExecutionEvidenceType = "test" | "lint" | "build" | "verification"
+export type ExecutionEvidenceStatus = "passed" | "failed" | "unknown"
+
+export interface SessionExecutionEvidenceResponse {
+  ordinal: number
+  evidence_type: ExecutionEvidenceType
+  status: ExecutionEvidenceStatus
+  tool_name: string | null
+  command: string | null
+  output_preview: string | null
+}
+
 export interface SessionDetailResponse extends SessionResponse {
   facets: SessionFacetsResponse | null
   tool_usages: ToolUsageResponse[]
   model_usages: ModelUsageResponse[]
+  execution_evidence: SessionExecutionEvidenceResponse[]
 }
 
 export interface OverviewStats {
