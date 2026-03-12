@@ -209,6 +209,7 @@ def get_cross_project_comparison(
     start_date: datetime | None = None,
     end_date: datetime | None = None,
     limit: int = 3,
+    max_projects: int = 20,
 ) -> CrossProjectComparisonResponse:
     project_rows = (
         base_session_query(
@@ -219,13 +220,18 @@ def get_cross_project_comparison(
             end_date=end_date,
         )
         .filter(SessionModel.project_name.isnot(None))
-        .with_entities(SessionModel.project_name)
+        .with_entities(
+            SessionModel.project_name,
+            func.count(SessionModel.id).label("session_count"),
+        )
         .group_by(SessionModel.project_name)
+        .order_by(func.count(SessionModel.id).desc())
+        .limit(max_projects)
         .all()
     )
 
     entries: list[CrossProjectComparisonEntry] = []
-    for (project_name,) in project_rows:
+    for project_name, _session_count in project_rows:
         if not project_name:
             continue
         workspace = get_project_workspace(
@@ -371,11 +377,11 @@ def _build_cross_project_comparison_entry(
 
 def _easiest_project_sort_key(entry: CrossProjectComparisonEntry) -> tuple[float, ...]:
     return (
-        entry.effectiveness_score or -1.0,
-        entry.quality_rate or -1.0,
-        -(entry.friction_rate or 1.0),
-        entry.measurement_confidence or -1.0,
-        entry.ai_readiness_score or -1.0,
+        entry.effectiveness_score if entry.effectiveness_score is not None else -1.0,
+        entry.quality_rate if entry.quality_rate is not None else -1.0,
+        -(entry.friction_rate if entry.friction_rate is not None else 1.0),
+        entry.measurement_confidence if entry.measurement_confidence is not None else -1.0,
+        entry.ai_readiness_score if entry.ai_readiness_score is not None else -1.0,
         float(entry.total_sessions),
     )
 

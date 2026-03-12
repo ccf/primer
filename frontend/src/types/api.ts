@@ -301,7 +301,6 @@ export interface CrossProjectComparisonResponse {
 export interface ProjectAnalytics {
   projects: ProjectStats[]
   total_count: number
-  comparison: CrossProjectComparisonResponse | null
 }
 
 export interface HeatmapCell {

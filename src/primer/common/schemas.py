@@ -576,7 +576,6 @@ class CrossProjectComparisonResponse(BaseModel):
 class ProjectAnalytics(BaseModel):
     projects: list[ProjectStats]
     total_count: int
-    comparison: CrossProjectComparisonResponse | None = None
 
 
 # --- Activity Heatmap ---
