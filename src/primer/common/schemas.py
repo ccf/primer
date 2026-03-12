@@ -21,6 +21,8 @@ class PaginatedResponse[T](BaseModel):
 AgentType = Literal["claude_code", "codex_cli", "gemini_cli", "cursor"]
 TelemetryParity = Literal["required", "optional", "unavailable"]
 InterventionStatus = Literal["planned", "in_progress", "completed", "dismissed"]
+ExecutionEvidenceType = Literal["test", "lint", "build", "verification"]
+ExecutionEvidenceStatus = Literal["passed", "failed", "unknown"]
 
 # --- Team ---
 
@@ -181,6 +183,17 @@ class ModelUsageResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class SessionExecutionEvidenceResponse(BaseModel):
+    ordinal: int
+    evidence_type: ExecutionEvidenceType
+    status: ExecutionEvidenceStatus
+    tool_name: str | None
+    command: str | None
+    output_preview: str | None
+
+    model_config = {"from_attributes": True}
+
+
 # --- Session Messages ---
 
 
@@ -313,6 +326,7 @@ class SessionDetailResponse(SessionResponse):
     facets: SessionFacetsResponse | None = None
     tool_usages: list[ToolUsageResponse] = []
     model_usages: list[ModelUsageResponse] = []
+    execution_evidence: list[SessionExecutionEvidenceResponse] = []
 
 
 # --- Analytics ---

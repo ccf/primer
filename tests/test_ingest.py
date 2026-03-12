@@ -5,7 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from primer.common.models import Session as SessionModel
-from primer.common.models import SessionFacets
+from primer.common.models import SessionExecutionEvidence, SessionFacets
 from primer.common.schemas import SessionFacetsPayload, SessionResponse
 from primer.server.services.ingest_service import upsert_facets
 
@@ -161,6 +161,80 @@ def test_ingest_session_auto_extracts_facets_for_codex_transcripts(
         "I found the API limit issue",
     ]
     assert [msg["role"] for msg in observed_messages] == ["human", "assistant"]
+
+
+def test_ingest_session_derives_execution_evidence_from_terminal_messages(
+    client, engineer_with_key, db_session
+):
+    _eng, api_key = engineer_with_key
+    session_id = str(uuid.uuid4())
+    payload = {
+        "session_id": session_id,
+        "api_key": api_key,
+        "project_name": "execution-project",
+        "message_count": 7,
+        "user_message_count": 1,
+        "assistant_message_count": 4,
+        "messages": [
+            {
+                "ordinal": 0,
+                "role": "assistant",
+                "tool_calls": [{"name": "Bash", "input_preview": '{"command":"pytest -q"}'}],
+            },
+            {
+                "ordinal": 1,
+                "role": "tool_result",
+                "tool_results": [{"name": "Bash", "output_preview": "2 passed in 0.12s"}],
+            },
+            {
+                "ordinal": 2,
+                "role": "assistant",
+                "tool_calls": [{"name": "Bash", "input_preview": '{"command":"ruff check ."}'}],
+            },
+            {
+                "ordinal": 3,
+                "role": "tool_result",
+                "tool_results": [{"name": "Bash", "output_preview": "Found 1 error"}],
+            },
+            {
+                "ordinal": 4,
+                "role": "assistant",
+                "tool_calls": [{"name": "Bash", "input_preview": '{"command":"npm run build"}'}],
+            },
+            {
+                "ordinal": 5,
+                "role": "tool_result",
+                "tool_results": [
+                    {"name": "Bash", "output_preview": "Build completed successfully"}
+                ],
+            },
+            {
+                "ordinal": 6,
+                "role": "assistant",
+                "tool_calls": [{"name": "Bash", "input_preview": '{"command":"cargo check"}'}],
+            },
+        ],
+    }
+
+    response = client.post("/api/v1/ingest/session", json=payload)
+
+    assert response.status_code == 200
+
+    evidence = (
+        db_session.query(SessionExecutionEvidence)
+        .filter(SessionExecutionEvidence.session_id == session_id)
+        .order_by(SessionExecutionEvidence.ordinal)
+        .all()
+    )
+
+    assert [(row.evidence_type, row.status, row.command) for row in evidence] == [
+        ("test", "passed", "pytest -q"),
+        ("lint", "failed", "ruff check ."),
+        ("build", "passed", "npm run build"),
+        ("verification", "unknown", "cargo check"),
+    ]
+    assert evidence[0].output_preview == "2 passed in 0.12s"
+    assert evidence[1].output_preview == "Found 1 error"
 
 
 def test_session_response_accepts_cursor_agent_type():

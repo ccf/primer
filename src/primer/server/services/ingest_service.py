@@ -12,6 +12,7 @@ from primer.common.models import (
     IngestEvent,
     ModelUsage,
     SessionCommit,
+    SessionExecutionEvidence,
     SessionFacets,
     SessionMessage,
     ToolUsage,
@@ -21,6 +22,7 @@ from primer.common.models import (
 )
 from primer.common.schemas import SessionFacetsPayload, SessionIngestPayload
 from primer.common.utils import parse_repo_full_name
+from primer.server.services.execution_evidence_service import extract_execution_evidence
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +158,22 @@ def upsert_session(db: Session, engineer_id: str, payload: SessionIngestPayload)
         db.query(SessionMessage).filter(SessionMessage.session_id == session.id).delete()
         for msg in payload.messages:
             db.add(SessionMessage(session_id=session.id, **msg.model_dump()))
+
+        db.query(SessionExecutionEvidence).filter(
+            SessionExecutionEvidence.session_id == session.id
+        ).delete()
+        for evidence in extract_execution_evidence(payload.messages):
+            db.add(
+                SessionExecutionEvidence(
+                    session_id=session.id,
+                    ordinal=evidence.ordinal,
+                    evidence_type=evidence.evidence_type,
+                    status=evidence.status,
+                    tool_name=evidence.tool_name,
+                    command=evidence.command,
+                    output_preview=evidence.output_preview,
+                )
+            )
 
     # Facets
     if payload.facets:

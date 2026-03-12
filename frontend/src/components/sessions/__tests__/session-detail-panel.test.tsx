@@ -55,6 +55,16 @@ const baseSession: SessionDetailResponse = {
       cache_creation_tokens: 100,
     },
   ],
+  execution_evidence: [
+    {
+      ordinal: 3,
+      evidence_type: "test",
+      status: "passed",
+      tool_name: "Bash",
+      command: "pytest -q",
+      output_preview: "2 passed in 0.12s",
+    },
+  ],
 }
 
 describe("SessionDetailPanel", () => {
@@ -101,6 +111,14 @@ describe("SessionDetailPanel", () => {
 
     expect(screen.getByText("Model Usage")).toBeInTheDocument()
     expect(screen.getByText("claude-sonnet-4-5-20250929")).toBeInTheDocument()
+  })
+
+  it("renders execution evidence when present", () => {
+    render(<SessionDetailPanel session={baseSession} />)
+
+    expect(screen.getByText("Execution Evidence")).toBeInTheDocument()
+    expect(screen.getByText("pytest -q")).toBeInTheDocument()
+    expect(screen.getByText("2 passed in 0.12s")).toBeInTheDocument()
   })
 
   it("does not render first prompt card when null", () => {

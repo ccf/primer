@@ -86,6 +86,7 @@ const mockDetailSession = {
       cache_creation_tokens: 0,
     },
   ],
+  execution_evidence: [],
 }
 
 describe("SessionDetailPage", () => {
