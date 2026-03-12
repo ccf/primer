@@ -245,8 +245,7 @@ def _extract_command(input_preview: object) -> str | None:
     parsed = _load_json_object(text)
     if parsed is not None:
         command = _find_command(parsed)
-        if command:
-            return command[:1000]
+        return command[:1000] if command else None
 
     return text[:1000]
 
