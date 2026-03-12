@@ -267,9 +267,9 @@ export function SessionDetailPanel({ session }: SessionDetailPanelProps) {
                       {filePath}
                     </Badge>
                   ))}
-                  {changeShape.files_touched_count > changeShape.named_touched_files.length && (
+                  {changeShape.files_touched_count > Math.min(8, changeShape.named_touched_files.length) && (
                     <Badge variant="outline">
-                      +{changeShape.files_touched_count - changeShape.named_touched_files.length} more inferred from commits
+                      +{changeShape.files_touched_count - Math.min(8, changeShape.named_touched_files.length)} more
                     </Badge>
                   )}
                 </div>
