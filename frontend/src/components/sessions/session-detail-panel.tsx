@@ -36,6 +36,7 @@ const EXECUTION_STATUS_BADGE: Record<
 
 export function SessionDetailPanel({ session }: SessionDetailPanelProps) {
   const { facets } = session
+  const changeShape = session.change_shape
   const outcomeBadge = facets?.outcome ? OUTCOME_BADGE[facets.outcome] : null
   const executionEvidenceCounts = session.execution_evidence.reduce<Record<string, number>>(
     (acc, evidence) => {
@@ -214,6 +215,66 @@ export function SessionDetailPanel({ session }: SessionDetailPanelProps) {
                 </tbody>
               </table>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {changeShape && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Change Shape</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                { label: "Files Touched", value: changeShape.files_touched_count },
+                { label: "Diff Size", value: changeShape.diff_size },
+                { label: "Lines Added", value: changeShape.lines_added },
+                { label: "Lines Deleted", value: changeShape.lines_deleted },
+              ].map((metric) => (
+                <div
+                  key={metric.label}
+                  className="rounded-lg border border-border/70 px-3 py-2"
+                >
+                  <p className="text-xs text-muted-foreground">{metric.label}</p>
+                  <p className="mt-1 text-sm font-semibold">{metric.value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="secondary">Edits {changeShape.edit_operations}</Badge>
+              <Badge variant="secondary">Creates {changeShape.create_operations}</Badge>
+              <Badge variant="secondary">Deletes {changeShape.delete_operations}</Badge>
+              <Badge variant="secondary">Renames {changeShape.rename_operations}</Badge>
+              {changeShape.churn_files_count > 0 && (
+                <Badge variant="warning">Churn {changeShape.churn_files_count}</Badge>
+              )}
+              {changeShape.rewrite_indicator && (
+                <Badge variant="warning">Rewrite Signal</Badge>
+              )}
+              {changeShape.revert_indicator && (
+                <Badge variant="destructive">Revert Signal</Badge>
+              )}
+            </div>
+            {changeShape.named_touched_files && changeShape.named_touched_files.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Named Files
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {changeShape.named_touched_files.slice(0, 8).map((filePath) => (
+                    <Badge key={filePath} variant="outline" className="max-w-full break-all">
+                      {filePath}
+                    </Badge>
+                  ))}
+                  {changeShape.files_touched_count > changeShape.named_touched_files.length && (
+                    <Badge variant="outline">
+                      +{changeShape.files_touched_count - changeShape.named_touched_files.length} more inferred from commits
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

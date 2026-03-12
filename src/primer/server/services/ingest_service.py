@@ -11,6 +11,7 @@ from primer.common.models import (
     GitRepository,
     IngestEvent,
     ModelUsage,
+    SessionChangeShape,
     SessionCommit,
     SessionExecutionEvidence,
     SessionFacets,
@@ -22,6 +23,7 @@ from primer.common.models import (
 )
 from primer.common.schemas import SessionFacetsPayload, SessionIngestPayload
 from primer.common.utils import parse_repo_full_name
+from primer.server.services.change_shape_service import extract_change_shape
 from primer.server.services.execution_evidence_service import extract_execution_evidence
 
 logger = logging.getLogger(__name__)
@@ -175,6 +177,9 @@ def upsert_session(db: Session, engineer_id: str, payload: SessionIngestPayload)
                 )
             )
 
+    if payload.messages is not None or payload.commits is not None:
+        _upsert_change_shape(db, session.id)
+
     # Facets
     if payload.facets:
         upsert_facets(db, session.id, payload.facets)
@@ -221,6 +226,47 @@ def upsert_facets(db: Session, session_id: str, facets: SessionFacetsPayload) ->
         if value is not None:
             setattr(record, field, value)
 
+    db.flush()
+
+
+def _upsert_change_shape(db: Session, session_id: str) -> None:
+    db.flush()
+
+    messages = (
+        db.query(SessionMessage)
+        .filter(SessionMessage.session_id == session_id)
+        .order_by(SessionMessage.ordinal)
+        .all()
+    )
+    commits = db.query(SessionCommit).filter(SessionCommit.session_id == session_id).all()
+    derived = extract_change_shape(messages, commits)
+
+    existing = (
+        db.query(SessionChangeShape).filter(SessionChangeShape.session_id == session_id).first()
+    )
+    if derived is None:
+        if existing is not None:
+            db.delete(existing)
+            db.flush()
+        return
+
+    record = existing or SessionChangeShape(session_id=session_id)
+    if existing is None:
+        db.add(record)
+
+    record.files_touched_count = derived.files_touched_count
+    record.named_touched_files = derived.named_touched_files
+    record.commit_files_changed = derived.commit_files_changed
+    record.lines_added = derived.lines_added
+    record.lines_deleted = derived.lines_deleted
+    record.diff_size = derived.diff_size
+    record.edit_operations = derived.edit_operations
+    record.create_operations = derived.create_operations
+    record.delete_operations = derived.delete_operations
+    record.rename_operations = derived.rename_operations
+    record.churn_files_count = derived.churn_files_count
+    record.rewrite_indicator = derived.rewrite_indicator
+    record.revert_indicator = derived.revert_indicator
     db.flush()
 
 

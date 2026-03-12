@@ -5,7 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from primer.common.models import Session as SessionModel
-from primer.common.models import SessionExecutionEvidence, SessionFacets
+from primer.common.models import SessionChangeShape, SessionExecutionEvidence, SessionFacets
 from primer.common.schemas import SessionFacetsPayload, SessionResponse
 from primer.server.services.ingest_service import upsert_facets
 
@@ -211,8 +211,21 @@ def test_ingest_session_derives_execution_evidence_from_terminal_messages(
             {
                 "ordinal": 6,
                 "role": "assistant",
-                "tool_calls": [{"name": "Bash", "input_preview": '{"command":"cargo check"}'}],
+                "tool_calls": [
+                    {"name": "Bash", "input_preview": '{"command":"cargo check"}'},
+                    {"name": "Write", "input_preview": '{"file_path":"src/auth.py"}'},
+                    {"name": "Edit", "input_preview": '{"path":"src/auth.py"}'},
+                ],
             },
+        ],
+        "commits": [
+            {
+                "sha": "abc123",
+                "message": "Update auth flow",
+                "files_changed": 2,
+                "lines_added": 10,
+                "lines_deleted": 2,
+            }
         ],
     }
 
@@ -235,6 +248,19 @@ def test_ingest_session_derives_execution_evidence_from_terminal_messages(
     ]
     assert evidence[0].output_preview == "2 passed in 0.12s"
     assert evidence[1].output_preview == "Found 1 error"
+
+    change_shape = (
+        db_session.query(SessionChangeShape)
+        .filter(SessionChangeShape.session_id == session_id)
+        .one()
+    )
+    assert change_shape.files_touched_count == 2
+    assert change_shape.named_touched_files == ["src/auth.py"]
+    assert change_shape.commit_files_changed == 2
+    assert change_shape.lines_added == 10
+    assert change_shape.lines_deleted == 2
+    assert change_shape.edit_operations == 2
+    assert change_shape.rewrite_indicator is True
 
 
 def test_session_response_accepts_cursor_agent_type():

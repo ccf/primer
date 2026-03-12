@@ -710,6 +710,50 @@ def test_session_detail(client, engineer_with_key, admin_headers):
     assert len(data["execution_evidence"]) == 1
     assert data["execution_evidence"][0]["evidence_type"] == "test"
     assert data["execution_evidence"][0]["status"] == "passed"
+    assert data["change_shape"] is None
+
+
+def test_session_detail_includes_change_shape_when_present(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    sid = _ingest_session(
+        client,
+        api_key,
+        messages=[
+            {
+                "ordinal": 0,
+                "role": "assistant",
+                "tool_calls": [{"name": "Write", "input_preview": '{"file_path":"src/auth.py"}'}],
+            },
+            {
+                "ordinal": 1,
+                "role": "assistant",
+                "tool_calls": [
+                    {"name": "Bash", "input_preview": '{"command":"git checkout -- src/auth.py"}'}
+                ],
+            },
+        ],
+        commits=[
+            {
+                "sha": "abc123",
+                "message": "Update auth flow",
+                "files_changed": 1,
+                "lines_added": 8,
+                "lines_deleted": 2,
+            }
+        ],
+    )
+
+    response = client.get(f"/api/v1/sessions/{sid}", headers=admin_headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["change_shape"]["files_touched_count"] == 1
+    assert data["change_shape"]["named_touched_files"] == ["src/auth.py"]
+    assert data["change_shape"]["diff_size"] == 10
+    assert data["change_shape"]["rewrite_indicator"] is True
+    assert data["change_shape"]["revert_indicator"] is True
 
 
 def test_cost_analytics(client, engineer_with_key, admin_headers):

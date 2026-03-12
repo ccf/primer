@@ -142,6 +142,9 @@ class Session(Base):
     execution_evidence: Mapped[list["SessionExecutionEvidence"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )
+    change_shape: Mapped["SessionChangeShape | None"] = relationship(
+        back_populates="session", uselist=False, cascade="all, delete-orphan"
+    )
     commits: Mapped[list["SessionCommit"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )
@@ -316,6 +319,36 @@ class SessionExecutionEvidence(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     session: Mapped[Session] = relationship(back_populates="execution_evidence")
+
+
+class SessionChangeShape(Base):
+    __tablename__ = "session_change_shapes"
+    __table_args__ = (
+        Index(
+            "ix_session_change_shapes_session_id",
+            "session_id",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), nullable=False)
+    files_touched_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    named_touched_files: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    commit_files_changed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    lines_added: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    lines_deleted: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    diff_size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    edit_operations: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    create_operations: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    delete_operations: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    rename_operations: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    churn_files_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    rewrite_indicator: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    revert_indicator: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    session: Mapped[Session] = relationship(back_populates="change_shape")
 
 
 class Alert(Base):
