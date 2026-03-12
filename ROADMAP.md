@@ -156,7 +156,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] [P1] Project-level agent mix comparison, including Cursor sessions alongside CLI agents
 - [x] [P1] Repository context model: language mix, test maturity, repo size, and AI-enablement signals
 - [x] [P1] Project enablement recommendations tied to observed bottlenecks
-- [ ] [P1] Cross-project comparison: which repos are easiest or hardest to use AI effectively in
+- [x] [P1] Cross-project comparison: which repos are easiest or hardest to use AI effectively in
 - [ ] [P2] Project playbook templates for greenfield, legacy, high-compliance, and test-poor repos
 
 ## AI Maturity

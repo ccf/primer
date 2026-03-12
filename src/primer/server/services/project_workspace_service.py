@@ -16,6 +16,8 @@ from primer.common.models import (
 from primer.common.models import Session as SessionModel
 from primer.common.pricing import estimate_cost
 from primer.common.schemas import (
+    CrossProjectComparisonEntry,
+    CrossProjectComparisonResponse,
     FrictionImpact,
     LanguageShare,
     ProjectAgentMixEntry,
@@ -199,6 +201,60 @@ def get_project_workspace(
     )
 
 
+def get_cross_project_comparison(
+    db: Session,
+    *,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    limit: int = 3,
+) -> CrossProjectComparisonResponse:
+    project_rows = (
+        base_session_query(
+            db,
+            team_id=team_id,
+            engineer_id=engineer_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        .filter(SessionModel.project_name.isnot(None))
+        .with_entities(SessionModel.project_name)
+        .group_by(SessionModel.project_name)
+        .all()
+    )
+
+    entries: list[CrossProjectComparisonEntry] = []
+    for (project_name,) in project_rows:
+        if not project_name:
+            continue
+        workspace = get_project_workspace(
+            db,
+            project_name,
+            team_id=team_id,
+            engineer_id=engineer_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        if workspace is None:
+            continue
+        entries.append(_build_cross_project_comparison_entry(workspace))
+
+    eligible_entries = [entry for entry in entries if entry.effectiveness_score is not None]
+    easiest_projects = sorted(
+        eligible_entries,
+        key=_easiest_project_sort_key,
+        reverse=True,
+    )[:limit]
+    hardest_projects = sorted(eligible_entries, key=_hardest_project_sort_key)[:limit]
+
+    return CrossProjectComparisonResponse(
+        compared_projects=len(eligible_entries),
+        easiest_projects=easiest_projects,
+        hardest_projects=hardest_projects,
+    )
+
+
 def _build_enablement_summary(db: Session, session_q) -> ProjectEnablementSummary:
     session_id_q = session_q.with_entities(SessionModel.id)
 
@@ -275,6 +331,63 @@ def _build_enablement_summary(db: Session, session_q) -> ProjectEnablementSummar
         permission_mode_counts=dict(permission_counts),
         top_tools=top_tools,
         top_models=top_models,
+    )
+
+
+def _build_cross_project_comparison_entry(
+    workspace: ProjectWorkspaceResponse,
+) -> CrossProjectComparisonEntry:
+    readiness_scores = [
+        repo.ai_readiness_score
+        for repo in workspace.repositories
+        if repo.ai_readiness_score is not None
+    ]
+    avg_readiness_score = (
+        round(sum(readiness_scores) / len(readiness_scores), 1) if readiness_scores else None
+    )
+    top_recommendation_title = (
+        workspace.enablement.recommendations[0].title
+        if workspace.enablement.recommendations
+        else None
+    )
+
+    return CrossProjectComparisonEntry(
+        project_name=workspace.project.project_name,
+        total_sessions=workspace.project.total_sessions,
+        unique_engineers=workspace.project.unique_engineers,
+        effectiveness_score=workspace.scorecard.effectiveness_score.score
+        if workspace.scorecard.effectiveness_score
+        else None,
+        effectiveness_rate=workspace.scorecard.effectiveness_rate,
+        quality_rate=workspace.scorecard.quality_rate,
+        friction_rate=workspace.friction.friction_rate if workspace.friction else None,
+        avg_cost_per_session=workspace.scorecard.avg_cost_per_session,
+        measurement_confidence=workspace.scorecard.measurement_confidence,
+        ai_readiness_score=avg_readiness_score,
+        dominant_agent_type=workspace.agent_mix.dominant_agent_type,
+        top_recommendation_title=top_recommendation_title,
+    )
+
+
+def _easiest_project_sort_key(entry: CrossProjectComparisonEntry) -> tuple[float, ...]:
+    return (
+        entry.effectiveness_score or -1.0,
+        entry.quality_rate or -1.0,
+        -(entry.friction_rate or 1.0),
+        entry.measurement_confidence or -1.0,
+        entry.ai_readiness_score or -1.0,
+        float(entry.total_sessions),
+    )
+
+
+def _hardest_project_sort_key(entry: CrossProjectComparisonEntry) -> tuple[float, ...]:
+    return (
+        entry.effectiveness_score if entry.effectiveness_score is not None else 101.0,
+        -(entry.friction_rate or 0.0),
+        entry.quality_rate if entry.quality_rate is not None else 1.0,
+        entry.ai_readiness_score if entry.ai_readiness_score is not None else 101.0,
+        -(entry.measurement_confidence or 0.0),
+        -float(entry.total_sessions),
     )
 
 

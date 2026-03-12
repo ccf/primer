@@ -552,9 +552,31 @@ class ProjectStats(BaseModel):
     top_tools: list[str] = []
 
 
+class CrossProjectComparisonEntry(BaseModel):
+    project_name: str
+    total_sessions: int
+    unique_engineers: int
+    effectiveness_score: float | None = None
+    effectiveness_rate: float | None = None
+    quality_rate: float | None = None
+    friction_rate: float | None = None
+    avg_cost_per_session: float | None = None
+    measurement_confidence: float | None = None
+    ai_readiness_score: float | None = None
+    dominant_agent_type: AgentType | None = None
+    top_recommendation_title: str | None = None
+
+
+class CrossProjectComparisonResponse(BaseModel):
+    compared_projects: int
+    easiest_projects: list[CrossProjectComparisonEntry] = Field(default_factory=list)
+    hardest_projects: list[CrossProjectComparisonEntry] = Field(default_factory=list)
+
+
 class ProjectAnalytics(BaseModel):
     projects: list[ProjectStats]
     total_count: int
+    comparison: CrossProjectComparisonResponse | None = None
 
 
 # --- Activity Heatmap ---

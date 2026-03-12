@@ -277,9 +277,31 @@ export interface ProjectStats {
   top_tools: string[]
 }
 
+export interface CrossProjectComparisonEntry {
+  project_name: string
+  total_sessions: number
+  unique_engineers: number
+  effectiveness_score: number | null
+  effectiveness_rate: number | null
+  quality_rate: number | null
+  friction_rate: number | null
+  avg_cost_per_session: number | null
+  measurement_confidence: number | null
+  ai_readiness_score: number | null
+  dominant_agent_type: AgentType | null
+  top_recommendation_title: string | null
+}
+
+export interface CrossProjectComparisonResponse {
+  compared_projects: number
+  easiest_projects: CrossProjectComparisonEntry[]
+  hardest_projects: CrossProjectComparisonEntry[]
+}
+
 export interface ProjectAnalytics {
   projects: ProjectStats[]
   total_count: number
+  comparison: CrossProjectComparisonResponse | null
 }
 
 export interface HeatmapCell {

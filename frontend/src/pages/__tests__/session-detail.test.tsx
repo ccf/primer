@@ -24,6 +24,7 @@ vi.mock("@/hooks/use-api-queries", () => ({
   useSessions: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useFriction: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useProjectAnalytics: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useProjectComparison: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useSimilarSessions: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
 }))
 
