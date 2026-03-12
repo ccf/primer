@@ -1093,7 +1093,11 @@ def test_project_comparison_ranks_easiest_and_hardest_projects(
                 }
             ],
             git_remote_url="https://github.com/acme/easy-project.git",
-            facets={"outcome": "success", "session_type": "implementation"},
+            facets={
+                "outcome": "success",
+                "session_type": "implementation",
+                "friction_counts": {},
+            },
         )
 
     for _ in range(2):
@@ -1145,6 +1149,7 @@ def test_project_comparison_ranks_easiest_and_hardest_projects(
     assert data["hardest_projects"][0]["project_name"] == "hard-project"
     assert data["easiest_projects"][0]["dominant_agent_type"] == "claude_code"
     assert data["hardest_projects"][0]["dominant_agent_type"] == "cursor"
+    assert data["easiest_projects"][0]["friction_rate"] == 0.0
     assert (
         data["easiest_projects"][0]["effectiveness_score"]
         > data["hardest_projects"][0]["effectiveness_score"]
