@@ -95,11 +95,28 @@ export interface SessionExecutionEvidenceResponse {
   output_preview: string | null
 }
 
+export interface SessionChangeShapeResponse {
+  files_touched_count: number
+  named_touched_files: string[] | null
+  commit_files_changed: number
+  lines_added: number
+  lines_deleted: number
+  diff_size: number
+  edit_operations: number
+  create_operations: number
+  delete_operations: number
+  rename_operations: number
+  churn_files_count: number
+  rewrite_indicator: boolean
+  revert_indicator: boolean
+}
+
 export interface SessionDetailResponse extends SessionResponse {
   facets: SessionFacetsResponse | null
   tool_usages: ToolUsageResponse[]
   model_usages: ModelUsageResponse[]
   execution_evidence: SessionExecutionEvidenceResponse[]
+  change_shape: SessionChangeShapeResponse | null
 }
 
 export interface OverviewStats {

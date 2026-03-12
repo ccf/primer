@@ -194,6 +194,24 @@ class SessionExecutionEvidenceResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class SessionChangeShapeResponse(BaseModel):
+    files_touched_count: int
+    named_touched_files: list[str] | None
+    commit_files_changed: int
+    lines_added: int
+    lines_deleted: int
+    diff_size: int
+    edit_operations: int
+    create_operations: int
+    delete_operations: int
+    rename_operations: int
+    churn_files_count: int
+    rewrite_indicator: bool
+    revert_indicator: bool
+
+    model_config = {"from_attributes": True}
+
+
 # --- Session Messages ---
 
 
@@ -327,6 +345,7 @@ class SessionDetailResponse(SessionResponse):
     tool_usages: list[ToolUsageResponse] = []
     model_usages: list[ModelUsageResponse] = []
     execution_evidence: list[SessionExecutionEvidenceResponse] = []
+    change_shape: SessionChangeShapeResponse | None = None
 
 
 # --- Analytics ---

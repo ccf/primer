@@ -65,6 +65,21 @@ const baseSession: SessionDetailResponse = {
       output_preview: "2 passed in 0.12s",
     },
   ],
+  change_shape: {
+    files_touched_count: 3,
+    named_touched_files: ["src/auth.py", "tests/test_auth.py"],
+    commit_files_changed: 3,
+    lines_added: 42,
+    lines_deleted: 12,
+    diff_size: 54,
+    edit_operations: 2,
+    create_operations: 1,
+    delete_operations: 0,
+    rename_operations: 0,
+    churn_files_count: 1,
+    rewrite_indicator: false,
+    revert_indicator: false,
+  },
 }
 
 describe("SessionDetailPanel", () => {
@@ -119,6 +134,15 @@ describe("SessionDetailPanel", () => {
     expect(screen.getByText("Execution Evidence")).toBeInTheDocument()
     expect(screen.getByText("pytest -q")).toBeInTheDocument()
     expect(screen.getByText("2 passed in 0.12s")).toBeInTheDocument()
+  })
+
+  it("renders change shape when present", () => {
+    render(<SessionDetailPanel session={baseSession} />)
+
+    expect(screen.getByText("Change Shape")).toBeInTheDocument()
+    expect(screen.getByText("Files Touched")).toBeInTheDocument()
+    expect(screen.getByText("src/auth.py")).toBeInTheDocument()
+    expect(screen.getByText("Edits 2")).toBeInTheDocument()
   })
 
   it("does not render first prompt card when null", () => {

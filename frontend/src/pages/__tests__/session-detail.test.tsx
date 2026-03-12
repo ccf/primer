@@ -87,6 +87,7 @@ const mockDetailSession = {
     },
   ],
   execution_evidence: [],
+  change_shape: null,
 }
 
 describe("SessionDetailPage", () => {
