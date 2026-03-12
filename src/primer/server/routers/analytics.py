@@ -13,6 +13,7 @@ from primer.common.schemas import (
     CoachingBrief,
     ConfigOptimizationResponse,
     CostAnalytics,
+    CrossProjectComparisonResponse,
     DailyStatsResponse,
     EngineerAnalytics,
     EngineerBenchmarkResponse,
@@ -228,6 +229,26 @@ def project_analytics(
         end_date=end_date,
         sort_by=sort_by,
         limit=limit,
+    )
+
+
+@router.get("/projects/comparison", response_model=CrossProjectComparisonResponse)
+def project_comparison(
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.project_workspace_service import get_cross_project_comparison
+
+    tid, eid = _resolve_scope(auth, team_id)
+    return get_cross_project_comparison(
+        db,
+        team_id=tid,
+        engineer_id=eid,
+        start_date=start_date,
+        end_date=end_date,
     )
 
 

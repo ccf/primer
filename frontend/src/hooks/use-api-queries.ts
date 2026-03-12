@@ -12,6 +12,7 @@ import type {
   ClaudePRComparisonResponse,
   ConfigOptimizationResponse,
   CostAnalytics,
+  CrossProjectComparisonResponse,
   CostForecastResponse,
   CostModelingResponse,
   DailyStatsResponse,
@@ -283,6 +284,20 @@ export function useProjectWorkspace(
         `/api/v1/analytics/projects/${encodeURIComponent(projectName)}/workspace${buildParams({ team_id: teamId, start_date: startDate, end_date: endDate })}`,
       ),
     enabled: !!projectName,
+  })
+}
+
+export function useProjectComparison(teamId: string | null, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ["project-comparison", teamId, startDate, endDate],
+    queryFn: () =>
+      apiFetch<CrossProjectComparisonResponse>(
+        `/api/v1/analytics/projects/comparison${buildParams({
+          team_id: teamId,
+          start_date: startDate,
+          end_date: endDate,
+        })}`,
+      ),
   })
 }
 

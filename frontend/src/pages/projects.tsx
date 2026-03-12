@@ -1,8 +1,9 @@
 import { useState } from "react"
 import { FolderKanban, Coins, FolderGit2, Sparkles } from "lucide-react"
-import { useProjectAnalytics } from "@/hooks/use-api-queries"
+import { useProjectAnalytics, useProjectComparison } from "@/hooks/use-api-queries"
 import { PageHeader } from "@/components/shared/page-header"
 import { CardSkeleton } from "@/components/shared/loading-skeleton"
+import { ProjectComparisonCard } from "@/components/projects/project-comparison-card"
 import { InlineStat } from "@/components/ui/inline-stat"
 import { ProjectTable } from "@/components/projects/project-table"
 import { formatCost, formatNumber, formatTokens } from "@/lib/utils"
@@ -18,6 +19,7 @@ export function ProjectsPage({ teamId, dateRange }: ProjectsPageProps) {
   const startDate = dateRange?.startDate
   const endDate = dateRange?.endDate
   const { data, isLoading } = useProjectAnalytics(teamId, startDate, endDate, sortBy)
+  const { data: comparison } = useProjectComparison(teamId, startDate, endDate)
 
   if (isLoading) {
     return (
@@ -53,6 +55,8 @@ export function ProjectsPage({ teamId, dateRange }: ProjectsPageProps) {
         <InlineStat label="Tracked Tokens" value={formatTokens(totalTokens)} icon={FolderKanban} />
         <InlineStat label="Estimated Spend" value={formatCost(totalCost)} icon={Coins} />
       </div>
+
+      {comparison ? <ProjectComparisonCard comparison={comparison} /> : null}
 
       <ProjectTable projects={data.projects} onSortChange={setSortBy} sortBy={sortBy} />
     </div>

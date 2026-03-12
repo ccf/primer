@@ -1,6 +1,6 @@
 import uuid
 
-from primer.common.models import SessionFacets
+from primer.common.models import GitRepository, SessionFacets
 
 
 def _messages(count: int) -> list[dict[str, str | int]]:
@@ -1068,6 +1068,87 @@ def test_project_analytics_includes_cursor_facets_when_present(
     data = response.json()
     project = next(p for p in data["projects"] if p["project_name"] == "facet-safe-project")
     assert project["outcome_distribution"] == {"success": 1, "failure": 1}
+
+
+def test_project_comparison_ranks_easiest_and_hardest_projects(
+    client, engineer_with_key, admin_headers, db_session
+):
+    _eng, api_key = engineer_with_key
+    for _ in range(2):
+        _ingest_session(
+            client,
+            api_key,
+            project_name="easy-project",
+            agent_type="claude_code",
+            messages=_messages(6),
+            tool_usages=[
+                {"tool_name": "Edit", "call_count": 2},
+                {"tool_name": "Bash", "call_count": 1},
+            ],
+            model_usages=[
+                {
+                    "model_name": "claude-sonnet-4",
+                    "input_tokens": 1200,
+                    "output_tokens": 600,
+                }
+            ],
+            git_remote_url="https://github.com/acme/easy-project.git",
+            facets={"outcome": "success", "session_type": "implementation"},
+        )
+
+    for _ in range(2):
+        _ingest_session(
+            client,
+            api_key,
+            project_name="hard-project",
+            agent_type="cursor",
+            messages=_messages(6),
+            tool_usages=[
+                {"tool_name": "Read", "call_count": 2},
+                {"tool_name": "Bash", "call_count": 1},
+            ],
+            model_usages=[
+                {
+                    "model_name": "gpt-5-mini",
+                    "input_tokens": 900,
+                    "output_tokens": 300,
+                }
+            ],
+            git_remote_url="https://github.com/acme/hard-project.git",
+            facets={
+                "outcome": "failure",
+                "session_type": "debugging",
+                "friction_counts": {"tool_error": 2},
+                "friction_detail": "Tooling kept failing mid-session.",
+            },
+        )
+
+    easy_repo = (
+        db_session.query(GitRepository).filter(GitRepository.full_name == "acme/easy-project").one()
+    )
+    easy_repo.ai_readiness_score = 90.0
+    easy_repo.ai_readiness_checked_at = easy_repo.created_at
+
+    hard_repo = (
+        db_session.query(GitRepository).filter(GitRepository.full_name == "acme/hard-project").one()
+    )
+    hard_repo.ai_readiness_score = 35.0
+    hard_repo.ai_readiness_checked_at = hard_repo.created_at
+    db_session.flush()
+
+    response = client.get("/api/v1/analytics/projects/comparison", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["compared_projects"] == 2
+    assert data["easiest_projects"][0]["project_name"] == "easy-project"
+    assert data["hardest_projects"][0]["project_name"] == "hard-project"
+    assert data["easiest_projects"][0]["dominant_agent_type"] == "claude_code"
+    assert data["hardest_projects"][0]["dominant_agent_type"] == "cursor"
+    assert (
+        data["easiest_projects"][0]["effectiveness_score"]
+        > data["hardest_projects"][0]["effectiveness_score"]
+    )
 
 
 def test_activity_heatmap(client, engineer_with_key, admin_headers):

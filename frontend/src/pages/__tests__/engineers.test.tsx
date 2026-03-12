@@ -31,6 +31,7 @@ vi.mock("@/hooks/use-api-queries", () => ({
   useTranscript: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useFriction: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useProjectAnalytics: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useProjectComparison: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
 }))
 
 import { useEngineerAnalytics } from "@/hooks/use-api-queries"
