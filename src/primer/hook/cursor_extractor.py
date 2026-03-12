@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import logging
 import re
+import sqlite3
 from collections import Counter
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from itertools import chain
 from pathlib import Path
@@ -19,6 +21,16 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 _GIT_REPO_PATTERN = re.compile(r"^Git repo:\s+(.+)$", re.MULTILINE)
+
+
+@dataclass
+class NativeCursorComposerState:
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+    git_branch: str | None = None
+    primary_model: str | None = None
+    summary: str | None = None
+    tool_counts: dict[str, int] = field(default_factory=dict)
 
 
 class CursorExtractor:
@@ -39,6 +51,17 @@ class CursorExtractor:
 
     def get_native_projects_dir(self) -> Path:
         return Path.home() / ".cursor" / "projects"
+
+    def get_native_global_state_db_path(self) -> Path:
+        return (
+            Path.home()
+            / "Library"
+            / "Application Support"
+            / "Cursor"
+            / "User"
+            / "globalStorage"
+            / "state.vscdb"
+        )
 
     def get_session_path(self, session_id: str) -> Path:
         return self.get_sessions_dir() / f"{self.validate_session_id(session_id)}.json"
@@ -273,6 +296,17 @@ class CursorExtractor:
         else:
             meta.project_name = _native_project_slug(transcript_path)
 
+        composer_state = None
+        if _is_native_cursor_transcript_path(transcript_path):
+            composer_state = self._load_native_composer_state(meta.session_id)
+            if composer_state is not None:
+                meta.git_branch = composer_state.git_branch or meta.git_branch
+                meta.primary_model = composer_state.primary_model or meta.primary_model
+                meta.summary = meta.summary or composer_state.summary or ""
+                if composer_state.tool_counts:
+                    meta.tool_counts = composer_state.tool_counts
+                    meta.tool_call_count = sum(composer_state.tool_counts.values())
+
         if transcript_path.parent == self.get_sessions_dir():
             started_at, ended_at = _native_session_time_bounds(
                 transcript_path.parent,
@@ -280,6 +314,11 @@ class CursorExtractor:
             )
         else:
             started_at, ended_at = _native_session_time_bounds(transcript_path.parent)
+
+        if composer_state is not None:
+            started_at = composer_state.started_at or started_at
+            ended_at = composer_state.ended_at or ended_at
+
         meta.started_at = started_at
         meta.ended_at = ended_at
         if meta.started_at and meta.ended_at:
@@ -318,6 +357,101 @@ class CursorExtractor:
 
         self._workspace_project_paths = workspace_paths
         return workspace_paths
+
+    def _load_native_composer_state(self, session_id: str) -> NativeCursorComposerState | None:
+        db_path = self.get_native_global_state_db_path()
+        if not db_path.exists():
+            return None
+
+        try:
+            conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        except sqlite3.Error:
+            logger.debug("Unable to open Cursor global state database: %s", db_path, exc_info=True)
+            return None
+
+        try:
+            row = conn.execute(
+                "select value from cursorDiskKV where key = ?",
+                (f"composerData:{session_id}",),
+            ).fetchone()
+            if row is None or not row[0]:
+                return None
+
+            composer = json.loads(row[0])
+            if not isinstance(composer, dict):
+                return None
+
+            header_ids = {
+                header.get("bubbleId")
+                for header in composer.get("fullConversationHeadersOnly", [])
+                if isinstance(header, dict) and isinstance(header.get("bubbleId"), str)
+            }
+            tool_counter: Counter[str] = Counter()
+            model_counter: Counter[str] = Counter()
+
+            if header_ids:
+                bubble_prefix = f"bubbleId:{session_id}:"
+                for key, value in conn.execute(
+                    "select key, value from cursorDiskKV where key like ?",
+                    (f"{bubble_prefix}%",),
+                ):
+                    bubble_id = key.removeprefix(bubble_prefix)
+                    if bubble_id not in header_ids:
+                        continue
+                    bubble = _load_json_object(value)
+                    if bubble is None:
+                        continue
+                    tool_data = bubble.get("toolFormerData")
+                    if not isinstance(tool_data, dict):
+                        continue
+
+                    status = tool_data.get("status")
+                    if isinstance(status, str) and status not in {"completed", "error"}:
+                        continue
+
+                    tool_name = tool_data.get("name")
+                    if isinstance(tool_name, str) and tool_name:
+                        tool_counter[tool_name] += 1
+
+                    model_counter.update(_extract_toolformer_models(tool_data))
+
+            active_branch = composer.get("activeBranch")
+            git_branch = ""
+            if isinstance(active_branch, dict):
+                branch_name = active_branch.get("branchName")
+                if isinstance(branch_name, str):
+                    git_branch = branch_name
+            if not git_branch:
+                committed_to_branch = composer.get("committedToBranch")
+                if isinstance(committed_to_branch, str):
+                    git_branch = committed_to_branch
+
+            summary = ""
+            for field_name in ("name", "subtitle"):
+                field_value = composer.get(field_name)
+                if isinstance(field_value, str) and field_value:
+                    summary = field_value[:500]
+                    break
+
+            primary_model = model_counter.most_common(1)[0][0] if model_counter else None
+
+            return NativeCursorComposerState(
+                started_at=_parse_cursor_unix_ms(composer.get("createdAt")),
+                ended_at=_parse_cursor_unix_ms(composer.get("lastUpdatedAt")),
+                git_branch=git_branch or None,
+                primary_model=primary_model,
+                summary=summary or None,
+                tool_counts=dict(tool_counter),
+            )
+        except (json.JSONDecodeError, sqlite3.Error):
+            logger.debug(
+                "Unable to load Cursor composer state for session %s",
+                session_id,
+                exc_info=True,
+            )
+            return None
+        finally:
+            conn.close()
 
 
 def _parse_timestamp(value: object) -> datetime | None:
@@ -470,6 +604,10 @@ def _extract_git_repo_path(messages: list[dict]) -> str | None:
     return None
 
 
+def _is_native_cursor_transcript_path(transcript_path: Path) -> bool:
+    return bool(_native_project_slug(transcript_path))
+
+
 def _native_project_slug(transcript_path: Path) -> str:
     try:
         if transcript_path.parents[1].name != "agent-transcripts":
@@ -521,6 +659,54 @@ def _load_workspace_folder_path(workspace_json_path: Path) -> str | None:
     if parsed.scheme == "file":
         return unquote(parsed.path)
     return folder
+
+
+def _load_json_object(value: object) -> dict | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        loaded = json.loads(value)
+    except json.JSONDecodeError:
+        return None
+    return loaded if isinstance(loaded, dict) else None
+
+
+def _parse_cursor_unix_ms(value: object) -> datetime | None:
+    if not isinstance(value, int | float):
+        return None
+    return datetime.fromtimestamp(float(value) / 1000, UTC)
+
+
+def _extract_toolformer_models(tool_data: dict) -> Counter[str]:
+    models: Counter[str] = Counter()
+
+    for field_name in ("model", "agentModel", "subagentModel"):
+        field_value = tool_data.get(field_name)
+        if isinstance(field_value, str) and field_value:
+            models[field_value] += 1
+
+    for field_name in ("rawArgs", "params"):
+        field_value = tool_data.get(field_name)
+        if not isinstance(field_value, str) or '"model"' not in field_value:
+            continue
+        parsed_value = _load_json_object(field_value)
+        if parsed_value is None:
+            continue
+        for model_name in _iter_model_names(parsed_value):
+            models[model_name] += 1
+
+    return models
+
+
+def _iter_model_names(value: object):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key in {"model", "agentModel", "subagentModel"} and isinstance(child, str) and child:
+                yield child
+            yield from _iter_model_names(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _iter_model_names(child)
 
 
 def _project_slug_from_path(project_path: str) -> str:

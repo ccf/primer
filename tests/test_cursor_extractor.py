@@ -1,4 +1,6 @@
 import json
+import os
+import sqlite3
 from pathlib import Path
 
 from primer.hook.cursor_extractor import CursorExtractor
@@ -48,6 +50,96 @@ def _setup_cursor_workspace_json(
 
 def _project_slug(project_path: Path) -> str:
     return project_path.as_posix().lstrip("/").replace("/", "-")
+
+
+def _setup_cursor_global_state(
+    tmp_path,
+    session_id: str,
+    *,
+    created_at: int = 1_741_431_600_000,
+    updated_at: int = 1_741_432_200_000,
+    branch_name: str = "feature/cursor-telemetry",
+) -> Path:
+    db_path = (
+        tmp_path
+        / "Library"
+        / "Application Support"
+        / "Cursor"
+        / "User"
+        / "globalStorage"
+        / "state.vscdb"
+    )
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    conn = sqlite3.connect(db_path)
+    conn.execute("create table cursorDiskKV (key text primary key, value text)")
+
+    bubble_entries = [
+        (
+            f"bubbleId:{session_id}:tool-read",
+            {
+                "toolFormerData": {
+                    "name": "read_file_v2",
+                    "status": "completed",
+                }
+            },
+        ),
+        (
+            f"bubbleId:{session_id}:tool-run",
+            {
+                "toolFormerData": {
+                    "name": "run_terminal_command_v2",
+                    "status": "error",
+                }
+            },
+        ),
+        (
+            f"bubbleId:{session_id}:tool-task",
+            {
+                "toolFormerData": {
+                    "name": "task_v2",
+                    "status": "completed",
+                    "rawArgs": json.dumps(
+                        {
+                            "model": "gpt-5.4-high",
+                            "prompt": "Investigate Cursor telemetry sources",
+                        }
+                    ),
+                }
+            },
+        ),
+        (
+            f"bubbleId:{session_id}:tool-pending",
+            {
+                "toolFormerData": {
+                    "name": "edit_file_v2",
+                    "status": "streaming",
+                }
+            },
+        ),
+    ]
+    composer = {
+        "createdAt": created_at,
+        "lastUpdatedAt": updated_at,
+        "activeBranch": {"branchName": branch_name},
+        "name": "Cursor composer summary",
+        "subtitle": "Fallback summary",
+        "fullConversationHeadersOnly": [
+            {"bubbleId": key.rsplit(":", 1)[-1]} for key, _value in bubble_entries
+        ],
+    }
+
+    conn.execute(
+        "insert into cursorDiskKV(key, value) values (?, ?)",
+        (f"composerData:{session_id}", json.dumps(composer)),
+    )
+    conn.executemany(
+        "insert into cursorDiskKV(key, value) values (?, ?)",
+        [(key, json.dumps(value)) for key, value in bubble_entries],
+    )
+    conn.commit()
+    conn.close()
+    return db_path
 
 
 def _setup_cursor_workspace_storage_entry(
@@ -372,6 +464,88 @@ def test_extract_native_cursor_transcript_reads_messages_and_repo_context(tmp_pa
     assert meta.ended_at is not None
     assert meta.duration_seconds is not None
     assert meta.ended_at >= meta.started_at
+
+
+def test_extract_native_cursor_transcript_enriches_tool_counts_model_and_branch(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+    project_path = tmp_path / "demo-project"
+    transcript_path = _setup_native_cursor_transcript(
+        tmp_path,
+        "cursor-native-enriched",
+        project_path,
+        add_workspace_mapping=True,
+    )
+    _setup_cursor_global_state(tmp_path, "cursor-native-enriched")
+
+    meta = CursorExtractor().extract(str(transcript_path))
+
+    assert meta.project_path == str(project_path)
+    assert meta.project_name == "demo-project"
+    assert meta.summary == "I'll inspect the local transcript format."
+    assert meta.git_branch == "feature/cursor-telemetry"
+    assert meta.primary_model == "gpt-5.4-high"
+    assert meta.tool_counts == {
+        "read_file_v2": 1,
+        "run_terminal_command_v2": 1,
+        "task_v2": 1,
+    }
+    assert meta.tool_call_count == 3
+    assert meta.started_at is not None
+    assert meta.ended_at is not None
+    assert meta.started_at.timestamp() == 1_741_431_600
+    assert meta.ended_at.timestamp() == 1_741_432_200
+    assert meta.duration_seconds == 600.0
+
+
+def test_imported_cursor_jsonl_does_not_use_native_composer_state(tmp_path, monkeypatch):
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+    sessions_dir = tmp_path / ".primer" / "cursor" / "sessions"
+    sessions_dir.mkdir(parents=True, exist_ok=True)
+    transcript_path = sessions_dir / "cursor-imported.jsonl"
+    transcript_path.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "role": "user",
+                        "message": {
+                            "content": [{"type": "text", "text": "Imported Cursor transcript"}]
+                        },
+                    }
+                ),
+                json.dumps(
+                    {
+                        "role": "assistant",
+                        "message": {
+                            "content": [{"type": "text", "text": "Imported assistant reply"}]
+                        },
+                    }
+                ),
+            ]
+        )
+        + "\n"
+    )
+    os.utime(transcript_path, (1_741_430_000, 1_741_430_123))
+    _setup_cursor_global_state(
+        tmp_path,
+        "cursor-imported",
+        created_at=1_741_431_600_000,
+        updated_at=1_741_432_200_000,
+    )
+
+    meta = CursorExtractor().extract(str(transcript_path))
+
+    assert meta.session_id == "cursor-imported"
+    assert meta.project_name == ""
+    assert meta.git_branch == ""
+    assert meta.primary_model == ""
+    assert meta.tool_counts == {}
+    assert meta.tool_call_count == 0
+    assert meta.started_at is not None
+    assert meta.ended_at is not None
+    assert meta.ended_at.timestamp() == 1_741_430_123
 
 
 def test_discover_sessions_includes_native_cursor_transcripts_with_workspace_mapping(
