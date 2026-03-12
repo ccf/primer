@@ -230,19 +230,45 @@ def _load_json_object(text: str) -> dict | list | None:
 
 def _find_command(value: object) -> str | None:
     if isinstance(value, dict):
-        for key in ("command", "cmd"):
-            candidate = value.get(key)
-            if isinstance(candidate, str) and candidate.strip():
-                return candidate.strip()
-        for nested in value.values():
-            command = _find_command(nested)
+        for key in (
+            "command",
+            "cmd",
+            "script",
+            "commandString",
+            "raw_command",
+            "rawCommand",
+        ):
+            child = value.get(key)
+            command = _command_from_child(child)
+            if command:
+                return command
+        for key in ("argv", "args"):
+            child = value.get(key)
+            command = _command_from_child(child)
+            if command:
+                return command
+        for child in value.values():
+            command = _find_command(child)
             if command:
                 return command
     elif isinstance(value, list):
-        for item in value:
-            command = _find_command(item)
+        command = _command_from_child(value)
+        if command:
+            return command
+        for child in value:
+            command = _find_command(child)
             if command:
                 return command
+    return None
+
+
+def _command_from_child(value: object) -> str | None:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    if isinstance(value, list):
+        parts = [str(part).strip() for part in value if str(part).strip()]
+        if parts:
+            return " ".join(parts)
     return None
 
 

@@ -67,3 +67,24 @@ def test_extract_change_shape_returns_none_without_mutations():
     )
 
     assert shape is None
+
+
+def test_extract_change_shape_detects_revert_from_argv_command_payload():
+    shape = extract_change_shape(
+        messages=[
+            {
+                "ordinal": 0,
+                "tool_calls": [
+                    {
+                        "name": "Bash",
+                        "input_preview": '{"argv":["git","restore","src/auth.py"]}',
+                    }
+                ],
+            }
+        ],
+        commits=[],
+    )
+
+    assert shape is not None
+    assert shape.edit_operations == 1
+    assert shape.revert_indicator is True
