@@ -96,3 +96,22 @@ def test_extract_execution_evidence_treats_exit_code_zero_as_passed():
         ("verification", "passed", "cargo check"),
         ("test", "failed", "pytest -q"),
     ]
+
+
+def test_extract_execution_evidence_does_not_treat_v20_failed_as_success():
+    messages = [
+        {
+            "ordinal": 0,
+            "tool_calls": [{"name": "Bash", "input_preview": '{"command":"pytest -q"}'}],
+        },
+        {
+            "ordinal": 1,
+            "tool_results": [{"name": "Bash", "output_preview": "test_v20 failed to compile"}],
+        },
+    ]
+
+    evidence = extract_execution_evidence(messages)
+
+    assert [(row.evidence_type, row.status, row.command) for row in evidence] == [
+        ("test", "failed", "pytest -q")
+    ]

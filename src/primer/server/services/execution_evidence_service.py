@@ -94,7 +94,6 @@ _SUCCESS_KEYWORDS = (
     "build completed successfully",
     "compiled successfully",
     "test result: ok",
-    "0 failed",
     '"success": true',
     '"ok": true',
 )
