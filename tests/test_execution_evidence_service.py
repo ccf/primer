@@ -147,3 +147,22 @@ def test_extract_execution_evidence_consumes_pending_record_without_output():
         ("test", "unknown", "pytest -q", None),
         ("lint", "failed", "ruff check .", "Found 1 error"),
     ]
+
+
+def test_extract_execution_evidence_treats_zero_failures_as_passed():
+    messages = [
+        {
+            "ordinal": 0,
+            "tool_calls": [{"name": "Bash", "input_preview": '{"command":"rspec"}'}],
+        },
+        {
+            "ordinal": 1,
+            "tool_results": [{"name": "Bash", "output_preview": "5 examples, 0 failures"}],
+        },
+    ]
+
+    evidence = extract_execution_evidence(messages)
+
+    assert [(row.evidence_type, row.status, row.command) for row in evidence] == [
+        ("test", "passed", "rspec")
+    ]
