@@ -106,6 +106,7 @@ _EXPLICIT_FAILURE_PATTERNS = (
 
 _EXPLICIT_SUCCESS_PATTERNS = (
     re.compile(r"\b0\s+failed\b"),
+    re.compile(r"\b0\s+failures?\b"),
     re.compile(r"\b0\s+errors?\b"),
     re.compile(r"exit code\s+0\b"),
 )
