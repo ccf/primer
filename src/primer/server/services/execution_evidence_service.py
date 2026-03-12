@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections import defaultdict, deque
 from dataclasses import dataclass
 
@@ -60,7 +61,6 @@ _BUILD_KEYWORDS = (
 )
 
 _VERIFICATION_KEYWORDS = (
-    "check",
     "typecheck",
     "verify",
     "validate",
@@ -98,6 +98,16 @@ _SUCCESS_KEYWORDS = (
     "0 failed",
     '"success": true',
     '"ok": true',
+)
+
+_EXPLICIT_FAILURE_PATTERNS = (
+    re.compile(r"\b[1-9]\d*\s+failed\b"),
+    re.compile(r"\b[1-9]\d*\s+errors?\b"),
+)
+
+_EXPLICIT_SUCCESS_PATTERNS = (
+    re.compile(r"\b0\s+failed\b"),
+    re.compile(r"\b0\s+errors?\b"),
 )
 
 
@@ -313,10 +323,14 @@ def _classify_evidence_type(text: str | None) -> str | None:
 
 def _classify_status(output_preview: str) -> str:
     normalized = output_preview.lower()
-    if any(keyword in normalized for keyword in _FAILURE_KEYWORDS):
+    if any(pattern.search(normalized) for pattern in _EXPLICIT_FAILURE_PATTERNS):
         return "failed"
+    if any(pattern.search(normalized) for pattern in _EXPLICIT_SUCCESS_PATTERNS):
+        return "passed"
     if any(keyword in normalized for keyword in _SUCCESS_KEYWORDS):
         return "passed"
+    if any(keyword in normalized for keyword in _FAILURE_KEYWORDS):
+        return "failed"
     if "passed" in normalized and "failed" not in normalized:
         return "passed"
     return "unknown"
