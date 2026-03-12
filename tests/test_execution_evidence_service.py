@@ -68,3 +68,31 @@ def test_extract_execution_evidence_ignores_json_without_command_fields():
     evidence = extract_execution_evidence(messages)
 
     assert evidence == []
+
+
+def test_extract_execution_evidence_treats_exit_code_zero_as_passed():
+    messages = [
+        {
+            "ordinal": 0,
+            "tool_calls": [{"name": "Bash", "input_preview": '{"command":"cargo check"}'}],
+        },
+        {
+            "ordinal": 1,
+            "tool_results": [{"name": "Bash", "output_preview": "Finished with exit code 0"}],
+        },
+        {
+            "ordinal": 2,
+            "tool_calls": [{"name": "Bash", "input_preview": '{"command":"pytest -q"}'}],
+        },
+        {
+            "ordinal": 3,
+            "tool_results": [{"name": "Bash", "output_preview": "Finished with exit code 2"}],
+        },
+    ]
+
+    evidence = extract_execution_evidence(messages)
+
+    assert [(row.evidence_type, row.status, row.command) for row in evidence] == [
+        ("verification", "passed", "cargo check"),
+        ("test", "failed", "pytest -q"),
+    ]

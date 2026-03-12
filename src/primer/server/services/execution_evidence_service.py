@@ -83,7 +83,6 @@ _FAILURE_KEYWORDS = (
     "exception",
     "fatal",
     "command failed",
-    "exit code",
     '"success": false',
     '"ok": false',
 )
@@ -103,11 +102,13 @@ _SUCCESS_KEYWORDS = (
 _EXPLICIT_FAILURE_PATTERNS = (
     re.compile(r"\b[1-9]\d*\s+failed\b"),
     re.compile(r"\b[1-9]\d*\s+errors?\b"),
+    re.compile(r"exit code\s+[1-9]\d*\b"),
 )
 
 _EXPLICIT_SUCCESS_PATTERNS = (
     re.compile(r"\b0\s+failed\b"),
     re.compile(r"\b0\s+errors?\b"),
+    re.compile(r"exit code\s+0\b"),
 )
 
 
