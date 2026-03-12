@@ -197,18 +197,26 @@ def _apply_tool_result(
     output_preview = tool_result.get("output_preview")
     if not isinstance(tool_name, str) or not tool_name:
         return
-    if not isinstance(output_preview, str) or not output_preview:
-        return
 
     normalized_tool_name = _normalize_tool_name(tool_name)
-    status = _classify_status(output_preview)
-    output_preview = output_preview[:1000]
+    has_output = isinstance(output_preview, str) and bool(output_preview)
+
+    if has_output:
+        status = _classify_status(output_preview)
+        output_preview = output_preview[:1000]
+    else:
+        status = None
+        output_preview = None
 
     if pending_by_tool[normalized_tool_name]:
         record = pending_by_tool[normalized_tool_name].popleft()
         record.ordinal = max(record.ordinal, ordinal)
-        record.output_preview = output_preview
-        record.status = status
+        if has_output:
+            record.output_preview = output_preview
+            record.status = status
+        return
+
+    if not has_output:
         return
 
     evidence_type = _classify_evidence_type(output_preview)

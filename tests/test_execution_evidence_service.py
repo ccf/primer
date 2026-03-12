@@ -115,3 +115,35 @@ def test_extract_execution_evidence_does_not_treat_v20_failed_as_success():
     assert [(row.evidence_type, row.status, row.command) for row in evidence] == [
         ("test", "failed", "pytest -q")
     ]
+
+
+def test_extract_execution_evidence_consumes_pending_record_without_output():
+    messages = [
+        {
+            "ordinal": 0,
+            "tool_calls": [{"name": "Bash", "input_preview": '{"command":"pytest -q"}'}],
+        },
+        {
+            "ordinal": 1,
+            "tool_results": [{"name": "Bash"}],
+        },
+        {
+            "ordinal": 2,
+            "tool_calls": [{"name": "Bash", "input_preview": '{"command":"ruff check ."}'}],
+        },
+        {
+            "ordinal": 3,
+            "tool_results": [{"name": "Bash", "output_preview": "Found 1 error"}],
+        },
+    ]
+
+    evidence = extract_execution_evidence(messages)
+
+    observed = [
+        (row.evidence_type, row.status, row.command, row.output_preview) for row in evidence
+    ]
+
+    assert observed == [
+        ("test", "unknown", "pytest -q", None),
+        ("lint", "failed", "ruff check .", "Found 1 error"),
+    ]
