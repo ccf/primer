@@ -92,6 +92,24 @@ export interface ModelUsageResponse {
 
 export type ExecutionEvidenceType = "test" | "lint" | "build" | "verification"
 export type ExecutionEvidenceStatus = "passed" | "failed" | "unknown"
+export type WorkflowStep =
+  | "search"
+  | "read"
+  | "edit"
+  | "execute"
+  | "test"
+  | "fix"
+  | "delegate"
+  | "integrate"
+  | "ship"
+export type SessionArchetype =
+  | "debugging"
+  | "feature_delivery"
+  | "refactor"
+  | "migration"
+  | "docs"
+  | "investigation"
+export type ArchetypeSource = "session_type" | "heuristic"
 
 export interface SessionExecutionEvidenceResponse {
   ordinal: number
@@ -129,6 +147,18 @@ export interface SessionRecoveryPathResponse {
   sample_recovery_commands: string[] | null
 }
 
+export interface SessionWorkflowProfileResponse {
+  fingerprint_id: string | null
+  label: string | null
+  steps: WorkflowStep[] | null
+  archetype: SessionArchetype | null
+  archetype_source: ArchetypeSource | null
+  archetype_reason: string | null
+  top_tools: string[] | null
+  delegation_count: number
+  verification_run_count: number
+}
+
 export interface SessionDetailResponse extends SessionResponse {
   facets: SessionFacetsResponse | null
   tool_usages: ToolUsageResponse[]
@@ -136,6 +166,7 @@ export interface SessionDetailResponse extends SessionResponse {
   execution_evidence: SessionExecutionEvidenceResponse[]
   change_shape: SessionChangeShapeResponse | null
   recovery_path: SessionRecoveryPathResponse | null
+  workflow_profile: SessionWorkflowProfileResponse | null
 }
 
 export interface OverviewStats {

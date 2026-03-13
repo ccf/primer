@@ -23,6 +23,26 @@ TelemetryParity = Literal["required", "optional", "unavailable"]
 InterventionStatus = Literal["planned", "in_progress", "completed", "dismissed"]
 ExecutionEvidenceType = Literal["test", "lint", "build", "verification"]
 ExecutionEvidenceStatus = Literal["passed", "failed", "unknown"]
+WorkflowStep = Literal[
+    "search",
+    "read",
+    "edit",
+    "execute",
+    "test",
+    "fix",
+    "delegate",
+    "integrate",
+    "ship",
+]
+SessionArchetype = Literal[
+    "debugging",
+    "feature_delivery",
+    "refactor",
+    "migration",
+    "docs",
+    "investigation",
+]
+ArchetypeSource = Literal["session_type", "heuristic"]
 RecoveryStrategy = Literal[
     "inspect_context",
     "edit_fix",
@@ -233,6 +253,20 @@ class SessionRecoveryPathResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class SessionWorkflowProfileResponse(BaseModel):
+    fingerprint_id: str | None
+    label: str | None
+    steps: list[WorkflowStep] | None
+    archetype: SessionArchetype | None
+    archetype_source: ArchetypeSource | None
+    archetype_reason: str | None
+    top_tools: list[str] | None
+    delegation_count: int
+    verification_run_count: int
+
+    model_config = {"from_attributes": True}
+
+
 # --- Session Messages ---
 
 
@@ -368,6 +402,7 @@ class SessionDetailResponse(SessionResponse):
     execution_evidence: list[SessionExecutionEvidenceResponse] = []
     change_shape: SessionChangeShapeResponse | None = None
     recovery_path: SessionRecoveryPathResponse | None = None
+    workflow_profile: SessionWorkflowProfileResponse | None = None
 
 
 # --- Analytics ---

@@ -89,6 +89,7 @@ const mockDetailSession = {
   execution_evidence: [],
   change_shape: null,
   recovery_path: null,
+  workflow_profile: null,
 }
 
 describe("SessionDetailPage", () => {

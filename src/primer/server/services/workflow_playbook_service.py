@@ -4,7 +4,13 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from primer.common.facet_taxonomy import canonical_outcome, is_success_outcome
-from primer.common.models import Engineer, SessionCommit, SessionFacets, ToolUsage
+from primer.common.models import (
+    Engineer,
+    SessionCommit,
+    SessionFacets,
+    SessionWorkflowProfile,
+    ToolUsage,
+)
 from primer.common.models import Session as SessionModel
 from primer.common.schemas import WorkflowPlaybook
 from primer.server.services.workflow_patterns import (
@@ -135,16 +141,31 @@ def _load_workflow_sessions(
         .distinct()
         .all()
     }
+    profiles_by_session = {
+        row.session_id: row
+        for row in (
+            db.query(
+                SessionWorkflowProfile.session_id,
+                SessionWorkflowProfile.fingerprint_id,
+                SessionWorkflowProfile.steps,
+            )
+            .filter(SessionWorkflowProfile.session_id.in_(session_ids))
+            .all()
+        )
+    }
 
     enriched_rows = []
     for row in session_rows:
         facets = facets_by_session.get(row.id, {})
         tool_counts = tool_counts_by_session.get(row.id, Counter())
-        steps = infer_workflow_steps(tool_counts, row.id in commit_session_ids)
+        profile = profiles_by_session.get(row.id)
+        steps = list(profile.steps or []) if profile is not None else []
+        if not steps:
+            steps = infer_workflow_steps(tool_counts, row.id in commit_session_ids)
         session_type = facets.get("session_type")
-        fingerprint_id = (
-            workflow_fingerprint_id(session_type, steps) if session_type or steps else None
-        )
+        fingerprint_id = profile.fingerprint_id if profile is not None else None
+        if not fingerprint_id and (session_type or steps):
+            fingerprint_id = workflow_fingerprint_id(session_type, steps)
         enriched_rows.append(
             {
                 "session_id": row.id,
