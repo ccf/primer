@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections import Counter
 from dataclasses import dataclass
 
@@ -25,8 +26,8 @@ _SESSION_TYPE_ARCHETYPES = {
     "refactoring": "refactor",
     "research": "investigation",
 }
-_DOC_TEXT_HINTS = ("doc", "docs", "documentation", "readme", "changelog", "guide")
-_MIGRATION_TEXT_HINTS = ("migrate", "migration", "upgrade", "modernize", "deprecat", "port")
+_DOC_TEXT_RE = re.compile(r"\b(?:docs?|documentation|readme|changelog|guide)\b")
+_MIGRATION_TEXT_RE = re.compile(r"\b(?:migrat\w*|upgrade|moderniz\w*|deprecat\w*|port)\b")
 
 
 @dataclass
@@ -94,8 +95,8 @@ def extract_session_workflow_profile(
     )
     verification_run_count = sum(
         1
-        for evidence_type in execution_types
-        if evidence_type in {"test", "lint", "build", "verification"}
+        for evidence in execution_evidence
+        if _string_attr(evidence, "evidence_type") in {"test", "lint", "build", "verification"}
     )
 
     if not (
@@ -250,7 +251,7 @@ def _has_mutations(change_shape: object | None) -> bool:
 
 
 def _looks_like_docs(text: str, named_files: list[str]) -> bool:
-    if any(hint in text for hint in _DOC_TEXT_HINTS):
+    if _DOC_TEXT_RE.search(text):
         return True
     if not named_files:
         return False
@@ -263,7 +264,7 @@ def _looks_like_docs(text: str, named_files: list[str]) -> bool:
 
 
 def _looks_like_migration(text: str, change_shape: object | None) -> bool:
-    if not any(hint in text for hint in _MIGRATION_TEXT_HINTS):
+    if not _MIGRATION_TEXT_RE.search(text):
         return False
     return (
         _int_attr(change_shape, "files_touched_count") >= 2
