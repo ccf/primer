@@ -1,19 +1,12 @@
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatPercent } from "@/lib/utils"
+import { RECOVERY_STRATEGY_LABELS } from "@/lib/recovery"
 import type { RecoveryOverview, RecoveryPattern } from "@/types/api"
 
 interface RecoveryPatternListProps {
   overview: RecoveryOverview | null
   patterns: RecoveryPattern[]
-}
-
-const STRATEGY_LABELS: Record<RecoveryPattern["strategy"], string> = {
-  inspect_context: "Inspect Context",
-  edit_fix: "Edit Fix",
-  revert_or_reset: "Revert or Reset",
-  rerun_verification: "Rerun Verification",
-  delegate_or_parallelize: "Delegate or Parallelize",
 }
 
 export function RecoveryPatternList({ overview, patterns }: RecoveryPatternListProps) {
@@ -53,7 +46,7 @@ export function RecoveryPatternList({ overview, patterns }: RecoveryPatternListP
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1">
-                    <p className="font-medium">{STRATEGY_LABELS[pattern.strategy]}</p>
+                    <p className="font-medium">{RECOVERY_STRATEGY_LABELS[pattern.strategy]}</p>
                     <p className="text-sm text-muted-foreground">
                       {pattern.session_count} sessions • {pattern.recovered_sessions} recovered
                     </p>
