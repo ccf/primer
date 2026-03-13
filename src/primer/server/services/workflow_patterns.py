@@ -7,7 +7,7 @@ _READ_HINTS = ("read", "fetch", "open", "cat", "view")
 _EDIT_HINTS = ("edit", "write", "patch", "replace", "insert", "delete", "remove", "rename", "move")
 _EXECUTE_HINTS = ("bash", "terminal", "exec", "command")
 _DELEGATE_HINTS = ("task", "agent", "delegate", "team", "sendmessage", "send_message")
-_INTEGRATE_HINTS = ("mcp", "plugin", "skill")
+_INTEGRATE_HINTS = ("mcp", "plugin")
 
 
 def infer_workflow_steps(
