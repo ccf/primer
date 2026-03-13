@@ -80,6 +80,16 @@ const baseSession: SessionDetailResponse = {
     rewrite_indicator: false,
     revert_indicator: false,
   },
+  recovery_path: {
+    friction_detected: true,
+    first_friction_ordinal: 3,
+    recovery_step_count: 2,
+    recovery_strategies: ["edit_fix", "rerun_verification"],
+    recovery_result: "recovered",
+    final_outcome: "success",
+    last_verification_status: "passed",
+    sample_recovery_commands: ["pytest -q"],
+  },
 }
 
 describe("SessionDetailPanel", () => {
@@ -108,7 +118,7 @@ describe("SessionDetailPanel", () => {
     render(<SessionDetailPanel session={baseSession} />)
 
     expect(screen.getByText("Facets")).toBeInTheDocument()
-    expect(screen.getByText("success")).toBeInTheDocument()
+    expect(screen.getAllByText("success").length).toBeGreaterThan(0)
     expect(screen.getByText("code_modification")).toBeInTheDocument()
     expect(
       screen.getByText("Successfully refactored the authentication module with improved error handling."),
@@ -132,7 +142,7 @@ describe("SessionDetailPanel", () => {
     render(<SessionDetailPanel session={baseSession} />)
 
     expect(screen.getByText("Execution Evidence")).toBeInTheDocument()
-    expect(screen.getByText("pytest -q")).toBeInTheDocument()
+    expect(screen.getAllByText("pytest -q").length).toBeGreaterThan(0)
     expect(screen.getByText("2 passed in 0.12s")).toBeInTheDocument()
   })
 
@@ -143,6 +153,16 @@ describe("SessionDetailPanel", () => {
     expect(screen.getByText("Files Touched")).toBeInTheDocument()
     expect(screen.getByText("src/auth.py")).toBeInTheDocument()
     expect(screen.getByText("Edits 2")).toBeInTheDocument()
+  })
+
+  it("renders recovery path when present", () => {
+    render(<SessionDetailPanel session={baseSession} />)
+
+    expect(screen.getByText("Recovery Path")).toBeInTheDocument()
+    expect(screen.getByText("Recovered")).toBeInTheDocument()
+    expect(screen.getByText("Edit Fix")).toBeInTheDocument()
+    expect(screen.getByText("Rerun Verification")).toBeInTheDocument()
+    expect(screen.getByText("Sample Recovery Commands")).toBeInTheDocument()
   })
 
   it("counts hidden change-shape files from both named overflow and inferred files", () => {

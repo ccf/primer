@@ -5,7 +5,12 @@ import pytest
 from pydantic import ValidationError
 
 from primer.common.models import Session as SessionModel
-from primer.common.models import SessionChangeShape, SessionExecutionEvidence, SessionFacets
+from primer.common.models import (
+    SessionChangeShape,
+    SessionExecutionEvidence,
+    SessionFacets,
+    SessionRecoveryPath,
+)
 from primer.common.schemas import SessionFacetsPayload, SessionResponse
 from primer.server.services.ingest_service import upsert_facets
 
@@ -261,6 +266,15 @@ def test_ingest_session_derives_execution_evidence_from_terminal_messages(
     assert change_shape.lines_deleted == 2
     assert change_shape.edit_operations == 2
     assert change_shape.rewrite_indicator is True
+
+    recovery_path = (
+        db_session.query(SessionRecoveryPath)
+        .filter(SessionRecoveryPath.session_id == session_id)
+        .one()
+    )
+    assert recovery_path.first_friction_ordinal == 3
+    assert recovery_path.recovery_result == "recovered"
+    assert recovery_path.recovery_strategies == ["edit_fix", "rerun_verification"]
 
 
 def test_session_response_accepts_cursor_agent_type():

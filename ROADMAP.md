@@ -78,7 +78,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Partial-telemetry handling for IDE-native agents like Cursor so missing transcript, tool, or model fields do not distort org-wide metrics
 - [x] [P1] Execution evidence capture: lint, test, build, and verification signals per session
 - [x] [P1] Change-shape capture: files touched, diff size, churn, and rewrite/revert indicators
-- [ ] [P1] Recovery-path tracking: detect whether engineers recover after friction or abandon the attempt
+- [x] [P1] Recovery-path tracking: detect whether engineers recover after friction or abandon the attempt
 - [ ] [P1] Derived analytics tables and materialized rollups for heavy longitudinal queries
 - [x] Source-quality dashboard by agent type, including capture coverage and telemetry completeness for Cursor
 - [ ] [P2] Data-quality anomaly detection for broken ingestion, sparse transcripts, or stale integrations
@@ -116,7 +116,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] [P0] Root-cause clustering from transcripts, tool traces, and repeated failure motifs
 - [ ] [P1] Time-lost estimation per friction type, engineer, and project
 - [ ] [P1] Toolchain reliability analytics for MCP servers, built-in tools, and external services
-- [ ] [P1] Friction recovery analysis: what engineers tried after failure and which recoveries worked
+- [x] [P1] Friction recovery analysis: what engineers tried after failure and which recoveries worked
 - [ ] [P2] Real-time friction detection for in-session intervention
 
 ## Engineer Intelligence

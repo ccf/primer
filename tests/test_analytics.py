@@ -711,6 +711,7 @@ def test_session_detail(client, engineer_with_key, admin_headers):
     assert data["execution_evidence"][0]["evidence_type"] == "test"
     assert data["execution_evidence"][0]["status"] == "passed"
     assert data["change_shape"] is None
+    assert data["recovery_path"] is None
 
 
 def test_session_detail_includes_change_shape_when_present(
@@ -754,6 +755,57 @@ def test_session_detail_includes_change_shape_when_present(
     assert data["change_shape"]["diff_size"] == 10
     assert data["change_shape"]["rewrite_indicator"] is True
     assert data["change_shape"]["revert_indicator"] is True
+
+
+def test_session_detail_includes_recovery_path_when_present(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    sid = _ingest_session(
+        client,
+        api_key,
+        messages=[
+            {
+                "ordinal": 0,
+                "role": "assistant",
+                "tool_calls": [{"name": "Bash", "input_preview": '{"command":"pytest -q"}'}],
+            },
+            {
+                "ordinal": 1,
+                "role": "tool_result",
+                "tool_results": [{"name": "Bash", "output_preview": "2 failed in 0.12s"}],
+            },
+            {
+                "ordinal": 2,
+                "role": "assistant",
+                "tool_calls": [{"name": "Edit", "input_preview": '{"file_path":"src/auth.py"}'}],
+            },
+            {
+                "ordinal": 3,
+                "role": "assistant",
+                "tool_calls": [{"name": "Bash", "input_preview": '{"command":"pytest -q"}'}],
+            },
+            {
+                "ordinal": 4,
+                "role": "tool_result",
+                "tool_results": [{"name": "Bash", "output_preview": "2 passed in 0.10s"}],
+            },
+        ],
+        facets={
+            "outcome": "success",
+            "friction_counts": {"compile_error": 1},
+            "friction_detail": "A test failed before the fix landed",
+        },
+    )
+
+    response = client.get(f"/api/v1/sessions/{sid}", headers=admin_headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["recovery_path"]["recovery_result"] == "recovered"
+    assert data["recovery_path"]["recovery_step_count"] == 3
+    assert data["recovery_path"]["recovery_strategies"] == ["edit_fix", "rerun_verification"]
+    assert data["recovery_path"]["last_verification_status"] == "passed"
 
 
 def test_cost_analytics(client, engineer_with_key, admin_headers):

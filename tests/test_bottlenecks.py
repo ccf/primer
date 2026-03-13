@@ -1,7 +1,13 @@
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from primer.common.models import Session, SessionFacets, SessionMessage, ToolUsage
+from primer.common.models import (
+    Session,
+    SessionFacets,
+    SessionMessage,
+    SessionRecoveryPath,
+    ToolUsage,
+)
 
 
 def _create_session(db_session, engineer, **kwargs):
@@ -35,6 +41,8 @@ def test_bottlenecks_empty(client, admin_headers):
     assert data["project_friction"] == []
     assert data["friction_trends"] == []
     assert data["root_cause_clusters"] == []
+    assert data["recovery_overview"]["sessions_with_recovery_paths"] == 0
+    assert data["recovery_patterns"] == []
 
 
 def test_bottlenecks_with_friction(client, db_session, engineer_with_key, admin_headers):
@@ -65,8 +73,21 @@ def test_bottlenecks_with_friction(client, db_session, engineer_with_key, admin_
             content_text="Please run the verification command and fix the issue.",
         )
     )
+    db_session.add(
+        SessionRecoveryPath(
+            session_id=s1.id,
+            friction_detected=True,
+            first_friction_ordinal=1,
+            recovery_step_count=2,
+            recovery_strategies=["inspect_context", "rerun_verification"],
+            recovery_result="recovered",
+            final_outcome="success",
+            last_verification_status="passed",
+            sample_recovery_commands=["pytest tests/test_auth.py"],
+        )
+    )
 
-    # Session 2: with friction, failure
+    # Session 2: with friction, abandoned
     s2 = _create_session(
         db_session,
         eng,
@@ -75,7 +96,7 @@ def test_bottlenecks_with_friction(client, db_session, engineer_with_key, admin_
     )
     f2 = SessionFacets(
         session_id=s2.id,
-        outcome="failure",
+        outcome="abandoned",
         friction_counts={"permission_denied": 2},
         friction_detail="Could not access directory",
     )
@@ -88,6 +109,19 @@ def test_bottlenecks_with_friction(client, db_session, engineer_with_key, admin_
             ordinal=1,
             role="human",
             content_text="Permission errors keep blocking the command.",
+        )
+    )
+    db_session.add(
+        SessionRecoveryPath(
+            session_id=s2.id,
+            friction_detected=True,
+            first_friction_ordinal=1,
+            recovery_step_count=1,
+            recovery_strategies=["inspect_context"],
+            recovery_result="abandoned",
+            final_outcome="abandoned",
+            last_verification_status=None,
+            sample_recovery_commands=["git status"],
         )
     )
 
@@ -148,6 +182,24 @@ def test_bottlenecks_with_friction(client, db_session, engineer_with_key, admin_
     assert "Bash" in permission_cluster["common_tools"]
     assert "permission" in permission_cluster["transcript_cues"]
     assert "Permission was denied on file write" in permission_cluster["sample_details"]
+
+    recovery_overview = data["recovery_overview"]
+    assert recovery_overview["sessions_with_recovery_paths"] == 2
+    assert recovery_overview["recovered_sessions"] == 1
+    assert recovery_overview["abandoned_sessions"] == 1
+    assert recovery_overview["unresolved_sessions"] == 0
+    assert recovery_overview["recovery_rate"] == 0.5
+
+    recovery_patterns = data["recovery_patterns"]
+    assert len(recovery_patterns) >= 1
+    inspect_pattern = next(
+        (pattern for pattern in recovery_patterns if pattern["strategy"] == "inspect_context"),
+        None,
+    )
+    assert inspect_pattern is not None
+    assert inspect_pattern["session_count"] == 2
+    assert inspect_pattern["recovered_sessions"] == 1
+    assert "pytest tests/test_auth.py" in inspect_pattern["sample_commands"]
 
     # Friction trends
     assert len(data["friction_trends"]) > 0

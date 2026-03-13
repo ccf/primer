@@ -23,6 +23,14 @@ TelemetryParity = Literal["required", "optional", "unavailable"]
 InterventionStatus = Literal["planned", "in_progress", "completed", "dismissed"]
 ExecutionEvidenceType = Literal["test", "lint", "build", "verification"]
 ExecutionEvidenceStatus = Literal["passed", "failed", "unknown"]
+RecoveryStrategy = Literal[
+    "inspect_context",
+    "edit_fix",
+    "revert_or_reset",
+    "rerun_verification",
+    "delegate_or_parallelize",
+]
+RecoveryResult = Literal["recovered", "abandoned", "unresolved"]
 
 # --- Team ---
 
@@ -212,6 +220,19 @@ class SessionChangeShapeResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class SessionRecoveryPathResponse(BaseModel):
+    friction_detected: bool
+    first_friction_ordinal: int | None
+    recovery_step_count: int
+    recovery_strategies: list[RecoveryStrategy] | None
+    recovery_result: RecoveryResult
+    final_outcome: str | None
+    last_verification_status: ExecutionEvidenceStatus | None
+    sample_recovery_commands: list[str] | None
+
+    model_config = {"from_attributes": True}
+
+
 # --- Session Messages ---
 
 
@@ -346,6 +367,7 @@ class SessionDetailResponse(SessionResponse):
     model_usages: list[ModelUsageResponse] = []
     execution_evidence: list[SessionExecutionEvidenceResponse] = []
     change_shape: SessionChangeShapeResponse | None = None
+    recovery_path: SessionRecoveryPathResponse | None = None
 
 
 # --- Analytics ---
@@ -864,11 +886,33 @@ class RootCauseCluster(BaseModel):
     sample_details: list[str]
 
 
+class RecoveryOverview(BaseModel):
+    sessions_with_recovery_paths: int
+    recovered_sessions: int
+    abandoned_sessions: int
+    unresolved_sessions: int
+    recovery_rate: float | None
+    avg_recovery_steps: float | None
+
+
+class RecoveryPattern(BaseModel):
+    strategy: RecoveryStrategy
+    session_count: int
+    recovered_sessions: int
+    abandoned_sessions: int
+    unresolved_sessions: int
+    recovery_rate: float | None
+    avg_recovery_steps: float | None
+    sample_commands: list[str]
+
+
 class BottleneckAnalytics(BaseModel):
     friction_impacts: list[FrictionImpact]
     project_friction: list[ProjectFriction]
     friction_trends: list[FrictionTrend]
     root_cause_clusters: list[RootCauseCluster]
+    recovery_overview: RecoveryOverview | None = None
+    recovery_patterns: list[RecoveryPattern] = []
     total_sessions_analyzed: int
     sessions_with_any_friction: int
     overall_friction_rate: float

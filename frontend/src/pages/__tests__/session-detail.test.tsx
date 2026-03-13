@@ -88,6 +88,7 @@ const mockDetailSession = {
   ],
   execution_evidence: [],
   change_shape: null,
+  recovery_path: null,
 }
 
 describe("SessionDetailPage", () => {

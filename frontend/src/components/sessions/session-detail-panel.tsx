@@ -25,6 +25,23 @@ const EXECUTION_EVIDENCE_LABELS = {
   verification: "Verification",
 } as const
 
+const RECOVERY_STRATEGY_LABELS = {
+  inspect_context: "Inspect Context",
+  edit_fix: "Edit Fix",
+  revert_or_reset: "Revert or Reset",
+  rerun_verification: "Rerun Verification",
+  delegate_or_parallelize: "Delegate or Parallelize",
+} as const
+
+const RECOVERY_RESULT_BADGE: Record<
+  string,
+  { variant: "success" | "destructive" | "warning"; label: string }
+> = {
+  recovered: { variant: "success", label: "Recovered" },
+  abandoned: { variant: "destructive", label: "Abandoned" },
+  unresolved: { variant: "warning", label: "Unresolved" },
+}
+
 const EXECUTION_STATUS_BADGE: Record<
   string,
   "success" | "destructive" | "secondary"
@@ -37,11 +54,13 @@ const EXECUTION_STATUS_BADGE: Record<
 export function SessionDetailPanel({ session }: SessionDetailPanelProps) {
   const { facets } = session
   const changeShape = session.change_shape
+  const recoveryPath = session.recovery_path
   const visibleNamedFiles = changeShape?.named_touched_files?.slice(0, 8) ?? []
   const hiddenChangeShapeFiles = changeShape
     ? changeShape.files_touched_count - visibleNamedFiles.length
     : 0
   const outcomeBadge = facets?.outcome ? OUTCOME_BADGE[facets.outcome] : null
+  const recoveryBadge = recoveryPath ? RECOVERY_RESULT_BADGE[recoveryPath.recovery_result] : null
   const executionEvidenceCounts = session.execution_evidence.reduce<Record<string, number>>(
     (acc, evidence) => {
       acc[evidence.evidence_type] = (acc[evidence.evidence_type] || 0) + 1
@@ -279,6 +298,60 @@ export function SessionDetailPanel({ session }: SessionDetailPanelProps) {
                 </div>
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {recoveryPath && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Recovery Path</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                { label: "First Friction", value: recoveryPath.first_friction_ordinal ?? "-" },
+                { label: "Recovery Steps", value: recoveryPath.recovery_step_count },
+                { label: "Final Outcome", value: recoveryPath.final_outcome ?? "-" },
+                { label: "Last Verification", value: recoveryPath.last_verification_status ?? "-" },
+              ].map((metric) => (
+                <div
+                  key={metric.label}
+                  className="rounded-lg border border-border/70 px-3 py-2"
+                >
+                  <p className="text-xs text-muted-foreground">{metric.label}</p>
+                  <p className="mt-1 text-sm font-semibold">{metric.value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {recoveryBadge && (
+                <Badge variant={recoveryBadge.variant}>{recoveryBadge.label}</Badge>
+              )}
+              {(recoveryPath.recovery_strategies ?? []).map((strategy) => (
+                <Badge key={strategy} variant="secondary">
+                  {RECOVERY_STRATEGY_LABELS[strategy]}
+                </Badge>
+              ))}
+            </div>
+            {recoveryPath.sample_recovery_commands &&
+              recoveryPath.sample_recovery_commands.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Sample Recovery Commands
+                  </p>
+                  <div className="space-y-2">
+                    {recoveryPath.sample_recovery_commands.map((command) => (
+                      <p
+                        key={command}
+                        className="break-all rounded bg-muted px-2 py-1 font-mono text-xs"
+                      >
+                        {command}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
           </CardContent>
         </Card>
       )}
