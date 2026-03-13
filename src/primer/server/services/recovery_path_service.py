@@ -37,7 +37,7 @@ _EDIT_TOOL_KEYWORDS = (
 _DELEGATE_TOOL_KEYWORDS = ("task", "agent", "delegate", "team", "sendmessage", "send_message")
 _INSPECT_COMMAND_PATTERNS = (
     re.compile(r"(^|\s)(rg|grep|find|fd)\s"),
-    re.compile(r"(^|\s)(cat|less|head|tail|sed)\s"),
+    re.compile(r"(^|\s)(cat|less|head|tail)\s"),
     re.compile(r"\bgit\s+(status|diff|log|show)\b"),
     re.compile(r"(^|\s)ls\s"),
 )
@@ -258,8 +258,8 @@ def _looks_like_verification_command(command: str) -> bool:
 
 
 def _append_sample_command(commands: list[str], command: str) -> None:
-    cleaned = command.strip()
+    cleaned = command.strip()[:200]
     if not cleaned or cleaned in commands:
         return
     if len(commands) < 5:
-        commands.append(cleaned[:200])
+        commands.append(cleaned)
