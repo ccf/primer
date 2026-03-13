@@ -76,3 +76,72 @@ def test_extract_session_workflow_profile_detects_debugging_fix_loop():
     assert record.archetype == "debugging"
     assert record.steps == ["edit", "execute", "test", "fix"]
     assert record.verification_run_count == 1
+
+
+def test_extract_session_workflow_profile_does_not_treat_docker_as_docs():
+    record = extract_session_workflow_profile(
+        {"first_prompt": "Fix the docker compose build failure"},
+        [
+            {"tool_name": "Edit", "call_count": 1},
+            {"tool_name": "Bash", "call_count": 2},
+        ],
+        [{"evidence_type": "test"}],
+        change_shape={
+            "files_touched_count": 1,
+            "diff_size": 8,
+            "edit_operations": 1,
+        },
+        recovery_path={
+            "recovery_step_count": 1,
+            "recovery_result": "recovered",
+            "recovery_strategies": ["edit_fix"],
+        },
+    )
+
+    assert record is not None
+    assert record.archetype == "debugging"
+
+
+def test_extract_session_workflow_profile_does_not_treat_import_as_migration():
+    record = extract_session_workflow_profile(
+        {"first_prompt": "Add import/export helpers for CSV support"},
+        [
+            {"tool_name": "Read", "call_count": 1},
+            {"tool_name": "Edit", "call_count": 2},
+        ],
+        [],
+        change_shape={
+            "files_touched_count": 2,
+            "diff_size": 20,
+            "edit_operations": 2,
+        },
+    )
+
+    assert record is not None
+    assert record.archetype == "feature_delivery"
+
+
+def test_extract_session_workflow_profile_counts_all_verification_runs():
+    record = extract_session_workflow_profile(
+        {"first_prompt": "Stabilize the flaky test suite"},
+        [{"tool_name": "Bash", "call_count": 4}],
+        [
+            {"evidence_type": "test"},
+            {"evidence_type": "test"},
+            {"evidence_type": "lint"},
+            {"evidence_type": "verification"},
+        ],
+        change_shape={
+            "files_touched_count": 1,
+            "diff_size": 4,
+            "edit_operations": 1,
+        },
+        recovery_path={
+            "recovery_step_count": 2,
+            "recovery_result": "recovered",
+            "recovery_strategies": ["rerun_verification"],
+        },
+    )
+
+    assert record is not None
+    assert record.verification_run_count == 4
