@@ -2,7 +2,7 @@ from collections import Counter
 
 from primer.common.tool_classification import classify_tool
 
-_SEARCH_HINTS = ("grep", "glob", "search", "find", "ripgrep", "rg")
+_SEARCH_HINTS = ("grep", "glob", "search", "find", "ripgrep")
 _READ_HINTS = ("read", "fetch", "open", "cat", "view")
 _EDIT_HINTS = ("edit", "write", "patch", "replace", "insert", "delete", "remove", "rename", "move")
 _EXECUTE_HINTS = ("bash", "terminal", "exec", "command")
