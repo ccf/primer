@@ -37,6 +37,10 @@ const EXECUTION_STATUS_BADGE: Record<
 export function SessionDetailPanel({ session }: SessionDetailPanelProps) {
   const { facets } = session
   const changeShape = session.change_shape
+  const visibleNamedFiles = changeShape?.named_touched_files?.slice(0, 8) ?? []
+  const hiddenChangeShapeFiles = changeShape
+    ? changeShape.files_touched_count - visibleNamedFiles.length
+    : 0
   const outcomeBadge = facets?.outcome ? OUTCOME_BADGE[facets.outcome] : null
   const executionEvidenceCounts = session.execution_evidence.reduce<Record<string, number>>(
     (acc, evidence) => {
@@ -262,14 +266,14 @@ export function SessionDetailPanel({ session }: SessionDetailPanelProps) {
                   Named Files
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {changeShape.named_touched_files.slice(0, 8).map((filePath) => (
+                  {visibleNamedFiles.map((filePath) => (
                     <Badge key={filePath} variant="outline" className="max-w-full break-all">
                       {filePath}
                     </Badge>
                   ))}
-                  {changeShape.files_touched_count > changeShape.named_touched_files.length && (
+                  {hiddenChangeShapeFiles > 0 && (
                     <Badge variant="outline">
-                      +{changeShape.files_touched_count - changeShape.named_touched_files.length} more inferred from commits
+                      +{hiddenChangeShapeFiles} more
                     </Badge>
                   )}
                 </div>
