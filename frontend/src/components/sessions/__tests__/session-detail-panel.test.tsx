@@ -145,6 +145,34 @@ describe("SessionDetailPanel", () => {
     expect(screen.getByText("Edits 2")).toBeInTheDocument()
   })
 
+  it("counts hidden change-shape files from both named overflow and inferred files", () => {
+    render(
+      <SessionDetailPanel
+        session={{
+          ...baseSession,
+          change_shape: {
+            ...baseSession.change_shape,
+            files_touched_count: 12,
+            named_touched_files: [
+              "src/a.ts",
+              "src/b.ts",
+              "src/c.ts",
+              "src/d.ts",
+              "src/e.ts",
+              "src/f.ts",
+              "src/g.ts",
+              "src/h.ts",
+              "src/i.ts",
+              "src/j.ts",
+            ],
+          },
+        }}
+      />,
+    )
+
+    expect(screen.getByText("+4 more")).toBeInTheDocument()
+  })
+
   it("does not render first prompt card when null", () => {
     const sessionNoPrompt: SessionDetailResponse = {
       ...baseSession,
