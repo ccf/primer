@@ -1,9 +1,14 @@
 from __future__ import annotations
 
-import json
 import re
 from collections import defaultdict, deque
 from dataclasses import dataclass
+
+from primer.server.services.session_signal_parsing import (
+    extract_command,
+    message_payload,
+    normalize_tool_name,
+)
 
 _EXECUTION_TOOL_NAMES = {
     "bash",
@@ -127,7 +132,7 @@ def extract_execution_evidence(messages: list[object]) -> list[ExecutionEvidence
     pending_by_tool: dict[str, deque[ExecutionEvidenceRecord]] = defaultdict(deque)
 
     for message in messages:
-        payload = _message_payload(message)
+        payload = message_payload(message)
         if payload is None:
             continue
 
@@ -140,7 +145,7 @@ def extract_execution_evidence(messages: list[object]) -> list[ExecutionEvidence
                 if record is None:
                     continue
                 records.append(record)
-                pending_by_tool[_normalize_tool_name(record.tool_name)].append(record)
+                pending_by_tool[normalize_tool_name(record.tool_name)].append(record)
 
         tool_results = payload.get("tool_results")
         if isinstance(tool_results, list):
@@ -148,16 +153,6 @@ def extract_execution_evidence(messages: list[object]) -> list[ExecutionEvidence
                 _apply_tool_result(ordinal, tool_result, pending_by_tool, records)
 
     return records
-
-
-def _message_payload(message: object) -> dict | None:
-    if isinstance(message, dict):
-        return message
-    model_dump = getattr(message, "model_dump", None)
-    if callable(model_dump):
-        dumped = model_dump()
-        return dumped if isinstance(dumped, dict) else None
-    return None
 
 
 def _record_from_tool_call(ordinal: int, tool_call: object) -> ExecutionEvidenceRecord | None:
@@ -169,7 +164,7 @@ def _record_from_tool_call(ordinal: int, tool_call: object) -> ExecutionEvidence
         return None
 
     input_preview = tool_call.get("input_preview")
-    command = _extract_command(input_preview)
+    command = extract_command(input_preview)
     if not _is_execution_tool(tool_name) and not command:
         return None
 
@@ -199,7 +194,7 @@ def _apply_tool_result(
     if not isinstance(tool_name, str) or not tool_name:
         return
 
-    normalized_tool_name = _normalize_tool_name(tool_name)
+    normalized_tool_name = normalize_tool_name(tool_name)
     has_output = isinstance(output_preview, str) and bool(output_preview)
 
     if has_output:
@@ -236,80 +231,7 @@ def _apply_tool_result(
 
 
 def _is_execution_tool(tool_name: str) -> bool:
-    return _normalize_tool_name(tool_name) in _EXECUTION_TOOL_NAMES
-
-
-def _normalize_tool_name(tool_name: str | None) -> str:
-    return tool_name.strip().lower() if isinstance(tool_name, str) else ""
-
-
-def _extract_command(input_preview: object) -> str | None:
-    if not isinstance(input_preview, str):
-        return None
-
-    text = input_preview.strip()
-    if not text:
-        return None
-
-    parsed = _load_json_object(text)
-    if parsed is not None:
-        command = _find_command(parsed)
-        return command[:1000] if command else None
-
-    return text[:1000]
-
-
-def _load_json_object(text: str) -> object | None:
-    if not text or text[0] not in "{[":
-        return None
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return None
-
-
-def _find_command(value: object) -> str | None:
-    if isinstance(value, dict):
-        for key in (
-            "command",
-            "cmd",
-            "script",
-            "commandString",
-            "raw_command",
-            "rawCommand",
-        ):
-            child = value.get(key)
-            command = _command_from_child(child)
-            if command:
-                return command
-        for key in ("argv", "args"):
-            child = value.get(key)
-            command = _command_from_child(child)
-            if command:
-                return command
-        for child in value.values():
-            command = _find_command(child)
-            if command:
-                return command
-    elif isinstance(value, list):
-        command = _command_from_child(value)
-        if command:
-            return command
-        for child in value:
-            command = _find_command(child)
-            if command:
-                return command
-    return None
-
-
-def _command_from_child(value: object) -> str | None:
-    if isinstance(value, str) and value.strip():
-        return value.strip()
-    if isinstance(value, list):
-        parts = [str(part).strip() for part in value if str(part).strip()]
-        if parts:
-            return " ".join(parts)
-    return None
+    return normalize_tool_name(tool_name) in _EXECUTION_TOOL_NAMES
 
 
 def _classify_evidence_type(text: str | None) -> str | None:

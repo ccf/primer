@@ -1,9 +1,14 @@
 from __future__ import annotations
 
-import json
 import re
 from collections import Counter
 from dataclasses import dataclass
+
+from primer.server.services.session_signal_parsing import (
+    extract_command,
+    load_json_object,
+    message_payload,
+)
 
 _CREATE_TOOL_KEYWORDS = ("create", "new_file")
 _DELETE_TOOL_KEYWORDS = ("delete", "remove", "unlink")
@@ -76,7 +81,7 @@ def extract_change_shape(
     revert_indicator = False
 
     for message in messages:
-        payload = _message_payload(message)
+        payload = message_payload(message)
         if payload is None:
             continue
 
@@ -93,7 +98,7 @@ def extract_change_shape(
                 continue
 
             input_preview = tool_call.get("input_preview")
-            command = _extract_command(input_preview)
+            command = extract_command(input_preview)
             if command and _is_revert_command(command):
                 revert_indicator = True
 
@@ -171,21 +176,6 @@ def extract_change_shape(
     )
 
 
-def _message_payload(message: object) -> dict | None:
-    if isinstance(message, dict):
-        return message
-    model_dump = getattr(message, "model_dump", None)
-    if callable(model_dump):
-        dumped = model_dump()
-        return dumped if isinstance(dumped, dict) else None
-    payload: dict[str, object] = {}
-    for field in ("ordinal", "role", "content_text", "tool_calls", "tool_results"):
-        value = getattr(message, field, None)
-        if value is not None:
-            payload[field] = value
-    return payload or None
-
-
 def _commit_value(commit: object, field: str) -> object:
     if isinstance(commit, dict):
         return commit.get(field)
@@ -202,74 +192,6 @@ def _safe_non_negative_int(value: object) -> int:
     except (TypeError, ValueError):
         return 0
     return max(number, 0)
-
-
-def _extract_command(input_preview: object) -> str | None:
-    if not isinstance(input_preview, str):
-        return None
-
-    text = input_preview.strip()
-    if not text:
-        return None
-
-    parsed = _load_json_object(text)
-    if parsed is not None:
-        command = _find_command(parsed)
-        return command[:1000] if command else None
-
-    return text[:1000]
-
-
-def _load_json_object(text: str) -> dict | list | None:
-    try:
-        parsed = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-    return parsed if isinstance(parsed, dict | list) else None
-
-
-def _find_command(value: object) -> str | None:
-    if isinstance(value, dict):
-        for key in (
-            "command",
-            "cmd",
-            "script",
-            "commandString",
-            "raw_command",
-            "rawCommand",
-        ):
-            child = value.get(key)
-            command = _command_from_child(child)
-            if command:
-                return command
-        for key in ("argv", "args"):
-            child = value.get(key)
-            command = _command_from_child(child)
-            if command:
-                return command
-        for child in value.values():
-            command = _find_command(child)
-            if command:
-                return command
-    elif isinstance(value, list):
-        command = _command_from_child(value)
-        if command:
-            return command
-        for child in value:
-            command = _find_command(child)
-            if command:
-                return command
-    return None
-
-
-def _command_from_child(value: object) -> str | None:
-    if isinstance(value, str) and value.strip():
-        return value.strip()
-    if isinstance(value, list):
-        parts = [str(part).strip() for part in value if str(part).strip()]
-        if parts:
-            return " ".join(parts)
-    return None
 
 
 def _classify_operation(tool_name: str, command: str | None) -> str | None:
@@ -304,7 +226,7 @@ def _extract_paths(input_preview: object) -> set[str]:
     if not isinstance(input_preview, str):
         return set()
 
-    parsed = _load_json_object(input_preview.strip())
+    parsed = load_json_object(input_preview.strip())
     if parsed is None:
         return set()
 

@@ -12,6 +12,7 @@ from primer.common.models import (
     ModelUsage,
     SessionFacets,
     SessionMessage,
+    SessionRecoveryPath,
     ToolUsage,
 )
 from primer.common.models import (
@@ -41,6 +42,8 @@ from primer.common.schemas import (
     ProjectAnalytics,
     ProjectFriction,
     ProjectStats,
+    RecoveryOverview,
+    RecoveryPattern,
     RootCauseCluster,
     ToolAdoptionAnalytics,
     ToolAdoptionEntry,
@@ -1698,6 +1701,15 @@ def get_bottleneck_analytics(
             project_friction=[],
             friction_trends=[],
             root_cause_clusters=[],
+            recovery_overview=RecoveryOverview(
+                sessions_with_recovery_paths=0,
+                recovered_sessions=0,
+                abandoned_sessions=0,
+                unresolved_sessions=0,
+                recovery_rate=0.0,
+                avg_recovery_steps=0.0,
+            ),
+            recovery_patterns=[],
             total_sessions_analyzed=0,
             sessions_with_any_friction=0,
             overall_friction_rate=0.0,
@@ -1951,6 +1963,82 @@ def get_bottleneck_analytics(
         )[:8]
     ]
 
+    recovery_rows = (
+        db.query(SessionRecoveryPath).filter(SessionRecoveryPath.session_id.in_(session_ids)).all()
+    )
+    recovered_sessions = sum(1 for row in recovery_rows if row.recovery_result == "recovered")
+    abandoned_sessions = sum(1 for row in recovery_rows if row.recovery_result == "abandoned")
+    unresolved_sessions = max(len(recovery_rows) - recovered_sessions - abandoned_sessions, 0)
+    avg_recovery_steps = (
+        round(
+            sum(row.recovery_step_count for row in recovery_rows) / len(recovery_rows),
+            1,
+        )
+        if recovery_rows
+        else 0.0
+    )
+    recovery_overview = RecoveryOverview(
+        sessions_with_recovery_paths=len(recovery_rows),
+        recovered_sessions=recovered_sessions,
+        abandoned_sessions=abandoned_sessions,
+        unresolved_sessions=unresolved_sessions,
+        recovery_rate=round(recovered_sessions / len(recovery_rows), 3) if recovery_rows else 0.0,
+        avg_recovery_steps=avg_recovery_steps,
+    )
+
+    recovery_buckets: dict[str, dict] = {}
+    for row in recovery_rows:
+        for strategy in row.recovery_strategies or []:
+            bucket = recovery_buckets.setdefault(
+                strategy,
+                {
+                    "session_count": 0,
+                    "recovered_sessions": 0,
+                    "abandoned_sessions": 0,
+                    "unresolved_sessions": 0,
+                    "step_total": 0,
+                    "command_counts": Counter(),
+                },
+            )
+            bucket["session_count"] += 1
+            bucket["step_total"] += row.recovery_step_count
+            if row.recovery_result == "recovered":
+                bucket["recovered_sessions"] += 1
+            elif row.recovery_result == "abandoned":
+                bucket["abandoned_sessions"] += 1
+            else:
+                bucket["unresolved_sessions"] += 1
+            bucket["command_counts"].update(row.sample_recovery_commands or [])
+
+    recovery_patterns = [
+        RecoveryPattern(
+            strategy=strategy,
+            session_count=bucket["session_count"],
+            recovered_sessions=bucket["recovered_sessions"],
+            abandoned_sessions=bucket["abandoned_sessions"],
+            unresolved_sessions=bucket["unresolved_sessions"],
+            recovery_rate=(
+                round(bucket["recovered_sessions"] / bucket["session_count"], 3)
+                if bucket["session_count"] > 0
+                else 0.0
+            ),
+            avg_recovery_steps=(
+                round(bucket["step_total"] / bucket["session_count"], 1)
+                if bucket["session_count"] > 0
+                else 0.0
+            ),
+            sample_commands=[command for command, _ in bucket["command_counts"].most_common(3)],
+        )
+        for strategy, bucket in sorted(
+            recovery_buckets.items(),
+            key=lambda item: (
+                item[1]["recovered_sessions"],
+                item[1]["session_count"],
+            ),
+            reverse=True,
+        )[:5]
+    ]
+
     # Build project friction
     project_friction_list: list[ProjectFriction] = []
     for proj, total in project_sessions.items():
@@ -1992,6 +2080,8 @@ def get_bottleneck_analytics(
         project_friction=project_friction_list,
         friction_trends=friction_trends,
         root_cause_clusters=root_cause_clusters,
+        recovery_overview=recovery_overview,
+        recovery_patterns=recovery_patterns,
         total_sessions_analyzed=total_sessions,
         sessions_with_any_friction=sessions_with_count,
         overall_friction_rate=round(sessions_with_count / total_sessions, 3)

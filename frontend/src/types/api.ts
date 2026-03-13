@@ -27,6 +27,13 @@ export interface EngineerResponse {
 
 export type AgentType = 'claude_code' | 'codex_cli' | 'gemini_cli' | 'cursor'
 export type TelemetryParity = 'required' | 'optional' | 'unavailable'
+export type RecoveryStrategy =
+  | 'inspect_context'
+  | 'edit_fix'
+  | 'revert_or_reset'
+  | 'rerun_verification'
+  | 'delegate_or_parallelize'
+export type RecoveryResult = 'recovered' | 'abandoned' | 'unresolved'
 
 export interface SessionResponse {
   id: string
@@ -111,12 +118,24 @@ export interface SessionChangeShapeResponse {
   revert_indicator: boolean
 }
 
+export interface SessionRecoveryPathResponse {
+  friction_detected: boolean
+  first_friction_ordinal: number | null
+  recovery_step_count: number
+  recovery_strategies: RecoveryStrategy[] | null
+  recovery_result: RecoveryResult
+  final_outcome: string | null
+  last_verification_status: ExecutionEvidenceStatus | null
+  sample_recovery_commands: string[] | null
+}
+
 export interface SessionDetailResponse extends SessionResponse {
   facets: SessionFacetsResponse | null
   tool_usages: ToolUsageResponse[]
   model_usages: ModelUsageResponse[]
   execution_evidence: SessionExecutionEvidenceResponse[]
   change_shape: SessionChangeShapeResponse | null
+  recovery_path: SessionRecoveryPathResponse | null
 }
 
 export interface OverviewStats {
@@ -543,11 +562,33 @@ export interface RootCauseCluster {
   sample_details: string[]
 }
 
+export interface RecoveryOverview {
+  sessions_with_recovery_paths: number
+  recovered_sessions: number
+  abandoned_sessions: number
+  unresolved_sessions: number
+  recovery_rate: number | null
+  avg_recovery_steps: number | null
+}
+
+export interface RecoveryPattern {
+  strategy: RecoveryStrategy
+  session_count: number
+  recovered_sessions: number
+  abandoned_sessions: number
+  unresolved_sessions: number
+  recovery_rate: number | null
+  avg_recovery_steps: number | null
+  sample_commands: string[]
+}
+
 export interface BottleneckAnalytics {
   friction_impacts: FrictionImpact[]
   project_friction: ProjectFriction[]
   friction_trends: FrictionTrend[]
   root_cause_clusters: RootCauseCluster[]
+  recovery_overview: RecoveryOverview | null
+  recovery_patterns: RecoveryPattern[]
   total_sessions_analyzed: number
   sessions_with_any_friction: number
   overall_friction_rate: number

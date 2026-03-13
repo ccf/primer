@@ -145,6 +145,9 @@ class Session(Base):
     change_shape: Mapped["SessionChangeShape | None"] = relationship(
         back_populates="session", uselist=False, cascade="all, delete-orphan"
     )
+    recovery_path: Mapped["SessionRecoveryPath | None"] = relationship(
+        back_populates="session", uselist=False, cascade="all, delete-orphan"
+    )
     commits: Mapped[list["SessionCommit"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )
@@ -349,6 +352,31 @@ class SessionChangeShape(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     session: Mapped[Session] = relationship(back_populates="change_shape")
+
+
+class SessionRecoveryPath(Base):
+    __tablename__ = "session_recovery_paths"
+    __table_args__ = (
+        Index(
+            "ix_session_recovery_paths_session_id",
+            "session_id",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), nullable=False)
+    friction_detected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    first_friction_ordinal: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    recovery_step_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    recovery_strategies: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    recovery_result: Mapped[str] = mapped_column(String(20), nullable=False, default="unresolved")
+    final_outcome: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    last_verification_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    sample_recovery_commands: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    session: Mapped[Session] = relationship(back_populates="recovery_path")
 
 
 class Alert(Base):

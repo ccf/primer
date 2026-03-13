@@ -5,6 +5,7 @@ import { FrictionTrendChart } from "@/components/bottlenecks/friction-trend-char
 import { FrictionImpactTable } from "@/components/bottlenecks/friction-impact-table"
 import { ProjectFrictionTable } from "@/components/bottlenecks/project-friction-table"
 import { RootCauseClusterList } from "@/components/bottlenecks/root-cause-cluster-list"
+import { RecoveryPatternList } from "@/components/bottlenecks/recovery-pattern-list"
 import { CardSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleton"
 import { AlertTriangle } from "lucide-react"
 import type { DateRange } from "@/components/layout/date-range-picker"
@@ -51,6 +52,11 @@ export function FrictionPage({ teamId, dateRange }: FrictionPageProps) {
       </div>
 
       <RootCauseClusterList data={data.root_cause_clusters} />
+
+      <RecoveryPatternList
+        overview={data.recovery_overview}
+        patterns={data.recovery_patterns}
+      />
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-muted-foreground">By Project</h2>
