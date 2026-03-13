@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { SessionToolChart } from "@/components/sessions/session-tool-chart"
 import { SessionCostChart } from "@/components/sessions/session-cost-chart"
+import { RECOVERY_STRATEGY_LABELS } from "@/lib/constants"
 import type { SessionDetailResponse } from "@/types/api"
 import { formatDuration, formatTokens } from "@/lib/utils"
 
@@ -23,14 +24,6 @@ const EXECUTION_EVIDENCE_LABELS = {
   lint: "Lint",
   build: "Build",
   verification: "Verification",
-} as const
-
-const RECOVERY_STRATEGY_LABELS = {
-  inspect_context: "Inspect Context",
-  edit_fix: "Edit Fix",
-  revert_or_reset: "Revert or Reset",
-  rerun_verification: "Rerun Verification",
-  delegate_or_parallelize: "Delegate or Parallelize",
 } as const
 
 const RECOVERY_RESULT_BADGE: Record<
