@@ -1,6 +1,16 @@
 from __future__ import annotations
 
 import json
+import re
+
+REVERT_COMMAND_PATTERNS = (
+    re.compile(r"\bgit\s+checkout\b"),
+    re.compile(r"\bgit\s+restore\b"),
+    re.compile(r"\bgit\s+revert\b"),
+    re.compile(r"\bgit\s+reset\b"),
+    re.compile(r"\brollback\b"),
+    re.compile(r"\brevert\b"),
+)
 
 
 def message_payload(message: object) -> dict | None:

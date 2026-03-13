@@ -5,6 +5,7 @@ from collections import Counter
 from dataclasses import dataclass
 
 from primer.server.services.session_signal_parsing import (
+    REVERT_COMMAND_PATTERNS,
     extract_command,
     load_json_object,
     message_payload,
@@ -38,14 +39,6 @@ _PATH_FIELD_NAMES = {
     "old_file_path",
     "new_file_path",
 }
-_REVERT_COMMAND_PATTERNS = (
-    re.compile(r"\bgit\s+checkout\b"),
-    re.compile(r"\bgit\s+restore\b"),
-    re.compile(r"\bgit\s+revert\b"),
-    re.compile(r"\bgit\s+reset\b"),
-    re.compile(r"\brollback\b"),
-    re.compile(r"\brevert\b"),
-)
 
 
 @dataclass
@@ -219,7 +212,7 @@ def _classify_operation(tool_name: str, command: str | None) -> str | None:
 
 def _is_revert_command(command: str) -> bool:
     normalized_command = command.lower()
-    return any(pattern.search(normalized_command) for pattern in _REVERT_COMMAND_PATTERNS)
+    return any(pattern.search(normalized_command) for pattern in REVERT_COMMAND_PATTERNS)
 
 
 def _extract_paths(input_preview: object) -> set[str]:
