@@ -1,6 +1,16 @@
 from __future__ import annotations
 
 import json
+import re
+
+_REVERT_COMMAND_PATTERNS = (
+    re.compile(r"\bgit\s+checkout\b"),
+    re.compile(r"\bgit\s+restore\b"),
+    re.compile(r"\bgit\s+revert\b"),
+    re.compile(r"\bgit\s+reset\b"),
+    re.compile(r"\brollback\b"),
+    re.compile(r"\brevert\b"),
+)
 
 
 def message_payload(message: object) -> dict | None:
@@ -38,6 +48,11 @@ def extract_command(input_preview: object) -> str | None:
         return command[:1000] if command else None
 
     return text[:1000]
+
+
+def is_revert_command(command: str) -> bool:
+    normalized_command = command.lower()
+    return any(pattern.search(normalized_command) for pattern in _REVERT_COMMAND_PATTERNS)
 
 
 def load_json_object(text: str) -> object | None:

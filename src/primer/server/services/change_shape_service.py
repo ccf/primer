@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from primer.server.services.session_signal_parsing import (
     extract_command,
+    is_revert_command,
     load_json_object,
     message_payload,
 )
@@ -38,14 +39,6 @@ _PATH_FIELD_NAMES = {
     "old_file_path",
     "new_file_path",
 }
-_REVERT_COMMAND_PATTERNS = (
-    re.compile(r"\bgit\s+checkout\b"),
-    re.compile(r"\bgit\s+restore\b"),
-    re.compile(r"\bgit\s+revert\b"),
-    re.compile(r"\bgit\s+reset\b"),
-    re.compile(r"\brollback\b"),
-    re.compile(r"\brevert\b"),
-)
 
 
 @dataclass
@@ -99,7 +92,7 @@ def extract_change_shape(
 
             input_preview = tool_call.get("input_preview")
             command = extract_command(input_preview)
-            if command and _is_revert_command(command):
+            if command and is_revert_command(command):
                 revert_indicator = True
 
             operation = _classify_operation(tool_name, command)
@@ -215,11 +208,6 @@ def _classify_operation(tool_name: str, command: str | None) -> str | None:
     if re.search(r"(^|\s)mv\s", normalized_command):
         return "rename"
     return None
-
-
-def _is_revert_command(command: str) -> bool:
-    normalized_command = command.lower()
-    return any(pattern.search(normalized_command) for pattern in _REVERT_COMMAND_PATTERNS)
 
 
 def _extract_paths(input_preview: object) -> set[str]:
