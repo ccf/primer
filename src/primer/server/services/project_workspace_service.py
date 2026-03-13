@@ -11,6 +11,7 @@ from primer.common.models import (
     SessionCommit,
     SessionFacets,
     SessionMessage,
+    SessionWorkflowProfile,
     ToolUsage,
 )
 from primer.common.models import Session as SessionModel
@@ -1061,6 +1062,19 @@ def _build_workflow_summary(
         .filter(SessionCommit.session_id.in_(session_ids))
         .all()
     }
+    profiles_by_session = {
+        row.session_id: row
+        for row in (
+            db.query(
+                SessionWorkflowProfile.session_id,
+                SessionWorkflowProfile.fingerprint_id,
+                SessionWorkflowProfile.label,
+                SessionWorkflowProfile.steps,
+            )
+            .filter(SessionWorkflowProfile.session_id.in_(session_ids))
+            .all()
+        )
+    }
     impact_by_type = {item.friction_type: item.impact_score for item in friction_impacts}
 
     fingerprinted_sessions = 0
@@ -1072,13 +1086,20 @@ def _build_workflow_summary(
         facets = facets_by_session.get(session_id, {})
         session_type = facets.get("session_type")
         tool_counts = tool_counts_by_session.get(session_id, Counter())
-        steps = infer_workflow_steps(tool_counts, session_id in commit_session_ids)
+        profile = profiles_by_session.get(session_id)
+        steps = list(profile.steps or []) if profile is not None else []
+        if not steps:
+            steps = infer_workflow_steps(tool_counts, session_id in commit_session_ids)
         if not session_type and not steps:
             continue
 
         fingerprinted_sessions += 1
-        fingerprint_id = workflow_fingerprint_id(session_type, steps)
-        label = workflow_fingerprint_label(session_type, steps)
+        fingerprint_id = profile.fingerprint_id if profile is not None else None
+        if not fingerprint_id:
+            fingerprint_id = workflow_fingerprint_id(session_type, steps)
+        label = profile.label if profile is not None else None
+        if not label:
+            label = workflow_fingerprint_label(session_type, steps)
         label_by_key[fingerprint_id] = label
 
         bucket = fingerprints.setdefault(

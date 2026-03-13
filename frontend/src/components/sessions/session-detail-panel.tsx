@@ -44,10 +44,20 @@ const EXECUTION_STATUS_BADGE: Record<
   unknown: "secondary",
 }
 
+const WORKFLOW_ARCHETYPE_LABELS: Record<string, string> = {
+  debugging: "Debugging",
+  feature_delivery: "Feature Delivery",
+  refactor: "Refactor",
+  migration: "Migration",
+  docs: "Docs",
+  investigation: "Investigation",
+}
+
 export function SessionDetailPanel({ session }: SessionDetailPanelProps) {
   const { facets } = session
   const changeShape = session.change_shape
   const recoveryPath = session.recovery_path
+  const workflowProfile = session.workflow_profile
   const visibleNamedFiles = changeShape?.named_touched_files?.slice(0, 8) ?? []
   const hiddenChangeShapeFiles = changeShape
     ? changeShape.files_touched_count - visibleNamedFiles.length
@@ -231,6 +241,77 @@ export function SessionDetailPanel({ session }: SessionDetailPanelProps) {
                 </tbody>
               </table>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {workflowProfile && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Workflow Profile</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-lg border border-border/70 px-3 py-2">
+                <p className="text-xs text-muted-foreground">Archetype</p>
+                <p className="mt-1 text-sm font-semibold">
+                  {workflowProfile.archetype
+                    ? WORKFLOW_ARCHETYPE_LABELS[workflowProfile.archetype]
+                    : "-"}
+                </p>
+              </div>
+              <div className="rounded-lg border border-border/70 px-3 py-2">
+                <p className="text-xs text-muted-foreground">Fingerprint</p>
+                <p className="mt-1 text-sm font-semibold">
+                  {workflowProfile.label ?? "-"}
+                </p>
+              </div>
+              <div className="rounded-lg border border-border/70 px-3 py-2">
+                <p className="text-xs text-muted-foreground">Delegations</p>
+                <p className="mt-1 text-sm font-semibold">
+                  {workflowProfile.delegation_count}
+                </p>
+              </div>
+              <div className="rounded-lg border border-border/70 px-3 py-2">
+                <p className="text-xs text-muted-foreground">Verification Runs</p>
+                <p className="mt-1 text-sm font-semibold">
+                  {workflowProfile.verification_run_count}
+                </p>
+              </div>
+            </div>
+            {workflowProfile.steps && workflowProfile.steps.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Workflow Steps
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {workflowProfile.steps.map((step) => (
+                    <Badge key={step} variant="secondary">
+                      {step.replace(/_/g, " ")}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            {workflowProfile.top_tools && workflowProfile.top_tools.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Top Tools
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {workflowProfile.top_tools.map((tool) => (
+                    <Badge key={tool} variant="outline">
+                      {tool}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            {workflowProfile.archetype_reason && (
+              <p className="text-sm text-muted-foreground">
+                {workflowProfile.archetype_reason}
+              </p>
+            )}
           </CardContent>
         </Card>
       )}

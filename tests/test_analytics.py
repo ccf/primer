@@ -808,6 +808,58 @@ def test_session_detail_includes_recovery_path_when_present(
     assert data["recovery_path"]["last_verification_status"] == "passed"
 
 
+def test_session_detail_includes_workflow_profile_when_present(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    sid = _ingest_session(
+        client,
+        api_key,
+        tool_usages=[
+            {"tool_name": "Read", "call_count": 2},
+            {"tool_name": "Edit", "call_count": 3},
+            {"tool_name": "Bash", "call_count": 2},
+        ],
+        messages=[
+            {
+                "ordinal": 0,
+                "role": "assistant",
+                "tool_calls": [{"name": "Bash", "input_preview": '{"command":"pytest -q"}'}],
+            },
+            {
+                "ordinal": 1,
+                "role": "tool_result",
+                "tool_results": [{"name": "Bash", "output_preview": "2 passed in 0.12s"}],
+            },
+        ],
+        facets={"outcome": "success", "session_type": "implementation"},
+        commits=[
+            {
+                "sha": "abc123",
+                "message": "Implement billing export",
+                "files_changed": 2,
+                "lines_added": 25,
+                "lines_deleted": 4,
+            }
+        ],
+    )
+
+    response = client.get(f"/api/v1/sessions/{sid}", headers=admin_headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["workflow_profile"]["archetype"] == "feature_delivery"
+    assert data["workflow_profile"]["archetype_source"] == "session_type"
+    assert data["workflow_profile"]["steps"] == [
+        "read",
+        "edit",
+        "execute",
+        "test",
+        "ship",
+    ]
+    assert data["workflow_profile"]["verification_run_count"] == 1
+
+
 def test_cost_analytics(client, engineer_with_key, admin_headers):
     _eng, api_key = engineer_with_key
     _ingest_session(

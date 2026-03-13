@@ -98,9 +98,9 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] [P0] Cursor transcript and tool-call extraction mapped onto the normalized session model
 - [ ] [P1] Cursor native telemetry enrichment for approvals, change shape, and context-usage signals
 - [ ] [P1] Cursor reliable token and model-usage extraction once source telemetry is trustworthy
-- [ ] [P1] Workflow fingerprinting: infer common sequences like search -> read -> edit -> test -> fix
+- [x] [P1] Workflow fingerprinting: infer common sequences like search -> read -> edit -> test -> fix
 - [ ] [P1] Cursor-specific workflow fingerprinting and session archetype mapping
-- [ ] [P1] Session archetype detection: debugging, feature delivery, refactor, migration, docs, investigation
+- [x] [P1] Session archetype detection: debugging, feature delivery, refactor, migration, docs, investigation
 - [ ] [P1] Delegation graph capture for multi-agent and subagent workflows
 - [ ] [P2] Exemplar session library for high-value workflows and onboarding examples
 - [ ] [P2] Prompt, skill, and template reuse analytics by workflow and outcome

@@ -17,6 +17,7 @@ from primer.common.models import (
     SessionFacets,
     SessionMessage,
     SessionRecoveryPath,
+    SessionWorkflowProfile,
     ToolUsage,
 )
 from primer.common.models import (
@@ -27,6 +28,7 @@ from primer.common.utils import parse_repo_full_name
 from primer.server.services.change_shape_service import extract_change_shape
 from primer.server.services.execution_evidence_service import extract_execution_evidence
 from primer.server.services.recovery_path_service import extract_recovery_path
+from primer.server.services.workflow_profile_service import extract_session_workflow_profile
 
 logger = logging.getLogger(__name__)
 
@@ -190,6 +192,8 @@ def upsert_session(db: Session, engineer_id: str, payload: SessionIngestPayload)
     if payload.messages is not None or payload.facets is not None:
         _upsert_recovery_path(db, session.id)
 
+    _upsert_workflow_profile(db, session.id)
+
     db.flush()
     return created
 
@@ -314,6 +318,65 @@ def _upsert_recovery_path(db: Session, session_id: str) -> None:
     record.final_outcome = derived.final_outcome
     record.last_verification_status = derived.last_verification_status
     record.sample_recovery_commands = derived.sample_recovery_commands
+    db.flush()
+
+
+def _upsert_workflow_profile(db: Session, session_id: str) -> None:
+    db.flush()
+
+    session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+    if session is None:
+        return
+
+    tool_usages = db.query(ToolUsage).filter(ToolUsage.session_id == session_id).all()
+    execution_evidence = (
+        db.query(SessionExecutionEvidence)
+        .filter(SessionExecutionEvidence.session_id == session_id)
+        .order_by(SessionExecutionEvidence.ordinal)
+        .all()
+    )
+    change_shape = (
+        db.query(SessionChangeShape).filter(SessionChangeShape.session_id == session_id).first()
+    )
+    recovery_path = (
+        db.query(SessionRecoveryPath).filter(SessionRecoveryPath.session_id == session_id).first()
+    )
+    facets = db.query(SessionFacets).filter(SessionFacets.session_id == session_id).first()
+    has_commit = db.query(SessionCommit.id).filter(SessionCommit.session_id == session_id).first()
+    derived = extract_session_workflow_profile(
+        session,
+        tool_usages,
+        execution_evidence,
+        change_shape=change_shape,
+        recovery_path=recovery_path,
+        facets=facets,
+        has_commit=has_commit is not None,
+    )
+
+    existing = (
+        db.query(SessionWorkflowProfile)
+        .filter(SessionWorkflowProfile.session_id == session_id)
+        .first()
+    )
+    if derived is None:
+        if existing is not None:
+            db.delete(existing)
+            db.flush()
+        return
+
+    record = existing or SessionWorkflowProfile(session_id=session_id)
+    if existing is None:
+        db.add(record)
+
+    record.fingerprint_id = derived.fingerprint_id
+    record.label = derived.label
+    record.steps = derived.steps
+    record.archetype = derived.archetype
+    record.archetype_source = derived.archetype_source
+    record.archetype_reason = derived.archetype_reason
+    record.top_tools = derived.top_tools
+    record.delegation_count = derived.delegation_count
+    record.verification_run_count = derived.verification_run_count
     db.flush()
 
 

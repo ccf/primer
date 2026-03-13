@@ -148,6 +148,9 @@ class Session(Base):
     recovery_path: Mapped["SessionRecoveryPath | None"] = relationship(
         back_populates="session", uselist=False, cascade="all, delete-orphan"
     )
+    workflow_profile: Mapped["SessionWorkflowProfile | None"] = relationship(
+        back_populates="session", uselist=False, cascade="all, delete-orphan"
+    )
     commits: Mapped[list["SessionCommit"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )
@@ -377,6 +380,32 @@ class SessionRecoveryPath(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     session: Mapped[Session] = relationship(back_populates="recovery_path")
+
+
+class SessionWorkflowProfile(Base):
+    __tablename__ = "session_workflow_profiles"
+    __table_args__ = (
+        Index(
+            "ix_session_workflow_profiles_session_id",
+            "session_id",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), nullable=False)
+    fingerprint_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    label: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    steps: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    archetype: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    archetype_source: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    archetype_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    top_tools: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    delegation_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    verification_run_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    session: Mapped[Session] = relationship(back_populates="workflow_profile")
 
 
 class Alert(Base):

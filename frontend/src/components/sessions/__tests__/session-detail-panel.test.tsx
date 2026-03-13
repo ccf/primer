@@ -90,6 +90,17 @@ const baseSession: SessionDetailResponse = {
     last_verification_status: "passed",
     sample_recovery_commands: ["pytest -q"],
   },
+  workflow_profile: {
+    fingerprint_id: "feature_delivery::read+edit+execute+test+ship",
+    label: "feature delivery: read -> edit -> execute -> test -> ship",
+    steps: ["read", "edit", "execute", "test", "ship"],
+    archetype: "feature_delivery",
+    archetype_source: "session_type",
+    archetype_reason: "Mapped from the extracted session type 'code_modification'.",
+    top_tools: ["Read", "Edit"],
+    delegation_count: 0,
+    verification_run_count: 1,
+  },
 }
 
 describe("SessionDetailPanel", () => {
@@ -165,6 +176,16 @@ describe("SessionDetailPanel", () => {
     expect(screen.getByText("Sample Recovery Commands")).toBeInTheDocument()
   })
 
+  it("renders workflow profile when present", () => {
+    render(<SessionDetailPanel session={baseSession} />)
+
+    expect(screen.getByText("Workflow Profile")).toBeInTheDocument()
+    expect(screen.getByText("Feature Delivery")).toBeInTheDocument()
+    expect(screen.getByText("Workflow Steps")).toBeInTheDocument()
+    expect(screen.getByText("Top Tools")).toBeInTheDocument()
+    expect(screen.getByText("Mapped from the extracted session type 'code_modification'.")).toBeInTheDocument()
+  })
+
   it("counts hidden change-shape files from both named overflow and inferred files", () => {
     render(
       <SessionDetailPanel
@@ -211,5 +232,18 @@ describe("SessionDetailPanel", () => {
     render(<SessionDetailPanel session={sessionNoFacets} />)
 
     expect(screen.queryByText("Facets")).not.toBeInTheDocument()
+  })
+
+  it("does not render workflow profile card when null", () => {
+    render(
+      <SessionDetailPanel
+        session={{
+          ...baseSession,
+          workflow_profile: null,
+        }}
+      />,
+    )
+
+    expect(screen.queryByText("Workflow Profile")).not.toBeInTheDocument()
   })
 })
