@@ -6,18 +6,11 @@ from dataclasses import dataclass
 from primer.common.facet_taxonomy import canonical_outcome, is_success_outcome
 from primer.server.services.session_signal_parsing import (
     extract_command,
+    is_revert_command,
     message_payload,
     normalize_tool_name,
 )
 
-_REVERT_COMMAND_PATTERNS = (
-    re.compile(r"\bgit\s+checkout\b"),
-    re.compile(r"\bgit\s+restore\b"),
-    re.compile(r"\bgit\s+revert\b"),
-    re.compile(r"\bgit\s+reset\b"),
-    re.compile(r"\brollback\b"),
-    re.compile(r"\brevert\b"),
-)
 _INSPECT_TOOL_KEYWORDS = ("read", "grep", "glob", "search", "fetch", "open")
 _EDIT_TOOL_KEYWORDS = (
     "edit",
@@ -213,7 +206,7 @@ def _classify_recovery_strategies(tool_name: str, command: str | None) -> set[st
     normalized_command = command.lower()
     if any(pattern.search(normalized_command) for pattern in _INSPECT_COMMAND_PATTERNS):
         strategies.add("inspect_context")
-    if any(pattern.search(normalized_command) for pattern in _REVERT_COMMAND_PATTERNS):
+    if is_revert_command(command):
         strategies.add("revert_or_reset")
     if _looks_like_edit_command(normalized_command):
         strategies.add("edit_fix")
