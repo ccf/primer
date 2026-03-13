@@ -4,6 +4,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 
+from primer.common.tool_classification import classify_tool
 from primer.server.services.workflow_patterns import (
     infer_workflow_steps,
     workflow_fingerprint_id,
@@ -324,7 +325,7 @@ def _looks_like_investigation(
 
 def _is_delegation_tool(tool_name: str) -> bool:
     normalized = tool_name.lower()
-    return any(
+    return classify_tool(tool_name) in {"orchestration", "skill"} or any(
         hint in normalized
         for hint in (
             "task",
