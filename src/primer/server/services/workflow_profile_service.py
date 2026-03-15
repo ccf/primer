@@ -4,8 +4,8 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 
-from primer.common.tool_classification import classify_tool
 from primer.server.services.workflow_patterns import (
+    _is_delegate_tool,
     infer_workflow_steps,
     workflow_fingerprint_id,
     workflow_fingerprint_label,
@@ -28,7 +28,7 @@ _SESSION_TYPE_ARCHETYPES = {
     "research": "investigation",
 }
 _DOC_TEXT_RE = re.compile(r"\b(?:docs?|documentation|readme|changelog|guide)\b")
-_MIGRATION_TEXT_RE = re.compile(r"\b(?:migrat\w*|upgrade|moderniz\w*|deprecat\w*|port)\b")
+_MIGRATION_TEXT_RE = re.compile(r"\b(?:migrat\w*|upgrade|moderniz\w*|deprecat\w*|port(?:ed|ing))\b")
 
 
 @dataclass
@@ -92,7 +92,7 @@ def extract_session_workflow_profile(
     label = workflow_fingerprint_label(fingerprint_type, steps) if fingerprint_id else None
     top_tools = [tool_name for tool_name, _count in tool_counts.most_common(4)]
     delegation_count = sum(
-        count for tool_name, count in tool_counts.items() if _is_delegation_tool(tool_name)
+        count for tool_name, count in tool_counts.items() if _is_delegate_tool(tool_name)
     )
     verification_run_count = sum(
         1
@@ -321,21 +321,6 @@ def _looks_like_investigation(
         return False
     return bool(steps) and set(steps).issubset(
         {"search", "read", "execute", "delegate", "integrate"}
-    )
-
-
-def _is_delegation_tool(tool_name: str) -> bool:
-    normalized = tool_name.lower()
-    return classify_tool(tool_name) in {"orchestration", "skill"} or any(
-        hint in normalized
-        for hint in (
-            "task",
-            "agent",
-            "delegate",
-            "team",
-            "sendmessage",
-            "send_message",
-        )
     )
 
 
