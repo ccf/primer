@@ -52,7 +52,7 @@ Primer is no longer just a session dashboard. The product loop is:
 
 ### Capture Layer
 
-Code lives in [`src/primer/hook/`](/Users/ccf/git/primer/src/primer/hook).
+Code lives in [`src/primer/hook/`](../src/primer/hook).
 
 - Agent-specific extractors handle Claude Code, Codex CLI, Gemini CLI, and Cursor.
 - Claude Code uses a SessionEnd hook.
@@ -62,7 +62,7 @@ Code lives in [`src/primer/hook/`](/Users/ccf/git/primer/src/primer/hook).
 
 ### API Platform
 
-Code lives in [`src/primer/server/`](/Users/ccf/git/primer/src/primer/server).
+Code lives in [`src/primer/server/`](../src/primer/server).
 
 - FastAPI app with routers for auth, ingest, sessions, analytics, alerts, interventions, admin,
   explorer, webhooks, and FinOps.
@@ -73,7 +73,7 @@ Code lives in [`src/primer/server/`](/Users/ccf/git/primer/src/primer/server).
 
 ### Dashboard
 
-Code lives in [`frontend/src/`](/Users/ccf/git/primer/frontend/src).
+Code lives in [`frontend/src/`](../frontend/src).
 
 - Leadership sees organization, quality, friction, maturity, FinOps, growth, projects, and
   interventions.
@@ -85,7 +85,7 @@ Code lives in [`frontend/src/`](/Users/ccf/git/primer/frontend/src).
 
 ### MCP Sidecar
 
-Code lives in [`src/primer/mcp/`](/Users/ccf/git/primer/src/primer/mcp).
+Code lives in [`src/primer/mcp/`](../src/primer/mcp).
 
 - Syncs local sessions to the server.
 - Exposes personal stats, team overview, friction reports, recommendations, and coaching.
@@ -147,7 +147,7 @@ These support anomaly detection, cost controls, narrative synthesis, and closed-
 Primer treats source parity as a first-class architecture concern.
 
 The capability registry in
-[`src/primer/common/source_capabilities.py`](/Users/ccf/git/primer/src/primer/common/source_capabilities.py)
+[`src/primer/common/source_capabilities.py`](../src/primer/common/source_capabilities.py)
 declares, per agent type, whether telemetry is:
 
 - `required`
