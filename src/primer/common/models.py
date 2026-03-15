@@ -155,6 +155,10 @@ class Session(Base):
         back_populates="session", cascade="all, delete-orphan"
     )
 
+    @property
+    def has_workflow_profile(self) -> bool:
+        return self.workflow_profile is not None
+
 
 class SessionFacets(Base):
     __tablename__ = "session_facets"

@@ -11,6 +11,7 @@ from primer.common.models import (
     SessionCommit,
     SessionFacets,
     SessionMessage,
+    SessionWorkflowProfile,
     ToolUsage,
 )
 from primer.common.models import Session as SessionModel
@@ -605,6 +606,130 @@ def test_normalize_facets_endpoint_audits_non_dry_run(
         "rows_scanned": 1,
         "rows_updated": 1,
         "remaining_legacy_rows": 0,
+    }
+
+
+def test_backfill_workflow_profiles_dry_run_reports_missing_profiles_without_writing(
+    client, admin_headers, engineer_with_key, db_session
+):
+    _eng, api_key = engineer_with_key
+    session_id = _ingest_session(
+        client,
+        api_key,
+        tool_usages=[
+            {"tool_name": "Read", "call_count": 2},
+            {"tool_name": "Edit", "call_count": 1},
+        ],
+        facets={"session_type": "bug_fix", "outcome": "success"},
+        commits=[
+            {
+                "sha": uuid.uuid4().hex[:12],
+                "message": "fix: restore workflow profile",
+                "committed_at": datetime.now(UTC).isoformat(),
+                "files_changed": 1,
+                "lines_added": 5,
+                "lines_deleted": 1,
+            }
+        ],
+    )
+
+    profile = (
+        db_session.query(SessionWorkflowProfile)
+        .filter(SessionWorkflowProfile.session_id == session_id)
+        .one()
+    )
+    db_session.delete(profile)
+    db_session.flush()
+
+    response = client.post(
+        "/api/v1/admin/backfill-workflow-profiles?limit=10&dry_run=true",
+        headers=admin_headers,
+    )
+    assert response.status_code == 200
+    assert response.json() == {
+        "sessions_scanned": 1,
+        "profiles_created": 1,
+        "profiles_updated": 0,
+        "profiles_deleted": 0,
+        "sessions_unchanged": 0,
+        "sessions_skipped": 0,
+    }
+    assert (
+        db_session.query(SessionWorkflowProfile)
+        .filter(SessionWorkflowProfile.session_id == session_id)
+        .first()
+        is None
+    )
+
+
+def test_backfill_workflow_profiles_recompute_deletes_stale_profiles_and_audits(
+    client, admin_headers, engineer_with_key, db_session
+):
+    eng, _api_key = engineer_with_key
+    session = SessionModel(
+        id=str(uuid.uuid4()),
+        engineer_id=eng.id,
+        started_at=datetime.now(UTC),
+        duration_seconds=60.0,
+        message_count=1,
+    )
+    db_session.add(session)
+    db_session.flush()
+    db_session.add(
+        SessionWorkflowProfile(
+            session_id=session.id,
+            fingerprint_id="stale::read",
+            label="stale: read",
+            steps=["read"],
+            archetype="investigation",
+            archetype_source="heuristic",
+            archetype_reason="Stale workflow profile",
+            top_tools=["Read"],
+            delegation_count=0,
+            verification_run_count=0,
+        )
+    )
+    db_session.flush()
+
+    response = client.post(
+        "/api/v1/admin/backfill-workflow-profiles?limit=10&recompute=true&dry_run=false",
+        headers=admin_headers,
+    )
+    assert response.status_code == 200
+    assert response.json() == {
+        "sessions_scanned": 1,
+        "profiles_created": 0,
+        "profiles_updated": 0,
+        "profiles_deleted": 1,
+        "sessions_unchanged": 0,
+        "sessions_skipped": 0,
+    }
+    assert (
+        db_session.query(SessionWorkflowProfile)
+        .filter(SessionWorkflowProfile.session_id == session.id)
+        .first()
+        is None
+    )
+
+    audit_log = (
+        db_session.query(AuditLog)
+        .filter(
+            AuditLog.action == "backfill",
+            AuditLog.resource_type == "session_workflow_profiles",
+        )
+        .one()
+    )
+    assert audit_log.actor_role == "admin"
+    assert audit_log.details == {
+        "limit": 10,
+        "recompute": True,
+        "dry_run": False,
+        "sessions_scanned": 1,
+        "profiles_created": 0,
+        "profiles_updated": 0,
+        "profiles_deleted": 1,
+        "sessions_unchanged": 0,
+        "sessions_skipped": 0,
     }
 
 

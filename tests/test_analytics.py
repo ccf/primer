@@ -671,12 +671,31 @@ def test_daily_stats_with_team_filter(client, engineer_with_key, admin_headers):
 
 def test_sessions_list(client, engineer_with_key, admin_headers):
     _eng, api_key = engineer_with_key
-    sid = _ingest_session(client, api_key, project_name="my-project")
+    sid = _ingest_session(
+        client,
+        api_key,
+        project_name="my-project",
+        tool_usages=[
+            {"tool_name": "Read", "call_count": 2},
+            {"tool_name": "Edit", "call_count": 1},
+        ],
+        commits=[
+            {
+                "sha": "session-list-workflow",
+                "message": "feat: workflow session",
+                "files_changed": 1,
+                "lines_added": 5,
+                "lines_deleted": 1,
+            }
+        ],
+    )
 
     r = client.get("/api/v1/sessions", headers=admin_headers)
     assert r.status_code == 200
     data = r.json()["items"]
-    assert any(s["id"] == sid for s in data)
+    session = next(s for s in data if s["id"] == sid)
+    assert session["has_facets"] is False
+    assert session["has_workflow_profile"] is True
 
 
 def test_session_detail(client, engineer_with_key, admin_headers):

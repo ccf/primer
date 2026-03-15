@@ -2,7 +2,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from primer.common.database import get_db
 from primer.common.models import Engineer, SessionFacets, SessionMessage
@@ -36,7 +36,7 @@ def list_sessions(
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(get_auth_context),
 ):
-    q = db.query(SessionModel)
+    q = db.query(SessionModel).options(selectinload(SessionModel.workflow_profile))
 
     # Role-based scoping
     if auth.role == "engineer":

@@ -3,13 +3,27 @@ from __future__ import annotations
 import re
 from collections import Counter
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Literal
 
+from primer.common.models import Session as SessionModel
+from primer.common.models import (
+    SessionChangeShape,
+    SessionCommit,
+    SessionExecutionEvidence,
+    SessionFacets,
+    SessionRecoveryPath,
+    SessionWorkflowProfile,
+    ToolUsage,
+)
 from primer.server.services.workflow_patterns import (
     infer_workflow_steps,
     is_delegate_tool,
     workflow_fingerprint_id,
     workflow_fingerprint_label,
 )
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 _SESSION_TYPE_ARCHETYPES = {
     "bug_fix": "debugging",
@@ -42,6 +56,9 @@ class WorkflowProfileRecord:
     top_tools: list[str]
     delegation_count: int
     verification_run_count: int
+
+
+WorkflowProfileAction = Literal["created", "updated", "deleted", "unchanged", "skipped"]
 
 
 def extract_session_workflow_profile(
@@ -122,6 +139,111 @@ def extract_session_workflow_profile(
     )
 
 
+def derive_session_workflow_profile(db: Session, session_id: str) -> WorkflowProfileRecord | None:
+    db.flush()
+
+    session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+    if session is None:
+        return None
+
+    tool_usages = db.query(ToolUsage).filter(ToolUsage.session_id == session_id).all()
+    execution_evidence = (
+        db.query(SessionExecutionEvidence)
+        .filter(SessionExecutionEvidence.session_id == session_id)
+        .order_by(SessionExecutionEvidence.ordinal)
+        .all()
+    )
+    change_shape = (
+        db.query(SessionChangeShape).filter(SessionChangeShape.session_id == session_id).first()
+    )
+    recovery_path = (
+        db.query(SessionRecoveryPath).filter(SessionRecoveryPath.session_id == session_id).first()
+    )
+    facets = db.query(SessionFacets).filter(SessionFacets.session_id == session_id).first()
+    has_commit = db.query(SessionCommit.id).filter(SessionCommit.session_id == session_id).first()
+    return extract_session_workflow_profile(
+        session,
+        tool_usages,
+        execution_evidence,
+        change_shape=change_shape,
+        recovery_path=recovery_path,
+        facets=facets,
+        has_commit=has_commit is not None,
+    )
+
+
+def upsert_session_workflow_profile(db: Session, session_id: str) -> WorkflowProfileAction:
+    derived = derive_session_workflow_profile(db, session_id)
+    existing = (
+        db.query(SessionWorkflowProfile)
+        .filter(SessionWorkflowProfile.session_id == session_id)
+        .first()
+    )
+    action = _classify_workflow_profile_action(existing, derived)
+
+    if action == "skipped" or action == "unchanged":
+        return action
+
+    if action == "deleted":
+        db.delete(existing)
+        db.flush()
+        return action
+
+    values = _workflow_profile_values(derived)
+    record = existing or SessionWorkflowProfile(session_id=session_id)
+    if existing is None:
+        db.add(record)
+
+    for field, value in values.items():
+        setattr(record, field, value)
+    db.flush()
+    return action
+
+
+def backfill_workflow_profiles(
+    db: Session,
+    *,
+    limit: int = 500,
+    recompute: bool = False,
+    dry_run: bool = True,
+) -> dict[str, int]:
+    session_ids = _workflow_profile_candidate_session_ids(db, limit=limit, recompute=recompute)
+
+    summary = {
+        "sessions_scanned": len(session_ids),
+        "profiles_created": 0,
+        "profiles_updated": 0,
+        "profiles_deleted": 0,
+        "sessions_unchanged": 0,
+        "sessions_skipped": 0,
+    }
+
+    for session_id in session_ids:
+        if dry_run:
+            derived = derive_session_workflow_profile(db, session_id)
+            existing = (
+                db.query(SessionWorkflowProfile)
+                .filter(SessionWorkflowProfile.session_id == session_id)
+                .first()
+            )
+            action = _classify_workflow_profile_action(existing, derived)
+        else:
+            action = upsert_session_workflow_profile(db, session_id)
+
+        if action == "created":
+            summary["profiles_created"] += 1
+        elif action == "updated":
+            summary["profiles_updated"] += 1
+        elif action == "deleted":
+            summary["profiles_deleted"] += 1
+        elif action == "unchanged":
+            summary["sessions_unchanged"] += 1
+        else:
+            summary["sessions_skipped"] += 1
+
+    return summary
+
+
 def _infer_archetype(
     session: object,
     facets: object | None,
@@ -194,6 +316,45 @@ def _tool_counts(tool_usages: list[object]) -> Counter[str]:
         call_count = _int_attr(usage, "call_count")
         counts[tool_name] += max(call_count, 0)
     return counts
+
+
+def _workflow_profile_candidate_session_ids(
+    db: Session, *, limit: int, recompute: bool
+) -> list[str]:
+    query = db.query(SessionModel.id).order_by(SessionModel.created_at.asc(), SessionModel.id.asc())
+    if not recompute:
+        query = query.outerjoin(
+            SessionWorkflowProfile, SessionWorkflowProfile.session_id == SessionModel.id
+        ).filter(SessionWorkflowProfile.id.is_(None))
+    return [row.id for row in query.limit(limit).all()]
+
+
+def _workflow_profile_values(record: WorkflowProfileRecord) -> dict[str, object]:
+    return {
+        "fingerprint_id": record.fingerprint_id,
+        "label": record.label,
+        "steps": record.steps,
+        "archetype": record.archetype,
+        "archetype_source": record.archetype_source,
+        "archetype_reason": record.archetype_reason,
+        "top_tools": record.top_tools,
+        "delegation_count": record.delegation_count,
+        "verification_run_count": record.verification_run_count,
+    }
+
+
+def _classify_workflow_profile_action(
+    existing: SessionWorkflowProfile | None, derived: WorkflowProfileRecord | None
+) -> WorkflowProfileAction:
+    if derived is None:
+        return "deleted" if existing is not None else "skipped"
+    if existing is None:
+        return "created"
+
+    values = _workflow_profile_values(derived)
+    if any(getattr(existing, field) != value for field, value in values.items()):
+        return "updated"
+    return "unchanged"
 
 
 def _string_attr(value: object | None, field: str) -> str | None:

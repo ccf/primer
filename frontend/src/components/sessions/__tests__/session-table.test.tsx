@@ -29,6 +29,7 @@ const session: SessionResponse = {
   first_prompt: null,
   summary: null,
   has_facets: true,
+  has_workflow_profile: true,
   created_at: "2025-01-15T10:00:00",
 }
 
@@ -44,7 +45,7 @@ describe("SessionTable", () => {
   it("renders table headers", () => {
     renderWithRouter([session])
 
-    const headers = ["Project", "Model", "Started", "Duration", "Messages", "Tools", "Tokens", "Facets"]
+    const headers = ["Project", "Model", "Started", "Duration", "Messages", "Tools", "Tokens", "Analysis"]
     for (const header of headers) {
       expect(screen.getByText(header)).toBeInTheDocument()
     }
@@ -57,16 +58,33 @@ describe("SessionTable", () => {
     expect(screen.getByText("10")).toBeInTheDocument()
   })
 
-  it("renders 'Yes' badge when has_facets is true", () => {
+  it("renders 'Analyzed' badge when has_facets is true", () => {
     renderWithRouter([session])
 
-    expect(screen.getByText("Yes")).toBeInTheDocument()
+    expect(screen.getByText("Analyzed")).toBeInTheDocument()
   })
 
-  it("renders 'No' badge when has_facets is false", () => {
-    const noFacetsSession: SessionResponse = { ...session, id: "s2", has_facets: false }
-    renderWithRouter([noFacetsSession])
+  it("renders 'Workflow' badge when workflow analysis exists without facets", () => {
+    const workflowSession: SessionResponse = {
+      ...session,
+      id: "s2",
+      has_facets: false,
+      has_workflow_profile: true,
+    }
+    renderWithRouter([workflowSession])
 
-    expect(screen.getByText("No")).toBeInTheDocument()
+    expect(screen.getByText("Workflow")).toBeInTheDocument()
+  })
+
+  it("renders 'Pending' badge when no analysis exists yet", () => {
+    const pendingSession: SessionResponse = {
+      ...session,
+      id: "s3",
+      has_facets: false,
+      has_workflow_profile: false,
+    }
+    renderWithRouter([pendingSession])
+
+    expect(screen.getByText("Pending")).toBeInTheDocument()
   })
 })
