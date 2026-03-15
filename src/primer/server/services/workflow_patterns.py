@@ -6,7 +6,7 @@ _SEARCH_HINTS = ("grep", "glob", "search", "find", "ripgrep")
 _READ_HINTS = ("read", "fetch", "open", "cat", "view")
 _EDIT_HINTS = ("edit", "write", "patch", "replace", "insert", "delete", "remove", "rename", "move")
 _EXECUTE_HINTS = ("bash", "terminal", "exec", "command")
-_DELEGATE_HINTS = ("task", "agent", "delegate", "team", "sendmessage", "send_message")
+_DELEGATE_HINTS = ("agent", "delegate", "team", "sendmessage", "send_message")
 _INTEGRATE_HINTS = ("mcp", "plugin")
 
 
