@@ -13,6 +13,7 @@ from primer.common.models import (
     ReviewFinding,
     SessionCommit,
     SessionFacets,
+    SessionWorkflowProfile,
     ToolUsage,
 )
 from primer.common.models import Session as SessionModel
@@ -1049,10 +1050,13 @@ def _compute_quality_attribution(db: Session, session_id_q) -> list[QualityAttri
             SessionModel.agent_type,
             SessionModel.permission_mode,
             SessionFacets.session_type,
+            SessionWorkflowProfile.archetype.label("workflow_archetype"),
+            SessionWorkflowProfile.label.label("workflow_label"),
             SessionCommit.pull_request_id,
         )
         .select_from(SessionModel)
         .outerjoin(SessionFacets, SessionFacets.session_id == SessionModel.id)
+        .outerjoin(SessionWorkflowProfile, SessionWorkflowProfile.session_id == SessionModel.id)
         .join(SessionCommit, SessionCommit.session_id == SessionModel.id)
         .filter(
             SessionModel.id.in_(session_id_q),
@@ -1102,12 +1106,16 @@ def _compute_quality_attribution(db: Session, session_id_q) -> list[QualityAttri
     groups: dict[tuple[str, str], dict[str, set[str]]] = {}
     for row in session_pr_rows:
         tool_breadth = _tool_breadth_label(tool_counts.get(row.session_id, 0))
-        behaviors = (
+        behaviors = [
             ("session_type", row.session_type or "unknown"),
             ("agent_type", row.agent_type or "unknown"),
             ("permission_mode", row.permission_mode or "unknown"),
             ("tool_breadth", tool_breadth),
-        )
+        ]
+        if row.workflow_archetype:
+            behaviors.append(("workflow_archetype", row.workflow_archetype))
+        if row.workflow_label:
+            behaviors.append(("workflow_fingerprint", row.workflow_label))
         for dimension, label in behaviors:
             group = groups.setdefault(
                 (dimension, label),
@@ -1122,6 +1130,8 @@ def _compute_quality_attribution(db: Session, session_id_q) -> list[QualityAttri
         "agent_type": 1,
         "permission_mode": 2,
         "tool_breadth": 3,
+        "workflow_archetype": 4,
+        "workflow_fingerprint": 5,
     }
 
     results: list[QualityAttributionRow] = []
@@ -1199,11 +1209,14 @@ def _compute_quality_attribution_for_session_scope(
             SessionModel.agent_type,
             SessionModel.permission_mode,
             SessionFacets.session_type,
+            SessionWorkflowProfile.archetype.label("workflow_archetype"),
+            SessionWorkflowProfile.label.label("workflow_label"),
             SessionCommit.pull_request_id,
         )
         .select_from(SessionModel)
         .join(session_scope, SessionModel.id == session_scope.c.id)
         .outerjoin(SessionFacets, SessionFacets.session_id == SessionModel.id)
+        .outerjoin(SessionWorkflowProfile, SessionWorkflowProfile.session_id == SessionModel.id)
         .join(SessionCommit, SessionCommit.session_id == SessionModel.id)
         .filter(SessionCommit.pull_request_id.isnot(None))
         .distinct()
@@ -1250,12 +1263,16 @@ def _compute_quality_attribution_for_session_scope(
     groups: dict[tuple[str, str], dict[str, set[str]]] = {}
     for row in session_pr_rows:
         tool_breadth = _tool_breadth_label(tool_counts.get(row.session_id, 0))
-        behaviors = (
+        behaviors = [
             ("session_type", row.session_type or "unknown"),
             ("agent_type", row.agent_type or "unknown"),
             ("permission_mode", row.permission_mode or "unknown"),
             ("tool_breadth", tool_breadth),
-        )
+        ]
+        if row.workflow_archetype:
+            behaviors.append(("workflow_archetype", row.workflow_archetype))
+        if row.workflow_label:
+            behaviors.append(("workflow_fingerprint", row.workflow_label))
         for dimension, label in behaviors:
             group = groups.setdefault(
                 (dimension, label),
@@ -1270,6 +1287,8 @@ def _compute_quality_attribution_for_session_scope(
         "agent_type": 1,
         "permission_mode": 2,
         "tool_breadth": 3,
+        "workflow_archetype": 4,
+        "workflow_fingerprint": 5,
     }
 
     results: list[QualityAttributionRow] = []
