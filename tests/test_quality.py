@@ -657,6 +657,16 @@ class TestQualityMetrics:
         on_request = _row("permission_mode", "on-request")
         assert on_request["avg_review_comments_per_pr"] == 2.0
 
+        debugging = _row("workflow_archetype", "debugging")
+        assert debugging["linked_sessions"] == 1
+        assert debugging["linked_prs"] == 1
+        assert debugging["merge_rate"] == 1.0
+
+        bug_fix_fingerprint = _row("workflow_fingerprint", "bug fix: read -> edit -> ship")
+        assert bug_fix_fingerprint["linked_sessions"] == 1
+        assert bug_fix_fingerprint["linked_prs"] == 1
+        assert bug_fix_fingerprint["avg_findings_per_pr"] == 2.0
+
 
 # ---------------------------------------------------------------------------
 # TestCommitPRCorrelation
