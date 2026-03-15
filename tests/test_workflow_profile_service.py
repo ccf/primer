@@ -121,6 +121,31 @@ def test_extract_session_workflow_profile_does_not_treat_import_as_migration():
     assert record.archetype == "feature_delivery"
 
 
+def test_extract_session_workflow_profile_does_not_treat_guide_text_as_docs_without_doc_files():
+    record = extract_session_workflow_profile(
+        {"first_prompt": "Follow the guide to debug the auth failure"},
+        [
+            {"tool_name": "Edit", "call_count": 1},
+            {"tool_name": "Bash", "call_count": 2},
+        ],
+        [{"evidence_type": "test"}],
+        change_shape={
+            "files_touched_count": 1,
+            "diff_size": 8,
+            "edit_operations": 1,
+            "named_touched_files": ["src/auth.py"],
+        },
+        recovery_path={
+            "recovery_step_count": 1,
+            "recovery_result": "recovered",
+            "recovery_strategies": ["edit_fix"],
+        },
+    )
+
+    assert record is not None
+    assert record.archetype == "debugging"
+
+
 def test_extract_session_workflow_profile_counts_all_verification_runs():
     record = extract_session_workflow_profile(
         {"first_prompt": "Stabilize the flaky test suite"},

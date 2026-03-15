@@ -268,7 +268,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] [P0] Cursor `agent_type` support across capture, sync, ingest, and analytics filters
 - [ ] [P0] Durable background job system for sync, facet extraction, narratives, and alerts
 - [ ] [P0] Scalable API key lookup and verification strategy
-- [ ] [P1] Source-capability registry so Primer can safely gate analytics by what each agent source actually provides
+- [x] [P1] Source-capability registry so Primer can safely gate analytics by what each agent source actually provides
 - [ ] [P1] OpenTelemetry integration for metrics, traces, and logs
 - [ ] [P1] Redis-backed caching for analytics query results and high-read metadata
 - [ ] [P1] Analytics performance work for large orgs and concurrent dashboard usage

@@ -252,8 +252,7 @@ def _has_mutations(change_shape: object | None) -> bool:
 
 
 def _looks_like_docs(text: str, named_files: list[str]) -> bool:
-    if _DOC_TEXT_RE.search(text):
-        return True
+    text_match = bool(_DOC_TEXT_RE.search(text))
     if not named_files:
         return False
     doc_files = 0
@@ -261,6 +260,8 @@ def _looks_like_docs(text: str, named_files: list[str]) -> bool:
         normalized = path.lower()
         if normalized.endswith((".md", ".mdx", ".rst", ".txt")) or "/docs/" in normalized:
             doc_files += 1
+    if text_match and doc_files > 0:
+        return True
     return doc_files > 0 and doc_files >= max(1, len(named_files) // 2)
 
 
