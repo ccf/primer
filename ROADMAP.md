@@ -192,7 +192,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Quality attribution layer linking session behavior to PR outcomes and review findings
 - [ ] [P1] Additional review bot parsers: CodeRabbit, SonarQube, and other automated review tools
 - [ ] [P1] Post-merge outcome tracking: reverts, hotfixes, and follow-up bug volume
-- [ ] [P1] Change-quality analysis by workflow fingerprint and session archetype
+- [x] [P1] Change-quality analysis by workflow fingerprint and session archetype
 - [ ] [P2] Review remediation tracking from finding creation to fix completion
 
 ## FinOps & Cost Management
