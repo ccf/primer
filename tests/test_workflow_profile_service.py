@@ -121,6 +121,25 @@ def test_extract_session_workflow_profile_does_not_treat_import_as_migration():
     assert record.archetype == "feature_delivery"
 
 
+def test_extract_session_workflow_profile_does_not_treat_server_port_as_migration():
+    record = extract_session_workflow_profile(
+        {"first_prompt": "Fix the server port binding for local development"},
+        [
+            {"tool_name": "Read", "call_count": 1},
+            {"tool_name": "Edit", "call_count": 2},
+        ],
+        [],
+        change_shape={
+            "files_touched_count": 2,
+            "diff_size": 10,
+            "edit_operations": 2,
+        },
+    )
+
+    assert record is not None
+    assert record.archetype == "feature_delivery"
+
+
 def test_extract_session_workflow_profile_does_not_treat_guide_text_as_docs_without_doc_files():
     record = extract_session_workflow_profile(
         {"first_prompt": "Follow the guide to debug the auth failure"},
