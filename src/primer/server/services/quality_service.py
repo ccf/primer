@@ -1031,6 +1031,99 @@ def _compute_findings_overview_for_session_scope(
     )
 
 
+_ATTRIBUTION_DIMENSION_ORDER = {
+    "session_type": 0,
+    "agent_type": 1,
+    "permission_mode": 2,
+    "tool_breadth": 3,
+    "workflow_archetype": 4,
+    "workflow_fingerprint": 5,
+}
+
+
+def _aggregate_attribution_results(
+    session_pr_rows,
+    tool_counts: dict[str, int],
+    pr_map: dict,
+    finding_map: dict[str, dict[str, int]],
+) -> list[QualityAttributionRow]:
+    """Group session-PR rows by behavior dimensions and aggregate PR quality metrics."""
+    groups: dict[tuple[str, str], dict[str, set[str]]] = {}
+    for row in session_pr_rows:
+        tool_breadth = _tool_breadth_label(tool_counts.get(row.session_id, 0))
+        behaviors = [
+            ("session_type", row.session_type or "unknown"),
+            ("agent_type", row.agent_type or "unknown"),
+            ("permission_mode", row.permission_mode or "unknown"),
+            ("tool_breadth", tool_breadth),
+        ]
+        if row.workflow_archetype:
+            behaviors.append(("workflow_archetype", row.workflow_archetype))
+        if row.workflow_label:
+            behaviors.append(("workflow_fingerprint", row.workflow_label))
+        for dimension, label in behaviors:
+            group = groups.setdefault(
+                (dimension, label),
+                {"sessions": set(), "prs": set()},
+            )
+            group["sessions"].add(row.session_id)
+            if row.pull_request_id:
+                group["prs"].add(row.pull_request_id)
+
+    results: list[QualityAttributionRow] = []
+    for (dimension, label), refs in groups.items():
+        pr_id_set = refs["prs"]
+        if not pr_id_set:
+            continue
+
+        prs = [pr_map[pr_id] for pr_id in pr_id_set if pr_id in pr_map]
+        if not prs:
+            continue
+
+        merged = sum(1 for pr in prs if pr.state == "merged")
+        closed = sum(1 for pr in prs if pr.state == "closed")
+        denominator = merged + closed
+        merge_rate = merged / denominator if denominator else None
+
+        avg_review_comments = sum(pr.review_comments_count or 0 for pr in prs) / len(prs)
+
+        total_findings = sum(finding_map.get(pr.id, {}).get("total", 0) for pr in prs)
+        high_findings = sum(finding_map.get(pr.id, {}).get("high", 0) for pr in prs)
+        fixed_findings = sum(finding_map.get(pr.id, {}).get("fixed", 0) for pr in prs)
+
+        merge_times = [
+            (pr.merged_at - pr.pr_created_at).total_seconds() / 3600
+            for pr in prs
+            if pr.merged_at and pr.pr_created_at
+        ]
+
+        results.append(
+            QualityAttributionRow(
+                dimension=dimension,
+                label=label,
+                linked_sessions=len(refs["sessions"]),
+                linked_prs=len(prs),
+                merge_rate=merge_rate,
+                avg_review_comments_per_pr=avg_review_comments,
+                avg_findings_per_pr=total_findings / len(prs),
+                high_severity_findings_per_pr=high_findings / len(prs),
+                avg_time_to_merge_hours=(
+                    sum(merge_times) / len(merge_times) if merge_times else None
+                ),
+                findings_fix_rate=(fixed_findings / total_findings if total_findings else None),
+            )
+        )
+
+    return sorted(
+        results,
+        key=lambda row: (
+            _ATTRIBUTION_DIMENSION_ORDER.get(row.dimension, 99),
+            -row.linked_prs,
+            row.label,
+        ),
+    )
+
+
 def _compute_quality_attribution(db: Session, session_id_q) -> list[QualityAttributionRow]:
     """Attribute PR outcomes and review findings back to session behaviors."""
     tool_rows = (
@@ -1103,89 +1196,7 @@ def _compute_quality_attribution(db: Session, session_id_q) -> list[QualityAttri
         for row in finding_rows
     }
 
-    groups: dict[tuple[str, str], dict[str, set[str]]] = {}
-    for row in session_pr_rows:
-        tool_breadth = _tool_breadth_label(tool_counts.get(row.session_id, 0))
-        behaviors = [
-            ("session_type", row.session_type or "unknown"),
-            ("agent_type", row.agent_type or "unknown"),
-            ("permission_mode", row.permission_mode or "unknown"),
-            ("tool_breadth", tool_breadth),
-        ]
-        if row.workflow_archetype:
-            behaviors.append(("workflow_archetype", row.workflow_archetype))
-        if row.workflow_label:
-            behaviors.append(("workflow_fingerprint", row.workflow_label))
-        for dimension, label in behaviors:
-            group = groups.setdefault(
-                (dimension, label),
-                {"sessions": set(), "prs": set()},
-            )
-            group["sessions"].add(row.session_id)
-            if row.pull_request_id:
-                group["prs"].add(row.pull_request_id)
-
-    dimension_order = {
-        "session_type": 0,
-        "agent_type": 1,
-        "permission_mode": 2,
-        "tool_breadth": 3,
-        "workflow_archetype": 4,
-        "workflow_fingerprint": 5,
-    }
-
-    results: list[QualityAttributionRow] = []
-    for (dimension, label), refs in groups.items():
-        pr_id_set = refs["prs"]
-        if not pr_id_set:
-            continue
-
-        prs = [pr_map[pr_id] for pr_id in pr_id_set if pr_id in pr_map]
-        if not prs:
-            continue
-
-        merged = sum(1 for pr in prs if pr.state == "merged")
-        closed = sum(1 for pr in prs if pr.state == "closed")
-        denominator = merged + closed
-        merge_rate = merged / denominator if denominator else None
-
-        avg_review_comments = sum(pr.review_comments_count or 0 for pr in prs) / len(prs)
-
-        total_findings = sum(finding_map.get(pr.id, {}).get("total", 0) for pr in prs)
-        high_findings = sum(finding_map.get(pr.id, {}).get("high", 0) for pr in prs)
-        fixed_findings = sum(finding_map.get(pr.id, {}).get("fixed", 0) for pr in prs)
-
-        merge_times = [
-            (pr.merged_at - pr.pr_created_at).total_seconds() / 3600
-            for pr in prs
-            if pr.merged_at and pr.pr_created_at
-        ]
-
-        results.append(
-            QualityAttributionRow(
-                dimension=dimension,
-                label=label,
-                linked_sessions=len(refs["sessions"]),
-                linked_prs=len(prs),
-                merge_rate=merge_rate,
-                avg_review_comments_per_pr=avg_review_comments,
-                avg_findings_per_pr=total_findings / len(prs),
-                high_severity_findings_per_pr=high_findings / len(prs),
-                avg_time_to_merge_hours=(
-                    sum(merge_times) / len(merge_times) if merge_times else None
-                ),
-                findings_fix_rate=(fixed_findings / total_findings if total_findings else None),
-            )
-        )
-
-    return sorted(
-        results,
-        key=lambda row: (
-            dimension_order.get(row.dimension, 99),
-            -row.linked_prs,
-            row.label,
-        ),
-    )
+    return _aggregate_attribution_results(session_pr_rows, tool_counts, pr_map, finding_map)
 
 
 def _compute_quality_attribution_for_session_scope(
@@ -1260,89 +1271,7 @@ def _compute_quality_attribution_for_session_scope(
         for row in finding_rows
     }
 
-    groups: dict[tuple[str, str], dict[str, set[str]]] = {}
-    for row in session_pr_rows:
-        tool_breadth = _tool_breadth_label(tool_counts.get(row.session_id, 0))
-        behaviors = [
-            ("session_type", row.session_type or "unknown"),
-            ("agent_type", row.agent_type or "unknown"),
-            ("permission_mode", row.permission_mode or "unknown"),
-            ("tool_breadth", tool_breadth),
-        ]
-        if row.workflow_archetype:
-            behaviors.append(("workflow_archetype", row.workflow_archetype))
-        if row.workflow_label:
-            behaviors.append(("workflow_fingerprint", row.workflow_label))
-        for dimension, label in behaviors:
-            group = groups.setdefault(
-                (dimension, label),
-                {"sessions": set(), "prs": set()},
-            )
-            group["sessions"].add(row.session_id)
-            if row.pull_request_id:
-                group["prs"].add(row.pull_request_id)
-
-    dimension_order = {
-        "session_type": 0,
-        "agent_type": 1,
-        "permission_mode": 2,
-        "tool_breadth": 3,
-        "workflow_archetype": 4,
-        "workflow_fingerprint": 5,
-    }
-
-    results: list[QualityAttributionRow] = []
-    for (dimension, label), refs in groups.items():
-        pr_id_set = refs["prs"]
-        if not pr_id_set:
-            continue
-
-        prs = [pr_map[pr_id] for pr_id in pr_id_set if pr_id in pr_map]
-        if not prs:
-            continue
-
-        merged = sum(1 for pr in prs if pr.state == "merged")
-        closed = sum(1 for pr in prs if pr.state == "closed")
-        denominator = merged + closed
-        merge_rate = merged / denominator if denominator else None
-
-        avg_review_comments = sum(pr.review_comments_count or 0 for pr in prs) / len(prs)
-
-        total_findings = sum(finding_map.get(pr.id, {}).get("total", 0) for pr in prs)
-        high_findings = sum(finding_map.get(pr.id, {}).get("high", 0) for pr in prs)
-        fixed_findings = sum(finding_map.get(pr.id, {}).get("fixed", 0) for pr in prs)
-
-        merge_times = [
-            (pr.merged_at - pr.pr_created_at).total_seconds() / 3600
-            for pr in prs
-            if pr.merged_at and pr.pr_created_at
-        ]
-
-        results.append(
-            QualityAttributionRow(
-                dimension=dimension,
-                label=label,
-                linked_sessions=len(refs["sessions"]),
-                linked_prs=len(prs),
-                merge_rate=merge_rate,
-                avg_review_comments_per_pr=avg_review_comments,
-                avg_findings_per_pr=total_findings / len(prs),
-                high_severity_findings_per_pr=high_findings / len(prs),
-                avg_time_to_merge_hours=(
-                    sum(merge_times) / len(merge_times) if merge_times else None
-                ),
-                findings_fix_rate=(fixed_findings / total_findings if total_findings else None),
-            )
-        )
-
-    return sorted(
-        results,
-        key=lambda row: (
-            dimension_order.get(row.dimension, 99),
-            -row.linked_prs,
-            row.label,
-        ),
-    )
+    return _aggregate_attribution_results(session_pr_rows, tool_counts, pr_map, finding_map)
 
 
 def _tool_breadth_label(tool_count: int) -> str:
