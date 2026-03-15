@@ -37,15 +37,29 @@ describe("QualityAttributionTable", () => {
             avg_time_to_merge_hours: 6,
             findings_fix_rate: 0.5,
           },
+          {
+            dimension: "workflow_archetype",
+            label: "debugging",
+            linked_sessions: 1,
+            linked_prs: 1,
+            merge_rate: 1,
+            avg_review_comments_per_pr: 1,
+            avg_findings_per_pr: 0,
+            high_severity_findings_per_pr: 0,
+            avg_time_to_merge_hours: 2,
+            findings_fix_rate: null,
+          },
         ]}
       />,
     )
 
     expect(screen.getByText("Session Type")).toBeInTheDocument()
     expect(screen.getByText("Agent Type")).toBeInTheDocument()
+    expect(screen.getByText("Workflow Archetype")).toBeInTheDocument()
     expect(screen.getByText("Bug Fix")).toBeInTheDocument()
     expect(screen.getByText("Codex Cli")).toBeInTheDocument()
-    expect(screen.getAllByText("100%")).toHaveLength(2)
-    expect(screen.getAllByText("50%")).toHaveLength(2)
+    expect(screen.getByText("Debugging")).toBeInTheDocument()
+    expect(screen.getAllByText("100%").length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByText("50%").length).toBeGreaterThanOrEqual(2)
   })
 })

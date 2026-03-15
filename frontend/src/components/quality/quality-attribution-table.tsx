@@ -9,6 +9,8 @@ const DIMENSION_LABELS: Record<string, string> = {
   agent_type: "Agent Type",
   permission_mode: "Permission Mode",
   tool_breadth: "Tool Breadth",
+  workflow_archetype: "Workflow Archetype",
+  workflow_fingerprint: "Workflow Fingerprint",
 }
 
 function formatPercent(value: number | null): string {
