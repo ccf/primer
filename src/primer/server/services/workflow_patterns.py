@@ -32,7 +32,7 @@ def infer_workflow_steps(
         steps.append("test")
     if recovery_strategies and recovery_strategies.intersection({"edit_fix", "revert_or_reset"}):
         steps.append("fix")
-    if any(_is_delegate_tool(name) for name in tool_names):
+    if any(is_delegate_tool(name) for name in tool_names):
         steps.append("delegate")
     if any(_is_integrate_tool(name) for name in tool_names):
         steps.append("integrate")
@@ -79,7 +79,7 @@ def _is_execute_tool(name: str) -> bool:
     return normalized == "bash" or any(hint in normalized for hint in _EXECUTE_HINTS)
 
 
-def _is_delegate_tool(name: str) -> bool:
+def is_delegate_tool(name: str) -> bool:
     normalized = _normalized_tool_name(name)
     return classify_tool(name) in {"orchestration", "skill"} or any(
         hint in normalized for hint in _DELEGATE_HINTS
