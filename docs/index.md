@@ -8,9 +8,10 @@ hide:
 
 # Primer
 
-**AI engineering analytics for Claude Code teams.**
+**AI engineering intelligence for agentic teams.**
 
-Aggregate usage data, track developer productivity, and surface actionable insights across your engineering organization.
+Capture how engineers use Claude Code, Codex CLI, Gemini CLI, and Cursor, then turn that
+telemetry into coaching, project enablement, quality attribution, and operational decisions.
 
 <div class="primer-buttons">
   <a href="getting-started/" class="primary">Get Started</a>
@@ -22,33 +23,39 @@ Aggregate usage data, track developer productivity, and surface actionable insig
 <div class="primer-features" markdown>
 
 <div class="feature" markdown>
-### Usage Analytics
-Track sessions, token consumption, cost breakdowns, and model usage patterns across teams and engineers.
+### Multi-Agent Capture
+Ingest sessions from Claude Code, Codex CLI, Gemini CLI, and Cursor with capability-aware
+analytics that avoid mixing incomparable telemetry.
 </div>
 
 <div class="feature" markdown>
-### GitHub Integration
-Sync pull requests, correlate commits with Claude Code sessions, and measure AI-readiness across repositories.
+### Project Intelligence
+See which repositories are AI-ready, where workflow friction clusters, and what enablement work
+should happen next.
 </div>
 
 <div class="feature" markdown>
 ### Role-Based Dashboard
-Engineers see a GitHub-like profile with personal stats. Leadership sees org-wide metrics, leaderboards, and team comparisons.
+Engineers get profile, growth, and session views. Leadership gets organization, quality, maturity,
+FinOps, project, and intervention surfaces.
 </div>
 
 <div class="feature" markdown>
-### Friction Detection
-Identify bottlenecks, tool over-reliance, and workflow inefficiencies with automated recommendations.
+### Closed-Loop Coaching
+Turn recommendations into interventions, track before-and-after measurements, and surface workflow
+playbooks learned from high performers.
 </div>
 
 <div class="feature" markdown>
 ### MCP Sidecar
-Five built-in MCP tools let Claude Code query its own usage stats, team overviews, and friction reports.
+On-demand sidecar tools expose personal stats, friction reports, recommendations, and coaching
+inside the engineer workflow.
 </div>
 
 <div class="feature" markdown>
-### AI Maturity Scoring
-Score repositories on AI-readiness (CLAUDE.md, AGENTS.md, .claude/ config) and track adoption across the org.
+### Quality, FinOps, and Maturity
+Connect workflows to PR outcomes, review findings, cost efficiency, and leverage across teams,
+projects, and engineers.
 </div>
 
 </div>
@@ -58,31 +65,31 @@ Score repositories on AI-readiness (CLAUDE.md, AGENTS.md, .claude/ config) and t
 ## Quick Start
 
 ```bash
-pip install -e .
-alembic upgrade head
-python scripts/seed_data.py     # optional: generate demo data
-uvicorn primer.server.app:app --reload
+pip install primer
+primer init
+primer server start
+primer hook install
 ```
 
-Then open [localhost:5173](http://localhost:5173) for the dashboard.
+Use `primer sync` to backfill supported local sessions, or run Docker/Helm for shared deployments.
 
 See the [Getting Started guide](getting-started.md) for the full walkthrough.
 
 ## Architecture
 
 ```
-Claude Code (hook) ──POST──▸ FastAPI Server ──▸ SQLite/PostgreSQL
-                                  │
-MCP Sidecar ──────GET/POST──▸─────┘
-                                  │
-React Dashboard ◂──GET────────────┘
+AI agents + local capture ──POST──┐
+GitHub App / webhooks ────────────┼──▸ FastAPI platform ──▸ SQLite/PostgreSQL
+MCP sidecar ─────────────GET──────┘             │
+                                                └──▸ React dashboard
 ```
 
-Primer has three entry points:
+Primer has four major runtime surfaces:
 
-- **SessionEnd Hook** extracts usage data from Claude Code and sends it to the server
-- **MCP Sidecar** provides five tools for Claude Code to query its own analytics
-- **React Dashboard** visualizes everything with role-based views
+- **Capture layer** discovers and extracts local sessions across supported agents
+- **FastAPI platform** ingests data and computes analytics, synthesis, quality, FinOps, and alerts
+- **React dashboard** exposes organization, profile, project, growth, and intervention workflows
+- **MCP sidecar** brings stats, friction, recommendations, and coaching into the session
 
 Read the full [Architecture guide](architecture.md) for details.
 
