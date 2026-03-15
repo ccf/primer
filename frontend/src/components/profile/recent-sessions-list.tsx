@@ -11,6 +11,16 @@ interface RecentSessionsListProps {
 export function RecentSessionsList({ sessions }: RecentSessionsListProps) {
   const navigate = useNavigate()
 
+  const renderAnalysisBadge = (session: SessionResponse) => {
+    if (session.has_facets) {
+      return <Badge variant="success" className="text-xs">Analyzed</Badge>
+    }
+    if (session.has_workflow_profile) {
+      return <Badge variant="info" className="text-xs">Workflow</Badge>
+    }
+    return <Badge variant="outline" className="text-xs">Pending</Badge>
+  }
+
   if (sessions.length === 0) {
     return (
       <p className="py-4 text-sm text-muted-foreground">No recent sessions.</p>
@@ -38,11 +48,7 @@ export function RecentSessionsList({ sessions }: RecentSessionsListProps) {
             {s.started_at && (
               <span>{formatDistanceToNow(parseISO(s.started_at), { addSuffix: true })}</span>
             )}
-            {s.has_facets ? (
-              <Badge variant="success" className="text-xs">Analyzed</Badge>
-            ) : (
-              <Badge variant="outline" className="text-xs">Pending</Badge>
-            )}
+            {renderAnalysisBadge(s)}
           </div>
         </button>
       ))}

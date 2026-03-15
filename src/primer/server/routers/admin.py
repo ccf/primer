@@ -12,6 +12,7 @@ from primer.common.schemas import (
     MeasurementIntegrityStats,
     PaginatedResponse,
     SystemStats,
+    WorkflowProfileBackfillSummary,
 )
 from primer.server.deps import AuthContext, require_role
 from primer.server.services import audit_service
@@ -117,6 +118,39 @@ def normalize_facets(
             "session_facets",
             details={
                 "limit": limit,
+                "dry_run": dry_run,
+                **summary,
+            },
+            ip_address=ip,
+        )
+        db.commit()
+    return summary
+
+
+@router.post("/backfill-workflow-profiles", response_model=WorkflowProfileBackfillSummary)
+def backfill_workflow_profiles(
+    request: Request,
+    limit: int = Query(default=500, le=5000),
+    recompute: bool = Query(default=False),
+    dry_run: bool = Query(default=True),
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_role("admin")),
+):
+    from primer.server.services.workflow_profile_service import (
+        backfill_workflow_profiles as _backfill,
+    )
+
+    summary = _backfill(db, limit=limit, recompute=recompute, dry_run=dry_run)
+    if not dry_run:
+        ip = request.client.host if request.client else None
+        audit_service.log_action(
+            db,
+            auth,
+            "backfill",
+            "session_workflow_profiles",
+            details={
+                "limit": limit,
+                "recompute": recompute,
                 "dry_run": dry_run,
                 **summary,
             },

@@ -390,6 +390,7 @@ class SessionResponse(BaseModel):
     first_prompt: str | None
     summary: str | None
     has_facets: bool
+    has_workflow_profile: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -859,6 +860,15 @@ class FacetNormalizationSummary(BaseModel):
     rows_scanned: int
     rows_updated: int
     remaining_legacy_rows: int
+
+
+class WorkflowProfileBackfillSummary(BaseModel):
+    sessions_scanned: int
+    profiles_created: int
+    profiles_updated: int
+    profiles_deleted: int
+    sessions_unchanged: int
+    sessions_skipped: int
 
 
 class IngestEventResponse(BaseModel):

@@ -60,6 +60,7 @@ export interface SessionResponse {
   first_prompt: string | null
   summary: string | null
   has_facets: boolean
+  has_workflow_profile?: boolean
   created_at: string
 }
 

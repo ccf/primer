@@ -14,6 +14,16 @@ export function SessionTable({ sessions, selectedIndex = -1 }: SessionTableProps
   const navigate = useNavigate()
   const selectedRef = useRef<HTMLTableRowElement>(null)
 
+  const renderAnalysisBadge = (session: SessionResponse) => {
+    if (session.has_facets) {
+      return <Badge variant="success">Analyzed</Badge>
+    }
+    if (session.has_workflow_profile) {
+      return <Badge variant="info">Workflow</Badge>
+    }
+    return <Badge variant="outline">Pending</Badge>
+  }
+
   useEffect(() => {
     if (selectedIndex >= 0 && selectedRef.current) {
       selectedRef.current.scrollIntoView({ block: "nearest" })
@@ -32,7 +42,7 @@ export function SessionTable({ sessions, selectedIndex = -1 }: SessionTableProps
             <th className="px-4 py-3 text-right font-medium text-muted-foreground">Messages</th>
             <th className="px-4 py-3 text-right font-medium text-muted-foreground">Tools</th>
             <th className="px-4 py-3 text-right font-medium text-muted-foreground">Tokens</th>
-            <th className="px-4 py-3 text-left font-medium text-muted-foreground">Facets</th>
+            <th className="px-4 py-3 text-left font-medium text-muted-foreground">Analysis</th>
           </tr>
         </thead>
         <tbody>
@@ -58,11 +68,7 @@ export function SessionTable({ sessions, selectedIndex = -1 }: SessionTableProps
               <td className="px-4 py-3 text-right">{s.tool_call_count}</td>
               <td className="px-4 py-3 text-right">{formatTokens(s.input_tokens + s.output_tokens)}</td>
               <td className="px-4 py-3">
-                {s.has_facets ? (
-                  <Badge variant="success">Yes</Badge>
-                ) : (
-                  <Badge variant="outline">No</Badge>
-                )}
+                {renderAnalysisBadge(s)}
               </td>
             </tr>
           ))}
