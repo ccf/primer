@@ -1149,8 +1149,26 @@ class SharedPattern(BaseModel):
     insight: str
 
 
+class BrightSpot(BaseModel):
+    bright_spot_id: str
+    title: str
+    summary: str
+    cluster_type: str
+    cluster_label: str
+    session_count: int
+    engineer_count: int
+    success_rate: float | None
+    avg_duration: float | None
+    exemplar_session_id: str
+    exemplar_engineer_id: str
+    exemplar_engineer_name: str
+    exemplar_duration_seconds: float | None
+    exemplar_tools: list[str]
+
+
 class PatternSharingResponse(BaseModel):
     patterns: list[SharedPattern]
+    bright_spots: list[BrightSpot] = []
     total_clusters_found: int
     sessions_analyzed: int
 

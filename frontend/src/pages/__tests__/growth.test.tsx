@@ -34,6 +34,9 @@ vi.mock("@/components/growth/onboarding-recommendations", () => ({
 vi.mock("@/components/growth/pattern-summary", () => ({
   PatternSummary: () => <div>pattern summary</div>,
 }))
+vi.mock("@/components/growth/bright-spot-cards", () => ({
+  BrightSpotCards: () => <div>bright spots</div>,
+}))
 vi.mock("@/components/growth/shared-pattern-card", () => ({
   SharedPatternCards: () => <div>shared patterns</div>,
 }))

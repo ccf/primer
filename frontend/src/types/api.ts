@@ -811,8 +811,26 @@ export interface SharedPattern {
   insight: string
 }
 
+export interface BrightSpot {
+  bright_spot_id: string
+  title: string
+  summary: string
+  cluster_type: string
+  cluster_label: string
+  session_count: number
+  engineer_count: number
+  success_rate: number | null
+  avg_duration: number | null
+  exemplar_session_id: string
+  exemplar_engineer_id: string
+  exemplar_engineer_name: string
+  exemplar_duration_seconds: number | null
+  exemplar_tools: string[]
+}
+
 export interface PatternSharingResponse {
   patterns: SharedPattern[]
+  bright_spots: BrightSpot[]
   total_clusters_found: number
   sessions_analyzed: number
 }

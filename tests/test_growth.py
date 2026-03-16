@@ -279,6 +279,47 @@ class TestPatternSharing:
         assert best is not None
         assert best["engineer_id"] == engineers[1].id
 
+    def test_bright_spots_surface_exemplar_sessions_for_strong_patterns(
+        self, client, db_session, admin_headers
+    ):
+        team, engineers = _create_team_engineers(db_session, 3)
+        now = datetime.now(UTC)
+
+        durations = [180.0, 60.0, 120.0]
+        session_ids = []
+        for engineer, duration in zip(engineers, durations, strict=True):
+            session = _create_session(
+                db_session,
+                engineer,
+                started_at=now - timedelta(hours=1),
+                project_name="primer",
+                duration_seconds=duration,
+            )
+            session_ids.append(session.id)
+            db_session.add(
+                SessionFacets(session_id=session.id, session_type="debugging", outcome="success")
+            )
+            db_session.add(ToolUsage(session_id=session.id, tool_name="Read", call_count=5))
+            db_session.add(ToolUsage(session_id=session.id, tool_name="Edit", call_count=2))
+        db_session.flush()
+
+        response = client.get(
+            f"/api/v1/analytics/pattern-sharing?team_id={team.id}",
+            headers=admin_headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+
+        assert len(data["bright_spots"]) >= 1
+        bright_spot = data["bright_spots"][0]
+        assert bright_spot["cluster_label"] == "debugging on primer"
+        assert bright_spot["session_count"] == 3
+        assert bright_spot["engineer_count"] == 3
+        assert bright_spot["success_rate"] == 1.0
+        assert bright_spot["exemplar_engineer_id"] == engineers[1].id
+        assert bright_spot["exemplar_session_id"] == session_ids[1]
+        assert bright_spot["exemplar_tools"] == ["Edit", "Read"]
+
     def test_best_approach_treats_legacy_success_as_success(
         self, client, db_session, admin_headers
     ):
