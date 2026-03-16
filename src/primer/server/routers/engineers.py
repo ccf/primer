@@ -2,10 +2,11 @@ import secrets
 
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from primer.common.database import get_db
 from primer.common.models import Engineer
+from primer.common.models import Session as SessionModel
 from primer.common.schemas import (
     EngineerCreate,
     EngineerCreateResponse,
@@ -90,7 +91,12 @@ def list_engineer_sessions(
     if auth.role == "team_lead" and engineer.team_id != auth.team_id:
         raise HTTPException(status_code=403, detail="Not your team")
 
-    return engineer.sessions
+    return (
+        db.query(SessionModel)
+        .options(selectinload(SessionModel.workflow_profile))
+        .filter(SessionModel.engineer_id == engineer_id)
+        .all()
+    )
 
 
 @router.patch("/{engineer_id}", response_model=EngineerResponse)
