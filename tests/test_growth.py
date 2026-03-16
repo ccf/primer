@@ -4,7 +4,15 @@ from datetime import UTC, datetime, timedelta
 
 import bcrypt
 
-from primer.common.models import Engineer, Session, SessionFacets, Team, ToolUsage
+from primer.common.models import (
+    Engineer,
+    ModelUsage,
+    Session,
+    SessionFacets,
+    SessionWorkflowProfile,
+    Team,
+    ToolUsage,
+)
 
 
 def _create_session(db_session, engineer, **kwargs):
@@ -319,6 +327,83 @@ class TestPatternSharing:
         assert bright_spot["exemplar_engineer_id"] == engineers[1].id
         assert bright_spot["exemplar_session_id"] == session_ids[1]
         assert bright_spot["exemplar_tools"] == ["Edit", "Read"]
+
+    def test_pattern_sharing_includes_workflow_aware_exemplar_library_entries(
+        self, client, db_session, admin_headers
+    ):
+        team, engineers = _create_team_engineers(db_session, 3)
+        now = datetime.now(UTC)
+
+        durations = [180.0, 60.0, 120.0]
+        session_ids = []
+        for engineer, duration in zip(engineers, durations, strict=True):
+            session = _create_session(
+                db_session,
+                engineer,
+                started_at=now - timedelta(hours=1),
+                project_name="primer",
+                duration_seconds=duration,
+                summary="Debugged the auth flow and verified the fix.",
+            )
+            session_ids.append(session.id)
+            db_session.add(
+                SessionFacets(
+                    session_id=session.id,
+                    session_type="debugging",
+                    outcome="success",
+                    brief_summary="Reproduced and fixed the auth failure.",
+                    goal_categories=["auth"],
+                    agent_helpfulness="very_helpful",
+                )
+            )
+            db_session.add(ToolUsage(session_id=session.id, tool_name="Read", call_count=5))
+            db_session.add(ToolUsage(session_id=session.id, tool_name="Edit", call_count=2))
+
+        db_session.add(
+            SessionWorkflowProfile(
+                session_id=session_ids[1],
+                fingerprint_id="debugging::read+edit+execute+fix",
+                label="debugging: read -> edit -> execute -> fix",
+                steps=["read", "edit", "execute", "fix"],
+                archetype="debugging",
+                archetype_source="session_type",
+                top_tools=["Read", "Edit"],
+            )
+        )
+        db_session.add(
+            ModelUsage(
+                session_id=session_ids[1],
+                model_name="claude-sonnet-4",
+                input_tokens=1000,
+                output_tokens=500,
+                cache_read_tokens=0,
+                cache_creation_tokens=0,
+            )
+        )
+        db_session.flush()
+
+        response = client.get(
+            f"/api/v1/analytics/pattern-sharing?team_id={team.id}",
+            headers=admin_headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+
+        exemplar = next(
+            item for item in data["exemplar_sessions"] if item["session_id"] == session_ids[1]
+        )
+        assert exemplar["title"] == "debugging: read -> edit -> execute -> fix"
+        assert exemplar["workflow_archetype"] == "debugging"
+        assert exemplar["workflow_fingerprint"] == "debugging: read -> edit -> execute -> fix"
+        assert exemplar["workflow_steps"] == ["read", "edit", "execute", "fix"]
+        assert exemplar["supporting_engineer_count"] == 3
+        assert exemplar["supporting_session_count"] == 3
+        assert exemplar["supporting_pattern_count"] == 2
+        assert exemplar["linked_patterns"][0]["cluster_label"] == "debugging on primer"
+        assert exemplar["linked_patterns"][1]["cluster_label"] == "auth"
+        assert exemplar["estimated_cost"] == 0.0105
+        assert exemplar["tools_used"] == ["Edit", "Read"]
+        assert exemplar["session_summary"] == "Reproduced and fixed the auth failure."
 
     def test_best_approach_treats_legacy_success_as_success(
         self, client, db_session, admin_headers

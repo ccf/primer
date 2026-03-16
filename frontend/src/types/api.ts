@@ -828,9 +828,44 @@ export interface BrightSpot {
   exemplar_tools: string[]
 }
 
+export interface ExemplarPatternReference {
+  cluster_id: string
+  cluster_type: string
+  cluster_label: string
+  session_count: number
+  engineer_count: number
+  success_rate: number | null
+}
+
+export interface ExemplarSession {
+  exemplar_id: string
+  title: string
+  summary: string
+  why_selected: string
+  session_id: string
+  engineer_id: string
+  engineer_name: string
+  project_name: string | null
+  outcome: string | null
+  helpfulness: string | null
+  session_summary: string | null
+  duration_seconds: number | null
+  estimated_cost: number | null
+  tools_used: string[]
+  workflow_archetype: string | null
+  workflow_fingerprint: string | null
+  workflow_steps: string[]
+  supporting_session_count: number
+  supporting_engineer_count: number
+  supporting_pattern_count: number
+  success_rate: number | null
+  linked_patterns: ExemplarPatternReference[]
+}
+
 export interface PatternSharingResponse {
   patterns: SharedPattern[]
   bright_spots: BrightSpot[]
+  exemplar_sessions: ExemplarSession[]
   total_clusters_found: number
   sessions_analyzed: number
 }

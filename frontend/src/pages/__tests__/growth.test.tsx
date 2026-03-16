@@ -37,6 +37,9 @@ vi.mock("@/components/growth/pattern-summary", () => ({
 vi.mock("@/components/growth/bright-spot-cards", () => ({
   BrightSpotCards: () => <div>bright spots</div>,
 }))
+vi.mock("@/components/growth/exemplar-session-library", () => ({
+  ExemplarSessionLibrary: () => <div>exemplar session library</div>,
+}))
 vi.mock("@/components/growth/shared-pattern-card", () => ({
   SharedPatternCards: () => <div>shared patterns</div>,
 }))
@@ -164,6 +167,29 @@ describe("GrowthPage", () => {
     expect(
       screen.getByText("documentation: edit -> execute -> delegate"),
     ).toBeInTheDocument()
+  })
+
+  it("shows exemplar library content on the patterns tab", () => {
+    mockUsePatternSharing.mockReturnValue({
+      data: {
+        patterns: [],
+        bright_spots: [],
+        exemplar_sessions: [],
+        total_clusters_found: 0,
+        sessions_analyzed: 0,
+      },
+      isLoading: false,
+    } as unknown as ReturnType<typeof usePatternSharing>)
+    mockUseEngineerProfile.mockReturnValue({
+      data: null,
+      isLoading: false,
+    } as unknown as ReturnType<typeof useEngineerProfile>)
+
+    renderPage()
+    fireEvent.click(screen.getByRole("button", { name: "Patterns" }))
+
+    expect(screen.getByText("Exemplar Session Library")).toBeInTheDocument()
+    expect(screen.getByText("exemplar session library")).toBeInTheDocument()
   })
 
   it("shows an engineer chooser for API-key admins without a selected context", () => {

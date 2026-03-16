@@ -19,6 +19,7 @@ import { VelocityChart } from "@/components/growth/velocity-chart"
 import { OnboardingRecommendations } from "@/components/growth/onboarding-recommendations"
 import { PatternSummary } from "@/components/growth/pattern-summary"
 import { BrightSpotCards } from "@/components/growth/bright-spot-cards"
+import { ExemplarSessionLibrary } from "@/components/growth/exemplar-session-library"
 import { SharedPatternCards } from "@/components/growth/shared-pattern-card"
 import { SkillInventorySummary } from "@/components/insights/skill-inventory-summary"
 import { CoverageSummary } from "@/components/growth/coverage-summary"
@@ -69,6 +70,15 @@ function PatternsTab({ teamId, startDate, endDate }: TabProps) {
     <div className="space-y-6">
       <PatternSummary data={data} />
       <BrightSpotCards spots={data.bright_spots} />
+      <div className="space-y-3">
+        <div className="space-y-1">
+          <h3 className="text-sm font-medium">Exemplar Session Library</h3>
+          <p className="text-sm text-muted-foreground">
+            Browse concrete sessions worth copying, with workflow, support, and cost context.
+          </p>
+        </div>
+        <ExemplarSessionLibrary exemplars={data.exemplar_sessions ?? []} />
+      </div>
       <SharedPatternCards patterns={data.patterns} />
     </div>
   )
