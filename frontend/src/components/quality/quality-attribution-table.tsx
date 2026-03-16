@@ -1,4 +1,4 @@
-import { formatLabel } from "@/lib/utils"
+import { formatLabel, formatMetric } from "@/lib/utils"
 import type { QualityAttributionRow } from "@/types/api"
 
 interface Props {
@@ -16,10 +16,6 @@ const DIMENSION_LABELS: Record<string, string> = {
 
 function formatPercent(value: number | null): string {
   return value == null ? "-" : `${(value * 100).toFixed(0)}%`
-}
-
-function formatMetric(value: number | null, digits = 1): string {
-  return value == null ? "-" : value.toFixed(digits)
 }
 
 export function QualityAttributionTable({ rows }: Props) {
