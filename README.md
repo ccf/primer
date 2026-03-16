@@ -38,7 +38,12 @@
 
 Your team adopted AI coding tools. Now what?
 
-Primer is an open-source intelligence platform that captures session data from [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), [Gemini CLI](https://github.com/google-gemini/gemini-cli), and Cursor — then answers the questions that no other tool can. Self-hosted. Privacy-first. Your data never leaves your network.
+Primer is an open-source intelligence platform for agentic engineering. It captures session data
+from [Claude Code](https://docs.anthropic.com/en/docs/claude-code),
+[Codex CLI](https://github.com/openai/codex),
+[Gemini CLI](https://github.com/google-gemini/gemini-cli), and Cursor, then turns that telemetry
+into coaching, project enablement, quality attribution, and operational decisions. Self-hosted.
+Privacy-first. Your data never leaves your network.
 
 ## Questions Primer Answers
 
@@ -71,7 +76,10 @@ Primer is an open-source intelligence platform that captures session data from [
 
 **Friction analysis, not just usage tracking.** Primer doesn't just count sessions — it classifies *why* sessions fail. LLM-powered facet extraction identifies goals, satisfaction, and friction types from every transcript, then scores their impact on outcomes. You learn that `permission_denied` errors cause 40% lower success rates, not just that they happen sometimes.
 
-**Individual intelligence, not just org dashboards.** Every engineer gets a trajectory view, strengths profile, friction breakdown, and AI-generated narrative about their patterns. The MCP sidecar lets Claude query your own stats mid-session — "what's my success rate this week?" — without leaving your editor.
+**Individual intelligence, not just org dashboards.** Every engineer gets a trajectory view,
+strengths profile, friction breakdown, and AI-generated narrative about their patterns. The MCP
+sidecar brings stats, friction reports, recommendations, and coaching into the session without
+forcing context switching.
 
 **Cost optimization, not just cost tracking.** Primer models whether each engineer should be on API billing, Pro ($20/mo), or Max ($100/mo) based on actual usage. It measures cache hit rates per engineer and surfaces how much money is being left on the table. Budget burn-rate alerts catch overruns before they happen.
 
@@ -90,11 +98,11 @@ Primer is an open-source intelligence platform that captures session data from [
 | **Engineer Profiles** | Weekly trajectory sparklines, strengths/friction breakdown, peer benchmarking, AI-generated narrative insights |
 | **AI Maturity** | Leverage scores (tool mastery, orchestration depth, efficiency), Effectiveness scores (success rate, cost efficiency), model diversity, agent team detection, project AI-readiness |
 | **Friction Intelligence** | Categorized friction types with impact scoring, bottleneck detection, root cause patterns, cluster analysis |
-| **Quality & Code Impact** | PR merge rates, Claude-assisted vs. non-Claude comparison, code volume per session, review comment analysis |
+| **Quality & Code Impact** | PR merge rates, workflow-based quality attribution, Claude-assisted vs. non-Claude comparison, code volume per session, review comment analysis |
 | **AI Synthesis** | LLM-generated narrative reports at org, team, and engineer scope — turns metrics into stories |
 | **Conversational Explorer** | Natural language queries over your data via SSE-streamed tool-use chat |
 | **Session Browser** | Full-text search, outcome/model/type filters, transcript viewer, message-level detail |
-| **MCP Sidecar** | Engineers query their own stats mid-session: trends, friction reports, recommendations |
+| **MCP Sidecar** | Engineers query their own stats mid-session: trends, friction reports, recommendations, coaching |
 | **Multi-Agent Support** | Claude Code, Codex CLI, Gemini CLI, and Cursor sessions in one platform |
 | **GitHub Integration** | OAuth SSO, PR sync, commit correlation, repository AI-readiness scoring |
 
@@ -126,20 +134,26 @@ See the [Installation guide](https://useprimer.dev/docs/installation/) for full 
 ## How It Works
 
 ```
-AI Coding Tools ──Hooks / Sync──▶ Primer API ◀──MCP Sidecar
- (Claude Code,                           │
-  Codex CLI,                             ▼
-  Gemini CLI,
-  Cursor)                        PostgreSQL / SQLite
-                                         │
-                                         ▼
-                                  React Dashboard
+AI agents + local capture ──POST──┐
+GitHub App / webhooks ────────────┼──▶ Primer API ◀──MCP Sidecar
+                                  │         │
+                                  │         ▼
+                                  └── PostgreSQL / SQLite
+                                            │
+                                            ▼
+                                     React Dashboard
 ```
 
-1. **SessionEnd Hook** — Captures transcripts automatically after each AI coding session. LLM-powered facet extraction classifies goals, friction, and satisfaction.
-2. **REST API** — FastAPI service with 14 routers covering analytics, alerting, FinOps, quality, maturity, and more. Role-based access at every layer.
-3. **Dashboard** — React frontend with org, team, and individual views. Date-range filtering, CSV/PDF export, dark mode.
-4. **MCP Sidecar** — Engineers query their own data during Claude Code sessions without context switching.
+1. **Capture Layer** — Hooks, sync, and import flows discover sessions across Claude Code, Codex
+   CLI, Gemini CLI, and Cursor. Derived evidence includes facets, execution evidence, change
+   shape, recovery paths, and workflow profiles.
+2. **REST API** — FastAPI service with routers covering analytics, alerting, FinOps, quality,
+   maturity, interventions, explorer, and admin workflows. Role-based access is enforced across
+   the platform.
+3. **Dashboard** — React frontend with organization, project, growth, quality, and individual
+   views. Date-range filtering, CSV/PDF export, and role-based navigation are built in.
+4. **MCP Sidecar** — Engineers query their own data during sessions for stats, friction,
+   recommendations, and coaching.
 
 ## Documentation
 
