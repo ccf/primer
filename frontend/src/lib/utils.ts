@@ -27,6 +27,12 @@ export function formatCost(dollars: number): string {
   return `$${dollars.toFixed(2)}`
 }
 
+export function formatLabel(value: string): string {
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
 export function formatPercent(value: number | null | undefined): string {
   if (value == null) return "-"
   return `${(value * 100).toFixed(0)}%`
