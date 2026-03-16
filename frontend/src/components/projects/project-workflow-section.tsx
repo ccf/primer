@@ -1,14 +1,10 @@
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { formatDuration, formatNumber, formatPercent } from "@/lib/utils"
+import { formatDuration, formatNumber, formatPercent, titleize } from "@/lib/utils"
 import type { ProjectWorkflowSummary } from "@/types/api"
 
 interface ProjectWorkflowSectionProps {
   workflowSummary: ProjectWorkflowSummary
-}
-
-function titleize(value: string) {
-  return value.replaceAll("_", " ")
 }
 
 export function ProjectWorkflowSection({ workflowSummary }: ProjectWorkflowSectionProps) {
