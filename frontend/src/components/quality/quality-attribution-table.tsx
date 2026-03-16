@@ -1,3 +1,4 @@
+import { formatLabel } from "@/lib/utils"
 import type { QualityAttributionRow } from "@/types/api"
 
 interface Props {
@@ -19,12 +20,6 @@ function formatPercent(value: number | null): string {
 
 function formatMetric(value: number | null, digits = 1): string {
   return value == null ? "-" : value.toFixed(digits)
-}
-
-function formatLabel(label: string): string {
-  return label
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
 export function QualityAttributionTable({ rows }: Props) {

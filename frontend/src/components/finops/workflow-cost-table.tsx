@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { WorkflowCostBreakdown } from "@/types/api"
-import { formatCost } from "@/lib/utils"
+import { formatCost, formatLabel } from "@/lib/utils"
 
 interface WorkflowCostTableProps {
   rows: WorkflowCostBreakdown[]
@@ -9,12 +9,6 @@ interface WorkflowCostTableProps {
 const DIMENSION_LABELS: Record<string, string> = {
   workflow_archetype: "Workflow Archetype",
   workflow_fingerprint: "Workflow Fingerprint",
-}
-
-function formatLabel(value: string) {
-  return value
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
 export function WorkflowCostTable({ rows }: WorkflowCostTableProps) {
