@@ -322,10 +322,20 @@ export interface DailyCostEntry {
   session_count: number
 }
 
+export interface WorkflowCostBreakdown {
+  dimension: string
+  label: string
+  session_count: number
+  total_estimated_cost: number
+  avg_cost_per_session: number | null
+  cost_per_successful_outcome: number | null
+}
+
 export interface CostAnalytics {
   total_estimated_cost: number
   model_breakdown: ModelCostBreakdown[]
   daily_costs: DailyCostEntry[]
+  workflow_breakdown: WorkflowCostBreakdown[]
 }
 
 export interface EngineerStats {

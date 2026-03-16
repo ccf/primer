@@ -13,6 +13,7 @@ from primer.common.models import (
     SessionFacets,
     SessionMessage,
     SessionRecoveryPath,
+    SessionWorkflowProfile,
     ToolUsage,
 )
 from primer.common.models import (
@@ -49,6 +50,7 @@ from primer.common.schemas import (
     ToolAdoptionEntry,
     ToolRanking,
     ToolTrendEntry,
+    WorkflowCostBreakdown,
 )
 from primer.common.source_capabilities import CAPABILITIES
 from primer.common.tool_classification import classify_tool
@@ -1002,10 +1004,112 @@ def get_cost_analytics(
 
     daily_costs = sorted(daily_map.values(), key=lambda e: e.date)
 
+    workflow_rows = (
+        db.query(
+            SessionModel.id.label("session_id"),
+            SessionWorkflowProfile.archetype,
+            SessionWorkflowProfile.label,
+            SessionFacets.outcome,
+            ModelUsage.model_name,
+            func.sum(ModelUsage.input_tokens).label("input_tokens"),
+            func.sum(ModelUsage.output_tokens).label("output_tokens"),
+            func.sum(ModelUsage.cache_read_tokens).label("cache_read_tokens"),
+            func.sum(ModelUsage.cache_creation_tokens).label("cache_creation_tokens"),
+        )
+        .select_from(SessionModel)
+        .join(ModelUsage, ModelUsage.session_id == SessionModel.id)
+        .outerjoin(SessionFacets, SessionFacets.session_id == SessionModel.id)
+        .outerjoin(SessionWorkflowProfile, SessionWorkflowProfile.session_id == SessionModel.id)
+    )
+    workflow_rows = _filter_sessions_by_capability(workflow_rows, "supports_model_usage")
+    if engineer_id:
+        workflow_rows = workflow_rows.filter(SessionModel.engineer_id == engineer_id)
+    elif team_id:
+        workflow_rows = workflow_rows.join(Engineer).filter(Engineer.team_id == team_id)
+    if start_date:
+        workflow_rows = workflow_rows.filter(SessionModel.started_at >= start_date)
+    if end_date:
+        workflow_rows = workflow_rows.filter(SessionModel.started_at <= end_date)
+    if project_name:
+        workflow_rows = workflow_rows.filter(SessionModel.project_name == project_name)
+    workflow_rows = workflow_rows.group_by(
+        SessionModel.id,
+        SessionWorkflowProfile.archetype,
+        SessionWorkflowProfile.label,
+        SessionFacets.outcome,
+        ModelUsage.model_name,
+    )
+
+    workflow_buckets: dict[tuple[str, str], dict[str, float | int]] = {}
+    for row in workflow_rows.all():
+        cost = estimate_cost(
+            row.model_name,
+            row.input_tokens or 0,
+            row.output_tokens or 0,
+            row.cache_read_tokens or 0,
+            row.cache_creation_tokens or 0,
+        )
+        dimensions = []
+        if row.archetype:
+            dimensions.append(("workflow_archetype", row.archetype))
+        if row.label:
+            dimensions.append(("workflow_fingerprint", row.label))
+
+        for dimension, label in dimensions:
+            bucket = workflow_buckets.setdefault(
+                (dimension, label),
+                {
+                    "session_ids": set(),
+                    "total_estimated_cost": 0.0,
+                    "successful_session_ids": set(),
+                },
+            )
+            session_ids = bucket["session_ids"]
+            assert isinstance(session_ids, set)
+            session_ids.add(row.session_id)
+            bucket["total_estimated_cost"] += cost
+            if is_success_outcome(row.outcome):
+                successful_ids = bucket["successful_session_ids"]
+                assert isinstance(successful_ids, set)
+                successful_ids.add(row.session_id)
+
+    workflow_breakdown: list[WorkflowCostBreakdown] = []
+    for (dimension, label), bucket in workflow_buckets.items():
+        session_count = len(bucket["session_ids"])
+        success_count = len(bucket["successful_session_ids"])
+        total_estimated_cost = float(bucket["total_estimated_cost"])
+        workflow_breakdown.append(
+            WorkflowCostBreakdown(
+                dimension=dimension,
+                label=label,
+                session_count=session_count,
+                total_estimated_cost=round(total_estimated_cost, 4),
+                avg_cost_per_session=(
+                    round(total_estimated_cost / session_count, 4) if session_count > 0 else None
+                ),
+                cost_per_successful_outcome=(
+                    round(total_estimated_cost / success_count, 4) if success_count > 0 else None
+                ),
+            )
+        )
+
+    workflow_dimension_order = {
+        "workflow_archetype": 0,
+        "workflow_fingerprint": 1,
+    }
+    workflow_breakdown.sort(
+        key=lambda row: (
+            workflow_dimension_order.get(row.dimension, 99),
+            -row.total_estimated_cost,
+            row.label,
+        )
+    )
+
     return CostAnalytics(
         total_estimated_cost=total_cost,
         model_breakdown=breakdown,
         daily_costs=daily_costs,
+        workflow_breakdown=workflow_breakdown,
     )
 
 
