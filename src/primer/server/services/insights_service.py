@@ -647,11 +647,14 @@ def get_learning_paths(
     engineers = db.query(Engineer.id, Engineer.name).filter(Engineer.id.in_(engineer_ids)).all()
     eng_names = {eid: name for eid, name in engineers}
 
-    # Session types per session
+    # Facets (expanded columns for reuse in pattern/exemplar building)
     all_facets = (
         db.query(
             SessionFacets.session_id,
             SessionFacets.session_type,
+            SessionFacets.outcome,
+            SessionFacets.agent_helpfulness,
+            SessionFacets.brief_summary,
             SessionFacets.goal_categories,
         )
         .filter(SessionFacets.session_id.in_(session_ids_q))
@@ -659,7 +662,9 @@ def get_learning_paths(
     )
     session_to_type: dict[str, str] = {}
     session_to_goals: dict[str, list[str]] = {}
+    session_facets: dict[str, object] = {}
     for f in all_facets:
+        session_facets[f.session_id] = f
         if f.session_type:
             session_to_type[f.session_id] = f.session_type
         if f.goal_categories:
@@ -672,11 +677,13 @@ def get_learning_paths(
             if isinstance(cats, list):
                 session_to_goals[f.session_id] = cats
 
-    # Build session_id → engineer_id
+    # Build session_id → engineer_id and session_map
     session_to_engineer: dict[str, str] = {}
+    session_map: dict[str, object] = {}
     for eid, sess_list in eng_sessions.items():
         for s in sess_list:
             session_to_engineer[s.id] = eid
+            session_map[s.id] = s
 
     # Tool usages
     all_tools = (
@@ -685,7 +692,11 @@ def get_learning_paths(
         .all()
     )
     eng_tool_names: dict[str, set[str]] = defaultdict(set)
+    session_tools: dict[str, list[str]] = defaultdict(list)
+    session_tool_count: dict[str, int] = defaultdict(int)
     for tu in all_tools:
+        session_tools[tu.session_id].append(tu.tool_name)
+        session_tool_count[tu.session_id] += tu.call_count
         eid = session_to_engineer.get(tu.session_id)
         if eid:
             eng_tool_names[eid].add(tu.tool_name)
@@ -731,14 +742,58 @@ def get_learning_paths(
         team_skill_universe[f"tool:{tool}"] = cnt
 
     team_skill_count = len(team_skill_universe) if team_skill_universe else 1
-    pattern_sharing = get_pattern_sharing(
-        db,
-        team_id=team_id,
-        engineer_id=engineer_id if team_id is None else None,
-        start_date=start_date,
-        end_date=end_date,
+
+    # Workflow profiles and costs for exemplar derivation
+    session_workflows: dict[str, dict[str, object]] = {
+        row.session_id: {
+            "archetype": row.archetype,
+            "label": row.label,
+            "steps": list(row.steps or []),
+        }
+        for row in (
+            db.query(
+                SessionWorkflowProfile.session_id,
+                SessionWorkflowProfile.archetype,
+                SessionWorkflowProfile.label,
+                SessionWorkflowProfile.steps,
+            )
+            .filter(SessionWorkflowProfile.session_id.in_(session_ids_q))
+            .all()
+        )
+    }
+    session_costs: dict[str, float] = defaultdict(float)
+    for row in (
+        db.query(
+            ModelUsage.session_id,
+            ModelUsage.model_name,
+            func.sum(ModelUsage.input_tokens).label("input_tokens"),
+            func.sum(ModelUsage.output_tokens).label("output_tokens"),
+            func.sum(ModelUsage.cache_read_tokens).label("cache_read_tokens"),
+            func.sum(ModelUsage.cache_creation_tokens).label("cache_creation_tokens"),
+        )
+        .filter(ModelUsage.session_id.in_(session_ids_q))
+        .group_by(ModelUsage.session_id, ModelUsage.model_name)
+        .all()
+    ):
+        session_costs[row.session_id] += estimate_cost(
+            row.model_name,
+            row.input_tokens or 0,
+            row.output_tokens or 0,
+            row.cache_read_tokens or 0,
+            row.cache_creation_tokens or 0,
+        )
+
+    _, _, exemplar_sessions = _build_patterns_and_exemplars(
+        sessions=sessions,
+        session_map=session_map,
+        session_to_engineer=session_to_engineer,
+        eng_names=eng_names,
+        session_facets=session_facets,
+        session_tools=session_tools,
+        session_tool_count=session_tool_count,
+        session_workflows=session_workflows,
+        session_costs=session_costs,
     )
-    exemplar_sessions = pattern_sharing.exemplar_sessions
 
     paths: list[EngineerLearningPath] = []
     for eid in engineer_ids:
@@ -982,6 +1037,41 @@ def get_pattern_sharing(
             row.cache_creation_tokens or 0,
         )
 
+    patterns, bright_spots, exemplar_sessions = _build_patterns_and_exemplars(
+        sessions=sessions,
+        session_map=session_map,
+        session_to_engineer=session_to_engineer,
+        eng_names=eng_names,
+        session_facets=session_facets,
+        session_tools=session_tools,
+        session_tool_count=session_tool_count,
+        session_workflows=session_workflows,
+        session_costs=session_costs,
+    )
+
+    return PatternSharingResponse(
+        patterns=patterns,
+        bright_spots=bright_spots,
+        exemplar_sessions=exemplar_sessions,
+        total_clusters_found=len(patterns),
+        sessions_analyzed=len(sessions),
+    )
+
+
+def _build_patterns_and_exemplars(
+    *,
+    sessions: list,
+    session_map: dict[str, object],
+    session_to_engineer: dict[str, str],
+    eng_names: dict[str, str],
+    session_facets: dict[str, object],
+    session_tools: dict[str, list[str]],
+    session_tool_count: dict[str, int],
+    session_workflows: dict[str, dict[str, object]],
+    session_costs: dict[str, float],
+) -> tuple[list[SharedPattern], list[BrightSpot], list[ExemplarSession]]:
+    """Build pattern clusters, bright spots, and exemplar sessions from pre-loaded data."""
+
     def _make_approach(sid: str) -> EngineerApproach:
         s = session_map[sid]
         eid = session_to_engineer[sid]
@@ -1006,7 +1096,6 @@ def get_pattern_sharing(
         approaches = [_make_approach(sid) for sid in sids]
         eng_set = {a.engineer_id for a in approaches}
 
-        # Best approach: successful + shortest duration
         successful = [
             approach
             for approach in approaches
@@ -1021,7 +1110,6 @@ def get_pattern_sharing(
         successes = sum(1 for outcome in outcomes if is_success_outcome(outcome))
         sr = round(successes / len(outcomes), 3) if outcomes else None
 
-        # Insight
         insight_parts = [f"{len(eng_set)} engineers worked on {cluster_label}"]
         if best and avg_dur and avg_dur > 0:
             pct = round((1 - best.duration_seconds / avg_dur) * 100)
@@ -1063,8 +1151,8 @@ def get_pattern_sharing(
 
     # 2. Goal category clusters
     goal_groups: dict[str, list[str]] = defaultdict(list)
-    for f in all_facets:
-        cats = f.goal_categories
+    for f in session_facets.values():
+        cats = getattr(f, "goal_categories", None)
         if cats:
             if isinstance(cats, str):
                 try:
@@ -1076,7 +1164,6 @@ def get_pattern_sharing(
                     goal_groups[cat].append(f.session_id)
 
     for cat, sids in goal_groups.items():
-        # Filter to valid session ids
         valid_sids = [sid for sid in sids if sid in session_map]
         eng_set = {session_to_engineer[sid] for sid in valid_sids}
         if len(eng_set) >= 2 and len(valid_sids) >= 3:
@@ -1088,7 +1175,6 @@ def get_pattern_sharing(
         if s.project_name:
             project_groups[s.project_name].append(s.id)
 
-    # Track projects already covered by type+project clusters
     covered_projects: set[str] = set()
     for (_, proj), sids_tp in type_project_groups.items():
         if len({session_to_engineer[sid] for sid in sids_tp}) >= 2:
@@ -1099,13 +1185,12 @@ def get_pattern_sharing(
         if len(eng_set) >= 2 and proj not in covered_projects:
             patterns.append(_build_pattern(f"project:{proj}", "project", proj, sids))
 
-    # Sort by engineer_count desc
     patterns.sort(key=lambda p: p.engineer_count, reverse=True)
 
-    return PatternSharingResponse(
-        patterns=patterns,
-        bright_spots=_derive_bright_spots(patterns),
-        exemplar_sessions=_derive_exemplar_sessions(
+    return (
+        patterns,
+        _derive_bright_spots(patterns),
+        _derive_exemplar_sessions(
             patterns,
             session_map=session_map,
             session_facets=session_facets,
@@ -1113,8 +1198,6 @@ def get_pattern_sharing(
             session_workflows=session_workflows,
             session_costs=session_costs,
         ),
-        total_clusters_found=len(patterns),
-        sessions_analyzed=len(sessions),
     )
 
 
