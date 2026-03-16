@@ -30,6 +30,7 @@ from primer.common.schemas import (
     ExemplarSession,
     LearningPathsResponse,
     LearningRecommendation,
+    LearningRecommendationExemplar,
     NewHireProgress,
     OnboardingAccelerationResponse,
     OnboardingRecommendation,
@@ -730,6 +731,14 @@ def get_learning_paths(
         team_skill_universe[f"tool:{tool}"] = cnt
 
     team_skill_count = len(team_skill_universe) if team_skill_universe else 1
+    pattern_sharing = get_pattern_sharing(
+        db,
+        team_id=team_id,
+        engineer_id=engineer_id if team_id is None else None,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    exemplar_sessions = pattern_sharing.exemplar_sessions
 
     paths: list[EngineerLearningPath] = []
     for eid in engineer_ids:
@@ -754,6 +763,11 @@ def get_learning_paths(
                         ),
                         priority="high",
                         evidence={"team_adoption": round(adoption, 2), "team_count": cnt},
+                        exemplars=_select_learning_recommendation_exemplars(
+                            "session_type_gap",
+                            stype,
+                            exemplar_sessions,
+                        ),
                     )
                 )
 
@@ -773,6 +787,11 @@ def get_learning_paths(
                         ),
                         priority=priority,
                         evidence={"team_adoption": round(adoption, 2), "team_count": cnt},
+                        exemplars=_select_learning_recommendation_exemplars(
+                            "tool_gap",
+                            tool,
+                            exemplar_sessions,
+                        ),
                     )
                 )
 
@@ -791,6 +810,11 @@ def get_learning_paths(
                         ),
                         priority="medium",
                         evidence={"team_adoption": round(adoption, 2), "team_count": cnt},
+                        exemplars=_select_learning_recommendation_exemplars(
+                            "goal_gap",
+                            cat,
+                            exemplar_sessions,
+                        ),
                     )
                 )
 
@@ -828,6 +852,11 @@ def get_learning_paths(
                             "first_avg": round(first_avg, 1),
                             "recent_avg": round(recent_avg, 1),
                         },
+                        exemplars=_select_learning_recommendation_exemplars(
+                            "complexity",
+                            "task complexity",
+                            exemplar_sessions,
+                        ),
                     )
                 )
 
@@ -1136,6 +1165,80 @@ def _derive_bright_spots(patterns: list[SharedPattern], limit: int = 3) -> list[
             )
         )
     return bright_spots
+
+
+def _select_learning_recommendation_exemplars(
+    category: str,
+    skill_area: str,
+    exemplars: list[ExemplarSession],
+    limit: int = 2,
+) -> list[LearningRecommendationExemplar]:
+    matches: list[tuple[ExemplarSession, str]] = []
+
+    for exemplar in exemplars:
+        reason = _learning_exemplar_reason(category, skill_area, exemplar)
+        if reason is not None:
+            matches.append((exemplar, reason))
+
+    matches.sort(
+        key=lambda item: (
+            -(item[0].success_rate or 0.0),
+            -item[0].supporting_engineer_count,
+            -item[0].supporting_session_count,
+            item[0].estimated_cost if item[0].estimated_cost is not None else float("inf"),
+            item[0].title,
+        )
+    )
+
+    return [
+        LearningRecommendationExemplar(
+            session_id=exemplar.session_id,
+            title=exemplar.title,
+            engineer_name=exemplar.engineer_name,
+            project_name=exemplar.project_name,
+            summary=exemplar.session_summary,
+            relevance_reason=reason,
+            workflow_archetype=exemplar.workflow_archetype,
+            workflow_fingerprint=exemplar.workflow_fingerprint,
+            duration_seconds=exemplar.duration_seconds,
+            estimated_cost=exemplar.estimated_cost,
+            tools_used=exemplar.tools_used,
+        )
+        for exemplar, reason in matches[:limit]
+    ]
+
+
+def _learning_exemplar_reason(
+    category: str, skill_area: str, exemplar: ExemplarSession
+) -> str | None:
+    if category == "session_type_gap":
+        if any(
+            pattern.cluster_type == "session_type"
+            and pattern.cluster_label.startswith(f"{skill_area} on ")
+            for pattern in exemplar.linked_patterns
+        ):
+            return f"Strong peer example of a '{skill_area}' workflow."
+        return None
+
+    if category == "goal_gap":
+        if any(
+            pattern.cluster_type == "goal_category" and pattern.cluster_label == skill_area
+            for pattern in exemplar.linked_patterns
+        ):
+            return f"Relevant exemplar for '{skill_area}' work."
+        return None
+
+    if category == "tool_gap":
+        if skill_area in exemplar.tools_used:
+            return f"Shows {skill_area} in a successful peer workflow."
+        return None
+
+    if category == "complexity":
+        if len(exemplar.workflow_steps) >= 3 or len(exemplar.tools_used) >= 3:
+            return "A stronger multi-step workflow to study when ramping complexity back up."
+        return None
+
+    return None
 
 
 def _derive_exemplar_sessions(

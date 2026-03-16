@@ -55,6 +55,9 @@ vi.mock("@/components/insights/team-skill-gaps", () => ({
 vi.mock("@/components/growth/skill-universe-chart", () => ({
   SkillUniverseChart: () => <div>skill universe</div>,
 }))
+vi.mock("@/components/growth/learning-path-cards", () => ({
+  LearningPathCards: () => <div>learning paths</div>,
+}))
 vi.mock("@/components/insights/engineer-skill-table", () => ({
   EngineerSkillTable: () => <div>engineer skill table</div>,
 }))
@@ -190,6 +193,46 @@ describe("GrowthPage", () => {
 
     expect(screen.getByText("Exemplar Session Library")).toBeInTheDocument()
     expect(screen.getByText("exemplar session library")).toBeInTheDocument()
+  })
+
+  it("shows learning paths on the skills tab", () => {
+    mockUseSkillInventory.mockReturnValue({
+      data: {
+        engineer_profiles: [],
+        team_skill_gaps: [],
+        total_engineers: 1,
+        total_session_types: 1,
+        total_tools_used: 1,
+      },
+      isLoading: false,
+    } as unknown as ReturnType<typeof useSkillInventory>)
+    mockUseLearningPaths.mockReturnValue({
+      data: {
+        engineer_paths: [
+          {
+            engineer_id: "eng-1",
+            name: "Alice Example",
+            total_sessions: 4,
+            recommendations: [],
+            coverage_score: 0.5,
+            complexity_trend: "flat",
+          },
+        ],
+        team_skill_universe: {},
+        sessions_analyzed: 4,
+      },
+      isLoading: false,
+    } as unknown as ReturnType<typeof useLearningPaths>)
+    mockUseEngineerProfile.mockReturnValue({
+      data: null,
+      isLoading: false,
+    } as unknown as ReturnType<typeof useEngineerProfile>)
+
+    renderPage()
+    fireEvent.click(screen.getByRole("button", { name: "Skills" }))
+
+    expect(screen.getByText("Learning Paths")).toBeInTheDocument()
+    expect(screen.getByText("learning paths")).toBeInTheDocument()
   })
 
   it("shows an engineer chooser for API-key admins without a selected context", () => {

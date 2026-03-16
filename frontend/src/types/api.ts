@@ -761,6 +761,20 @@ export interface SkillInventoryResponse {
 
 // --- Learning Paths ---
 
+export interface LearningRecommendationExemplar {
+  session_id: string
+  title: string
+  engineer_name: string
+  project_name: string | null
+  summary: string | null
+  relevance_reason: string
+  workflow_archetype: string | null
+  workflow_fingerprint: string | null
+  duration_seconds: number | null
+  estimated_cost: number | null
+  tools_used: string[]
+}
+
 export interface LearningRecommendation {
   category: string
   skill_area: string
@@ -768,6 +782,7 @@ export interface LearningRecommendation {
   description: string
   priority: string
   evidence: Record<string, unknown>
+  exemplars: LearningRecommendationExemplar[]
 }
 
 export interface EngineerLearningPath {

@@ -1,6 +1,8 @@
+import { Link } from "react-router-dom"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { cn } from "@/lib/utils"
+import { cn, formatCost, formatDuration, formatLabel } from "@/lib/utils"
 import type { EngineerLearningPath } from "@/types/api"
 
 const categoryColors: Record<string, string> = {
@@ -82,6 +84,49 @@ export function LearningPathCards({ paths }: LearningPathCardsProps) {
                       </Badge>
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground">{rec.description}</p>
+                    {rec.exemplars.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Study Exemplars
+                        </p>
+                        <div className="grid gap-2 lg:grid-cols-2">
+                          {rec.exemplars.map((exemplar) => (
+                            <Link
+                              key={`${rec.category}-${rec.skill_area}-${exemplar.session_id}`}
+                              to={`/sessions/${exemplar.session_id}`}
+                              className="rounded-md border border-border/70 bg-muted/20 p-3 transition-colors hover:bg-muted/40"
+                            >
+                              <div className="space-y-1">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="text-sm font-medium">{exemplar.title}</span>
+                                  {exemplar.workflow_archetype && (
+                                    <Badge variant="outline">
+                                      {formatLabel(exemplar.workflow_archetype)}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  {exemplar.engineer_name}
+                                  {exemplar.project_name ? ` • ${exemplar.project_name}` : ""}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {exemplar.relevance_reason}
+                                </p>
+                                <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                                  <span>{formatDuration(exemplar.duration_seconds)}</span>
+                                  {exemplar.estimated_cost != null && (
+                                    <span>{formatCost(exemplar.estimated_cost)}</span>
+                                  )}
+                                  {exemplar.tools_used.slice(0, 3).map((tool) => (
+                                    <span key={tool}>{tool}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
