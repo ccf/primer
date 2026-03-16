@@ -18,6 +18,7 @@ import { NewHireTable } from "@/components/growth/new-hire-table"
 import { VelocityChart } from "@/components/growth/velocity-chart"
 import { OnboardingRecommendations } from "@/components/growth/onboarding-recommendations"
 import { PatternSummary } from "@/components/growth/pattern-summary"
+import { BrightSpotCards } from "@/components/growth/bright-spot-cards"
 import { SharedPatternCards } from "@/components/growth/shared-pattern-card"
 import { SkillInventorySummary } from "@/components/insights/skill-inventory-summary"
 import { CoverageSummary } from "@/components/growth/coverage-summary"
@@ -67,6 +68,7 @@ function PatternsTab({ teamId, startDate, endDate }: TabProps) {
   return (
     <div className="space-y-6">
       <PatternSummary data={data} />
+      <BrightSpotCards spots={data.bright_spots} />
       <SharedPatternCards patterns={data.patterns} />
     </div>
   )

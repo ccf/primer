@@ -11,6 +11,7 @@ from primer.common.facet_taxonomy import canonical_outcome, is_success_outcome
 from primer.common.models import Engineer, SessionFacets, ToolUsage
 from primer.common.models import Session as SessionModel
 from primer.common.schemas import (
+    BrightSpot,
     CohortMetrics,
     ConfigOptimizationResponse,
     ConfigSuggestion,
@@ -1025,9 +1026,59 @@ def get_pattern_sharing(
 
     return PatternSharingResponse(
         patterns=patterns,
+        bright_spots=_derive_bright_spots(patterns),
         total_clusters_found=len(patterns),
         sessions_analyzed=len(sessions),
     )
+
+
+def _derive_bright_spots(patterns: list[SharedPattern], limit: int = 3) -> list[BrightSpot]:
+    candidates = [
+        pattern
+        for pattern in patterns
+        if pattern.best_approach is not None
+        and pattern.success_rate is not None
+        and pattern.success_rate >= 0.75
+        and pattern.engineer_count >= 2
+        and pattern.session_count >= 3
+    ]
+    candidates.sort(
+        key=lambda pattern: (
+            -(pattern.success_rate or 0.0),
+            -pattern.engineer_count,
+            -pattern.session_count,
+            pattern.avg_duration or float("inf"),
+        )
+    )
+
+    bright_spots: list[BrightSpot] = []
+    for pattern in candidates[:limit]:
+        exemplar = pattern.best_approach
+        if exemplar is None:
+            continue
+        bright_spots.append(
+            BrightSpot(
+                bright_spot_id=pattern.cluster_id,
+                title=f"Bright spot: {pattern.cluster_label}",
+                summary=(
+                    f"{pattern.engineer_count} engineers converged on this pattern across "
+                    f"{pattern.session_count} sessions. {exemplar.name}'s exemplar session is the "
+                    "best place to copy the approach."
+                ),
+                cluster_type=pattern.cluster_type,
+                cluster_label=pattern.cluster_label,
+                session_count=pattern.session_count,
+                engineer_count=pattern.engineer_count,
+                success_rate=pattern.success_rate,
+                avg_duration=pattern.avg_duration,
+                exemplar_session_id=exemplar.session_id,
+                exemplar_engineer_id=exemplar.engineer_id,
+                exemplar_engineer_name=exemplar.name,
+                exemplar_duration_seconds=exemplar.duration_seconds,
+                exemplar_tools=exemplar.tools_used,
+            )
+        )
+    return bright_spots
 
 
 # ---------------------------------------------------------------------------
