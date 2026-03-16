@@ -1,6 +1,6 @@
 # Primer
 
-Aggregate AI coding agent usage insights across an engineering organization.
+AI engineering intelligence platform for agentic teams.
 
 ## Key Paths
 
@@ -14,15 +14,15 @@ Aggregate AI coding agent usage insights across an engineering organization.
 | `src/primer/common/pricing.py` | Model pricing config + cost estimation (longest-prefix match) |
 | `src/primer/common/config.py` | `pydantic-settings` with `PRIMER_` env prefix |
 | `src/primer/common/database.py` | SQLAlchemy engine + session factory |
-| `src/primer/server/app.py` | FastAPI app with 14 routers, CORS, rate limiting, lifespan hooks |
+| `src/primer/server/app.py` | FastAPI app with 15 routers, CORS, rate limiting, lifespan hooks |
 | `src/primer/server/deps.py` | Auth dependency injection (`AuthContext` with role/team_id/engineer_id) |
 | `src/primer/server/middleware.py` | Rate limiting via slowapi (key function, limiter instance) |
 | `src/primer/server/routers/` | API endpoint definitions (see Routers table below) |
 | `src/primer/server/services/` | Business logic (see Services table below) |
-| `src/primer/hook/` | SessionEnd hook: multi-agent extractor registry (Claude Code, Codex CLI, Gemini CLI) |
-| `src/primer/mcp/` | MCP sidecar server (5 tools: sync, my_stats, team_overview, friction_report, recommendations) |
+| `src/primer/hook/` | Session capture layer: multi-agent extractor registry (Claude Code, Codex CLI, Gemini CLI, Cursor) |
+| `src/primer/mcp/` | MCP sidecar server (6 tools: sync, my_stats, team_overview, friction_report, recommendations, coaching) |
 | `alembic/` | Database migrations |
-| `tests/` | pytest test suite (~50 files, 491+ tests) |
+| `tests/` | Large pytest suite covering ingest, analytics, quality, auth, CLI, extractors, and UI-adjacent backend behavior |
 | `scripts/` | Dev utilities: seed_data.py, install_hook.py, verify_github.py, provision_user.py |
 
 ### Frontend
@@ -30,13 +30,14 @@ Aggregate AI coding agent usage insights across an engineering organization.
 | Path | Purpose |
 |------|---------|
 | `frontend/src/pages/` | Route pages (dashboard, sessions, engineers, engineer-profile, teams, team-detail, maturity, explorer, narrative, finops, admin, login, profile) |
-| `frontend/src/components/dashboard-v2/` | Main dashboard tabs (overview, sessions, engineers, projects, quality, insights) |
+| `frontend/src/components/dashboard/` | Organization dashboard sections (activity, attention, deep-dive cards, recommendations, charts) |
 | `frontend/src/components/finops/` | FinOps tabs (overview, cache, modeling, forecast, budgets) |
 | `frontend/src/components/engineer-profile/` | Engineer profile views (trajectory, strengths, friction, quality, narrative) |
 | `frontend/src/components/session-insights/` | Session analytics charts (health, cache, satisfaction, goals, friction) |
 | `frontend/src/components/sessions/` | Session browser, search, filters, transcript viewer, cost/tool charts |
 | `frontend/src/components/maturity/` | AI maturity scoring (leverage, tool categories, project readiness) |
 | `frontend/src/components/growth/` | Onboarding acceleration (cohorts, ramp-up, learning paths, patterns) |
+| `frontend/src/components/projects/` | Project workspace cards for readiness, workflows, enablement, repositories, and comparisons |
 | `frontend/src/components/quality/` | Code quality metrics, Claude PR comparison, review findings, GitHub integration |
 | `frontend/src/components/explorer/` | Conversational data explorer (floating chat, SSE streaming) |
 | `frontend/src/components/narrative/` | AI-generated narrative insights |
@@ -67,6 +68,7 @@ Aggregate AI coding agent usage insights across an engineering organization.
 | `explorer.py` | SSE streaming conversational data explorer |
 | `admin.py` | System stats, audit logs, engineer/team/alert management |
 | `finops.py` | Cache analytics, cost modeling, forecasting, budget CRUD |
+| `interventions.py` | Recommendation-to-intervention workflow and effectiveness reporting |
 
 ### Services
 
@@ -78,8 +80,12 @@ Aggregate AI coding agent usage insights across an engineering organization.
 | `insights_service.py` | Productivity metrics, bottleneck detection, pattern sharing, learning paths, skill inventory, config optimization |
 | `session_insights_service.py` | Session-level insights: end reasons, satisfaction, friction clusters, cache efficiency, health scoring, goals |
 | `engineer_profile_service.py` | Engineer trajectory, strengths, friction, quality aggregation |
+| `project_workspace_service.py` | Project readiness, workflow fingerprints, friction hotspots, scorecards, comparisons |
+| `workflow_profile_service.py` | Derive per-session workflow fingerprints, archetypes, and workflow signals |
+| `workflow_playbook_service.py` | Build workflow playbooks from successful peer patterns |
 | `narrative_service.py` | Claude API-powered narrative insights with caching and auto-refresh |
 | `synthesis_service.py` | AI synthesis of recommendations |
+| `coaching_service.py` | Personalized in-workflow coaching brief from analytics, tips, and maturity data |
 | `facet_extraction_service.py` | LLM-powered session facet extraction (goal, friction, satisfaction) |
 | `explorer_service.py` | Conversational data explorer (tool-use chat with Anthropic API) |
 | `quality_service.py` | Code quality metrics, Claude PR comparison, review findings aggregation, GitHub integration |
@@ -139,7 +145,7 @@ cd frontend && npx tsc -b --noEmit  # Type check
 - **Auth**: bcrypt-hashed API keys for engineers, GitHub OAuth + JWT (access + refresh) for dashboard, plain admin key via `x-admin-key` header
 - **Services**: Service-layer pattern — routers call services, services own DB logic
 - **MCP**: `FastMCP` server with `httpx` calls back to the REST API
-- **Hook**: Multi-agent extractor registry (Claude Code, Codex CLI, Gemini CLI) with SessionEnd hook
+- **Hook**: Multi-agent capture layer with extractor registry (Claude Code, Codex CLI, Gemini CLI, Cursor)
 - **Pricing**: `src/primer/common/pricing.py` — longest-prefix match on model name, falls back to Sonnet 4 pricing
 - **Theming**: CSS custom properties in `index.css`, `.dark` class toggle, localStorage-persisted preference
 - **Rate Limiting**: slowapi middleware with per-route limits; key function uses API key prefix or client IP
@@ -151,6 +157,7 @@ cd frontend && npx tsc -b --noEmit  # Type check
 - **GitHub Integration**: App-based PR/commit fetching, AI readiness scoring (CLAUDE.md, AGENTS.md detection)
 - **Review Findings**: Extensible parser registry (`@register_parser` decorator) for automated review bot comments (BugBot); fetches issue comments, PR review comments, and review bodies; upsert with unique constraint deduplication
 - **FinOps**: Cache savings via per-model pricing deltas, cost modeling (API vs subscription tiers), linear regression forecasting, budget burn-rate tracking
+- **Workflow Intelligence**: Derived workflow profiles, project workflow fingerprints, workflow playbooks, and workflow-based quality attribution
 
 ## Conventions
 
