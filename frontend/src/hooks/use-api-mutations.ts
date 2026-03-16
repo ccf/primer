@@ -1,6 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiFetch } from "@/lib/api"
-import type { AlertConfigResponse, BudgetStatus, NarrativeResponse } from "@/types/api"
+import type {
+  AlertConfigResponse,
+  BudgetStatus,
+  NarrativeResponse,
+  WorkflowProfileBackfillSummary,
+} from "@/types/api"
 
 export function useAcknowledgeAlert() {
   const qc = useQueryClient()
@@ -198,6 +203,30 @@ export function useDeleteBudget() {
     mutationFn: (id: string) =>
       apiFetch<void>(`/api/v1/finops/budgets/${id}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["finops-budgets"] }),
+  })
+}
+
+export function useBackfillWorkflowProfiles() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      limit,
+      recompute,
+      dryRun,
+    }: {
+      limit?: number
+      recompute?: boolean
+      dryRun?: boolean
+    }) =>
+      apiFetch<WorkflowProfileBackfillSummary>(
+        `/api/v1/admin/backfill-workflow-profiles?limit=${limit ?? 5000}&recompute=${String(recompute ?? false)}&dry_run=${String(dryRun ?? false)}`,
+        { method: "POST" },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["measurement-integrity"] })
+      qc.invalidateQueries({ queryKey: ["audit-logs"] })
+      qc.invalidateQueries({ queryKey: ["sessions"] })
+    },
   })
 }
 

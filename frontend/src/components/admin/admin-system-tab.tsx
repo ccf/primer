@@ -12,16 +12,19 @@ import {
   Users,
 } from "lucide-react"
 import { useMeasurementIntegrity, useSystemStats } from "@/hooks/use-api-queries"
+import { useBackfillWorkflowProfiles } from "@/hooks/use-api-mutations"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { formatNumber } from "@/lib/utils"
 import { CardSkeleton } from "@/components/shared/loading-skeleton"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type {
   AgentSourceQuality,
   MeasurementIntegrityStats,
   RepositoryQuality,
   TelemetryParity,
+  WorkflowProfileCoverageRow,
 } from "@/types/api"
 
 function formatCoverage(value: number): string {
@@ -217,6 +220,53 @@ function RepositoryQualityTable({ rows }: { rows: RepositoryQuality[] }) {
   )
 }
 
+function WorkflowProfileCoverageTable({ rows }: { rows: WorkflowProfileCoverageRow[] }) {
+  if (rows.length === 0) {
+    return <p className="text-sm text-muted-foreground">No workflow coverage data yet.</p>
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-4">
+        <CardTitle>Workflow Coverage</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Coverage shows how many sessions per agent currently have a derived workflow profile.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="text-left text-muted-foreground">
+              <tr className="border-b border-border/60">
+                <th className="pb-3 pr-4 font-medium">Agent</th>
+                <th className="pb-3 pr-4 font-medium">Sessions</th>
+                <th className="pb-3 pr-4 font-medium">Profiles</th>
+                <th className="pb-3 font-medium">Coverage</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.agent_type} className="border-b border-border/40 last:border-b-0">
+                  <td className="py-3 pr-4 font-medium">{row.agent_type}</td>
+                  <td className="py-3 pr-4 text-muted-foreground">
+                    {formatNumber(row.session_count)}
+                  </td>
+                  <td className="py-3 pr-4 text-muted-foreground">
+                    {formatNumber(row.sessions_with_workflow_profiles)}
+                  </td>
+                  <td className="py-3 font-medium">
+                    {formatCoverage(row.workflow_profile_coverage_pct)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 function githubSyncSubtitle(integrity: MeasurementIntegrityStats): string {
   if (integrity.sessions_with_commit_sync_target === 0) {
     return "No repo-linked commit sessions yet"
@@ -233,9 +283,32 @@ function repositoryMetadataSubtitle(integrity: MeasurementIntegrityStats): strin
   return `${formatNumber(integrity.repositories_with_complete_metadata)} of ${formatNumber(integrity.repositories_in_scope)} linked repositories complete`
 }
 
+function workflowCoverageSubtitle(integrity: MeasurementIntegrityStats): string {
+  return `${formatNumber(integrity.sessions_with_workflow_profiles)} of ${formatNumber(integrity.total_sessions)} sessions`
+}
+
+function backfillSummaryLabel(result: {
+  sessions_scanned: number
+  profiles_created: number
+  profiles_updated: number
+  profiles_deleted: number
+  sessions_unchanged: number
+  sessions_skipped: number
+}) {
+  return [
+    `${formatNumber(result.sessions_scanned)} scanned`,
+    `${formatNumber(result.profiles_created)} created`,
+    `${formatNumber(result.profiles_updated)} updated`,
+    `${formatNumber(result.profiles_deleted)} deleted`,
+    `${formatNumber(result.sessions_unchanged)} unchanged`,
+    `${formatNumber(result.sessions_skipped)} skipped`,
+  ].join(" · ")
+}
+
 export function AdminSystemTab() {
   const { data: stats, isLoading: isSystemLoading } = useSystemStats()
   const { data: integrity, isLoading: isIntegrityLoading } = useMeasurementIntegrity()
+  const workflowBackfill = useBackfillWorkflowProfiles()
 
   if (isSystemLoading) {
     return (
@@ -282,7 +355,39 @@ export function AdminSystemTab() {
       </section>
 
       <section className="space-y-4">
-        <h3 className="text-lg font-semibold">Measurement Integrity</h3>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold">Measurement Integrity</h3>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={workflowBackfill.isPending}
+              onClick={() => workflowBackfill.mutate({ limit: 5000, recompute: false, dryRun: false })}
+            >
+              <RefreshCcw className="mr-2 h-4 w-4" />
+              Backfill Workflow Profiles
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={workflowBackfill.isPending}
+              onClick={() => workflowBackfill.mutate({ limit: 5000, recompute: true, dryRun: false })}
+            >
+              <RefreshCcw className="mr-2 h-4 w-4" />
+              Recompute Workflow Profiles
+            </Button>
+          </div>
+        </div>
+        {workflowBackfill.data && (
+          <p className="text-sm text-muted-foreground">
+            Workflow profile backfill completed: {backfillSummaryLabel(workflowBackfill.data)}
+          </p>
+        )}
+        {workflowBackfill.error && (
+          <p className="text-sm text-destructive">
+            Failed to update workflow profiles. Please try again.
+          </p>
+        )}
         {isIntegrityLoading ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             {Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)}
@@ -300,6 +405,12 @@ export function AdminSystemTab() {
               value={formatCoverage(integrity.transcript_coverage_pct)}
               subtitle={`${formatNumber(integrity.sessions_with_messages)} of ${formatNumber(integrity.total_sessions)} sessions`}
               icon={FileText}
+            />
+            <StatCard
+              label="Workflow Profiles"
+              value={formatCoverage(integrity.workflow_profile_coverage_pct)}
+              subtitle={workflowCoverageSubtitle(integrity)}
+              icon={RefreshCcw}
             />
             <StatCard
               label="GitHub Sync"
@@ -330,6 +441,9 @@ export function AdminSystemTab() {
           <p className="text-sm text-muted-foreground">Measurement integrity data is unavailable.</p>
         )}
         {!isIntegrityLoading && integrity && <SourceQualityTable rows={integrity.source_quality} />}
+        {!isIntegrityLoading && integrity && (
+          <WorkflowProfileCoverageTable rows={integrity.workflow_profile_quality} />
+        )}
         {!isIntegrityLoading && integrity && (
           <RepositoryQualityTable rows={integrity.repository_quality} />
         )}

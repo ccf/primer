@@ -499,12 +499,21 @@ export interface RepositoryQuality {
   readiness_checked: boolean
 }
 
+export interface WorkflowProfileCoverageRow {
+  agent_type: AgentType
+  session_count: number
+  sessions_with_workflow_profiles: number
+  workflow_profile_coverage_pct: number
+}
+
 export interface MeasurementIntegrityStats {
   total_sessions: number
   sessions_with_messages: number
   sessions_with_facets: number
+  sessions_with_workflow_profiles: number
   facet_coverage_pct: number
   transcript_coverage_pct: number
+  workflow_profile_coverage_pct: number
   sessions_with_commit_sync_target: number
   sessions_with_linked_pull_requests: number
   github_sync_coverage_pct: number
@@ -522,6 +531,16 @@ export interface MeasurementIntegrityStats {
   remaining_legacy_rows: number
   source_quality: AgentSourceQuality[]
   repository_quality: RepositoryQuality[]
+  workflow_profile_quality: WorkflowProfileCoverageRow[]
+}
+
+export interface WorkflowProfileBackfillSummary {
+  sessions_scanned: number
+  profiles_created: number
+  profiles_updated: number
+  profiles_deleted: number
+  sessions_unchanged: number
+  sessions_skipped: number
 }
 
 export interface IngestEventResponse {

@@ -293,6 +293,62 @@ def test_measurement_integrity_stats_include_source_quality_breakdown(
     }
 
 
+def test_measurement_integrity_stats_include_workflow_profile_coverage(
+    client, admin_headers, engineer_with_key, db_session
+):
+    eng, _api_key = engineer_with_key
+
+    session_with_profile = _create_measurement_integrity_session(
+        db_session,
+        eng.id,
+        agent_type="claude_code",
+        with_messages=True,
+        with_tool_usage=True,
+    )
+    _create_measurement_integrity_session(
+        db_session,
+        eng.id,
+        agent_type="cursor",
+        with_messages=True,
+    )
+    db_session.add(
+        SessionWorkflowProfile(
+            session_id=session_with_profile,
+            fingerprint_id="debugging::read+edit+ship",
+            label="debugging: read -> edit -> ship",
+            steps=["read", "edit", "ship"],
+            archetype="debugging",
+            archetype_source="heuristic",
+            archetype_reason="Recovered from a failing flow",
+            top_tools=["Read", "Edit"],
+            delegation_count=0,
+            verification_run_count=1,
+        )
+    )
+    db_session.flush()
+
+    response = client.get("/api/v1/admin/measurement-integrity", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["sessions_with_workflow_profiles"] == 1
+    assert data["workflow_profile_coverage_pct"] == pytest.approx(50.0, abs=0.1)
+
+    workflow_quality = {row["agent_type"]: row for row in data["workflow_profile_quality"]}
+    assert workflow_quality["claude_code"] == {
+        "agent_type": "claude_code",
+        "session_count": 1,
+        "sessions_with_workflow_profiles": 1,
+        "workflow_profile_coverage_pct": 100.0,
+    }
+    assert workflow_quality["cursor"] == {
+        "agent_type": "cursor",
+        "session_count": 1,
+        "sessions_with_workflow_profiles": 0,
+        "workflow_profile_coverage_pct": 0.0,
+    }
+
+
 def test_measurement_integrity_stats_count_missing_supported_tool_and_model_telemetry(
     client, admin_headers, engineer_with_key, db_session
 ):

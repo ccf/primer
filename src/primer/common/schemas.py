@@ -831,12 +831,21 @@ class RepositoryQuality(BaseModel):
     readiness_checked: bool
 
 
+class WorkflowProfileCoverageRow(BaseModel):
+    agent_type: AgentType
+    session_count: int
+    sessions_with_workflow_profiles: int
+    workflow_profile_coverage_pct: float
+
+
 class MeasurementIntegrityStats(BaseModel):
     total_sessions: int
     sessions_with_messages: int
     sessions_with_facets: int
+    sessions_with_workflow_profiles: int
     facet_coverage_pct: float
     transcript_coverage_pct: float
+    workflow_profile_coverage_pct: float
     sessions_with_commit_sync_target: int
     sessions_with_linked_pull_requests: int
     github_sync_coverage_pct: float
@@ -854,6 +863,7 @@ class MeasurementIntegrityStats(BaseModel):
     remaining_legacy_rows: int
     source_quality: list[AgentSourceQuality] = Field(default_factory=list)
     repository_quality: list[RepositoryQuality] = Field(default_factory=list)
+    workflow_profile_quality: list[WorkflowProfileCoverageRow] = Field(default_factory=list)
 
 
 class FacetNormalizationSummary(BaseModel):
