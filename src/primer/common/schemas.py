@@ -1098,6 +1098,20 @@ class SkillInventoryResponse(BaseModel):
 # --- Learning Paths ---
 
 
+class LearningRecommendationExemplar(BaseModel):
+    session_id: str
+    title: str
+    engineer_name: str
+    project_name: str | None = None
+    summary: str | None = None
+    relevance_reason: str
+    workflow_archetype: str | None = None
+    workflow_fingerprint: str | None = None
+    duration_seconds: float | None
+    estimated_cost: float | None = None
+    tools_used: list[str]
+
+
 class LearningRecommendation(BaseModel):
     category: str  # "session_type_gap", "tool_gap", "complexity", "goal_gap"
     skill_area: str
@@ -1105,6 +1119,7 @@ class LearningRecommendation(BaseModel):
     description: str
     priority: str  # "high", "medium", "low"
     evidence: dict
+    exemplars: list[LearningRecommendationExemplar] = []
 
 
 class EngineerLearningPath(BaseModel):

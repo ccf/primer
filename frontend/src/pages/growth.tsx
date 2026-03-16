@@ -25,6 +25,7 @@ import { SkillInventorySummary } from "@/components/insights/skill-inventory-sum
 import { CoverageSummary } from "@/components/growth/coverage-summary"
 import { TeamSkillGaps } from "@/components/insights/team-skill-gaps"
 import { SkillUniverseChart } from "@/components/growth/skill-universe-chart"
+import { LearningPathCards } from "@/components/growth/learning-path-cards"
 import { WorkflowPlaybookCards } from "@/components/growth/workflow-playbook-cards"
 import { EngineerSkillTable } from "@/components/insights/engineer-skill-table"
 import { Card, CardContent } from "@/components/ui/card"
@@ -100,6 +101,17 @@ function SkillsTab({ teamId, startDate, endDate }: TabProps) {
         <div className="grid gap-6 lg:grid-cols-2">
           <TeamSkillGaps data={skills.team_skill_gaps} />
           <SkillUniverseChart universe={learning.team_skill_universe} />
+        </div>
+      )}
+      {learning && learning.engineer_paths.length > 0 && (
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <h3 className="text-sm font-medium">Learning Paths</h3>
+            <p className="text-sm text-muted-foreground">
+              Personalized recommendations with exemplar peer sessions to study.
+            </p>
+          </div>
+          <LearningPathCards paths={learning.engineer_paths} />
         </div>
       )}
       {skills && <EngineerSkillTable data={skills.engineer_profiles} />}

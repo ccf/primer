@@ -130,6 +130,128 @@ class TestLearningPaths:
         assert len(tool_recs) >= 1
         assert any("Grep" in r["skill_area"] for r in tool_recs)
 
+    def test_learning_recommendations_include_relevant_exemplar_sessions(
+        self, client, db_session, admin_headers
+    ):
+        team, engineers = _create_team_engineers(db_session, 3)
+        now = datetime.now(UTC)
+
+        peer_session_ids = []
+        for engineer, duration in zip(engineers[:2], [180.0, 75.0], strict=True):
+            session = _create_session(
+                db_session,
+                engineer,
+                started_at=now - timedelta(hours=1),
+                project_name="primer",
+                duration_seconds=duration,
+                summary="Debugged the auth flow with a lightweight fix loop.",
+            )
+            peer_session_ids.append(session.id)
+            db_session.add(
+                SessionFacets(
+                    session_id=session.id,
+                    session_type="debugging",
+                    outcome="success",
+                    brief_summary="Reproduced and fixed an auth regression.",
+                    goal_categories=["auth"],
+                )
+            )
+            db_session.add(ToolUsage(session_id=session.id, tool_name="Read", call_count=5))
+            db_session.add(ToolUsage(session_id=session.id, tool_name="Edit", call_count=2))
+
+        db_session.add(
+            SessionWorkflowProfile(
+                session_id=peer_session_ids[1],
+                fingerprint_id="debugging::read+edit+execute+fix",
+                label="debugging: read -> edit -> execute -> fix",
+                steps=["read", "edit", "execute", "fix"],
+                archetype="debugging",
+                archetype_source="session_type",
+                top_tools=["Read", "Edit"],
+            )
+        )
+        db_session.add(
+            ModelUsage(
+                session_id=peer_session_ids[1],
+                model_name="claude-sonnet-4",
+                input_tokens=1000,
+                output_tokens=500,
+                cache_read_tokens=0,
+                cache_creation_tokens=0,
+            )
+        )
+        extra_auth_session = _create_session(
+            db_session,
+            engineers[0],
+            started_at=now - timedelta(minutes=50),
+            project_name="primer",
+            duration_seconds=210.0,
+        )
+        db_session.add(
+            SessionFacets(
+                session_id=extra_auth_session.id,
+                session_type="debugging",
+                outcome="success",
+                goal_categories=["auth"],
+            )
+        )
+        db_session.add(ToolUsage(session_id=extra_auth_session.id, tool_name="Read", call_count=4))
+        db_session.add(ToolUsage(session_id=extra_auth_session.id, tool_name="Edit", call_count=1))
+
+        learner_session = _create_session(
+            db_session,
+            engineers[2],
+            started_at=now - timedelta(minutes=30),
+            project_name="primer",
+            duration_seconds=120.0,
+        )
+        db_session.add(
+            SessionFacets(
+                session_id=learner_session.id,
+                session_type="feature",
+                outcome="success",
+                goal_categories=["ui_component"],
+            )
+        )
+        db_session.add(ToolUsage(session_id=learner_session.id, tool_name="Read", call_count=3))
+        db_session.flush()
+
+        response = client.get(
+            f"/api/v1/analytics/learning-paths?team_id={team.id}",
+            headers=admin_headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+
+        learner_path = next(
+            path for path in data["engineer_paths"] if path["engineer_id"] == engineers[2].id
+        )
+        session_type_gap = next(
+            rec
+            for rec in learner_path["recommendations"]
+            if rec["category"] == "session_type_gap" and rec["skill_area"] == "debugging"
+        )
+        assert session_type_gap["exemplars"][0]["session_id"] == peer_session_ids[1]
+        assert session_type_gap["exemplars"][0]["workflow_fingerprint"] == (
+            "debugging: read -> edit -> execute -> fix"
+        )
+        assert "debugging" in session_type_gap["exemplars"][0]["relevance_reason"]
+
+        tool_gap = next(
+            rec
+            for rec in learner_path["recommendations"]
+            if rec["category"] == "tool_gap" and rec["skill_area"] == "Edit"
+        )
+        assert tool_gap["exemplars"][0]["session_id"] == peer_session_ids[1]
+        assert tool_gap["exemplars"][0]["estimated_cost"] == 0.0105
+
+        goal_gap = next(
+            rec
+            for rec in learner_path["recommendations"]
+            if rec["category"] == "goal_gap" and rec["skill_area"] == "auth"
+        )
+        assert goal_gap["exemplars"][0]["session_id"] == peer_session_ids[1]
+
     def test_complexity_trend_increasing(self, client, db_session, admin_headers):
         """Rising tool_call_count + message_count over time → increasing trend."""
         team, engineers = _create_team_engineers(db_session, 1)
