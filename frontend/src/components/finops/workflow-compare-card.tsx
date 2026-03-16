@@ -1,7 +1,7 @@
 import { useState } from "react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { formatCost, formatLabel, formatPercent } from "@/lib/utils"
+import { formatCost, formatLabel, formatMetric, formatPercent } from "@/lib/utils"
 import type { QualityAttributionRow, WorkflowCostBreakdown } from "@/types/api"
 
 type CompareDimension = "workflow_archetype" | "workflow_fingerprint"
@@ -18,10 +18,6 @@ const DIMENSION_LABELS: Record<CompareDimension, string> = {
 
 function displayLabel(value: string, dimension: CompareDimension) {
   return dimension === "workflow_archetype" ? formatLabel(value) : value
-}
-
-function formatMetric(value: number | null | undefined, digits = 1): string {
-  return value == null ? "-" : value.toFixed(digits)
 }
 
 export function WorkflowCompareCard({

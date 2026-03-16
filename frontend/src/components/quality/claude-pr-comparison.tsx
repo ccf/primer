@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { CardSkeleton } from "@/components/shared/loading-skeleton"
 import { useClaudePRComparison } from "@/hooks/use-api-queries"
-import { cn } from "@/lib/utils"
+import { cn, formatMetric } from "@/lib/utils"
 import { GitPullRequest } from "lucide-react"
 import type { PRGroupMetrics } from "@/types/api"
 
@@ -11,9 +11,9 @@ interface ClaudePRComparisonProps {
   endDate?: string
 }
 
-function formatMetric(value: number | null, suffix = ""): string {
-  if (value == null) return "-"
-  return `${value.toFixed(1)}${suffix}`
+function formatMetricWithSuffix(value: number | null, suffix = ""): string {
+  const base = formatMetric(value)
+  return base === "-" ? base : `${base}${suffix}`
 }
 
 function DeltaIndicator({ value }: { value: number | null }) {
@@ -56,8 +56,8 @@ function MetricRow({
   return (
     <div className="grid grid-cols-4 gap-4 border-b border-border py-3 last:border-0">
       <div className="text-sm text-muted-foreground">{label}</div>
-      <div className="text-sm font-medium">{formatMetric(claudeValue, suffix)}</div>
-      <div className="text-sm font-medium">{formatMetric(otherValue, suffix)}</div>
+      <div className="text-sm font-medium">{formatMetricWithSuffix(claudeValue, suffix)}</div>
+      <div className="text-sm font-medium">{formatMetricWithSuffix(otherValue, suffix)}</div>
       <div className="flex items-center">
         <DeltaIndicator value={displayDelta ?? null} />
       </div>
