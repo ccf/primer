@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { formatDuration, formatPercent } from "@/lib/utils"
+import { formatDuration, formatPercent, titleize } from "@/lib/utils"
 import type { WorkflowPlaybook } from "@/types/api"
 
 interface WorkflowPlaybookCardsProps {
@@ -11,10 +11,6 @@ const adoptionVariant: Record<string, "default" | "secondary" | "outline"> = {
   not_used: "default",
   underused: "secondary",
   already_using: "outline",
-}
-
-function titleize(value: string) {
-  return value.replaceAll("_", " ")
 }
 
 export function WorkflowPlaybookCards({ playbooks }: WorkflowPlaybookCardsProps) {

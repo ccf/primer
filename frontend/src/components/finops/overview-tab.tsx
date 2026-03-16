@@ -17,7 +17,7 @@ export function OverviewTab({ teamId, startDate, endDate }: OverviewTabProps) {
   const productivity = useProductivity(teamId, startDate, endDate)
   const quality = useQualityMetrics(teamId, startDate, endDate)
 
-  if (costs.isLoading || productivity.isLoading || quality.isLoading) {
+  if (costs.isLoading || productivity.isLoading) {
     return (
       <div className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -32,7 +32,7 @@ export function OverviewTab({ teamId, startDate, endDate }: OverviewTabProps) {
     )
   }
 
-  if (!costs.data || !productivity.data || !quality.data) return null
+  if (!costs.data || !productivity.data) return null
 
   const costData = costs.data
   const prod = productivity.data
@@ -85,7 +85,7 @@ export function OverviewTab({ teamId, startDate, endDate }: OverviewTabProps) {
 
       <WorkflowCompareCard
         workflowCosts={costData.workflow_breakdown}
-        qualityRows={quality.data.attribution}
+        qualityRows={quality.data?.attribution ?? []}
       />
     </div>
   )

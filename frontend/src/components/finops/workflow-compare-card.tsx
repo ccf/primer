@@ -36,13 +36,29 @@ export function WorkflowCompareCard({
       ? rightLabel
       : (labels.find((label) => label !== effectiveLeftLabel) ?? "")
 
+  const dimensionSelector = (
+    <label className="space-y-1">
+      <span className="text-xs font-medium text-muted-foreground">Dimension</span>
+      <select
+        aria-label="Dimension"
+        value={dimension}
+        onChange={(e) => setDimension(e.target.value as CompareDimension)}
+        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+      >
+        <option value="workflow_archetype">{DIMENSION_LABELS.workflow_archetype}</option>
+        <option value="workflow_fingerprint">{DIMENSION_LABELS.workflow_fingerprint}</option>
+      </select>
+    </label>
+  )
+
   if (options.length < 2) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Workflow Compare</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <div className="max-w-xs">{dimensionSelector}</div>
           <p className="text-sm text-muted-foreground">
             Need at least two workflows with cost data to compare them.
           </p>
@@ -78,17 +94,7 @@ export function WorkflowCompareCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-4 md:grid-cols-3">
-          <label className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">Dimension</span>
-            <select
-              value={dimension}
-              onChange={(e) => setDimension(e.target.value as CompareDimension)}
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="workflow_archetype">{DIMENSION_LABELS.workflow_archetype}</option>
-              <option value="workflow_fingerprint">{DIMENSION_LABELS.workflow_fingerprint}</option>
-            </select>
-          </label>
+          {dimensionSelector}
 
           <label className="space-y-1">
             <span className="text-xs font-medium text-muted-foreground">Workflow A</span>
@@ -175,8 +181,12 @@ export function WorkflowCompareCard({
               </tr>
               <tr className="border-b border-border/40">
                 <td className="px-3 py-2 font-medium">Reviews / PR</td>
-                <td className="px-3 py-2">{formatMetric(leftQuality?.avg_review_comments_per_pr)}</td>
-                <td className="px-3 py-2">{formatMetric(rightQuality?.avg_review_comments_per_pr)}</td>
+                <td className="px-3 py-2">
+                  {formatMetric(leftQuality?.avg_review_comments_per_pr)}
+                </td>
+                <td className="px-3 py-2">
+                  {formatMetric(rightQuality?.avg_review_comments_per_pr)}
+                </td>
               </tr>
               <tr className="border-b border-border/40">
                 <td className="px-3 py-2 font-medium">Findings / PR</td>
@@ -185,8 +195,12 @@ export function WorkflowCompareCard({
               </tr>
               <tr>
                 <td className="px-3 py-2 font-medium">Merge Time (h)</td>
-                <td className="px-3 py-2">{formatMetric(leftQuality?.avg_time_to_merge_hours)}</td>
-                <td className="px-3 py-2">{formatMetric(rightQuality?.avg_time_to_merge_hours)}</td>
+                <td className="px-3 py-2">
+                  {formatMetric(leftQuality?.avg_time_to_merge_hours)}
+                </td>
+                <td className="px-3 py-2">
+                  {formatMetric(rightQuality?.avg_time_to_merge_hours)}
+                </td>
               </tr>
             </tbody>
           </table>
