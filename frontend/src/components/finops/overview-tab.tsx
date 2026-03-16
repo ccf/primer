@@ -1,7 +1,8 @@
-import { useCostAnalytics, useProductivity } from "@/hooks/use-api-queries"
+import { useCostAnalytics, useProductivity, useQualityMetrics } from "@/hooks/use-api-queries"
 import { DailyCostChart } from "@/components/dashboard/daily-cost-chart"
 import { CostBreakdownChart } from "@/components/dashboard/cost-breakdown-chart"
 import { WorkflowCostTable } from "@/components/finops/workflow-cost-table"
+import { WorkflowCompareCard } from "@/components/finops/workflow-compare-card"
 import { CardSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleton"
 import { formatCost, getModelPricing } from "@/lib/utils"
 
@@ -14,8 +15,9 @@ interface OverviewTabProps {
 export function OverviewTab({ teamId, startDate, endDate }: OverviewTabProps) {
   const costs = useCostAnalytics(teamId, startDate, endDate)
   const productivity = useProductivity(teamId, startDate, endDate)
+  const quality = useQualityMetrics(teamId, startDate, endDate)
 
-  if (costs.isLoading || productivity.isLoading) {
+  if (costs.isLoading || productivity.isLoading || quality.isLoading) {
     return (
       <div className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -30,7 +32,7 @@ export function OverviewTab({ teamId, startDate, endDate }: OverviewTabProps) {
     )
   }
 
-  if (!costs.data || !productivity.data) return null
+  if (!costs.data || !productivity.data || !quality.data) return null
 
   const costData = costs.data
   const prod = productivity.data
@@ -80,6 +82,11 @@ export function OverviewTab({ teamId, startDate, endDate }: OverviewTabProps) {
       </div>
 
       <WorkflowCostTable rows={costData.workflow_breakdown} />
+
+      <WorkflowCompareCard
+        workflowCosts={costData.workflow_breakdown}
+        qualityRows={quality.data.attribution}
+      />
     </div>
   )
 }
