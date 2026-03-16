@@ -11,6 +11,7 @@ from primer.common.models import (
     SessionCommit,
     SessionFacets,
     SessionMessage,
+    SessionWorkflowProfile,
     ToolUsage,
 )
 from primer.common.models import (
@@ -225,6 +226,12 @@ def get_measurement_integrity_stats(
         or 0
     )
     sessions_with_facets = _scoped_facets_query(db, scoped_session_ids).count()
+    sessions_with_workflow_profiles = (
+        db.query(func.count(func.distinct(SessionWorkflowProfile.session_id)))
+        .join(scoped_session_ids, SessionWorkflowProfile.session_id == scoped_session_ids.c.id)
+        .scalar()
+        or 0
+    )
     low_confidence_sessions = (
         _scoped_facets_query(db, scoped_session_ids)
         .filter(
@@ -287,6 +294,15 @@ def get_measurement_integrity_stats(
         db,
         SessionFacets,
         SessionFacets.session_id,
+        team_id=team_id,
+        engineer_id=engineer_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    workflow_profile_sessions_by_agent = _grouped_related_counts(
+        db,
+        SessionWorkflowProfile,
+        SessionWorkflowProfile.session_id,
         team_id=team_id,
         engineer_id=engineer_id,
         start_date=start_date,
@@ -418,6 +434,10 @@ def get_measurement_integrity_stats(
     transcript_coverage_pct = _coverage_pct(
         required_transcript_sessions_with_messages, required_transcript_session_count
     )
+    workflow_profile_coverage_pct = _coverage_pct(
+        sessions_with_workflow_profiles,
+        total_sessions,
+    )
     github_sync_coverage_pct = _coverage_pct(
         sessions_with_linked_pull_requests, sessions_with_commit_sync_target
     )
@@ -442,6 +462,7 @@ def get_measurement_integrity_stats(
         for row in repository_linked_pr_rows
     }
     repository_quality: list[dict[str, str | int | float | bool | None]] = []
+    workflow_profile_quality: list[dict[str, str | int | float]] = []
     for row in repository_rows:
         has_github_id = row.github_id is not None
         has_default_branch = row.default_branch is not None
@@ -524,12 +545,28 @@ def get_measurement_integrity_stats(
             }
         )
 
+        workflow_profile_quality.append(
+            {
+                "agent_type": agent_type,
+                "session_count": session_count,
+                "sessions_with_workflow_profiles": workflow_profile_sessions_by_agent.get(
+                    agent_type, 0
+                ),
+                "workflow_profile_coverage_pct": _coverage_pct(
+                    workflow_profile_sessions_by_agent.get(agent_type, 0),
+                    session_count,
+                ),
+            }
+        )
+
     return {
         "total_sessions": total_sessions,
         "sessions_with_messages": sessions_with_messages,
         "sessions_with_facets": sessions_with_facets,
+        "sessions_with_workflow_profiles": sessions_with_workflow_profiles,
         "facet_coverage_pct": facet_coverage_pct,
         "transcript_coverage_pct": transcript_coverage_pct,
+        "workflow_profile_coverage_pct": workflow_profile_coverage_pct,
         "sessions_with_commit_sync_target": sessions_with_commit_sync_target,
         "sessions_with_linked_pull_requests": sessions_with_linked_pull_requests,
         "github_sync_coverage_pct": github_sync_coverage_pct,
@@ -547,6 +584,7 @@ def get_measurement_integrity_stats(
         "sessions_missing_model_telemetry": sessions_missing_model_telemetry,
         "source_quality": source_quality,
         "repository_quality": repository_quality,
+        "workflow_profile_quality": workflow_profile_quality,
     }
 
 

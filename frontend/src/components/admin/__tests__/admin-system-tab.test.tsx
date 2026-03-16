@@ -1,18 +1,29 @@
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AdminSystemTab } from "../admin-system-tab"
 
 const mockUseSystemStats = vi.fn()
 const mockUseMeasurementIntegrity = vi.fn()
+const mockUseBackfillWorkflowProfiles = vi.fn()
 
 vi.mock("@/hooks/use-api-queries", () => ({
   useSystemStats: () => mockUseSystemStats(),
   useMeasurementIntegrity: () => mockUseMeasurementIntegrity(),
 }))
 
+vi.mock("@/hooks/use-api-mutations", () => ({
+  useBackfillWorkflowProfiles: () => mockUseBackfillWorkflowProfiles(),
+}))
+
 describe("AdminSystemTab", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockUseBackfillWorkflowProfiles.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      data: null,
+      error: null,
+    })
     mockUseSystemStats.mockReturnValue({
       data: {
         total_engineers: 12,
@@ -32,8 +43,10 @@ describe("AdminSystemTab", () => {
         total_sessions: 48,
         sessions_with_messages: 40,
         sessions_with_facets: 18,
+        sessions_with_workflow_profiles: 24,
         facet_coverage_pct: 100,
         transcript_coverage_pct: 83.3,
+        workflow_profile_coverage_pct: 50,
         sessions_with_commit_sync_target: 12,
         sessions_with_linked_pull_requests: 9,
         github_sync_coverage_pct: 75,
@@ -49,6 +62,20 @@ describe("AdminSystemTab", () => {
         legacy_outcome_sessions: 0,
         legacy_goal_category_sessions: 0,
         remaining_legacy_rows: 0,
+        workflow_profile_quality: [
+          {
+            agent_type: "claude_code",
+            session_count: 18,
+            sessions_with_workflow_profiles: 18,
+            workflow_profile_coverage_pct: 100,
+          },
+          {
+            agent_type: "cursor",
+            session_count: 30,
+            sessions_with_workflow_profiles: 6,
+            workflow_profile_coverage_pct: 20,
+          },
+        ],
         source_quality: [
           {
             agent_type: "claude_code",
@@ -110,19 +137,69 @@ describe("AdminSystemTab", () => {
     expect(screen.getAllByText("GitHub Sync").length).toBeGreaterThan(0)
     expect(screen.getByText("Repository Metadata")).toBeInTheDocument()
     expect(screen.getByText("Schema Parity by Source")).toBeInTheDocument()
+    expect(screen.getByText("Workflow Coverage")).toBeInTheDocument()
     expect(screen.getByText("Repository Coverage")).toBeInTheDocument()
-    expect(screen.getByText("claude_code")).toBeInTheDocument()
-    expect(screen.getByText("cursor")).toBeInTheDocument()
+    expect(screen.getAllByText("claude_code").length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText("cursor").length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText("acme/complete-repo")).toBeInTheDocument()
     expect(screen.getByText("acme/pending-repo")).toBeInTheDocument()
     expect(screen.getByText("Native Discovery")).toBeInTheDocument()
     expect(screen.getAllByText("Required").length).toBeGreaterThan(0)
     expect(screen.getAllByText("-").length).toBeGreaterThan(0)
     expect(screen.getByText("73.3%")).toBeInTheDocument()
+    expect(screen.getByText("50.0%")).toBeInTheDocument()
     expect(screen.getAllByText("Not expected").length).toBeGreaterThan(0)
     expect(screen.getByText("75.0%")).toBeInTheDocument()
     expect(screen.getByText("66.7%")).toBeInTheDocument()
     expect(screen.getByText("Checked")).toBeInTheDocument()
     expect(screen.getByText("Pending")).toBeInTheDocument()
+  })
+
+  it("triggers workflow profile backfill and recompute actions", () => {
+    const mutate = vi.fn()
+    mockUseBackfillWorkflowProfiles.mockReturnValue({
+      mutate,
+      isPending: false,
+      data: null,
+      error: null,
+    })
+    mockUseMeasurementIntegrity.mockReturnValue({
+      data: {
+        total_sessions: 1,
+        sessions_with_messages: 1,
+        sessions_with_facets: 1,
+        sessions_with_workflow_profiles: 1,
+        facet_coverage_pct: 100,
+        transcript_coverage_pct: 100,
+        workflow_profile_coverage_pct: 100,
+        sessions_with_commit_sync_target: 0,
+        sessions_with_linked_pull_requests: 0,
+        github_sync_coverage_pct: 0,
+        repositories_in_scope: 0,
+        repositories_with_complete_metadata: 0,
+        repositories_with_readiness_check: 0,
+        repository_metadata_coverage_pct: 0,
+        sessions_missing_transcript_telemetry: 0,
+        sessions_missing_tool_telemetry: 0,
+        sessions_missing_model_telemetry: 0,
+        low_confidence_sessions: 0,
+        missing_confidence_sessions: 0,
+        legacy_outcome_sessions: 0,
+        legacy_goal_category_sessions: 0,
+        remaining_legacy_rows: 0,
+        source_quality: [],
+        repository_quality: [],
+        workflow_profile_quality: [],
+      },
+      isLoading: false,
+    })
+
+    render(<AdminSystemTab />)
+
+    fireEvent.click(screen.getByRole("button", { name: /backfill workflow profiles/i }))
+    fireEvent.click(screen.getByRole("button", { name: /recompute workflow profiles/i }))
+
+    expect(mutate).toHaveBeenNthCalledWith(1, { limit: 5000, recompute: false, dryRun: false })
+    expect(mutate).toHaveBeenNthCalledWith(2, { limit: 5000, recompute: true, dryRun: false })
   })
 })
