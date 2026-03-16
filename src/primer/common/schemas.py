@@ -601,10 +601,20 @@ class DailyCostEntry(BaseModel):
     session_count: int
 
 
+class WorkflowCostBreakdown(BaseModel):
+    dimension: str
+    label: str
+    session_count: int
+    total_estimated_cost: float
+    avg_cost_per_session: float | None
+    cost_per_successful_outcome: float | None
+
+
 class CostAnalytics(BaseModel):
     total_estimated_cost: float
     model_breakdown: list[ModelCostBreakdown]
     daily_costs: list[DailyCostEntry]
+    workflow_breakdown: list[WorkflowCostBreakdown] = []
 
 
 # --- Engineer Analytics ---

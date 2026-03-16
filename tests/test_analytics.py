@@ -914,6 +914,55 @@ def test_cost_analytics(client, engineer_with_key, admin_headers):
     assert opus["estimated_cost"] > 0
 
 
+def test_cost_analytics_include_workflow_breakdown_when_profiles_exist(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    _ingest_session(
+        client,
+        api_key,
+        tool_usages=[
+            {"tool_name": "Read", "call_count": 2},
+            {"tool_name": "Edit", "call_count": 1},
+        ],
+        facets={"session_type": "bug_fix", "outcome": "success"},
+        commits=[
+            {
+                "sha": "workflow-cost-a",
+                "message": "fix: workflow cost path",
+                "files_changed": 1,
+                "lines_added": 5,
+                "lines_deleted": 1,
+            }
+        ],
+        model_usages=[
+            {
+                "model_name": "claude-sonnet-4-5-20250929",
+                "input_tokens": 1_000,
+                "output_tokens": 500,
+            },
+        ],
+    )
+
+    response = client.get("/api/v1/analytics/costs", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    workflow_rows = data["workflow_breakdown"]
+    assert len(workflow_rows) == 2
+
+    archetype = next(row for row in workflow_rows if row["dimension"] == "workflow_archetype")
+    assert archetype["label"] == "debugging"
+    assert archetype["session_count"] == 1
+    assert archetype["total_estimated_cost"] > 0
+    assert archetype["cost_per_successful_outcome"] == archetype["total_estimated_cost"]
+
+    fingerprint = next(row for row in workflow_rows if row["dimension"] == "workflow_fingerprint")
+    assert fingerprint["label"] == "bug fix: read -> edit -> ship"
+    assert fingerprint["session_count"] == 1
+    assert fingerprint["avg_cost_per_session"] == fingerprint["total_estimated_cost"]
+
+
 def test_cost_analytics_include_cursor_model_usage_when_present(
     client, engineer_with_key, admin_headers
 ):
