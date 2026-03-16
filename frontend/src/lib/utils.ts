@@ -33,6 +33,10 @@ export function formatLabel(value: string): string {
     .replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
+export function formatMetric(value: number | null | undefined, digits = 1): string {
+  return value == null ? "-" : value.toFixed(digits)
+}
+
 export function formatPercent(value: number | null | undefined): string {
   if (value == null) return "-"
   return `${(value * 100).toFixed(0)}%`
