@@ -2,15 +2,11 @@ import { Link } from "react-router-dom"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { formatDuration, formatPercent } from "@/lib/utils"
+import { formatDuration, formatLabel, formatPercent } from "@/lib/utils"
 import type { BrightSpot } from "@/types/api"
 
 interface BrightSpotCardsProps {
   spots: BrightSpot[]
-}
-
-function titleize(value: string) {
-  return value.replaceAll("_", " ")
 }
 
 export function BrightSpotCards({ spots }: BrightSpotCardsProps) {
@@ -33,7 +29,7 @@ export function BrightSpotCards({ spots }: BrightSpotCardsProps) {
                 <p className="text-sm text-muted-foreground">{spot.summary}</p>
               </div>
               <Badge variant="success" className="capitalize">
-                {titleize(spot.cluster_type)}
+                {formatLabel(spot.cluster_type)}
               </Badge>
             </div>
           </CardHeader>
