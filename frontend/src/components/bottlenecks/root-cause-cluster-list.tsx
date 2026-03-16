@@ -1,14 +1,10 @@
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { formatPercent } from "@/lib/utils"
+import { formatPercent, titleize } from "@/lib/utils"
 import type { RootCauseCluster } from "@/types/api"
 
 interface RootCauseClusterListProps {
   data: RootCauseCluster[]
-}
-
-function titleize(value: string) {
-  return value.replaceAll("_", " ")
 }
 
 export function RootCauseClusterList({ data }: RootCauseClusterListProps) {

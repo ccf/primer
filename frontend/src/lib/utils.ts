@@ -27,6 +27,10 @@ export function formatCost(dollars: number): string {
   return `$${dollars.toFixed(2)}`
 }
 
+export function titleize(value: string): string {
+  return value.replaceAll("_", " ")
+}
+
 export function formatLabel(value: string): string {
   return value
     .replaceAll("_", " ")
