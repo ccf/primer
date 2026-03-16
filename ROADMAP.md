@@ -102,7 +102,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [ ] [P1] Cursor-specific workflow fingerprinting and session archetype mapping
 - [x] [P1] Session archetype detection: debugging, feature delivery, refactor, migration, docs, investigation
 - [ ] [P1] Delegation graph capture for multi-agent and subagent workflows
-- [ ] [P2] Exemplar session library for high-value workflows and onboarding examples
+- [x] [P2] Exemplar session library for high-value workflows and onboarding examples
 - [ ] [P2] Prompt, skill, and template reuse analytics by workflow and outcome
 
 ## Friction & Bottleneck Analysis
@@ -144,7 +144,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Onboarding velocity scoring
 - [x] Onboarding recommendations
 - [x] Shared behavior pattern discovery with approach comparison
-- [ ] [P1] Bright spot detection: explicitly surface high performers and cross-pollinate their patterns
+- [x] [P1] Bright spot detection: explicitly surface high performers and cross-pollinate their patterns
 - [ ] [P1] Exemplar-session-to-learning-path pipeline
 - [ ] [P1] Team skill gap mapping by workflow, tool category, and project context
 - [ ] [P2] Coaching program measurement: which onboarding or training changes improved outcomes
@@ -206,7 +206,8 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Budget tracking with burn-rate alerts and projected overrun warnings
 - [x] Cost per successful outcome metric
 - [ ] [P1] Break-even analysis for API vs seat-based pricing with per-engineer recommendations
-- [ ] [P1] Cost per workflow archetype and cost per engineering outcome
+- [x] [P1] Cost per workflow archetype and cost per engineering outcome
+- [x] [P1] Workflow compare mode for archetype and fingerprint performance
 - [ ] [P1] Model-choice opportunity scoring for overspend reduction
 - [ ] [P2] Budget policy simulation by team, project, and billing model
 
@@ -221,6 +222,11 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [ ] [P1] Compare mode for engineer, team, project, and time-period analysis
 - [ ] [P2] Weekly manager review packs that combine quality, friction, growth, and cost
 - [ ] [P2] Recommendation narratives that explain why a workflow is likely to help
+
+## Website & Positioning
+
+- [ ] [P1] Reposition the website around workflow intelligence for agentic engineering
+- [ ] [P1] Showcase workflow cost, quality, compare mode, and exemplar sessions as the core proof points
 
 ## Interventions & Experimentation
 

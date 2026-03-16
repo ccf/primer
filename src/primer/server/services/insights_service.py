@@ -8,8 +8,15 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from primer.common.facet_taxonomy import canonical_outcome, is_success_outcome
-from primer.common.models import Engineer, SessionFacets, ToolUsage
+from primer.common.models import (
+    Engineer,
+    ModelUsage,
+    SessionFacets,
+    SessionWorkflowProfile,
+    ToolUsage,
+)
 from primer.common.models import Session as SessionModel
+from primer.common.pricing import estimate_cost
 from primer.common.schemas import (
     BrightSpot,
     CohortMetrics,
@@ -19,6 +26,8 @@ from primer.common.schemas import (
     EngineerLearningPath,
     EngineerRampup,
     EngineerSkillProfile,
+    ExemplarPatternReference,
+    ExemplarSession,
     LearningPathsResponse,
     LearningRecommendation,
     NewHireProgress,
@@ -35,9 +44,7 @@ from primer.common.schemas import (
     TimeToTeamAverageResponse,
     WeeklySuccessPoint,
 )
-from primer.server.services.analytics_service import (
-    base_session_query,
-)
+from primer.server.services.analytics_service import base_session_query
 
 
 def _shannon_entropy(counts: dict[str, int]) -> float:
@@ -883,6 +890,7 @@ def get_pattern_sharing(
             SessionFacets.session_type,
             SessionFacets.outcome,
             SessionFacets.agent_helpfulness,
+            SessionFacets.brief_summary,
             SessionFacets.goal_categories,
         )
         .filter(SessionFacets.session_id.in_(session_ids_q))
@@ -903,6 +911,47 @@ def get_pattern_sharing(
     for tu in all_tools:
         session_tools[tu.session_id].append(tu.tool_name)
         session_tool_count[tu.session_id] += tu.call_count
+
+    session_workflows = {
+        row.session_id: {
+            "archetype": row.archetype,
+            "label": row.label,
+            "steps": list(row.steps or []),
+        }
+        for row in (
+            db.query(
+                SessionWorkflowProfile.session_id,
+                SessionWorkflowProfile.archetype,
+                SessionWorkflowProfile.label,
+                SessionWorkflowProfile.steps,
+            )
+            .filter(SessionWorkflowProfile.session_id.in_(session_ids_q))
+            .all()
+        )
+    }
+
+    session_costs: dict[str, float] = defaultdict(float)
+    model_rows = (
+        db.query(
+            ModelUsage.session_id,
+            ModelUsage.model_name,
+            func.sum(ModelUsage.input_tokens).label("input_tokens"),
+            func.sum(ModelUsage.output_tokens).label("output_tokens"),
+            func.sum(ModelUsage.cache_read_tokens).label("cache_read_tokens"),
+            func.sum(ModelUsage.cache_creation_tokens).label("cache_creation_tokens"),
+        )
+        .filter(ModelUsage.session_id.in_(session_ids_q))
+        .group_by(ModelUsage.session_id, ModelUsage.model_name)
+        .all()
+    )
+    for row in model_rows:
+        session_costs[row.session_id] += estimate_cost(
+            row.model_name,
+            row.input_tokens or 0,
+            row.output_tokens or 0,
+            row.cache_read_tokens or 0,
+            row.cache_creation_tokens or 0,
+        )
 
     def _make_approach(sid: str) -> EngineerApproach:
         s = session_map[sid]
@@ -1027,6 +1076,14 @@ def get_pattern_sharing(
     return PatternSharingResponse(
         patterns=patterns,
         bright_spots=_derive_bright_spots(patterns),
+        exemplar_sessions=_derive_exemplar_sessions(
+            patterns,
+            session_map=session_map,
+            session_facets=session_facets,
+            session_tools=session_tools,
+            session_workflows=session_workflows,
+            session_costs=session_costs,
+        ),
         total_clusters_found=len(patterns),
         sessions_analyzed=len(sessions),
     )
@@ -1079,6 +1136,143 @@ def _derive_bright_spots(patterns: list[SharedPattern], limit: int = 3) -> list[
             )
         )
     return bright_spots
+
+
+def _derive_exemplar_sessions(
+    patterns: list[SharedPattern],
+    *,
+    session_map: dict[str, SessionModel],
+    session_facets: dict[str, object],
+    session_tools: dict[str, list[str]],
+    session_workflows: dict[str, dict[str, object]],
+    session_costs: dict[str, float],
+    limit: int = 6,
+) -> list[ExemplarSession]:
+    cluster_type_order = {
+        "session_type": 0,
+        "goal_category": 1,
+        "project": 2,
+    }
+    buckets: dict[str, dict[str, object]] = {}
+
+    for pattern in patterns:
+        exemplar = pattern.best_approach
+        if exemplar is None:
+            continue
+
+        bucket = buckets.setdefault(
+            exemplar.session_id,
+            {
+                "approach": exemplar,
+                "linked_patterns": [],
+                "supporting_session_count": 0,
+                "supporting_engineer_count": 0,
+                "success_rate": None,
+            },
+        )
+        linked_patterns = bucket["linked_patterns"]
+        assert isinstance(linked_patterns, list)
+        linked_patterns.append(
+            ExemplarPatternReference(
+                cluster_id=pattern.cluster_id,
+                cluster_type=pattern.cluster_type,
+                cluster_label=pattern.cluster_label,
+                session_count=pattern.session_count,
+                engineer_count=pattern.engineer_count,
+                success_rate=pattern.success_rate,
+            )
+        )
+        bucket["supporting_session_count"] = max(
+            int(bucket["supporting_session_count"]),
+            pattern.session_count,
+        )
+        bucket["supporting_engineer_count"] = max(
+            int(bucket["supporting_engineer_count"]),
+            pattern.engineer_count,
+        )
+        current_success_rate = bucket["success_rate"]
+        if current_success_rate is None or (
+            pattern.success_rate is not None and pattern.success_rate > current_success_rate
+        ):
+            bucket["success_rate"] = pattern.success_rate
+
+    exemplars: list[ExemplarSession] = []
+    for session_id, bucket in buckets.items():
+        approach = bucket["approach"]
+        assert isinstance(approach, EngineerApproach)
+        session = session_map[session_id]
+        facet = session_facets.get(session_id)
+        workflow = session_workflows.get(session_id, {})
+        linked_patterns = bucket["linked_patterns"]
+        assert isinstance(linked_patterns, list)
+        linked_patterns.sort(
+            key=lambda item: (
+                cluster_type_order.get(item.cluster_type, 99),
+                -item.engineer_count,
+                -item.session_count,
+                -(item.success_rate or 0.0),
+                item.cluster_label,
+            )
+        )
+        primary_pattern = linked_patterns[0]
+        related_pattern_count = max(len(linked_patterns) - 1, 0)
+        linked_pattern_phrase = (
+            " It also anchors "
+            f"{related_pattern_count} related pattern"
+            f"{'' if related_pattern_count == 1 else 's'}."
+            if related_pattern_count > 0
+            else ""
+        )
+        why_selected = (
+            f"Chosen as the fastest successful example for {primary_pattern.cluster_label}."
+            f"{linked_pattern_phrase}"
+        )
+
+        title = str(workflow.get("label") or primary_pattern.cluster_label)
+        summary = (
+            f"Backed by {bucket['supporting_engineer_count']} engineers across "
+            f"{bucket['supporting_session_count']} sessions."
+        )
+        session_summary = getattr(facet, "brief_summary", None) or session.summary
+        exemplars.append(
+            ExemplarSession(
+                exemplar_id=f"exemplar:{session_id}",
+                title=title,
+                summary=summary,
+                why_selected=why_selected,
+                session_id=session_id,
+                engineer_id=approach.engineer_id,
+                engineer_name=approach.name,
+                project_name=session.project_name,
+                outcome=approach.outcome,
+                helpfulness=getattr(facet, "agent_helpfulness", None),
+                session_summary=session_summary,
+                duration_seconds=session.duration_seconds,
+                estimated_cost=(
+                    round(session_costs[session_id], 4) if session_id in session_costs else None
+                ),
+                tools_used=sorted(set(session_tools.get(session_id, []))),
+                workflow_archetype=workflow.get("archetype"),
+                workflow_fingerprint=workflow.get("label"),
+                workflow_steps=list(workflow.get("steps") or []),
+                supporting_session_count=int(bucket["supporting_session_count"]),
+                supporting_engineer_count=int(bucket["supporting_engineer_count"]),
+                supporting_pattern_count=len(linked_patterns),
+                success_rate=bucket["success_rate"],
+                linked_patterns=linked_patterns[:3],
+            )
+        )
+
+    exemplars.sort(
+        key=lambda exemplar: (
+            -(exemplar.success_rate or 0.0),
+            -exemplar.supporting_engineer_count,
+            -exemplar.supporting_session_count,
+            exemplar.estimated_cost if exemplar.estimated_cost is not None else float("inf"),
+            exemplar.title,
+        )
+    )
+    return exemplars[:limit]
 
 
 # ---------------------------------------------------------------------------

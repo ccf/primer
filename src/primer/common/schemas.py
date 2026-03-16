@@ -1166,9 +1166,44 @@ class BrightSpot(BaseModel):
     exemplar_tools: list[str]
 
 
+class ExemplarPatternReference(BaseModel):
+    cluster_id: str
+    cluster_type: str
+    cluster_label: str
+    session_count: int
+    engineer_count: int
+    success_rate: float | None
+
+
+class ExemplarSession(BaseModel):
+    exemplar_id: str
+    title: str
+    summary: str
+    why_selected: str
+    session_id: str
+    engineer_id: str
+    engineer_name: str
+    project_name: str | None = None
+    outcome: str | None = None
+    helpfulness: str | None = None
+    session_summary: str | None = None
+    duration_seconds: float | None
+    estimated_cost: float | None = None
+    tools_used: list[str]
+    workflow_archetype: str | None = None
+    workflow_fingerprint: str | None = None
+    workflow_steps: list[str] = []
+    supporting_session_count: int
+    supporting_engineer_count: int
+    supporting_pattern_count: int
+    success_rate: float | None
+    linked_patterns: list[ExemplarPatternReference]
+
+
 class PatternSharingResponse(BaseModel):
     patterns: list[SharedPattern]
     bright_spots: list[BrightSpot] = []
+    exemplar_sessions: list[ExemplarSession] = []
     total_clusters_found: int
     sessions_analyzed: int
 
