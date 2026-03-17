@@ -1,11 +1,17 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { ToolRecommendationList } from "@/components/insights/tool-recommendation-list"
 import { cn } from "@/lib/utils"
-import type { SkillInventoryResponse, EngineerLearningPath } from "@/types/api"
+import type {
+  SkillInventoryResponse,
+  EngineerLearningPath,
+  ToolRecommendation,
+} from "@/types/api"
 
 interface StrengthsTabProps {
   strengths: SkillInventoryResponse
   learningPaths: EngineerLearningPath[]
+  toolRecommendations?: ToolRecommendation[]
 }
 
 const proficiencyColor: Record<string, string> = {
@@ -21,7 +27,11 @@ const priorityVariant: Record<string, "destructive" | "warning" | "secondary"> =
   low: "secondary",
 }
 
-export function StrengthsTab({ strengths, learningPaths }: StrengthsTabProps) {
+export function StrengthsTab({
+  strengths,
+  learningPaths,
+  toolRecommendations = [],
+}: StrengthsTabProps) {
   const profiles = strengths.engineer_profiles
   const hasProfiles = profiles.length > 0
   const hasLearning = learningPaths.length > 0
@@ -145,6 +155,13 @@ export function StrengthsTab({ strengths, learningPaths }: StrengthsTabProps) {
               </Card>
             ))}
           </div>
+        </div>
+      )}
+
+      {toolRecommendations.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium">Tool Recommendations</h3>
+          <ToolRecommendationList recommendations={toolRecommendations} />
         </div>
       )}
     </div>

@@ -1,4 +1,5 @@
 import logging
+from collections import Counter
 from datetime import datetime
 
 from sqlalchemy.orm import Session
@@ -9,6 +10,7 @@ from primer.common.models import Session as SessionModel
 from primer.common.pricing import estimate_cost
 from primer.common.schemas import (
     EngineerProfileResponse,
+    ToolRecommendation,
     WeeklyMetricPoint,
 )
 from primer.server.services.analytics_service import (
@@ -29,6 +31,175 @@ from primer.server.services.insights_service import (
 from primer.server.services.workflow_playbook_service import get_workflow_playbooks
 
 logger = logging.getLogger(__name__)
+
+
+_RECOMMENDATION_PRIORITY_SCORE = {
+    "high": 3,
+    "medium": 2,
+    "low": 1,
+}
+
+
+def _build_tool_recommendations(
+    db: Session,
+    engineer_id: str,
+    learning_paths: list,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    limit: int = 6,
+) -> list[ToolRecommendation]:
+    if not learning_paths:
+        return []
+
+    session_query = db.query(SessionModel.id, SessionModel.project_name).filter(
+        SessionModel.engineer_id == engineer_id
+    )
+    if start_date:
+        session_query = session_query.filter(SessionModel.started_at >= start_date)
+    if end_date:
+        session_query = session_query.filter(SessionModel.started_at <= end_date)
+
+    session_rows = session_query.all()
+    session_ids = [row.id for row in session_rows]
+    project_counts = Counter(row.project_name for row in session_rows if row.project_name)
+
+    engineer_tools: set[str] = set()
+    if session_ids:
+        engineer_tools = {
+            tool_name
+            for (tool_name,) in (
+                db.query(ToolUsage.tool_name)
+                .filter(ToolUsage.session_id.in_(session_ids))
+                .distinct()
+                .all()
+            )
+        }
+
+    buckets: dict[str, dict[str, object]] = {}
+    for path in learning_paths:
+        for recommendation in path.recommendations:
+            priority_score = _RECOMMENDATION_PRIORITY_SCORE.get(recommendation.priority, 1)
+            for exemplar in recommendation.exemplars:
+                project_match = bool(
+                    exemplar.project_name and exemplar.project_name in project_counts
+                )
+                for tool_name in exemplar.tools_used:
+                    if tool_name in engineer_tools:
+                        continue
+
+                    bucket = buckets.setdefault(
+                        tool_name,
+                        {
+                            "score": 0,
+                            "priority_score": 0,
+                            "supporting_exemplar_ids": set(),
+                            "project_context_match_count": 0,
+                            "related_skill_areas": set(),
+                            "related_categories": set(),
+                            "matching_projects": Counter(),
+                            "best_exemplar": None,
+                            "best_rank": None,
+                        },
+                    )
+                    bucket["score"] = (
+                        int(bucket["score"]) + (priority_score * 2) + int(project_match)
+                    )
+                    bucket["priority_score"] = max(int(bucket["priority_score"]), priority_score)
+                    supporting_exemplar_ids = bucket["supporting_exemplar_ids"]
+                    assert isinstance(supporting_exemplar_ids, set)
+                    supporting_exemplar_ids.add(exemplar.session_id)
+                    if project_match:
+                        bucket["project_context_match_count"] = (
+                            int(bucket["project_context_match_count"]) + 1
+                        )
+
+                    related_skill_areas = bucket["related_skill_areas"]
+                    assert isinstance(related_skill_areas, set)
+                    related_skill_areas.add(recommendation.skill_area)
+
+                    related_categories = bucket["related_categories"]
+                    assert isinstance(related_categories, set)
+                    related_categories.add(recommendation.category)
+
+                    matching_projects = bucket["matching_projects"]
+                    assert isinstance(matching_projects, Counter)
+                    if exemplar.project_name:
+                        matching_projects[exemplar.project_name] += 1
+
+                    exemplar_rank = (
+                        int(project_match),
+                        priority_score,
+                        -(
+                            exemplar.estimated_cost
+                            if exemplar.estimated_cost is not None
+                            else float("inf")
+                        ),
+                        -(exemplar.duration_seconds or float("inf")),
+                    )
+                    best_rank = bucket["best_rank"]
+                    if best_rank is None or exemplar_rank > best_rank:
+                        bucket["best_rank"] = exemplar_rank
+                        bucket["best_exemplar"] = exemplar
+
+    recommendations: list[ToolRecommendation] = []
+    for tool_name, bucket in buckets.items():
+        related_skill_areas = sorted(bucket["related_skill_areas"])
+        related_categories = sorted(bucket["related_categories"])
+        matching_projects_counter = bucket["matching_projects"]
+        assert isinstance(matching_projects_counter, Counter)
+        matching_projects = [name for name, _count in matching_projects_counter.most_common(3)]
+        exemplar = bucket["best_exemplar"]
+        assert exemplar is None or hasattr(exemplar, "session_id")
+
+        context_phrase = ", ".join(area.replace("_", " ") for area in related_skill_areas[:2])
+        if len(related_skill_areas) > 2:
+            context_phrase = f"{context_phrase}, and similar work"
+
+        project_phrase = f" on {matching_projects[0]}" if matching_projects else ""
+
+        if context_phrase:
+            description = (
+                f"Peers repeatedly use {tool_name} in successful {context_phrase} workflows"
+                f"{project_phrase}."
+            )
+        else:
+            description = f"Peers repeatedly use {tool_name} in similar successful workflows."
+
+        if exemplar is not None:
+            description = (
+                f"{description} Start with {exemplar.title} from {exemplar.engineer_name}."
+            )
+
+        priority = next(
+            label
+            for label, score in _RECOMMENDATION_PRIORITY_SCORE.items()
+            if score == int(bucket["priority_score"])
+        )
+
+        recommendations.append(
+            ToolRecommendation(
+                tool_name=tool_name,
+                title=f"Try {tool_name}",
+                description=description,
+                priority=priority,
+                related_skill_areas=related_skill_areas[:4],
+                related_categories=related_categories[:3],
+                matching_projects=matching_projects,
+                supporting_exemplar_count=len(bucket["supporting_exemplar_ids"]),
+                project_context_match_count=int(bucket["project_context_match_count"]),
+                exemplar=exemplar,
+            )
+        )
+
+    recommendations.sort(
+        key=lambda recommendation: (
+            -_RECOMMENDATION_PRIORITY_SCORE.get(recommendation.priority, 0),
+            -recommendation.project_context_match_count,
+            -recommendation.supporting_exemplar_count,
+            recommendation.tool_name,
+        )
+    )
+    return recommendations[:limit]
 
 
 def _get_weekly_trajectory(
@@ -255,6 +426,13 @@ def get_engineer_profile(
         .all()
     )
     projects = [r[0] for r in project_rows if r[0]]
+    tool_recommendations = _build_tool_recommendations(
+        db,
+        engineer_id,
+        eng_paths,
+        start_date=start_date,
+        end_date=end_date,
+    )
 
     # Leverage score from maturity analytics
     leverage_score: float | None = None
@@ -310,6 +488,7 @@ def get_engineer_profile(
         config_suggestions=config.suggestions,
         strengths=skills,
         learning_paths=eng_paths,
+        tool_recommendations=tool_recommendations,
         quality=quality,
         leverage_score=leverage_score,
         effectiveness=effectiveness,

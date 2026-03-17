@@ -320,6 +320,69 @@ class TestEngineerProfileOverview:
         assert playbook["caution_friction_types"] == ["context_switching"]
         assert playbook["example_projects"] == ["primer", "sdk"]
 
+    def test_profile_includes_tool_recommendations_from_learning_exemplars(
+        self, client, db_session, engineer_with_key, admin_headers
+    ):
+        eng, _key = engineer_with_key
+        now = datetime.now(UTC)
+        team = db_session.query(Team).filter(Team.id == eng.team_id).one()
+        peer_one, _peer_key = _make_engineer(db_session, team, name="Peer One")
+        peer_two, _peer_key_two = _make_engineer(db_session, team, name="Peer Two")
+
+        learner_session = _create_session(
+            db_session,
+            eng,
+            started_at=now - timedelta(hours=1),
+            project_name="primer",
+        )
+        db_session.add(
+            SessionFacets(
+                session_id=learner_session.id,
+                session_type="feature",
+                outcome="success",
+            )
+        )
+        db_session.add(ToolUsage(session_id=learner_session.id, tool_name="Read", call_count=3))
+
+        for idx, peer in enumerate((peer_one, peer_two), start=1):
+            session = _create_session(
+                db_session,
+                peer,
+                started_at=now - timedelta(hours=idx + 1),
+                project_name="primer",
+                duration_seconds=120.0 - (idx * 20),
+                summary="Debugged auth with Grep and Edit before shipping the fix.",
+            )
+            db_session.add(
+                SessionFacets(
+                    session_id=session.id,
+                    session_type="debugging",
+                    outcome="success",
+                    brief_summary="Traced the failing auth path and fixed it.",
+                )
+            )
+            db_session.add(ToolUsage(session_id=session.id, tool_name="Read", call_count=4))
+            db_session.add(ToolUsage(session_id=session.id, tool_name="Edit", call_count=2))
+            db_session.add(ToolUsage(session_id=session.id, tool_name="Grep", call_count=3))
+
+        db_session.flush()
+
+        response = client.get(
+            f"/api/v1/analytics/engineers/{eng.id}/profile",
+            headers=admin_headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+
+        assert len(data["tool_recommendations"]) >= 1
+        recommendation = data["tool_recommendations"][0]
+        assert recommendation["tool_name"] == "Edit"
+        assert recommendation["matching_projects"] == ["primer"]
+        assert recommendation["project_context_match_count"] >= 1
+        assert recommendation["supporting_exemplar_count"] >= 1
+        assert recommendation["exemplar"]["project_name"] == "primer"
+        assert recommendation["exemplar"]["relevance_reason"]
+
     def test_profile_overview_treats_legacy_outcomes_as_canonical(
         self, client, db_session, engineer_with_key, admin_headers
     ):
