@@ -116,6 +116,7 @@ const engineerProfile = {
     total_tools_used: 0,
   },
   learning_paths: [],
+  tool_recommendations: [],
   quality: {},
   leverage_score: null,
   effectiveness: null,

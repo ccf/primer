@@ -19,7 +19,11 @@ export function ProfileInsightsTab({ profile, teamId, startDate, endDate }: Prof
     <div className="space-y-8">
       <div>
         <h3 className="mb-3 text-sm font-medium">Strengths & Skills</h3>
-        <StrengthsTab strengths={profile.strengths} learningPaths={profile.learning_paths} />
+        <StrengthsTab
+          strengths={profile.strengths}
+          learningPaths={profile.learning_paths}
+          toolRecommendations={profile.tool_recommendations}
+        />
       </div>
 
       <div>

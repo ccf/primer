@@ -800,6 +800,19 @@ export interface LearningPathsResponse {
   sessions_analyzed: number
 }
 
+export interface ToolRecommendation {
+  tool_name: string
+  title: string
+  description: string
+  priority: string
+  related_skill_areas: string[]
+  related_categories: string[]
+  matching_projects: string[]
+  supporting_exemplar_count: number
+  project_context_match_count: number
+  exemplar: LearningRecommendationExemplar | null
+}
+
 // --- Pattern Sharing ---
 
 export interface EngineerApproach {
@@ -1335,6 +1348,7 @@ export interface EngineerProfileResponse {
   config_suggestions: ConfigSuggestion[]
   strengths: SkillInventoryResponse
   learning_paths: EngineerLearningPath[]
+  tool_recommendations: ToolRecommendation[]
   quality: Record<string, unknown>
   leverage_score: number | null
   effectiveness: EffectivenessScore | null

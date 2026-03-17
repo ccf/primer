@@ -1137,6 +1137,19 @@ class LearningPathsResponse(BaseModel):
     sessions_analyzed: int
 
 
+class ToolRecommendation(BaseModel):
+    tool_name: str
+    title: str
+    description: str
+    priority: str
+    related_skill_areas: list[str] = Field(default_factory=list)
+    related_categories: list[str] = Field(default_factory=list)
+    matching_projects: list[str] = Field(default_factory=list)
+    supporting_exemplar_count: int = 0
+    project_context_match_count: int = 0
+    exemplar: LearningRecommendationExemplar | None = None
+
+
 # --- Pattern Sharing ---
 
 
@@ -1688,6 +1701,7 @@ class EngineerProfileResponse(BaseModel):
     config_suggestions: list[ConfigSuggestion]
     strengths: SkillInventoryResponse
     learning_paths: list[EngineerLearningPath]
+    tool_recommendations: list[ToolRecommendation] = []
     quality: dict  # flexible dict for quality metrics
     leverage_score: float | None = None
     effectiveness: EffectivenessScore | None = None
