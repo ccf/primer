@@ -1885,6 +1885,25 @@ class CustomizationUsage(BaseModel):
     top_engineers: list[str] = []
 
 
+class StackCustomization(BaseModel):
+    identifier: str
+    customization_type: str
+    provenance: CustomizationProvenance
+    invocation_count: int
+
+
+class HighPerformerStack(BaseModel):
+    stack_id: str
+    label: str
+    customizations: list[StackCustomization]
+    engineer_count: int
+    session_count: int
+    avg_effectiveness_score: float | None = None
+    avg_leverage_score: float
+    top_projects: list[str] = []
+    top_engineers: list[str] = []
+
+
 class ProjectReadinessEntry(BaseModel):
     repository: str
     has_claude_md: bool
@@ -1900,6 +1919,7 @@ class MaturityAnalyticsResponse(BaseModel):
     daily_leverage: list[DailyLeverageEntry]
     agent_skill_breakdown: list[AgentSkillUsage]
     customization_breakdown: list[CustomizationUsage] = []
+    high_performer_stacks: list[HighPerformerStack] = []
     project_readiness: list[ProjectReadinessEntry]
     sessions_analyzed: int
     avg_leverage_score: float

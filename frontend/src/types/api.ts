@@ -1513,6 +1513,25 @@ export interface CustomizationUsage {
   top_engineers: string[]
 }
 
+export interface StackCustomization {
+  identifier: string
+  customization_type: string
+  provenance: CustomizationProvenance
+  invocation_count: number
+}
+
+export interface HighPerformerStack {
+  stack_id: string
+  label: string
+  customizations: StackCustomization[]
+  engineer_count: number
+  session_count: number
+  avg_effectiveness_score: number | null
+  avg_leverage_score: number
+  top_projects: string[]
+  top_engineers: string[]
+}
+
 export interface ProjectReadinessEntry {
   repository: string
   has_claude_md: boolean
@@ -1528,6 +1547,7 @@ export interface MaturityAnalyticsResponse {
   daily_leverage: DailyLeverageEntry[]
   agent_skill_breakdown: AgentSkillUsage[]
   customization_breakdown: CustomizationUsage[]
+  high_performer_stacks: HighPerformerStack[]
   project_readiness: ProjectReadinessEntry[]
   sessions_analyzed: number
   avg_leverage_score: number
