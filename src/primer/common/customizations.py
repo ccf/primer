@@ -221,6 +221,14 @@ def _scan_customization_dirs(
     return snapshots
 
 
+_MCP_SENSITIVE_KEYS = frozenset({"env", "headers"})
+
+
+def _redact_mcp_config(config: dict[str, object]) -> dict[str, object]:
+    """Return a copy of an MCP server config with sensitive keys removed."""
+    return {k: v for k, v in config.items() if k not in _MCP_SENSITIVE_KEYS}
+
+
 def _scan_mcp_settings(
     settings_path: Path,
     *,
@@ -243,7 +251,7 @@ def _scan_mcp_settings(
     for identifier, config in servers.items():
         if not isinstance(identifier, str) or not identifier:
             continue
-        details = config if isinstance(config, dict) else {}
+        details = _redact_mcp_config(config) if isinstance(config, dict) else {}
         snapshots.append(
             CustomizationSnapshot(
                 customization_type="mcp",
@@ -268,7 +276,7 @@ def _candidate_project_roots(project_path: str) -> list[Path]:
     results: list[Path] = []
     home = Path.home().resolve()
     for candidate in [path.resolve(), *path.resolve().parents]:
-        if candidate == home or home in candidate.parents:
+        if candidate == home or candidate in home.parents:
             if (candidate / ".claude").exists() or (candidate / ".git").exists():
                 results.append(candidate)
             break
