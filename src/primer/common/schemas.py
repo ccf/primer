@@ -1873,6 +1873,18 @@ class AgentSkillUsage(BaseModel):
     engineer_count: int
 
 
+class CustomizationUsage(BaseModel):
+    identifier: str
+    customization_type: str
+    provenance: CustomizationProvenance
+    total_invocations: int
+    session_count: int
+    engineer_count: int
+    project_count: int
+    top_projects: list[str] = []
+    top_engineers: list[str] = []
+
+
 class ProjectReadinessEntry(BaseModel):
     repository: str
     has_claude_md: bool
@@ -1887,12 +1899,14 @@ class MaturityAnalyticsResponse(BaseModel):
     engineer_profiles: list[EngineerLeverageProfile]
     daily_leverage: list[DailyLeverageEntry]
     agent_skill_breakdown: list[AgentSkillUsage]
+    customization_breakdown: list[CustomizationUsage] = []
     project_readiness: list[ProjectReadinessEntry]
     sessions_analyzed: int
     avg_leverage_score: float
     avg_effectiveness_score: float | None = None
     orchestration_adoption_rate: float
     team_orchestration_adoption_rate: float = 0.0
+    explicit_customization_adoption_rate: float = 0.0
     model_diversity_avg: float = 0.0
 
 

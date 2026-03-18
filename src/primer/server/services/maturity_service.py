@@ -7,6 +7,7 @@ from statistics import median
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from primer.common.customizations import is_explicit_customization_provenance
 from primer.common.facet_taxonomy import canonical_outcome, is_success_outcome
 from primer.common.models import (
     Engineer,
@@ -14,6 +15,7 @@ from primer.common.models import (
     ModelUsage,
     PullRequest,
     SessionCommit,
+    SessionCustomization,
     SessionFacets,
     ToolUsage,
 )
@@ -21,6 +23,7 @@ from primer.common.models import Session as SessionModel
 from primer.common.pricing import estimate_cost, get_cost_tier
 from primer.common.schemas import (
     AgentSkillUsage,
+    CustomizationUsage,
     DailyLeverageEntry,
     EngineerLeverageProfile,
     LeverageBreakdown,
@@ -386,7 +389,82 @@ def get_maturity_analytics(
         for d in sorted(agent_skill_data.values(), key=lambda x: x["total_calls"], reverse=True)
     ]
 
-    # 5. Project readiness
+    # 5. Explicit customization breakdown
+    customization_data: dict[tuple[str, str, str], dict] = {}
+    engineers_using_explicit_customizations: set[str] = set()
+    customization_rows = (
+        db.query(
+            SessionCustomization.session_id,
+            SessionCustomization.customization_type,
+            SessionCustomization.identifier,
+            SessionCustomization.provenance,
+            SessionCustomization.state,
+            SessionCustomization.invocation_count,
+            SessionModel.engineer_id,
+            SessionModel.project_name,
+        )
+        .join(SessionModel, SessionCustomization.session_id == SessionModel.id)
+        .filter(SessionCustomization.session_id.in_(db.query(session_id_subq.c.id)))
+        .all()
+    )
+    for (
+        session_id,
+        customization_type,
+        identifier,
+        provenance,
+        state,
+        invocation_count,
+        engineer_id,
+        project_name,
+    ) in customization_rows:
+        if state != "invoked" or not is_explicit_customization_provenance(provenance):
+            continue
+
+        engineers_using_explicit_customizations.add(engineer_id)
+        key = (customization_type, identifier, provenance)
+        bucket = customization_data.setdefault(
+            key,
+            {
+                "identifier": identifier,
+                "customization_type": customization_type,
+                "provenance": provenance,
+                "total_invocations": 0,
+                "sessions": set(),
+                "engineers": set(),
+                "projects": Counter(),
+                "engineer_names": Counter(),
+            },
+        )
+        bucket["total_invocations"] += invocation_count or 0
+        bucket["sessions"].add(session_id)
+        bucket["engineers"].add(engineer_id)
+        if project_name:
+            bucket["projects"][project_name] += 1
+        bucket["engineer_names"][engineer_names.get(engineer_id, "Unknown")] += 1
+
+    customization_breakdown = [
+        CustomizationUsage(
+            identifier=bucket["identifier"],
+            customization_type=bucket["customization_type"],
+            provenance=bucket["provenance"],
+            total_invocations=bucket["total_invocations"],
+            session_count=len(bucket["sessions"]),
+            engineer_count=len(bucket["engineers"]),
+            project_count=len(bucket["projects"]),
+            top_projects=[project for project, _count in bucket["projects"].most_common(3)],
+            top_engineers=[name for name, _count in bucket["engineer_names"].most_common(3)],
+        )
+        for bucket in sorted(
+            customization_data.values(),
+            key=lambda item: (
+                -item["engineer_names"].total(),
+                -item["total_invocations"],
+                item["identifier"],
+            ),
+        )
+    ]
+
+    # 6. Project readiness
     project_readiness: list[ProjectReadinessEntry] = []
     if sessions_analyzed > 0:
         repo_session_counts = (
@@ -433,6 +511,11 @@ def get_maturity_analytics(
     )
     adoption_rate = engineers_using_orchestration / total_engineers if total_engineers > 0 else 0.0
     team_adoption_rate = engineers_using_teams / total_engineers if total_engineers > 0 else 0.0
+    explicit_customization_adoption_rate = (
+        len(engineers_using_explicit_customizations) / total_engineers
+        if total_engineers > 0
+        else 0.0
+    )
     model_div_avg = (
         sum(all_model_diversities) / len(all_model_diversities) if all_model_diversities else 0.0
     )
@@ -442,6 +525,7 @@ def get_maturity_analytics(
         engineer_profiles=engineer_profiles,
         daily_leverage=daily_leverage,
         agent_skill_breakdown=agent_skill_breakdown,
+        customization_breakdown=customization_breakdown,
         project_readiness=project_readiness,
         sessions_analyzed=sessions_analyzed,
         avg_leverage_score=round(avg_leverage, 1),
@@ -450,5 +534,6 @@ def get_maturity_analytics(
         ),
         orchestration_adoption_rate=round(adoption_rate, 3),
         team_orchestration_adoption_rate=round(team_adoption_rate, 3),
+        explicit_customization_adoption_rate=round(explicit_customization_adoption_rate, 3),
         model_diversity_avg=round(model_div_avg, 3),
     )

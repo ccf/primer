@@ -5,6 +5,7 @@ from primer.common.customizations import (
     _candidate_project_roots,
     _redact_mcp_config,
     build_session_customizations,
+    is_explicit_customization_provenance,
 )
 
 
@@ -56,9 +57,9 @@ def test_build_session_customizations_collects_enabled_and_invoked_items(tmp_pat
     assert ("skill", "enabled", "commit", "user_local") in as_keys
     assert ("mcp", "enabled", "github", "user_local") in as_keys
     assert ("mcp", "enabled", "linear", "repo_defined") in as_keys
-    assert ("skill", "invoked", "commit", "unknown") in as_keys
-    assert ("subagent", "invoked", "reviewer", "unknown") in as_keys
-    assert ("mcp", "invoked", "github", "unknown") in as_keys
+    assert ("skill", "invoked", "commit", "user_local") in as_keys
+    assert ("subagent", "invoked", "reviewer", "repo_defined") in as_keys
+    assert ("mcp", "invoked", "github", "user_local") in as_keys
 
     invoked_github = next(
         item
@@ -68,6 +69,13 @@ def test_build_session_customizations_collects_enabled_and_invoked_items(tmp_pat
         and item.identifier == "github"
     )
     assert invoked_github.invocation_count == 3
+
+
+def test_explicit_customization_provenance_filters_unknown_and_builtin():
+    assert is_explicit_customization_provenance("repo_defined") is True
+    assert is_explicit_customization_provenance("user_local") is True
+    assert is_explicit_customization_provenance("unknown") is False
+    assert is_explicit_customization_provenance("built_in") is False
 
 
 def test_candidate_project_roots_traverses_nested_dirs(tmp_path, monkeypatch):
