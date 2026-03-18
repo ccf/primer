@@ -90,7 +90,6 @@ def _build_tool_recommendations(
                     bucket = buckets.setdefault(
                         tool_name,
                         {
-                            "score": 0,
                             "priority_score": 0,
                             "supporting_exemplar_ids": set(),
                             "project_context_match_count": 0,
@@ -100,9 +99,6 @@ def _build_tool_recommendations(
                             "best_exemplar": None,
                             "best_rank": None,
                         },
-                    )
-                    bucket["score"] = (
-                        int(bucket["score"]) + (priority_score * 2) + int(project_match)
                     )
                     bucket["priority_score"] = max(int(bucket["priority_score"]), priority_score)
                     supporting_exemplar_ids = bucket["supporting_exemplar_ids"]
