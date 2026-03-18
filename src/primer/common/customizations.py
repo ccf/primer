@@ -277,8 +277,6 @@ def _candidate_project_roots(project_path: str) -> list[Path]:
     home = Path.home().resolve()
     for candidate in [path.resolve(), *path.resolve().parents]:
         if candidate == home or candidate in home.parents:
-            if (candidate / ".claude").exists() or (candidate / ".git").exists():
-                results.append(candidate)
             break
         if (candidate / ".claude").exists() or (candidate / ".git").exists():
             results.append(candidate)
