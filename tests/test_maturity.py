@@ -282,6 +282,12 @@ def test_maturity_filters_to_explicit_customizations(
     assert github["provenance"] == "user_local"
     assert github["engineer_count"] == 1
     assert github["top_engineers"] == ["Alice"]
+    assert len(data["high_performer_stacks"]) == 1
+    stack = data["high_performer_stacks"][0]
+    assert stack["engineer_count"] == 1
+    assert stack["label"] == "github + review-pr"
+    assert [item["identifier"] for item in stack["customizations"]] == ["github", "review-pr"]
+    assert stack["top_engineers"] == ["Alice"]
 
 
 def test_maturity_date_filtering(client, admin_headers, seeded_maturity_data):

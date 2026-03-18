@@ -2,6 +2,7 @@
 
 from collections import Counter, defaultdict
 from datetime import datetime
+from hashlib import md5
 from statistics import median
 
 from sqlalchemy import func
@@ -26,9 +27,11 @@ from primer.common.schemas import (
     CustomizationUsage,
     DailyLeverageEntry,
     EngineerLeverageProfile,
+    HighPerformerStack,
     LeverageBreakdown,
     MaturityAnalyticsResponse,
     ProjectReadinessEntry,
+    StackCustomization,
     ToolCategoryBreakdown,
 )
 from primer.common.tool_classification import (
@@ -391,6 +394,11 @@ def get_maturity_analytics(
 
     # 5. Explicit customization breakdown
     customization_data: dict[tuple[str, str, str], dict] = {}
+    engineer_explicit_customizations: dict[str, Counter[tuple[str, str, str]]] = defaultdict(
+        Counter
+    )
+    engineer_explicit_sessions: dict[str, set[str]] = defaultdict(set)
+    engineer_explicit_projects: dict[str, Counter[str]] = defaultdict(Counter)
     engineers_using_explicit_customizations: set[str] = set()
     customization_rows = (
         db.query(
@@ -421,6 +429,12 @@ def get_maturity_analytics(
             continue
 
         engineers_using_explicit_customizations.add(engineer_id)
+        engineer_explicit_customizations[engineer_id][
+            (customization_type, identifier, provenance)
+        ] += invocation_count or 0
+        engineer_explicit_sessions[engineer_id].add(session_id)
+        if project_name:
+            engineer_explicit_projects[engineer_id][project_name] += 1
         key = (customization_type, identifier, provenance)
         bucket = customization_data.setdefault(
             key,
@@ -463,6 +477,103 @@ def get_maturity_analytics(
             ),
         )
     ]
+
+    high_performer_stacks: list[HighPerformerStack] = []
+    scored_profiles = [
+        profile for profile in engineer_profiles if profile.effectiveness_score is not None
+    ]
+    ranked_profiles = (
+        sorted(
+            scored_profiles,
+            key=lambda profile: (
+                -(profile.effectiveness_score or 0.0),
+                -profile.leverage_score,
+            ),
+        )
+        if scored_profiles
+        else engineer_profiles
+    )
+    top_cohort_size = max(1, (len(ranked_profiles) + 3) // 4) if ranked_profiles else 0
+    high_performer_ids = {profile.engineer_id for profile in ranked_profiles[:top_cohort_size]}
+    profile_by_engineer_id = {profile.engineer_id: profile for profile in engineer_profiles}
+    stack_buckets: dict[tuple[tuple[str, str, str], ...], dict] = {}
+    for engineer_id in high_performer_ids:
+        customization_counts = engineer_explicit_customizations.get(engineer_id, Counter())
+        if not customization_counts:
+            continue
+
+        top_customizations = customization_counts.most_common(3)
+        stack_key = tuple(key for key, _count in top_customizations)
+        bucket = stack_buckets.setdefault(
+            stack_key,
+            {
+                "customization_totals": Counter(),
+                "engineers": set(),
+                "sessions": set(),
+                "projects": Counter(),
+                "effectiveness_scores": [],
+                "leverage_scores": [],
+                "engineer_names": [],
+            },
+        )
+        bucket["engineers"].add(engineer_id)
+        bucket["sessions"].update(engineer_explicit_sessions.get(engineer_id, set()))
+        bucket["projects"].update(engineer_explicit_projects.get(engineer_id, Counter()))
+        profile = profile_by_engineer_id.get(engineer_id)
+        if profile is not None:
+            if profile.effectiveness_score is not None:
+                bucket["effectiveness_scores"].append(profile.effectiveness_score)
+            bucket["leverage_scores"].append(profile.leverage_score)
+            bucket["engineer_names"].append(profile.name)
+        for customization_key, invocation_count in top_customizations:
+            bucket["customization_totals"][customization_key] += invocation_count
+
+    for stack_key, bucket in sorted(
+        stack_buckets.items(),
+        key=lambda item: (
+            -len(item[1]["engineers"]),
+            -(
+                sum(item[1]["effectiveness_scores"]) / len(item[1]["effectiveness_scores"])
+                if item[1]["effectiveness_scores"]
+                else 0.0
+            ),
+        ),
+    ):
+        label = " + ".join(identifier for _type, identifier, _provenance in stack_key)
+        stack_id = md5(label.encode(), usedforsecurity=False).hexdigest()[:12]
+        high_performer_stacks.append(
+            HighPerformerStack(
+                stack_id=stack_id,
+                label=label,
+                customizations=[
+                    StackCustomization(
+                        identifier=identifier,
+                        customization_type=customization_type,
+                        provenance=provenance,
+                        invocation_count=bucket["customization_totals"][
+                            (customization_type, identifier, provenance)
+                        ],
+                    )
+                    for customization_type, identifier, provenance in stack_key
+                ],
+                engineer_count=len(bucket["engineers"]),
+                session_count=len(bucket["sessions"]),
+                avg_effectiveness_score=(
+                    round(
+                        sum(bucket["effectiveness_scores"]) / len(bucket["effectiveness_scores"]),
+                        1,
+                    )
+                    if bucket["effectiveness_scores"]
+                    else None
+                ),
+                avg_leverage_score=round(
+                    sum(bucket["leverage_scores"]) / len(bucket["leverage_scores"]),
+                    1,
+                ),
+                top_projects=[project for project, _count in bucket["projects"].most_common(3)],
+                top_engineers=sorted(bucket["engineer_names"])[:3],
+            )
+        )
 
     # 6. Project readiness
     project_readiness: list[ProjectReadinessEntry] = []
@@ -526,6 +637,7 @@ def get_maturity_analytics(
         daily_leverage=daily_leverage,
         agent_skill_breakdown=agent_skill_breakdown,
         customization_breakdown=customization_breakdown,
+        high_performer_stacks=high_performer_stacks,
         project_readiness=project_readiness,
         sessions_analyzed=sessions_analyzed,
         avg_leverage_score=round(avg_leverage, 1),
