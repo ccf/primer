@@ -92,7 +92,7 @@ def _build_tool_recommendations(
                         {
                             "priority_score": 0,
                             "supporting_exemplar_ids": set(),
-                            "project_context_match_count": 0,
+                            "project_context_match_session_ids": set(),
                             "related_skill_areas": set(),
                             "related_categories": set(),
                             "matching_projects": Counter(),
@@ -105,9 +105,9 @@ def _build_tool_recommendations(
                     assert isinstance(supporting_exemplar_ids, set)
                     supporting_exemplar_ids.add(exemplar.session_id)
                     if project_match:
-                        bucket["project_context_match_count"] = (
-                            int(bucket["project_context_match_count"]) + 1
-                        )
+                        project_match_ids = bucket["project_context_match_session_ids"]
+                        assert isinstance(project_match_ids, set)
+                        project_match_ids.add(exemplar.session_id)
 
                     related_skill_areas = bucket["related_skill_areas"]
                     assert isinstance(related_skill_areas, set)
@@ -186,7 +186,7 @@ def _build_tool_recommendations(
                 related_categories=related_categories[:3],
                 matching_projects=matching_projects,
                 supporting_exemplar_count=len(bucket["supporting_exemplar_ids"]),
-                project_context_match_count=int(bucket["project_context_match_count"]),
+                project_context_match_count=len(bucket["project_context_match_session_ids"]),
                 exemplar=exemplar,
             )
         )
