@@ -130,7 +130,11 @@ def _build_tool_recommendations(
                             if exemplar.estimated_cost is not None
                             else float("inf")
                         ),
-                        -(exemplar.duration_seconds or float("inf")),
+                        -(
+                            exemplar.duration_seconds
+                            if exemplar.duration_seconds is not None
+                            else float("inf")
+                        ),
                     )
                     best_rank = bucket["best_rank"]
                     if best_rank is None or exemplar_rank > best_rank:
