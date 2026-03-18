@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/shared/page-header"
 import { MaturitySummary } from "@/components/maturity/maturity-summary"
 import { ToolCategoryChart } from "@/components/maturity/tool-category-chart"
 import { AgentSkillTable } from "@/components/maturity/agent-skill-table"
+import { CustomizationBreakdownTable } from "@/components/maturity/customization-breakdown-table"
 import { LeverageScoreTable } from "@/components/maturity/leverage-score-table"
 import { LeverageTrendChart } from "@/components/maturity/leverage-trend-chart"
 import { EffectivenessScatter } from "@/components/maturity/effectiveness-scatter"
@@ -70,7 +71,10 @@ export function MaturityPage({ teamId, dateRange }: MaturityPageProps) {
       )}
 
       {data && activeTab === "agents" && (
-        <AgentSkillTable data={data.agent_skill_breakdown} />
+        <div className="space-y-6">
+          <AgentSkillTable data={data.agent_skill_breakdown} />
+          <CustomizationBreakdownTable data={data.customization_breakdown} />
+        </div>
       )}
 
       {activeTab === "tools" && loadingTools && (

@@ -9,7 +9,7 @@ interface MaturitySummaryProps {
 
 export function MaturitySummary({ data }: MaturitySummaryProps) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
       <StatCard
         label="Avg Leverage Score"
         value={data.avg_leverage_score.toFixed(1)}
@@ -26,6 +26,12 @@ export function MaturitySummary({ data }: MaturitySummaryProps) {
         label="Orchestration Adoption"
         value={formatPercent(data.orchestration_adoption_rate)}
         subtitle="Engineers using agents/skills"
+        icon={Users}
+      />
+      <StatCard
+        label="Explicit Customization Adoption"
+        value={formatPercent(data.explicit_customization_adoption_rate)}
+        subtitle="Engineers using explicit MCPs, skills, or subagents"
         icon={Users}
       />
       <StatCard

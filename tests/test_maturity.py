@@ -10,6 +10,7 @@ from primer.common.models import (
     PullRequest,
     Session,
     SessionCommit,
+    SessionCustomization,
     SessionFacets,
     Team,
     ToolUsage,
@@ -230,6 +231,57 @@ def test_maturity_agent_skill_breakdown(client, admin_headers, seeded_maturity_d
     task_explore = next(i for i in breakdown if i["name"] == "Task:explore")
     assert task_explore["category"] == "orchestration"
     assert task_explore["total_calls"] == 3
+
+
+def test_maturity_filters_to_explicit_customizations(
+    client, admin_headers, seeded_maturity_data, db_session
+):
+    s1 = seeded_maturity_data["s1"]
+    s2 = seeded_maturity_data["s2"]
+
+    db_session.add_all(
+        [
+            SessionCustomization(
+                session_id=s1.id,
+                customization_type="mcp",
+                state="invoked",
+                identifier="github",
+                provenance="user_local",
+                invocation_count=3,
+            ),
+            SessionCustomization(
+                session_id=s1.id,
+                customization_type="skill",
+                state="invoked",
+                identifier="review-pr",
+                provenance="repo_defined",
+                invocation_count=1,
+            ),
+            SessionCustomization(
+                session_id=s2.id,
+                customization_type="skill",
+                state="invoked",
+                identifier="always-on",
+                provenance="unknown",
+                invocation_count=5,
+            ),
+        ]
+    )
+    db_session.flush()
+
+    response = client.get("/api/v1/analytics/maturity", headers=admin_headers)
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["explicit_customization_adoption_rate"] == 0.5
+    identifiers = [item["identifier"] for item in data["customization_breakdown"]]
+    assert identifiers == ["github", "review-pr"]
+    github = next(
+        item for item in data["customization_breakdown"] if item["identifier"] == "github"
+    )
+    assert github["provenance"] == "user_local"
+    assert github["engineer_count"] == 1
+    assert github["top_engineers"] == ["Alice"]
 
 
 def test_maturity_date_filtering(client, admin_headers, seeded_maturity_data):

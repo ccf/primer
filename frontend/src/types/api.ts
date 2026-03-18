@@ -1501,6 +1501,18 @@ export interface AgentSkillUsage {
   engineer_count: number
 }
 
+export interface CustomizationUsage {
+  identifier: string
+  customization_type: string
+  provenance: CustomizationProvenance
+  total_invocations: number
+  session_count: number
+  engineer_count: number
+  project_count: number
+  top_projects: string[]
+  top_engineers: string[]
+}
+
 export interface ProjectReadinessEntry {
   repository: string
   has_claude_md: boolean
@@ -1515,12 +1527,14 @@ export interface MaturityAnalyticsResponse {
   engineer_profiles: EngineerLeverageProfile[]
   daily_leverage: DailyLeverageEntry[]
   agent_skill_breakdown: AgentSkillUsage[]
+  customization_breakdown: CustomizationUsage[]
   project_readiness: ProjectReadinessEntry[]
   sessions_analyzed: number
   avg_leverage_score: number
   avg_effectiveness_score: number | null
   orchestration_adoption_rate: number
   team_orchestration_adoption_rate: number
+  explicit_customization_adoption_rate: number
   model_diversity_avg: number
 }
 

@@ -16,6 +16,15 @@ _CUSTOMIZATION_DIRS: dict[str, tuple[str, str]] = {
     "skills": ("skill", "skills"),
     "templates": ("template", "templates"),
 }
+_EXPLICIT_PROVENANCE = frozenset({"user_local", "repo_defined", "org_managed", "marketplace"})
+_PROVENANCE_PRIORITY = {
+    "repo_defined": 3,
+    "org_managed": 2,
+    "user_local": 1,
+    "marketplace": 0,
+    "built_in": -1,
+    "unknown": -2,
+}
 
 
 @dataclass(slots=True)
@@ -56,12 +65,16 @@ def build_session_customizations(
     project_path: str | None,
     tool_counts: Mapping[str, int],
 ) -> list[CustomizationSnapshot]:
-    snapshots = []
-    snapshots.extend(_derive_invoked_customizations(tool_counts))
-    snapshots.extend(_collect_enabled_project_customizations(project_path))
+    enabled_snapshots = _collect_enabled_project_customizations(project_path)
     if agent_type == "claude_code":
-        snapshots.extend(_collect_enabled_claude_user_customizations())
-    return _dedupe_snapshots(snapshots)
+        enabled_snapshots.extend(_collect_enabled_claude_user_customizations())
+
+    enabled_snapshots = _dedupe_snapshots(enabled_snapshots)
+    invoked_snapshots = _resolve_invoked_snapshot_provenance(
+        _derive_invoked_customizations(tool_counts),
+        enabled_snapshots,
+    )
+    return _dedupe_snapshots([*invoked_snapshots, *enabled_snapshots])
 
 
 def derive_invoked_customizations_from_tool_usages(
@@ -91,6 +104,10 @@ def derive_invoked_customizations_from_tool_usages(
         tool_counts[tool_name] = tool_counts.get(tool_name, 0) + normalized_count
 
     return _derive_invoked_customizations(tool_counts)
+
+
+def is_explicit_customization_provenance(provenance: str) -> bool:
+    return provenance in _EXPLICIT_PROVENANCE
 
 
 def _derive_invoked_customizations(
@@ -190,6 +207,44 @@ def _collect_enabled_claude_user_customizations() -> list[CustomizationSnapshot]
         )
     )
     return _dedupe_snapshots(snapshots)
+
+
+def _resolve_invoked_snapshot_provenance(
+    invoked_snapshots: list[CustomizationSnapshot],
+    enabled_snapshots: list[CustomizationSnapshot],
+) -> list[CustomizationSnapshot]:
+    enabled_by_key: dict[tuple[str, str], list[CustomizationSnapshot]] = {}
+    for snapshot in enabled_snapshots:
+        enabled_by_key.setdefault(
+            (snapshot.customization_type, snapshot.identifier),
+            [],
+        ).append(snapshot)
+
+    resolved: list[CustomizationSnapshot] = []
+    for snapshot in invoked_snapshots:
+        candidates = enabled_by_key.get((snapshot.customization_type, snapshot.identifier), [])
+        if not candidates:
+            resolved.append(snapshot)
+            continue
+
+        best_match = max(
+            candidates,
+            key=lambda item: _PROVENANCE_PRIORITY.get(item.provenance, -10),
+        )
+        resolved.append(
+            CustomizationSnapshot(
+                customization_type=snapshot.customization_type,
+                state=snapshot.state,
+                identifier=snapshot.identifier,
+                provenance=best_match.provenance,
+                display_name=best_match.display_name or snapshot.display_name,
+                source_path=best_match.source_path,
+                invocation_count=snapshot.invocation_count,
+                details=snapshot.details,
+            )
+        )
+
+    return resolved
 
 
 def _scan_customization_dirs(
