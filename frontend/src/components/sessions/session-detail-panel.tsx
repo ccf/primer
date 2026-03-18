@@ -330,7 +330,7 @@ export function SessionDetailPanel({ session }: SessionDetailPanelProps) {
           <CardContent className="space-y-3">
             {session.customizations.map((customization) => (
               <div
-                key={`${customization.customization_type}:${customization.state}:${customization.identifier}:${customization.source_path ?? ""}`}
+                key={`${customization.customization_type}:${customization.state}:${customization.identifier}:${customization.provenance}:${customization.source_path ?? ""}`}
                 className="rounded-lg border border-border/70 p-3"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
