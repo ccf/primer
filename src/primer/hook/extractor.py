@@ -72,14 +72,18 @@ class SessionMetadata:
     customizations: list[dict] | None = None
 
     def to_ingest_payload(self, api_key: str, facets: dict | None = None) -> dict:
-        customizations = self.customizations if self.customizations is not None else [
-            snapshot.to_payload()
-            for snapshot in build_session_customizations(
-                self.agent_type,
-                self.project_path or None,
-                self.tool_counts,
-            )
-        ]
+        customizations = (
+            self.customizations
+            if self.customizations is not None
+            else [
+                snapshot.to_payload()
+                for snapshot in build_session_customizations(
+                    self.agent_type,
+                    self.project_path or None,
+                    self.tool_counts,
+                )
+            ]
+        )
         payload: dict = {
             "session_id": self.session_id,
             "api_key": api_key,
