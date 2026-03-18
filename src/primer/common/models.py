@@ -133,6 +133,9 @@ class Session(Base):
     tool_usages: Mapped[list["ToolUsage"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )
+    customizations: Mapped[list["SessionCustomization"]] = relationship(
+        back_populates="session", cascade="all, delete-orphan"
+    )
     model_usages: Mapped[list["ModelUsage"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )
@@ -190,6 +193,29 @@ class ToolUsage(Base):
     call_count: Mapped[int] = mapped_column(Integer, default=0)
 
     session: Mapped[Session] = relationship(back_populates="tool_usages")
+
+
+class SessionCustomization(Base):
+    __tablename__ = "session_customizations"
+    __table_args__ = (
+        Index(
+            "ix_session_customizations_session_id",
+            "session_id",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), nullable=False)
+    customization_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    state: Mapped[str] = mapped_column(String(20), nullable=False)
+    identifier: Mapped[str] = mapped_column(String(255), nullable=False)
+    provenance: Mapped[str] = mapped_column(String(30), nullable=False, server_default="unknown")
+    display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    invocation_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    session: Mapped[Session] = relationship(back_populates="customizations")
 
 
 class ModelUsage(Base):

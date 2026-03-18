@@ -16,6 +16,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Protocol
 
+from primer.common.customizations import build_session_customizations
+
 logger = logging.getLogger(__name__)
 
 
@@ -67,8 +69,17 @@ class SessionMetadata:
     model_tokens: dict[str, dict[str, int]] = field(default_factory=dict)
     messages: list[dict] = field(default_factory=list)
     commits: list[dict] = field(default_factory=list)
+    customizations: list[dict] = field(default_factory=list)
 
     def to_ingest_payload(self, api_key: str, facets: dict | None = None) -> dict:
+        customizations = self.customizations or [
+            snapshot.to_payload()
+            for snapshot in build_session_customizations(
+                self.agent_type,
+                self.project_path or None,
+                self.tool_counts,
+            )
+        ]
         payload: dict = {
             "session_id": self.session_id,
             "api_key": api_key,
@@ -97,6 +108,7 @@ class SessionMetadata:
             "tool_usages": [
                 {"tool_name": name, "call_count": count} for name, count in self.tool_counts.items()
             ],
+            "customizations": customizations,
             "model_usages": [
                 {
                     "model_name": name,

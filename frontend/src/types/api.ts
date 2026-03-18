@@ -34,6 +34,15 @@ export type RecoveryStrategy =
   | 'rerun_verification'
   | 'delegate_or_parallelize'
 export type RecoveryResult = 'recovered' | 'abandoned' | 'unresolved'
+export type CustomizationType = "mcp" | "subagent" | "skill" | "command" | "template"
+export type CustomizationState = "available" | "enabled" | "invoked"
+export type CustomizationProvenance =
+  | "built_in"
+  | "user_local"
+  | "repo_defined"
+  | "org_managed"
+  | "marketplace"
+  | "unknown"
 
 export interface SessionResponse {
   id: string
@@ -160,9 +169,21 @@ export interface SessionWorkflowProfileResponse {
   verification_run_count: number
 }
 
+export interface SessionCustomizationResponse {
+  customization_type: CustomizationType
+  state: CustomizationState
+  identifier: string
+  provenance: CustomizationProvenance
+  display_name: string | null
+  source_path: string | null
+  invocation_count: number
+  details: Record<string, unknown> | null
+}
+
 export interface SessionDetailResponse extends SessionResponse {
   facets: SessionFacetsResponse | null
   tool_usages: ToolUsageResponse[]
+  customizations: SessionCustomizationResponse[]
   model_usages: ModelUsageResponse[]
   execution_evidence: SessionExecutionEvidenceResponse[]
   change_shape: SessionChangeShapeResponse | null

@@ -3,6 +3,7 @@ import logging
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from primer.common.customizations import derive_invoked_customizations_from_tool_usages
 from primer.common.facet_taxonomy import (
     validate_inbound_goal_categories,
     validate_inbound_outcome,
@@ -13,6 +14,7 @@ from primer.common.models import (
     ModelUsage,
     SessionChangeShape,
     SessionCommit,
+    SessionCustomization,
     SessionExecutionEvidence,
     SessionFacets,
     SessionMessage,
@@ -123,6 +125,18 @@ def upsert_session(db: Session, engineer_id: str, payload: SessionIngestPayload)
                     call_count=tu.call_count,
                 )
             )
+
+    if payload.customizations is not None:
+        _replace_session_customizations(db, session.id, payload.customizations)
+    elif payload.tool_usages is not None:
+        _replace_session_customizations(
+            db,
+            session.id,
+            [
+                snapshot.to_payload()
+                for snapshot in derive_invoked_customizations_from_tool_usages(payload.tool_usages)
+            ],
+        )
 
     # Model usages — replace all
     if payload.model_usages is not None:
@@ -235,6 +249,27 @@ def upsert_facets(db: Session, session_id: str, facets: SessionFacetsPayload) ->
             setattr(record, field, value)
 
     db.flush()
+
+
+def _replace_session_customizations(
+    db: Session, session_id: str, customizations: list[object]
+) -> None:
+    db.query(SessionCustomization).filter(SessionCustomization.session_id == session_id).delete()
+    for customization in customizations:
+        values = customization if isinstance(customization, dict) else customization.model_dump()
+        db.add(
+            SessionCustomization(
+                session_id=session_id,
+                customization_type=values["customization_type"],
+                state=values["state"],
+                identifier=values["identifier"],
+                provenance=values.get("provenance", "unknown"),
+                display_name=values.get("display_name"),
+                source_path=values.get("source_path"),
+                invocation_count=values.get("invocation_count", 0),
+                details=values.get("details"),
+            )
+        )
 
 
 def _upsert_change_shape(db: Session, session_id: str) -> None:

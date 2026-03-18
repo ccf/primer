@@ -86,7 +86,12 @@ def get_session(
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(get_auth_context),
 ):
-    session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+    session = (
+        db.query(SessionModel)
+        .options(selectinload(SessionModel.customizations))
+        .filter(SessionModel.id == session_id)
+        .first()
+    )
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 

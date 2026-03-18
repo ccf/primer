@@ -46,6 +46,7 @@ const baseSession: SessionDetailResponse = {
     { tool_name: "Read", call_count: 5 },
     { tool_name: "Edit", call_count: 3 },
   ],
+  customizations: [],
   model_usages: [
     {
       model_name: "claude-sonnet-4-5-20250929",
@@ -184,6 +185,43 @@ describe("SessionDetailPanel", () => {
     expect(screen.getByText("Workflow Steps")).toBeInTheDocument()
     expect(screen.getByText("Top Tools")).toBeInTheDocument()
     expect(screen.getByText("Mapped from the extracted session type 'code_modification'.")).toBeInTheDocument()
+  })
+
+  it("renders customizations when present", () => {
+    render(
+      <SessionDetailPanel
+        session={{
+          ...baseSession,
+          customizations: [
+            {
+              customization_type: "mcp",
+              state: "enabled",
+              identifier: "github",
+              provenance: "user_local",
+              display_name: "github",
+              source_path: "/Users/test/.claude/settings.json",
+              invocation_count: 0,
+              details: null,
+            },
+            {
+              customization_type: "skill",
+              state: "invoked",
+              identifier: "commit",
+              provenance: "unknown",
+              display_name: "commit",
+              source_path: null,
+              invocation_count: 2,
+              details: null,
+            },
+          ],
+        }}
+      />,
+    )
+
+    expect(screen.getByText("Customizations")).toBeInTheDocument()
+    expect(screen.getAllByText("github").length).toBeGreaterThan(0)
+    expect(screen.getByText("Enabled")).toBeInTheDocument()
+    expect(screen.getByText("2 calls")).toBeInTheDocument()
   })
 
   it("counts hidden change-shape files from both named overflow and inferred files", () => {

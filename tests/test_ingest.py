@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from primer.common.models import Session as SessionModel
 from primer.common.models import (
     SessionChangeShape,
+    SessionCustomization,
     SessionExecutionEvidence,
     SessionFacets,
     SessionRecoveryPath,
@@ -76,6 +77,40 @@ def test_ingest_session(client, engineer_with_key):
     assert data["status"] == "ok"
     assert data["session_id"] == session_id
     assert data["created"] is True
+
+
+def test_ingest_session_derives_invoked_customizations_from_tool_usages(
+    client, engineer_with_key, db_session
+):
+    _eng, api_key = engineer_with_key
+    session_id = str(uuid.uuid4())
+    payload = {
+        "session_id": session_id,
+        "api_key": api_key,
+        "project_name": "customization-project",
+        "tool_usages": [
+            {"tool_name": "Skill:commit", "call_count": 2},
+            {"tool_name": "Task:reviewer", "call_count": 1},
+            {"tool_name": "mcp__github__fetch_pr_comments", "call_count": 3},
+        ],
+    }
+
+    response = client.post("/api/v1/ingest/session", json=payload)
+
+    assert response.status_code == 200
+    stored = (
+        db_session.query(SessionCustomization)
+        .filter(SessionCustomization.session_id == session_id)
+        .order_by(SessionCustomization.customization_type, SessionCustomization.identifier)
+        .all()
+    )
+    assert [
+        (row.customization_type, row.state, row.identifier, row.invocation_count) for row in stored
+    ] == [
+        ("mcp", "invoked", "github", 3),
+        ("skill", "invoked", "commit", 2),
+        ("subagent", "invoked", "reviewer", 1),
+    ]
 
 
 def test_ingest_session_accepts_cursor_agent_type_and_persists(

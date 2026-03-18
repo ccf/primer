@@ -77,6 +77,7 @@ const mockDetailSession = {
     created_at: "2025-01-15T10:00:00",
   },
   tool_usages: [{ tool_name: "Read", call_count: 10 }],
+  customizations: [],
   model_usages: [
     {
       model_name: "claude-sonnet-4-5-20250929",
