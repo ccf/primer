@@ -43,7 +43,7 @@ export function CustomizationBreakdownTable({ data }: CustomizationBreakdownTabl
             </thead>
             <tbody>
               {data.map((item) => (
-                <tr key={`${item.customization_type}:${item.identifier}`} className="border-b border-border/40">
+                <tr key={`${item.customization_type}:${item.identifier}:${item.provenance}`} className="border-b border-border/40">
                   <td className="py-2 font-mono text-xs">{item.identifier}</td>
                   <td className="py-2">
                     <Badge variant="outline">{formatLabel(item.customization_type)}</Badge>
