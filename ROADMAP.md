@@ -172,8 +172,14 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Daily leverage trend tracking
 - [ ] [P1] Model diversity factor in leverage scoring
 - [ ] [P1] Agent team detection for coordinated multi-agent orchestration
+- [ ] [P1] Session customization snapshot: capture enabled MCP servers, subagents, skills, commands, and templates alongside what was actually invoked
 - [ ] [P1] Tool source classification: built-in vs marketplace vs custom
+- [ ] [P1] Skill provenance + baseline filtering so recommendations and reuse analytics suppress built-in/default skills and focus on explicit user or repo-configured choices
+- [ ] [P1] Cross-agent customization normalization so Claude, Cursor, Codex, and Gemini plugin surfaces map into one shared model
+- [ ] [P1] Customization state model: available vs enabled vs invoked for MCPs, subagents, skills, commands, and templates
+- [ ] [P1] Outcome attribution for customizations: which MCPs, skills, commands, and subagents improve workflow, quality, cost, and friction outcomes
 - [ ] [P1] Cross-team tooling landscape: overlap, reuse, and local best-of-breed tools
+- [ ] [P1] High-performer agent stack analysis: which combinations of MCPs, skills, commands, and subagents differentiate top performers
 - [ ] [P2] Prompt, skill, and template maturity scoring
 
 ## Code Quality

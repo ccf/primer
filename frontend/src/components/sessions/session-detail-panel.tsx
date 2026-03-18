@@ -6,7 +6,7 @@ import { SessionToolChart } from "@/components/sessions/session-tool-chart"
 import { SessionCostChart } from "@/components/sessions/session-cost-chart"
 import { RECOVERY_STRATEGY_LABELS } from "@/lib/recovery"
 import type { SessionDetailResponse } from "@/types/api"
-import { formatDuration, formatTokens } from "@/lib/utils"
+import { formatDuration, formatLabel, formatTokens } from "@/lib/utils"
 
 interface SessionDetailPanelProps {
   session: SessionDetailResponse
@@ -51,6 +51,12 @@ const WORKFLOW_ARCHETYPE_LABELS: Record<string, string> = {
   migration: "Migration",
   docs: "Docs",
   investigation: "Investigation",
+}
+
+const CUSTOMIZATION_STATE_VARIANT: Record<string, "outline" | "secondary"> = {
+  enabled: "outline",
+  invoked: "secondary",
+  available: "secondary",
 }
 
 export function SessionDetailPanel({ session }: SessionDetailPanelProps) {
@@ -312,6 +318,51 @@ export function SessionDetailPanel({ session }: SessionDetailPanelProps) {
                 {workflowProfile.archetype_reason}
               </p>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {session.customizations.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Customizations</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {session.customizations.map((customization) => (
+              <div
+                key={`${customization.customization_type}:${customization.state}:${customization.identifier}:${customization.source_path ?? ""}`}
+                className="rounded-lg border border-border/70 p-3"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">
+                      {customization.display_name ?? customization.identifier}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatLabel(customization.customization_type)}
+                      {" • "}
+                      {formatLabel(customization.provenance)}
+                      {customization.source_path ? ` • ${customization.source_path}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline">{customization.identifier}</Badge>
+                    <Badge
+                      variant={
+                        CUSTOMIZATION_STATE_VARIANT[customization.state] ?? "outline"
+                      }
+                    >
+                      {formatLabel(customization.state)}
+                    </Badge>
+                    {customization.invocation_count > 0 && (
+                      <Badge variant="secondary">
+                        {customization.invocation_count} calls
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}

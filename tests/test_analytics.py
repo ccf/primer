@@ -879,6 +879,45 @@ def test_session_detail_includes_workflow_profile_when_present(
     assert data["workflow_profile"]["verification_run_count"] == 1
 
 
+def test_session_detail_includes_customizations_when_present(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    sid = _ingest_session(
+        client,
+        api_key,
+        customizations=[
+            {
+                "customization_type": "mcp",
+                "state": "enabled",
+                "identifier": "github",
+                "provenance": "user_local",
+                "display_name": "github",
+                "source_path": "/Users/test/.claude/settings.json",
+                "details": {"command": "npx"},
+            },
+            {
+                "customization_type": "skill",
+                "state": "invoked",
+                "identifier": "commit",
+                "provenance": "unknown",
+                "display_name": "commit",
+                "invocation_count": 2,
+            },
+        ],
+    )
+
+    response = client.get(f"/api/v1/sessions/{sid}", headers=admin_headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["customizations"]) == 2
+    assert data["customizations"][0]["customization_type"] == "mcp"
+    assert data["customizations"][0]["state"] == "enabled"
+    assert data["customizations"][1]["customization_type"] == "skill"
+    assert data["customizations"][1]["invocation_count"] == 2
+
+
 def test_cost_analytics(client, engineer_with_key, admin_headers):
     _eng, api_key = engineer_with_key
     _ingest_session(

@@ -51,6 +51,16 @@ RecoveryStrategy = Literal[
     "delegate_or_parallelize",
 ]
 RecoveryResult = Literal["recovered", "abandoned", "unresolved"]
+CustomizationType = Literal["mcp", "subagent", "skill", "command", "template"]
+CustomizationState = Literal["available", "enabled", "invoked"]
+CustomizationProvenance = Literal[
+    "built_in",
+    "user_local",
+    "repo_defined",
+    "org_managed",
+    "marketplace",
+    "unknown",
+]
 
 # --- Team ---
 
@@ -211,6 +221,19 @@ class ModelUsageResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class SessionCustomizationResponse(BaseModel):
+    customization_type: CustomizationType
+    state: CustomizationState
+    identifier: str
+    provenance: CustomizationProvenance
+    display_name: str | None
+    source_path: str | None
+    invocation_count: int
+    details: dict[str, Any] | None
+
+    model_config = {"from_attributes": True}
+
+
 class SessionExecutionEvidenceResponse(BaseModel):
     ordinal: int
     evidence_type: ExecutionEvidenceType
@@ -306,6 +329,17 @@ class CommitPayload(BaseModel):
     lines_deleted: int = 0
 
 
+class SessionCustomizationPayload(BaseModel):
+    customization_type: CustomizationType
+    state: CustomizationState
+    identifier: str
+    provenance: CustomizationProvenance = "unknown"
+    display_name: str | None = None
+    source_path: str | None = None
+    invocation_count: int = 0
+    details: dict[str, Any] | None = None
+
+
 class SessionIngestPayload(BaseModel):
     session_id: str
     api_key: str
@@ -333,6 +367,7 @@ class SessionIngestPayload(BaseModel):
     summary: str | None = None
     facets: SessionFacetsPayload | None = None
     tool_usages: list[ToolUsagePayload] | None = None
+    customizations: list[SessionCustomizationPayload] | None = None
     model_usages: list[ModelUsagePayload] | None = None
     messages: list[SessionMessagePayload] | None = None
     git_remote_url: str | None = None
@@ -399,6 +434,7 @@ class SessionResponse(BaseModel):
 class SessionDetailResponse(SessionResponse):
     facets: SessionFacetsResponse | None = None
     tool_usages: list[ToolUsageResponse] = []
+    customizations: list[SessionCustomizationResponse] = []
     model_usages: list[ModelUsageResponse] = []
     execution_evidence: list[SessionExecutionEvidenceResponse] = []
     change_shape: SessionChangeShapeResponse | None = None
