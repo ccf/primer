@@ -69,10 +69,10 @@ class SessionMetadata:
     model_tokens: dict[str, dict[str, int]] = field(default_factory=dict)
     messages: list[dict] = field(default_factory=list)
     commits: list[dict] = field(default_factory=list)
-    customizations: list[dict] = field(default_factory=list)
+    customizations: list[dict] | None = None
 
     def to_ingest_payload(self, api_key: str, facets: dict | None = None) -> dict:
-        customizations = self.customizations or [
+        customizations = self.customizations if self.customizations is not None else [
             snapshot.to_payload()
             for snapshot in build_session_customizations(
                 self.agent_type,
