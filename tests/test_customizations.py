@@ -90,9 +90,11 @@ def test_candidate_project_roots_traverses_nested_dirs(tmp_path, monkeypatch):
     (monorepo / ".git").mkdir()
     (monorepo / ".claude").mkdir()
     (project / ".claude").mkdir()
+    (project / "nested" / ".cursor").mkdir(parents=True)
 
-    roots = _candidate_project_roots(str(project))
+    roots = _candidate_project_roots(str(project / "nested"))
     paths = [str(r) for r in roots]
+    assert str(project / "nested") in paths
     assert str(project) in paths
     assert str(monorepo) in paths
 
@@ -137,6 +139,32 @@ def test_mcp_secrets_not_stored_in_details(tmp_path, monkeypatch):
     mcp_snap = next(s for s in snapshots if s.customization_type == "mcp" and s.state == "enabled")
     assert "env" not in mcp_snap.details
     assert mcp_snap.details["command"] == "npx"
+
+
+def test_mcp_agent_family_cannot_be_overridden_by_user_config(tmp_path, monkeypatch):
+    home_dir = tmp_path / "home"
+    home_dir.mkdir()
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: home_dir))
+
+    project_dir = tmp_path / "repo"
+    cursor_dir = project_dir / ".cursor"
+    cursor_dir.mkdir(parents=True)
+    (cursor_dir / "settings.json").write_text(
+        json.dumps(
+            {
+                "mcpServers": {
+                    "linear": {
+                        "command": "npx",
+                        "agent_family": "spoofed-family",
+                    }
+                }
+            }
+        )
+    )
+
+    snapshots = build_session_customizations("cursor", str(project_dir), {})
+    mcp_snap = next(s for s in snapshots if s.customization_type == "mcp" and s.state == "enabled")
+    assert mcp_snap.details["agent_family"] == "cursor"
 
 
 def test_build_session_customizations_scans_cursor_roots_and_prefers_cursor_provenance(
