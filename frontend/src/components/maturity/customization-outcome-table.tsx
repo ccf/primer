@@ -42,8 +42,8 @@ export function CustomizationOutcomeTable({ rows }: CustomizationOutcomeTablePro
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr key={`${row.dimension}:${row.label}`} className="border-b border-border/40">
+              {rows.map((row, index) => (
+                <tr key={`${row.dimension}:${row.label}:${index}`} className="border-b border-border/40">
                   <td className="py-2">
                     <div className="space-y-1">
                       <p className="font-medium">{row.label}</p>
