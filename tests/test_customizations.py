@@ -92,10 +92,10 @@ def test_candidate_project_roots_traverses_nested_dirs(tmp_path, monkeypatch):
     (project / ".claude").mkdir()
     (project / "nested" / ".cursor").mkdir(parents=True)
 
-    roots = _candidate_project_roots(str(project / "nested"))
+    roots = _candidate_project_roots(str(project / "nested"), agent_type="cursor")
     paths = [str(r) for r in roots]
     assert str(project / "nested") in paths
-    assert str(project) in paths
+    assert str(project) not in paths
     assert str(monorepo) in paths
 
 
@@ -236,3 +236,28 @@ def test_unknown_agent_type_does_not_scan_other_agent_roots(tmp_path, monkeypatc
 
     snapshots = build_session_customizations("unknown_agent", str(project_dir), {})
     assert snapshots == []
+
+
+def test_candidate_project_roots_ignores_other_agent_markers_when_agent_known(
+    tmp_path, monkeypatch
+):
+    home_dir = tmp_path / "home" / "user"
+    home_dir.mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: home_dir))
+
+    root = home_dir / "repo"
+    level_one = root / "apps"
+    level_two = level_one / "web"
+    level_three = level_two / "nested"
+    level_three.mkdir(parents=True)
+
+    (root / ".claude").mkdir()
+    (level_one / ".cursor").mkdir()
+    (level_two / ".gemini").mkdir()
+    (level_three / ".codex").mkdir()
+
+    roots = _candidate_project_roots(str(level_three), agent_type="claude_code")
+    paths = [str(path) for path in roots]
+    assert str(root) in paths
+    assert str(level_one) not in paths
+    assert str(level_two) not in paths

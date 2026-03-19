@@ -32,7 +32,6 @@ _PROVENANCE_PRIORITY = {
     "built_in": -1,
     "unknown": -2,
 }
-_PROJECT_ROOT_MARKERS = frozenset({".git", *_AGENT_CUSTOMIZATION_ROOTS.values()})
 
 
 @dataclass(slots=True)
@@ -191,7 +190,7 @@ def _collect_enabled_project_customizations(
     root_dir_name = _AGENT_CUSTOMIZATION_ROOTS.get(agent_type)
     if not root_dir_name:
         return []
-    for root in _candidate_project_roots(project_path):
+    for root in _candidate_project_roots(project_path, agent_type=agent_type):
         custom_dir = root / root_dir_name
         if not custom_dir.exists():
             continue
@@ -372,7 +371,10 @@ def _scan_possible_settings_files(
     return snapshots
 
 
-def _candidate_project_roots(project_path: str) -> list[Path]:
+def _candidate_project_roots(
+    project_path: str,
+    agent_type: str | None = None,
+) -> list[Path]:
     path = Path(project_path).expanduser()
     if not path.exists():
         return []
@@ -381,10 +383,15 @@ def _candidate_project_roots(project_path: str) -> list[Path]:
 
     results: list[Path] = []
     home = Path.home().resolve()
+    markers = {".git"}
+    if agent_type is None:
+        markers.update(_AGENT_CUSTOMIZATION_ROOTS.values())
+    elif agent_type in _AGENT_CUSTOMIZATION_ROOTS:
+        markers.add(_AGENT_CUSTOMIZATION_ROOTS[agent_type])
     for candidate in [path.resolve(), *path.resolve().parents]:
         if candidate == home or candidate in home.parents:
             break
-        if any((candidate / marker).exists() for marker in _PROJECT_ROOT_MARKERS):
+        if any((candidate / marker).exists() for marker in markers):
             results.append(candidate)
     if not results:
         results.append(path.resolve())
