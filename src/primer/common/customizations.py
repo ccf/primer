@@ -188,7 +188,9 @@ def _collect_enabled_project_customizations(
         return []
 
     snapshots: list[CustomizationSnapshot] = []
-    root_dir_name = _AGENT_CUSTOMIZATION_ROOTS.get(agent_type, ".claude")
+    root_dir_name = _AGENT_CUSTOMIZATION_ROOTS.get(agent_type)
+    if not root_dir_name:
+        return []
     for root in _candidate_project_roots(project_path):
         custom_dir = root / root_dir_name
         if not custom_dir.exists():

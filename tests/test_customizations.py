@@ -217,3 +217,22 @@ def test_build_session_customizations_scans_cursor_roots_and_prefers_cursor_prov
     )
     assert invoked_review.source_path == str(cursor_home / "skills" / "review.md")
     assert invoked_review.details["raw_tool_name"] == "Skill:review"
+
+
+def test_unknown_agent_type_does_not_scan_other_agent_roots(tmp_path, monkeypatch):
+    home_dir = tmp_path / "home"
+    claude_home = home_dir / ".claude"
+    claude_home.mkdir(parents=True)
+    (claude_home / "skills").mkdir(parents=True)
+    (claude_home / "skills" / "review.md").write_text("# review")
+
+    project_dir = tmp_path / "repo"
+    repo_claude = project_dir / ".claude"
+    repo_claude.mkdir(parents=True)
+    (repo_claude / "commands").mkdir(parents=True)
+    (repo_claude / "commands" / "ship.md").write_text("# ship")
+
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: home_dir))
+
+    snapshots = build_session_customizations("unknown_agent", str(project_dir), {})
+    assert snapshots == []
