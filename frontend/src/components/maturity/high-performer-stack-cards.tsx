@@ -72,7 +72,7 @@ export function HighPerformerStackCards({ stacks }: HighPerformerStackCardsProps
               <div className="flex flex-wrap gap-2">
                 {stack.customizations.map((item) => (
                   <Badge
-                    key={`${stack.stack_id}:${item.identifier}:provenance`}
+                    key={`${stack.stack_id}:${item.customization_type}:${item.identifier}:${item.provenance}`}
                     variant="outline"
                   >
                     {formatLabel(item.provenance)}

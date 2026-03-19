@@ -397,8 +397,12 @@ def get_maturity_analytics(
     engineer_explicit_customizations: dict[str, Counter[tuple[str, str, str]]] = defaultdict(
         Counter
     )
-    engineer_explicit_sessions: dict[str, set[str]] = defaultdict(set)
-    engineer_explicit_projects: dict[str, Counter[str]] = defaultdict(Counter)
+    engineer_customization_sessions: dict[str, dict[tuple[str, str, str], set[str]]] = defaultdict(
+        lambda: defaultdict(set)
+    )
+    engineer_customization_projects: dict[str, dict[tuple[str, str, str], Counter[str]]] = (
+        defaultdict(lambda: defaultdict(Counter))
+    )
     engineers_using_explicit_customizations: set[str] = set()
     customization_rows = (
         db.query(
@@ -429,13 +433,11 @@ def get_maturity_analytics(
             continue
 
         engineers_using_explicit_customizations.add(engineer_id)
-        engineer_explicit_customizations[engineer_id][
-            (customization_type, identifier, provenance)
-        ] += invocation_count or 0
-        engineer_explicit_sessions[engineer_id].add(session_id)
-        if project_name:
-            engineer_explicit_projects[engineer_id][project_name] += 1
         key = (customization_type, identifier, provenance)
+        engineer_explicit_customizations[engineer_id][key] += invocation_count or 0
+        engineer_customization_sessions[engineer_id][key].add(session_id)
+        if project_name:
+            engineer_customization_projects[engineer_id][key][project_name] += 1
         bucket = customization_data.setdefault(
             key,
             {
@@ -517,16 +519,18 @@ def get_maturity_analytics(
             },
         )
         bucket["engineers"].add(engineer_id)
-        bucket["sessions"].update(engineer_explicit_sessions.get(engineer_id, set()))
-        bucket["projects"].update(engineer_explicit_projects.get(engineer_id, Counter()))
         profile = profile_by_engineer_id.get(engineer_id)
         if profile is not None:
             if profile.effectiveness_score is not None:
                 bucket["effectiveness_scores"].append(profile.effectiveness_score)
             bucket["leverage_scores"].append(profile.leverage_score)
             bucket["engineer_names"].append(profile.name)
+        eng_sessions = engineer_customization_sessions.get(engineer_id, {})
+        eng_projects = engineer_customization_projects.get(engineer_id, {})
         for customization_key, invocation_count in top_customizations:
             bucket["customization_totals"][customization_key] += invocation_count
+            bucket["sessions"].update(eng_sessions.get(customization_key, set()))
+            bucket["projects"].update(eng_projects.get(customization_key, Counter()))
 
     for stack_key, bucket in sorted(
         stack_buckets.items(),
