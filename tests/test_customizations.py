@@ -57,12 +57,19 @@ def test_build_session_customizations_collects_enabled_and_invoked_items(tmp_pat
         for item in snapshots
     }
     assert ("command", "enabled", "ship", "repo_defined", "custom") in as_keys
+    assert ("command", "available", "ship", "repo_defined", "custom") in as_keys
     assert ("subagent", "enabled", "reviewer", "repo_defined", "custom") in as_keys
+    assert ("subagent", "available", "reviewer", "repo_defined", "custom") in as_keys
     assert ("template", "enabled", "bugfix", "repo_defined", "custom") in as_keys
+    assert ("template", "available", "bugfix", "repo_defined", "custom") in as_keys
     assert ("command", "enabled", "review-pr", "user_local", "custom") in as_keys
+    assert ("command", "available", "review-pr", "user_local", "custom") in as_keys
     assert ("skill", "enabled", "commit", "user_local", "custom") in as_keys
+    assert ("skill", "available", "commit", "user_local", "custom") in as_keys
     assert ("mcp", "enabled", "github", "user_local", "marketplace") in as_keys
+    assert ("mcp", "available", "github", "user_local", "marketplace") in as_keys
     assert ("mcp", "enabled", "linear", "repo_defined", "marketplace") in as_keys
+    assert ("mcp", "available", "linear", "repo_defined", "marketplace") in as_keys
     assert ("skill", "invoked", "commit", "user_local", "custom") in as_keys
     assert ("subagent", "invoked", "reviewer", "repo_defined", "custom") in as_keys
     assert ("mcp", "invoked", "github", "user_local", "marketplace") in as_keys
@@ -216,8 +223,11 @@ def test_build_session_customizations_scans_cursor_roots_and_prefers_cursor_prov
         for item in snapshots
     }
     assert ("skill", "enabled", "review", "user_local", "custom") in as_keys
+    assert ("skill", "available", "review", "user_local", "custom") in as_keys
     assert ("subagent", "enabled", "reviewer", "repo_defined", "custom") in as_keys
+    assert ("subagent", "available", "reviewer", "repo_defined", "custom") in as_keys
     assert ("mcp", "enabled", "linear", "user_local", "marketplace") in as_keys
+    assert ("mcp", "available", "linear", "user_local", "marketplace") in as_keys
     assert ("skill", "invoked", "review", "user_local", "custom") in as_keys
     assert ("subagent", "invoked", "reviewer", "repo_defined", "custom") in as_keys
     assert ("mcp", "invoked", "linear", "user_local", "marketplace") in as_keys
@@ -254,8 +264,28 @@ def test_derive_invoked_customizations_classifies_builtin_skill_and_subagent():
         for item in snapshots
     }
 
-    assert ("skill", "invoked", "explore", "unknown", "built_in") in as_keys
-    assert ("subagent", "invoked", "plan", "unknown", "built_in") in as_keys
+    assert ("skill", "available", "explore", "built_in", "built_in") in as_keys
+    assert ("subagent", "available", "plan", "built_in", "built_in") in as_keys
+    assert ("skill", "invoked", "explore", "built_in", "built_in") in as_keys
+    assert ("subagent", "invoked", "plan", "built_in", "built_in") in as_keys
+
+
+def test_build_session_customizations_emits_built_in_availability_for_supported_agents():
+    snapshots = build_session_customizations("claude_code", None, {})
+
+    as_keys = {
+        (
+            item.customization_type,
+            item.state,
+            item.identifier,
+            item.provenance,
+            item.source_classification,
+        )
+        for item in snapshots
+    }
+
+    assert ("skill", "available", "explore", "built_in", "built_in") in as_keys
+    assert ("subagent", "available", "bash", "built_in", "built_in") in as_keys
 
 
 def test_mcp_source_classification_marks_local_commands_as_custom(tmp_path, monkeypatch):

@@ -26,6 +26,7 @@ from primer.common.pricing import estimate_cost, get_cost_tier
 from primer.common.schemas import (
     AgentSkillUsage,
     CustomizationOutcomeAttribution,
+    CustomizationStateFunnel,
     CustomizationUsage,
     DailyLeverageEntry,
     EngineerLeverageProfile,
@@ -401,6 +402,7 @@ def get_maturity_analytics(
 
     # 5. Explicit customization breakdown
     customization_data: dict[tuple[str, str, str, str], dict] = {}
+    customization_state_data: dict[tuple[str, str, str, str], dict] = {}
     engineer_explicit_customizations: dict[str, Counter[tuple[str, str, str, str]]] = defaultdict(
         Counter
     )
@@ -440,6 +442,25 @@ def get_maturity_analytics(
         engineer_id,
         project_name,
     ) in customization_rows:
+        if provenance != "unknown" or source_classification != "unknown":
+            state_bucket = customization_state_data.setdefault(
+                (customization_type, identifier, provenance, source_classification),
+                {
+                    "identifier": identifier,
+                    "customization_type": customization_type,
+                    "provenance": provenance,
+                    "source_classification": source_classification,
+                    "available_sessions": set(),
+                    "enabled_sessions": set(),
+                    "invoked_sessions": set(),
+                    "available_engineers": set(),
+                    "enabled_engineers": set(),
+                    "invoked_engineers": set(),
+                },
+            )
+            state_bucket[f"{state}_sessions"].add(session_id)
+            state_bucket[f"{state}_engineers"].add(engineer_id)
+
         if state != "invoked" or not is_explicit_customization_provenance(provenance):
             continue
 
@@ -491,6 +512,52 @@ def get_maturity_analytics(
             key=lambda item: (
                 -item["engineer_names"].total(),
                 -item["total_invocations"],
+                item["identifier"],
+            ),
+        )
+    ]
+
+    customization_state_funnel = [
+        CustomizationStateFunnel(
+            identifier=bucket["identifier"],
+            customization_type=bucket["customization_type"],
+            provenance=bucket["provenance"],
+            source_classification=bucket["source_classification"],
+            available_session_count=len(bucket["available_sessions"]),
+            enabled_session_count=len(bucket["enabled_sessions"]),
+            invoked_session_count=len(bucket["invoked_sessions"]),
+            available_engineer_count=len(bucket["available_engineers"]),
+            enabled_engineer_count=len(bucket["enabled_engineers"]),
+            invoked_engineer_count=len(bucket["invoked_engineers"]),
+            activation_rate=(
+                round(
+                    len(bucket["enabled_engineers"]) / len(bucket["available_engineers"]),
+                    3,
+                )
+                if bucket["available_engineers"]
+                else None
+            ),
+            usage_rate=(
+                round(
+                    len(bucket["invoked_engineers"]) / len(bucket["available_engineers"]),
+                    3,
+                )
+                if bucket["available_engineers"]
+                else None
+            ),
+            available_not_enabled_engineer_count=len(
+                bucket["available_engineers"] - bucket["enabled_engineers"]
+            ),
+            enabled_not_invoked_engineer_count=len(
+                bucket["enabled_engineers"] - bucket["invoked_engineers"]
+            ),
+        )
+        for bucket in sorted(
+            customization_state_data.values(),
+            key=lambda item: (
+                -len(item["invoked_engineers"]),
+                -len(item["enabled_engineers"]),
+                -len(item["available_engineers"]),
                 item["identifier"],
             ),
         )
@@ -879,6 +946,7 @@ def get_maturity_analytics(
         customization_breakdown=customization_breakdown,
         high_performer_stacks=high_performer_stacks,
         team_customization_landscape=team_customization_landscape,
+        customization_state_funnel=customization_state_funnel,
         customization_outcomes=customization_outcomes,
         project_readiness=project_readiness,
         sessions_analyzed=sessions_analyzed,

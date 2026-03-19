@@ -244,11 +244,47 @@ def test_maturity_filters_to_explicit_customizations(
             SessionCustomization(
                 session_id=s1.id,
                 customization_type="mcp",
+                state="available",
+                identifier="github",
+                provenance="user_local",
+                source_classification="marketplace",
+                invocation_count=0,
+            ),
+            SessionCustomization(
+                session_id=s1.id,
+                customization_type="mcp",
+                state="enabled",
+                identifier="github",
+                provenance="user_local",
+                source_classification="marketplace",
+                invocation_count=0,
+            ),
+            SessionCustomization(
+                session_id=s1.id,
+                customization_type="mcp",
                 state="invoked",
                 identifier="github",
                 provenance="user_local",
                 source_classification="marketplace",
                 invocation_count=3,
+            ),
+            SessionCustomization(
+                session_id=s1.id,
+                customization_type="skill",
+                state="available",
+                identifier="review-pr",
+                provenance="repo_defined",
+                source_classification="custom",
+                invocation_count=0,
+            ),
+            SessionCustomization(
+                session_id=s1.id,
+                customization_type="skill",
+                state="enabled",
+                identifier="review-pr",
+                provenance="repo_defined",
+                source_classification="custom",
+                invocation_count=0,
             ),
             SessionCustomization(
                 session_id=s1.id,
@@ -262,9 +298,18 @@ def test_maturity_filters_to_explicit_customizations(
             SessionCustomization(
                 session_id=s2.id,
                 customization_type="skill",
+                state="available",
+                identifier="always-on",
+                provenance="built_in",
+                source_classification="built_in",
+                invocation_count=0,
+            ),
+            SessionCustomization(
+                session_id=s2.id,
+                customization_type="skill",
                 state="invoked",
                 identifier="always-on",
-                provenance="unknown",
+                provenance="built_in",
                 source_classification="built_in",
                 invocation_count=5,
             ),
@@ -305,6 +350,22 @@ def test_maturity_filters_to_explicit_customizations(
         if row["dimension"] == "customization" and row["label"] == "github"
     )
     assert github_outcome["source_classification"] == "marketplace"
+    github_state = next(
+        row for row in data["customization_state_funnel"] if row["identifier"] == "github"
+    )
+    assert github_state["available_engineer_count"] == 1
+    assert github_state["enabled_engineer_count"] == 1
+    assert github_state["invoked_engineer_count"] == 1
+    assert github_state["activation_rate"] == 1.0
+    assert github_state["usage_rate"] == 1.0
+    built_in_state = next(
+        row for row in data["customization_state_funnel"] if row["identifier"] == "always-on"
+    )
+    assert built_in_state["provenance"] == "built_in"
+    assert built_in_state["available_engineer_count"] == 1
+    assert built_in_state["enabled_engineer_count"] == 0
+    assert built_in_state["invoked_engineer_count"] == 1
+    assert built_in_state["available_not_enabled_engineer_count"] == 1
 
 
 def test_maturity_builds_team_customization_landscape(client, admin_headers, db_session):
