@@ -1904,6 +1904,19 @@ class HighPerformerStack(BaseModel):
     top_engineers: list[str] = []
 
 
+class CustomizationOutcomeAttribution(BaseModel):
+    dimension: str
+    label: str
+    support_engineer_count: int
+    support_session_count: int
+    avg_effectiveness_score: float | None = None
+    avg_leverage_score: float
+    avg_success_rate: float | None = None
+    avg_cost_per_successful_outcome: float | None = None
+    avg_pr_merge_rate: float | None = None
+    cohort_share: float | None = None
+
+
 class ProjectReadinessEntry(BaseModel):
     repository: str
     has_claude_md: bool
@@ -1920,6 +1933,7 @@ class MaturityAnalyticsResponse(BaseModel):
     agent_skill_breakdown: list[AgentSkillUsage]
     customization_breakdown: list[CustomizationUsage] = []
     high_performer_stacks: list[HighPerformerStack] = []
+    customization_outcomes: list[CustomizationOutcomeAttribution] = []
     project_readiness: list[ProjectReadinessEntry]
     sessions_analyzed: int
     avg_leverage_score: float

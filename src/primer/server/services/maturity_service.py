@@ -24,6 +24,7 @@ from primer.common.models import Session as SessionModel
 from primer.common.pricing import estimate_cost, get_cost_tier
 from primer.common.schemas import (
     AgentSkillUsage,
+    CustomizationOutcomeAttribution,
     CustomizationUsage,
     DailyLeverageEntry,
     EngineerLeverageProfile,
@@ -480,6 +481,59 @@ def get_maturity_analytics(
         )
     ]
 
+    total_engineers = len(all_engineer_ids)
+    profile_by_engineer_id = {profile.engineer_id: profile for profile in engineer_profiles}
+
+    def _avg(values: list[float | None]) -> float | None:
+        present = [value for value in values if value is not None]
+        return sum(present) / len(present) if present else None
+
+    customization_outcome_buckets: dict[tuple[str, str], dict] = {}
+    for bucket in customization_data.values():
+        engineer_ids = bucket["engineers"]
+        if not engineer_ids:
+            continue
+        cohort_share = len(engineer_ids) / total_engineers if total_engineers > 0 else None
+
+        effectiveness_values = [
+            profile_by_engineer_id[eid].effectiveness_score
+            for eid in engineer_ids
+            if eid in profile_by_engineer_id
+        ]
+        leverage_values = [
+            profile_by_engineer_id[eid].leverage_score
+            for eid in engineer_ids
+            if eid in profile_by_engineer_id
+        ]
+        success_values = [eng_success_rates.get(eid) for eid in engineer_ids]
+        cost_values = [eng_cost_per_success.get(eid) for eid in engineer_ids]
+        merge_values = [eng_merge_rates.get(eid) for eid in engineer_ids]
+
+        customization_outcome_buckets[("customization", bucket["identifier"])] = (
+            CustomizationOutcomeAttribution(
+                dimension="customization",
+                label=bucket["identifier"],
+                support_engineer_count=len(engineer_ids),
+                support_session_count=len(bucket["sessions"]),
+                avg_effectiveness_score=(
+                    round(_avg(effectiveness_values), 1)
+                    if _avg(effectiveness_values) is not None
+                    else None
+                ),
+                avg_leverage_score=round(_avg(leverage_values) or 0.0, 1),
+                avg_success_rate=(
+                    round(_avg(success_values), 3) if _avg(success_values) is not None else None
+                ),
+                avg_cost_per_successful_outcome=(
+                    round(_avg(cost_values), 4) if _avg(cost_values) is not None else None
+                ),
+                avg_pr_merge_rate=(
+                    round(_avg(merge_values), 3) if _avg(merge_values) is not None else None
+                ),
+                cohort_share=round(cohort_share, 3) if cohort_share is not None else None,
+            )
+        )
+
     high_performer_stacks: list[HighPerformerStack] = []
     scored_profiles = [
         profile for profile in engineer_profiles if profile.effectiveness_score is not None
@@ -497,7 +551,6 @@ def get_maturity_analytics(
     )
     top_cohort_size = max(1, (len(ranked_profiles) + 3) // 4) if ranked_profiles else 0
     high_performer_ids = {profile.engineer_id for profile in ranked_profiles[:top_cohort_size]}
-    profile_by_engineer_id = {profile.engineer_id: profile for profile in engineer_profiles}
     stack_buckets: dict[tuple[tuple[str, str, str], ...], dict] = {}
     for engineer_id in high_performer_ids:
         customization_counts = engineer_explicit_customizations.get(engineer_id, Counter())
@@ -580,6 +633,69 @@ def get_maturity_analytics(
             )
         )
 
+        stack_cost_values = [
+            eng_cost_per_success.get(engineer_id)
+            for engineer_id in bucket["engineers"]
+            if eng_cost_per_success.get(engineer_id) is not None
+        ]
+        stack_merge_values = [
+            eng_merge_rates.get(engineer_id)
+            for engineer_id in bucket["engineers"]
+            if eng_merge_rates.get(engineer_id) is not None
+        ]
+        stack_outcome = CustomizationOutcomeAttribution(
+            dimension="stack",
+            label=label,
+            support_engineer_count=len(bucket["engineers"]),
+            support_session_count=len(bucket["sessions"]),
+            avg_effectiveness_score=(
+                round(
+                    sum(bucket["effectiveness_scores"]) / len(bucket["effectiveness_scores"]),
+                    1,
+                )
+                if bucket["effectiveness_scores"]
+                else None
+            ),
+            avg_leverage_score=round(
+                sum(bucket["leverage_scores"]) / len(bucket["leverage_scores"]),
+                1,
+            ),
+            avg_success_rate=(
+                round(
+                    sum(
+                        eng_success_rates.get(engineer_id, 0.0)
+                        for engineer_id in bucket["engineers"]
+                    )
+                    / len(bucket["engineers"]),
+                    3,
+                )
+                if bucket["engineers"]
+                else None
+            ),
+            avg_cost_per_successful_outcome=(
+                round(_avg(stack_cost_values), 4) if _avg(stack_cost_values) is not None else None
+            ),
+            avg_pr_merge_rate=(
+                round(_avg(stack_merge_values), 3) if _avg(stack_merge_values) is not None else None
+            ),
+            cohort_share=(
+                round(len(bucket["engineers"]) / total_engineers, 3)
+                if total_engineers > 0
+                else None
+            ),
+        )
+        customization_outcome_buckets[("stack", label)] = stack_outcome
+
+    customization_outcomes = sorted(
+        customization_outcome_buckets.values(),
+        key=lambda row: (
+            0 if row.dimension == "customization" else 1,
+            -(row.avg_effectiveness_score or 0.0),
+            -row.support_engineer_count,
+            row.label,
+        ),
+    )
+
     # 6. Project readiness
     project_readiness: list[ProjectReadinessEntry] = []
     if sessions_analyzed > 0:
@@ -616,7 +732,6 @@ def get_maturity_analytics(
     project_readiness.sort(key=lambda p: p.ai_readiness_score, reverse=True)
 
     # Aggregate metrics
-    total_engineers = len(all_engineer_ids)
     avg_leverage = (
         sum(all_leverage_scores) / len(all_leverage_scores) if all_leverage_scores else 0.0
     )
@@ -643,6 +758,7 @@ def get_maturity_analytics(
         agent_skill_breakdown=agent_skill_breakdown,
         customization_breakdown=customization_breakdown,
         high_performer_stacks=high_performer_stacks,
+        customization_outcomes=customization_outcomes,
         project_readiness=project_readiness,
         sessions_analyzed=sessions_analyzed,
         avg_leverage_score=round(avg_leverage, 1),

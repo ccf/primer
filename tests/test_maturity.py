@@ -288,6 +288,9 @@ def test_maturity_filters_to_explicit_customizations(
     assert stack["label"] == "github + review-pr"
     assert [item["identifier"] for item in stack["customizations"]] == ["github", "review-pr"]
     assert stack["top_engineers"] == ["Alice"]
+    outcome_labels = {(row["dimension"], row["label"]) for row in data["customization_outcomes"]}
+    assert ("customization", "github") in outcome_labels
+    assert ("stack", "github + review-pr") in outcome_labels
 
 
 def test_maturity_date_filtering(client, admin_headers, seeded_maturity_data):

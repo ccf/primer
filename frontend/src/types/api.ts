@@ -1532,6 +1532,19 @@ export interface HighPerformerStack {
   top_engineers: string[]
 }
 
+export interface CustomizationOutcomeAttribution {
+  dimension: string
+  label: string
+  support_engineer_count: number
+  support_session_count: number
+  avg_effectiveness_score: number | null
+  avg_leverage_score: number
+  avg_success_rate: number | null
+  avg_cost_per_successful_outcome: number | null
+  avg_pr_merge_rate: number | null
+  cohort_share: number | null
+}
+
 export interface ProjectReadinessEntry {
   repository: string
   has_claude_md: boolean
@@ -1548,6 +1561,7 @@ export interface MaturityAnalyticsResponse {
   agent_skill_breakdown: AgentSkillUsage[]
   customization_breakdown: CustomizationUsage[]
   high_performer_stacks: HighPerformerStack[]
+  customization_outcomes: CustomizationOutcomeAttribution[]
   project_readiness: ProjectReadinessEntry[]
   sessions_analyzed: number
   avg_leverage_score: number
