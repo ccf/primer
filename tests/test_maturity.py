@@ -293,6 +293,87 @@ def test_maturity_filters_to_explicit_customizations(
     assert ("stack", "github + review-pr") in outcome_labels
 
 
+def test_maturity_builds_team_customization_landscape(client, admin_headers, db_session):
+    team_one = Team(name="Platform")
+    team_two = Team(name="Product")
+    db_session.add_all([team_one, team_two])
+    db_session.flush()
+
+    alice = Engineer(
+        name="Alice",
+        email="alice-landscape@test.com",
+        team_id=team_one.id,
+        api_key_hash="x",
+    )
+    bob = Engineer(
+        name="Bob",
+        email="bob-landscape@test.com",
+        team_id=team_one.id,
+        api_key_hash="x",
+    )
+    cara = Engineer(
+        name="Cara",
+        email="cara-landscape@test.com",
+        team_id=team_two.id,
+        api_key_hash="x",
+    )
+    db_session.add_all([alice, bob, cara])
+    db_session.flush()
+
+    now = datetime.now(tz=UTC)
+    sessions = [
+        Session(id=str(uuid.uuid4()), engineer_id=alice.id, started_at=now - timedelta(days=1)),
+        Session(id=str(uuid.uuid4()), engineer_id=bob.id, started_at=now - timedelta(days=1)),
+        Session(id=str(uuid.uuid4()), engineer_id=cara.id, started_at=now - timedelta(days=1)),
+    ]
+    db_session.add_all(sessions)
+    db_session.flush()
+
+    db_session.add_all(
+        [
+            ToolUsage(session_id=sessions[0].id, tool_name="Read", call_count=2),
+            ToolUsage(session_id=sessions[1].id, tool_name="Read", call_count=2),
+            ToolUsage(session_id=sessions[2].id, tool_name="Read", call_count=2),
+            SessionCustomization(
+                session_id=sessions[0].id,
+                customization_type="mcp",
+                state="invoked",
+                identifier="github",
+                provenance="user_local",
+                invocation_count=3,
+            ),
+            SessionCustomization(
+                session_id=sessions[1].id,
+                customization_type="skill",
+                state="invoked",
+                identifier="review-pr",
+                provenance="repo_defined",
+                invocation_count=1,
+            ),
+            SessionCustomization(
+                session_id=sessions[2].id,
+                customization_type="mcp",
+                state="invoked",
+                identifier="linear",
+                provenance="user_local",
+                invocation_count=2,
+            ),
+        ]
+    )
+    db_session.flush()
+
+    response = client.get("/api/v1/analytics/maturity", headers=admin_headers)
+    assert response.status_code == 200
+    data = response.json()
+
+    team_rows = {row["team_name"]: row for row in data["team_customization_landscape"]}
+    assert team_rows["Platform"]["explicit_customization_count"] == 2
+    assert team_rows["Platform"]["adoption_rate"] == 1.0
+    assert team_rows["Platform"]["top_customizations"] == ["github", "review-pr"]
+    assert team_rows["Platform"]["unique_customizations"] == ["github", "review-pr"]
+    assert team_rows["Product"]["top_customizations"] == ["linear"]
+
+
 def test_maturity_date_filtering(client, admin_headers, seeded_maturity_data):
     now = datetime.now(tz=UTC)
     # Filter to only include yesterday (Alice's session)
