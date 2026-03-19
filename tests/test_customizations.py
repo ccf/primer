@@ -288,6 +288,39 @@ def test_mcp_source_classification_marks_local_commands_as_custom(tmp_path, monk
     assert local_snap.source_classification == "custom"
 
 
+def test_mcp_source_classification_marks_local_script_args_as_custom(tmp_path, monkeypatch):
+    home_dir = tmp_path / "home"
+    home_dir.mkdir()
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: home_dir))
+
+    project_dir = tmp_path / "repo"
+    claude_dir = project_dir / ".claude"
+    claude_dir.mkdir(parents=True)
+    (claude_dir / "settings.json").write_text(
+        json.dumps(
+            {
+                "mcpServers": {
+                    "local-node-tool": {
+                        "command": "node",
+                        "args": ["src/mcp/main.js"],
+                    }
+                }
+            }
+        )
+    )
+
+    snapshots = build_session_customizations("claude_code", str(project_dir), {})
+    local_snap = next(
+        s
+        for s in snapshots
+        if s.customization_type == "mcp"
+        and s.state == "enabled"
+        and s.identifier == "local-node-tool"
+    )
+
+    assert local_snap.source_classification == "custom"
+
+
 def test_unknown_agent_type_does_not_scan_other_agent_roots(tmp_path, monkeypatch):
     home_dir = tmp_path / "home"
     claude_home = home_dir / ".claude"
