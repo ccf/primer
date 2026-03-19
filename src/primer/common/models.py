@@ -210,6 +210,9 @@ class SessionCustomization(Base):
     state: Mapped[str] = mapped_column(String(20), nullable=False)
     identifier: Mapped[str] = mapped_column(String(255), nullable=False)
     provenance: Mapped[str] = mapped_column(String(30), nullable=False, server_default="unknown")
+    source_classification: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="unknown"
+    )
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     source_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     invocation_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

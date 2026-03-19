@@ -40,7 +40,7 @@ export function HighPerformerStackCards({ stacks }: HighPerformerStackCardsProps
             <div className="flex flex-wrap gap-2">
               {stack.customizations.map((item) => (
                 <Badge
-                  key={`${stack.stack_id}:${item.customization_type}:${item.identifier}:${item.provenance}`}
+                  key={`${stack.stack_id}:${item.customization_type}:${item.identifier}:${item.provenance}:${item.source_classification}`}
                   variant="secondary"
                 >
                   {item.identifier}
@@ -72,10 +72,26 @@ export function HighPerformerStackCards({ stacks }: HighPerformerStackCardsProps
               <div className="flex flex-wrap gap-2">
                 {stack.customizations.map((item) => (
                   <Badge
-                    key={`${stack.stack_id}:${item.customization_type}:${item.identifier}:${item.provenance}`}
+                    key={`${stack.stack_id}:${item.customization_type}:${item.identifier}:${item.provenance}:${item.source_classification}`}
                     variant="outline"
                   >
                     {formatLabel(item.provenance)}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Source Mix
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {stack.customizations.map((item) => (
+                  <Badge
+                    key={`${stack.stack_id}:${item.customization_type}:${item.identifier}:source:${item.source_classification}`}
+                    variant="outline"
+                  >
+                    {formatLabel(item.source_classification)}
                   </Badge>
                 ))}
               </div>

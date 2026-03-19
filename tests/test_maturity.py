@@ -247,6 +247,7 @@ def test_maturity_filters_to_explicit_customizations(
                 state="invoked",
                 identifier="github",
                 provenance="user_local",
+                source_classification="marketplace",
                 invocation_count=3,
             ),
             SessionCustomization(
@@ -255,6 +256,7 @@ def test_maturity_filters_to_explicit_customizations(
                 state="invoked",
                 identifier="review-pr",
                 provenance="repo_defined",
+                source_classification="custom",
                 invocation_count=1,
             ),
             SessionCustomization(
@@ -263,6 +265,7 @@ def test_maturity_filters_to_explicit_customizations(
                 state="invoked",
                 identifier="always-on",
                 provenance="unknown",
+                source_classification="built_in",
                 invocation_count=5,
             ),
         ]
@@ -280,6 +283,7 @@ def test_maturity_filters_to_explicit_customizations(
         item for item in data["customization_breakdown"] if item["identifier"] == "github"
     )
     assert github["provenance"] == "user_local"
+    assert github["source_classification"] == "marketplace"
     assert github["engineer_count"] == 1
     assert github["top_engineers"] == ["Alice"]
     assert len(data["high_performer_stacks"]) == 1
@@ -287,10 +291,20 @@ def test_maturity_filters_to_explicit_customizations(
     assert stack["engineer_count"] == 1
     assert stack["label"] == "github + review-pr"
     assert [item["identifier"] for item in stack["customizations"]] == ["github", "review-pr"]
+    assert [item["source_classification"] for item in stack["customizations"]] == [
+        "marketplace",
+        "custom",
+    ]
     assert stack["top_engineers"] == ["Alice"]
     outcome_labels = {(row["dimension"], row["label"]) for row in data["customization_outcomes"]}
     assert ("customization", "github") in outcome_labels
     assert ("stack", "github + review-pr") in outcome_labels
+    github_outcome = next(
+        row
+        for row in data["customization_outcomes"]
+        if row["dimension"] == "customization" and row["label"] == "github"
+    )
+    assert github_outcome["source_classification"] == "marketplace"
 
 
 def test_maturity_builds_team_customization_landscape(client, admin_headers, db_session):

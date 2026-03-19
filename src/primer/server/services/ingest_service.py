@@ -264,6 +264,7 @@ def _replace_session_customizations(
                 state=values["state"],
                 identifier=values["identifier"],
                 provenance=values.get("provenance", "unknown"),
+                source_classification=values.get("source_classification", "unknown"),
                 display_name=values.get("display_name"),
                 source_path=values.get("source_path"),
                 invocation_count=values.get("invocation_count", 0),

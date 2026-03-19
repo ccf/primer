@@ -400,17 +400,17 @@ def get_maturity_analytics(
     ]
 
     # 5. Explicit customization breakdown
-    customization_data: dict[tuple[str, str, str], dict] = {}
-    engineer_explicit_customizations: dict[str, Counter[tuple[str, str, str]]] = defaultdict(
+    customization_data: dict[tuple[str, str, str, str], dict] = {}
+    engineer_explicit_customizations: dict[str, Counter[tuple[str, str, str, str]]] = defaultdict(
         Counter
     )
-    engineer_customization_sessions: dict[str, dict[tuple[str, str, str], set[str]]] = defaultdict(
-        lambda: defaultdict(set)
+    engineer_customization_sessions: dict[str, dict[tuple[str, str, str, str], set[str]]] = (
+        defaultdict(lambda: defaultdict(set))
     )
-    engineer_customization_projects: dict[str, dict[tuple[str, str, str], Counter[str]]] = (
+    engineer_customization_projects: dict[str, dict[tuple[str, str, str, str], Counter[str]]] = (
         defaultdict(lambda: defaultdict(Counter))
     )
-    team_customizations: dict[str, Counter[tuple[str, str, str]]] = defaultdict(Counter)
+    team_customizations: dict[str, Counter[tuple[str, str, str, str]]] = defaultdict(Counter)
     team_customization_engineers: dict[str, set[str]] = defaultdict(set)
     engineers_using_explicit_customizations: set[str] = set()
     customization_rows = (
@@ -419,6 +419,7 @@ def get_maturity_analytics(
             SessionCustomization.customization_type,
             SessionCustomization.identifier,
             SessionCustomization.provenance,
+            SessionCustomization.source_classification,
             SessionCustomization.state,
             SessionCustomization.invocation_count,
             SessionModel.engineer_id,
@@ -433,6 +434,7 @@ def get_maturity_analytics(
         customization_type,
         identifier,
         provenance,
+        source_classification,
         state,
         invocation_count,
         engineer_id,
@@ -442,7 +444,7 @@ def get_maturity_analytics(
             continue
 
         engineers_using_explicit_customizations.add(engineer_id)
-        key = (customization_type, identifier, provenance)
+        key = (customization_type, identifier, provenance, source_classification)
         team_key = engineer_team_ids.get(engineer_id) or "unassigned"
         engineer_explicit_customizations[engineer_id][key] += invocation_count or 0
         engineer_customization_sessions[engineer_id][key].add(session_id)
@@ -456,6 +458,7 @@ def get_maturity_analytics(
                 "identifier": identifier,
                 "customization_type": customization_type,
                 "provenance": provenance,
+                "source_classification": source_classification,
                 "total_invocations": 0,
                 "sessions": set(),
                 "engineers": set(),
@@ -475,6 +478,7 @@ def get_maturity_analytics(
             identifier=bucket["identifier"],
             customization_type=bucket["customization_type"],
             provenance=bucket["provenance"],
+            source_classification=bucket["source_classification"],
             total_invocations=bucket["total_invocations"],
             session_count=len(bucket["sessions"]),
             engineer_count=len(bucket["engineers"]),
@@ -500,15 +504,15 @@ def get_maturity_analytics(
         return sum(present) / len(present) if present else None
 
     def _team_customization_label(
-        customization_key: tuple[str, str, str],
+        customization_key: tuple[str, str, str, str],
         identifier_counts: Counter[str],
     ) -> str:
-        customization_type, identifier, provenance = customization_key
+        customization_type, identifier, provenance, source_classification = customization_key
         if identifier_counts[identifier] <= 1:
             return identifier
-        return f"{identifier} ({customization_type}, {provenance})"
+        return f"{identifier} ({customization_type}, {provenance}, {source_classification})"
 
-    customization_presence_by_team: dict[tuple[str, str, str], set[str]] = defaultdict(set)
+    customization_presence_by_team: dict[tuple[str, str, str, str], set[str]] = defaultdict(set)
     for team_key, counts in team_customizations.items():
         for customization_key in counts:
             customization_presence_by_team[customization_key].add(team_key)
@@ -526,7 +530,9 @@ def get_maturity_analytics(
             item[0],
         ),
     ):
-        identifier_counts = Counter(identifier for _ctype, identifier, _prov in counts)
+        identifier_counts = Counter(
+            identifier for _ctype, identifier, _prov, _source_classification in counts
+        )
         avg_team_effectiveness = _avg(
             [
                 profile_by_engineer_id[engineer_id].effectiveness_score
@@ -556,12 +562,29 @@ def get_maturity_analytics(
                 ],
                 unique_customizations=[
                     _team_customization_label(
-                        (customization_type, identifier, provenance),
+                        (
+                            customization_type,
+                            identifier,
+                            provenance,
+                            source_classification,
+                        ),
                         identifier_counts,
                     )
-                    for (customization_type, identifier, provenance), _count in counts.most_common()
+                    for (
+                        customization_type,
+                        identifier,
+                        provenance,
+                        source_classification,
+                    ), _count in counts.most_common()
                     if len(
-                        customization_presence_by_team[(customization_type, identifier, provenance)]
+                        customization_presence_by_team[
+                            (
+                                customization_type,
+                                identifier,
+                                provenance,
+                                source_classification,
+                            )
+                        ]
                     )
                     == 1
                 ][:5],
@@ -601,12 +624,14 @@ def get_maturity_analytics(
                 bucket["customization_type"],
                 bucket["identifier"],
                 bucket["provenance"],
+                bucket["source_classification"],
             )
         ] = CustomizationOutcomeAttribution(
             dimension="customization",
             label=bucket["identifier"],
             customization_type=bucket["customization_type"],
             provenance=bucket["provenance"],
+            source_classification=bucket["source_classification"],
             support_engineer_count=len(engineer_ids),
             support_session_count=len(bucket["sessions"]),
             avg_effectiveness_score=(round(avg_eff, 1) if avg_eff is not None else None),
@@ -634,7 +659,7 @@ def get_maturity_analytics(
     )
     top_cohort_size = max(1, (len(ranked_profiles) + 3) // 4) if ranked_profiles else 0
     high_performer_ids = {profile.engineer_id for profile in ranked_profiles[:top_cohort_size]}
-    stack_buckets: dict[tuple[tuple[str, str, str], ...], dict] = {}
+    stack_buckets: dict[tuple[tuple[str, str, str, str], ...], dict] = {}
     for engineer_id in high_performer_ids:
         customization_counts = engineer_explicit_customizations.get(engineer_id, Counter())
         if not customization_counts:
@@ -679,8 +704,13 @@ def get_maturity_analytics(
             ),
         ),
     ):
-        label = " + ".join(identifier for _type, identifier, _provenance in stack_key)
-        stack_id_source = "|".join(f"{ctype}:{ident}:{prov}" for ctype, ident, prov in stack_key)
+        label = " + ".join(
+            identifier for _type, identifier, _provenance, _source_classification in stack_key
+        )
+        stack_id_source = "|".join(
+            f"{ctype}:{ident}:{prov}:{source_classification}"
+            for ctype, ident, prov, source_classification in stack_key
+        )
         stack_id = md5(stack_id_source.encode(), usedforsecurity=False).hexdigest()[:12]
         high_performer_stacks.append(
             HighPerformerStack(
@@ -691,11 +721,22 @@ def get_maturity_analytics(
                         identifier=identifier,
                         customization_type=customization_type,
                         provenance=provenance,
+                        source_classification=source_classification,
                         invocation_count=bucket["customization_totals"][
-                            (customization_type, identifier, provenance)
+                            (
+                                customization_type,
+                                identifier,
+                                provenance,
+                                source_classification,
+                            )
                         ],
                     )
-                    for customization_type, identifier, provenance in stack_key
+                    for (
+                        customization_type,
+                        identifier,
+                        provenance,
+                        source_classification,
+                    ) in stack_key
                 ],
                 engineer_count=len(bucket["engineers"]),
                 session_count=len(bucket["sessions"]),
@@ -737,6 +778,7 @@ def get_maturity_analytics(
             label=label,
             customization_type=None,
             provenance=None,
+            source_classification=None,
             support_engineer_count=len(bucket["engineers"]),
             support_session_count=len(bucket["sessions"]),
             avg_effectiveness_score=(

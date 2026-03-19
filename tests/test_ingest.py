@@ -105,12 +105,54 @@ def test_ingest_session_derives_invoked_customizations_from_tool_usages(
         .all()
     )
     assert [
-        (row.customization_type, row.state, row.identifier, row.invocation_count) for row in stored
+        (
+            row.customization_type,
+            row.state,
+            row.identifier,
+            row.source_classification,
+            row.invocation_count,
+        )
+        for row in stored
     ] == [
-        ("mcp", "invoked", "github", 3),
-        ("skill", "invoked", "commit", 2),
-        ("subagent", "invoked", "reviewer", 1),
+        ("mcp", "invoked", "github", "unknown", 3),
+        ("skill", "invoked", "commit", "unknown", 2),
+        ("subagent", "invoked", "reviewer", "unknown", 1),
     ]
+
+
+def test_ingest_session_persists_explicit_customization_source_classification(
+    client, engineer_with_key, db_session
+):
+    _eng, api_key = engineer_with_key
+    session_id = str(uuid.uuid4())
+    payload = {
+        "session_id": session_id,
+        "api_key": api_key,
+        "project_name": "customization-project",
+        "customizations": [
+            {
+                "customization_type": "mcp",
+                "state": "enabled",
+                "identifier": "github",
+                "provenance": "user_local",
+                "source_classification": "marketplace",
+                "display_name": "github",
+                "source_path": "/Users/test/.claude/settings.json",
+                "details": {"command": "npx"},
+            }
+        ],
+    }
+
+    response = client.post("/api/v1/ingest/session", json=payload)
+
+    assert response.status_code == 200
+    stored = (
+        db_session.query(SessionCustomization)
+        .filter(SessionCustomization.session_id == session_id)
+        .one()
+    )
+    assert stored.provenance == "user_local"
+    assert stored.source_classification == "marketplace"
 
 
 def test_ingest_session_accepts_cursor_agent_type_and_persists(

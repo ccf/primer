@@ -61,6 +61,7 @@ CustomizationProvenance = Literal[
     "marketplace",
     "unknown",
 ]
+CustomizationSourceClassification = Literal["built_in", "marketplace", "custom", "unknown"]
 
 # --- Team ---
 
@@ -226,6 +227,7 @@ class SessionCustomizationResponse(BaseModel):
     state: CustomizationState
     identifier: str
     provenance: CustomizationProvenance
+    source_classification: CustomizationSourceClassification
     display_name: str | None
     source_path: str | None
     invocation_count: int
@@ -334,6 +336,7 @@ class SessionCustomizationPayload(BaseModel):
     state: CustomizationState
     identifier: str
     provenance: CustomizationProvenance = "unknown"
+    source_classification: CustomizationSourceClassification = "unknown"
     display_name: str | None = None
     source_path: str | None = None
     invocation_count: int = 0
@@ -1877,6 +1880,7 @@ class CustomizationUsage(BaseModel):
     identifier: str
     customization_type: str
     provenance: CustomizationProvenance
+    source_classification: CustomizationSourceClassification = "unknown"
     total_invocations: int
     session_count: int
     engineer_count: int
@@ -1889,6 +1893,7 @@ class StackCustomization(BaseModel):
     identifier: str
     customization_type: str
     provenance: CustomizationProvenance
+    source_classification: CustomizationSourceClassification = "unknown"
     invocation_count: int
 
 
@@ -1921,6 +1926,7 @@ class CustomizationOutcomeAttribution(BaseModel):
     label: str
     customization_type: str | None = None
     provenance: CustomizationProvenance | None = None
+    source_classification: CustomizationSourceClassification | None = None
     support_engineer_count: int
     support_session_count: int
     avg_effectiveness_score: float | None = None

@@ -47,19 +47,25 @@ def test_build_session_customizations_collects_enabled_and_invoked_items(tmp_pat
     )
 
     as_keys = {
-        (item.customization_type, item.state, item.identifier, item.provenance)
+        (
+            item.customization_type,
+            item.state,
+            item.identifier,
+            item.provenance,
+            item.source_classification,
+        )
         for item in snapshots
     }
-    assert ("command", "enabled", "ship", "repo_defined") in as_keys
-    assert ("subagent", "enabled", "reviewer", "repo_defined") in as_keys
-    assert ("template", "enabled", "bugfix", "repo_defined") in as_keys
-    assert ("command", "enabled", "review-pr", "user_local") in as_keys
-    assert ("skill", "enabled", "commit", "user_local") in as_keys
-    assert ("mcp", "enabled", "github", "user_local") in as_keys
-    assert ("mcp", "enabled", "linear", "repo_defined") in as_keys
-    assert ("skill", "invoked", "commit", "user_local") in as_keys
-    assert ("subagent", "invoked", "reviewer", "repo_defined") in as_keys
-    assert ("mcp", "invoked", "github", "user_local") in as_keys
+    assert ("command", "enabled", "ship", "repo_defined", "custom") in as_keys
+    assert ("subagent", "enabled", "reviewer", "repo_defined", "custom") in as_keys
+    assert ("template", "enabled", "bugfix", "repo_defined", "custom") in as_keys
+    assert ("command", "enabled", "review-pr", "user_local", "custom") in as_keys
+    assert ("skill", "enabled", "commit", "user_local", "custom") in as_keys
+    assert ("mcp", "enabled", "github", "user_local", "marketplace") in as_keys
+    assert ("mcp", "enabled", "linear", "repo_defined", "marketplace") in as_keys
+    assert ("skill", "invoked", "commit", "user_local", "custom") in as_keys
+    assert ("subagent", "invoked", "reviewer", "repo_defined", "custom") in as_keys
+    assert ("mcp", "invoked", "github", "user_local", "marketplace") in as_keys
 
     invoked_github = next(
         item
@@ -69,6 +75,7 @@ def test_build_session_customizations_collects_enabled_and_invoked_items(tmp_pat
         and item.identifier == "github"
     )
     assert invoked_github.invocation_count == 3
+    assert invoked_github.source_classification == "marketplace"
 
 
 def test_explicit_customization_provenance_filters_unknown_and_builtin():
@@ -139,6 +146,7 @@ def test_mcp_secrets_not_stored_in_details(tmp_path, monkeypatch):
     mcp_snap = next(s for s in snapshots if s.customization_type == "mcp" and s.state == "enabled")
     assert "env" not in mcp_snap.details
     assert mcp_snap.details["command"] == "npx"
+    assert mcp_snap.source_classification == "marketplace"
 
 
 def test_mcp_agent_family_cannot_be_overridden_by_user_config(tmp_path, monkeypatch):
@@ -198,15 +206,21 @@ def test_build_session_customizations_scans_cursor_roots_and_prefers_cursor_prov
     )
 
     as_keys = {
-        (item.customization_type, item.state, item.identifier, item.provenance)
+        (
+            item.customization_type,
+            item.state,
+            item.identifier,
+            item.provenance,
+            item.source_classification,
+        )
         for item in snapshots
     }
-    assert ("skill", "enabled", "review", "user_local") in as_keys
-    assert ("subagent", "enabled", "reviewer", "repo_defined") in as_keys
-    assert ("mcp", "enabled", "linear", "user_local") in as_keys
-    assert ("skill", "invoked", "review", "user_local") in as_keys
-    assert ("subagent", "invoked", "reviewer", "repo_defined") in as_keys
-    assert ("mcp", "invoked", "linear", "user_local") in as_keys
+    assert ("skill", "enabled", "review", "user_local", "custom") in as_keys
+    assert ("subagent", "enabled", "reviewer", "repo_defined", "custom") in as_keys
+    assert ("mcp", "enabled", "linear", "user_local", "marketplace") in as_keys
+    assert ("skill", "invoked", "review", "user_local", "custom") in as_keys
+    assert ("subagent", "invoked", "reviewer", "repo_defined", "custom") in as_keys
+    assert ("mcp", "invoked", "linear", "user_local", "marketplace") in as_keys
 
     invoked_review = next(
         item
@@ -217,6 +231,61 @@ def test_build_session_customizations_scans_cursor_roots_and_prefers_cursor_prov
     )
     assert invoked_review.source_path == str(cursor_home / "skills" / "review.md")
     assert invoked_review.details["raw_tool_name"] == "Skill:review"
+
+
+def test_derive_invoked_customizations_classifies_builtin_skill_and_subagent():
+    snapshots = build_session_customizations(
+        "claude_code",
+        None,
+        {
+            "Skill:explore": 1,
+            "Task:plan": 2,
+        },
+    )
+
+    as_keys = {
+        (
+            item.customization_type,
+            item.state,
+            item.identifier,
+            item.provenance,
+            item.source_classification,
+        )
+        for item in snapshots
+    }
+
+    assert ("skill", "invoked", "explore", "unknown", "built_in") in as_keys
+    assert ("subagent", "invoked", "plan", "unknown", "built_in") in as_keys
+
+
+def test_mcp_source_classification_marks_local_commands_as_custom(tmp_path, monkeypatch):
+    home_dir = tmp_path / "home"
+    home_dir.mkdir()
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: home_dir))
+
+    project_dir = tmp_path / "repo"
+    claude_dir = project_dir / ".claude"
+    claude_dir.mkdir(parents=True)
+    (claude_dir / "settings.json").write_text(
+        json.dumps(
+            {
+                "mcpServers": {
+                    "local-tool": {
+                        "command": "./scripts/local-mcp.py",
+                    }
+                }
+            }
+        )
+    )
+
+    snapshots = build_session_customizations("claude_code", str(project_dir), {})
+    local_snap = next(
+        s
+        for s in snapshots
+        if s.customization_type == "mcp" and s.state == "enabled" and s.identifier == "local-tool"
+    )
+
+    assert local_snap.source_classification == "custom"
 
 
 def test_unknown_agent_type_does_not_scan_other_agent_roots(tmp_path, monkeypatch):

@@ -198,6 +198,7 @@ describe("SessionDetailPanel", () => {
               state: "enabled",
               identifier: "github",
               provenance: "user_local",
+              source_classification: "marketplace",
               display_name: "github",
               source_path: "/Users/test/.claude/settings.json",
               invocation_count: 0,
@@ -208,6 +209,7 @@ describe("SessionDetailPanel", () => {
               state: "invoked",
               identifier: "commit",
               provenance: "unknown",
+              source_classification: "unknown",
               display_name: "commit",
               source_path: null,
               invocation_count: 2,
@@ -221,6 +223,7 @@ describe("SessionDetailPanel", () => {
     expect(screen.getByText("Customizations")).toBeInTheDocument()
     expect(screen.getAllByText("github").length).toBeGreaterThan(0)
     expect(screen.getByText("Enabled")).toBeInTheDocument()
+    expect(screen.getByText(/Mcp • User Local • Marketplace/)).toBeInTheDocument()
     expect(screen.getByText("2 calls")).toBeInTheDocument()
   })
 
