@@ -30,7 +30,7 @@ describe("TeamCustomizationLandscapeTable", () => {
 
     expect(screen.getByText("Platform")).toBeInTheDocument()
     expect(screen.getByText("67%")).toBeInTheDocument()
-    expect(screen.getAllByText("Github").length).toBeGreaterThan(0)
-    expect(screen.getByText("Review-Pr")).toBeInTheDocument()
+    expect(screen.getAllByText("github").length).toBeGreaterThan(0)
+    expect(screen.getByText("review-pr")).toBeInTheDocument()
   })
 })

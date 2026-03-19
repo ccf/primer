@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { formatLabel, formatPercent } from "@/lib/utils"
+import { formatPercent } from "@/lib/utils"
 import type { TeamCustomizationLandscape } from "@/types/api"
 
 interface TeamCustomizationLandscapeTableProps {
@@ -57,7 +57,7 @@ export function TeamCustomizationLandscapeTable({ data }: TeamCustomizationLands
                     <div className="flex flex-wrap gap-2">
                       {row.top_customizations.map((item) => (
                         <Badge key={`${row.team_id}:${item}`} variant="secondary">
-                          {formatLabel(item)}
+                          {item}
                         </Badge>
                       ))}
                     </div>
@@ -69,7 +69,7 @@ export function TeamCustomizationLandscapeTable({ data }: TeamCustomizationLands
                       ) : (
                         row.unique_customizations.map((item) => (
                           <Badge key={`${row.team_id}:unique:${item}`} variant="outline">
-                            {formatLabel(item)}
+                            {item}
                           </Badge>
                         ))
                       )}

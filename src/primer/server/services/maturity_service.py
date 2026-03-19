@@ -499,6 +499,15 @@ def get_maturity_analytics(
         present = [value for value in values if value is not None]
         return sum(present) / len(present) if present else None
 
+    def _team_customization_label(
+        customization_key: tuple[str, str, str],
+        identifier_counts: Counter[str],
+    ) -> str:
+        customization_type, identifier, provenance = customization_key
+        if identifier_counts[identifier] <= 1:
+            return identifier
+        return f"{identifier} ({customization_type}, {provenance})"
+
     customization_presence_by_team: dict[tuple[str, str, str], set[str]] = defaultdict(set)
     for team_key, counts in team_customizations.items():
         for customization_key in counts:
@@ -508,52 +517,56 @@ def get_maturity_analytics(
     for engineer_id, team_id in engineer_team_ids.items():
         team_engineers[team_id or "unassigned"].add(engineer_id)
 
-    team_customization_landscape = [
-        TeamCustomizationLandscape(
-            team_id=team_key,
-            team_name=team_names.get(team_key, "Unassigned"),
-            engineer_count=len(team_engineers.get(team_key, set())),
-            engineers_using_explicit_customizations=len(team_customization_engineers[team_key]),
-            explicit_customization_count=len(counts),
-            adoption_rate=(
-                len(team_customization_engineers[team_key])
-                / len(team_engineers.get(team_key, set()))
-                if team_engineers.get(team_key)
-                else 0.0
-            ),
-            avg_effectiveness_score=(
-                round(avg_team_effectiveness, 1)
-                if (
-                    avg_team_effectiveness := _avg(
-                        [
-                            profile_by_engineer_id[engineer_id].effectiveness_score
-                            for engineer_id in team_engineers.get(team_key, set())
-                            if engineer_id in profile_by_engineer_id
-                        ]
+    team_customization_landscape: list[TeamCustomizationLandscape] = []
+    for team_key, counts in sorted(
+        team_customizations.items(),
+        key=lambda item: (
+            -len(item[1]),
+            -len(team_customization_engineers[item[0]]),
+            item[0],
+        ),
+    ):
+        identifier_counts = Counter(identifier for _ctype, identifier, _prov in counts)
+        avg_team_effectiveness = _avg(
+            [
+                profile_by_engineer_id[engineer_id].effectiveness_score
+                for engineer_id in team_engineers.get(team_key, set())
+                if engineer_id in profile_by_engineer_id
+            ]
+        )
+        team_customization_landscape.append(
+            TeamCustomizationLandscape(
+                team_id=team_key,
+                team_name=team_names.get(team_key, "Unassigned"),
+                engineer_count=len(team_engineers.get(team_key, set())),
+                engineers_using_explicit_customizations=len(team_customization_engineers[team_key]),
+                explicit_customization_count=len(counts),
+                adoption_rate=(
+                    len(team_customization_engineers[team_key])
+                    / len(team_engineers.get(team_key, set()))
+                    if team_engineers.get(team_key)
+                    else 0.0
+                ),
+                avg_effectiveness_score=(
+                    round(avg_team_effectiveness, 1) if avg_team_effectiveness is not None else None
+                ),
+                top_customizations=[
+                    _team_customization_label(customization_key, identifier_counts)
+                    for customization_key, _count in counts.most_common(5)
+                ],
+                unique_customizations=[
+                    _team_customization_label(
+                        (customization_type, identifier, provenance),
+                        identifier_counts,
                     )
-                )
-                is not None
-                else None
-            ),
-            top_customizations=[
-                identifier for (_ctype, identifier, _prov), _count in counts.most_common(5)
-            ],
-            unique_customizations=[
-                identifier
-                for (customization_type, identifier, provenance), _count in counts.most_common()
-                if len(customization_presence_by_team[(customization_type, identifier, provenance)])
-                == 1
-            ][:5],
+                    for (customization_type, identifier, provenance), _count in counts.most_common()
+                    if len(
+                        customization_presence_by_team[(customization_type, identifier, provenance)]
+                    )
+                    == 1
+                ][:5],
+            )
         )
-        for team_key, counts in sorted(
-            team_customizations.items(),
-            key=lambda item: (
-                -len(item[1]),
-                -len(team_customization_engineers[item[0]]),
-                item[0],
-            ),
-        )
-    ]
 
     customization_outcome_buckets: dict[tuple[str, ...], dict] = {}
     for bucket in customization_data.values():
