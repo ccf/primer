@@ -488,7 +488,7 @@ def get_maturity_analytics(
         present = [value for value in values if value is not None]
         return sum(present) / len(present) if present else None
 
-    customization_outcome_buckets: dict[tuple[str, str], dict] = {}
+    customization_outcome_buckets: dict[tuple[str, ...], dict] = {}
     for bucket in customization_data.values():
         engineer_ids = bucket["engineers"]
         if not engineer_ids:
@@ -509,29 +509,34 @@ def get_maturity_analytics(
         cost_values = [eng_cost_per_success.get(eid) for eid in engineer_ids]
         merge_values = [eng_merge_rates.get(eid) for eid in engineer_ids]
 
-        customization_outcome_buckets[("customization", bucket["identifier"])] = (
-            CustomizationOutcomeAttribution(
-                dimension="customization",
-                label=bucket["identifier"],
-                support_engineer_count=len(engineer_ids),
-                support_session_count=len(bucket["sessions"]),
-                avg_effectiveness_score=(
-                    round(_avg(effectiveness_values), 1)
-                    if _avg(effectiveness_values) is not None
-                    else None
-                ),
-                avg_leverage_score=round(_avg(leverage_values) or 0.0, 1),
-                avg_success_rate=(
-                    round(_avg(success_values), 3) if _avg(success_values) is not None else None
-                ),
-                avg_cost_per_successful_outcome=(
-                    round(_avg(cost_values), 4) if _avg(cost_values) is not None else None
-                ),
-                avg_pr_merge_rate=(
-                    round(_avg(merge_values), 3) if _avg(merge_values) is not None else None
-                ),
-                cohort_share=round(cohort_share, 3) if cohort_share is not None else None,
+        customization_outcome_buckets[
+            (
+                "customization",
+                bucket["customization_type"],
+                bucket["identifier"],
+                bucket["provenance"],
             )
+        ] = CustomizationOutcomeAttribution(
+            dimension="customization",
+            label=bucket["identifier"],
+            support_engineer_count=len(engineer_ids),
+            support_session_count=len(bucket["sessions"]),
+            avg_effectiveness_score=(
+                round(_avg(effectiveness_values), 1)
+                if _avg(effectiveness_values) is not None
+                else None
+            ),
+            avg_leverage_score=round(_avg(leverage_values) or 0.0, 1),
+            avg_success_rate=(
+                round(_avg(success_values), 3) if _avg(success_values) is not None else None
+            ),
+            avg_cost_per_successful_outcome=(
+                round(_avg(cost_values), 4) if _avg(cost_values) is not None else None
+            ),
+            avg_pr_merge_rate=(
+                round(_avg(merge_values), 3) if _avg(merge_values) is not None else None
+            ),
+            cohort_share=round(cohort_share, 3) if cohort_share is not None else None,
         )
 
     high_performer_stacks: list[HighPerformerStack] = []
@@ -633,6 +638,9 @@ def get_maturity_analytics(
             )
         )
 
+        stack_success_values = [
+            eng_success_rates.get(engineer_id) for engineer_id in bucket["engineers"]
+        ]
         stack_cost_values = [
             eng_cost_per_success.get(engineer_id)
             for engineer_id in bucket["engineers"]
@@ -661,15 +669,8 @@ def get_maturity_analytics(
                 1,
             ),
             avg_success_rate=(
-                round(
-                    sum(
-                        eng_success_rates.get(engineer_id, 0.0)
-                        for engineer_id in bucket["engineers"]
-                    )
-                    / len(bucket["engineers"]),
-                    3,
-                )
-                if bucket["engineers"]
+                round(_avg(stack_success_values), 3)
+                if _avg(stack_success_values) is not None
                 else None
             ),
             avg_cost_per_successful_outcome=(
