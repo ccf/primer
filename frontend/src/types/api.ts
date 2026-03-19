@@ -1535,6 +1535,8 @@ export interface HighPerformerStack {
 export interface CustomizationOutcomeAttribution {
   dimension: string
   label: string
+  customization_type: string | null
+  provenance: CustomizationProvenance | null
   support_engineer_count: number
   support_session_count: number
   avg_effectiveness_score: number | null

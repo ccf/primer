@@ -1907,6 +1907,8 @@ class HighPerformerStack(BaseModel):
 class CustomizationOutcomeAttribution(BaseModel):
     dimension: str
     label: str
+    customization_type: str | None = None
+    provenance: CustomizationProvenance | None = None
     support_engineer_count: int
     support_session_count: int
     avg_effectiveness_score: float | None = None
