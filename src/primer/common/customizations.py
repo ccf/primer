@@ -465,8 +465,19 @@ def _classify_mcp_source(details: dict[str, object]) -> str:
         return "custom"
     if isinstance(args, list) and args:
         first_arg = args[0]
-        if isinstance(first_arg, str) and (first_arg.startswith("@") or "/" in first_arg):
-            return "marketplace"
+        if isinstance(first_arg, str):
+            if (
+                first_arg.startswith(".")
+                or first_arg.startswith("/")
+                or first_arg.endswith(".py")
+                or first_arg.endswith(".js")
+                or first_arg.endswith(".mjs")
+                or first_arg.endswith(".cjs")
+                or first_arg.endswith(".ts")
+            ):
+                return "custom"
+            if first_arg.startswith("@"):
+                return "marketplace"
     return "unknown"
 
 
