@@ -137,3 +137,55 @@ def test_mcp_secrets_not_stored_in_details(tmp_path, monkeypatch):
     mcp_snap = next(s for s in snapshots if s.customization_type == "mcp" and s.state == "enabled")
     assert "env" not in mcp_snap.details
     assert mcp_snap.details["command"] == "npx"
+
+
+def test_build_session_customizations_scans_cursor_roots_and_prefers_cursor_provenance(
+    tmp_path, monkeypatch
+):
+    home_dir = tmp_path / "home"
+    cursor_home = home_dir / ".cursor"
+    claude_home = home_dir / ".claude"
+    (cursor_home / "skills").mkdir(parents=True)
+    (claude_home / "skills").mkdir(parents=True)
+    (cursor_home / "skills" / "review.md").write_text("# cursor review")
+    (claude_home / "skills" / "review.md").write_text("# claude review")
+    (cursor_home / "settings.json").write_text(
+        '{"mcpServers": {"linear": {"command": "npx", "args": ["linear-mcp"]}}}'
+    )
+
+    project_dir = tmp_path / "repo"
+    repo_cursor = project_dir / ".cursor"
+    (repo_cursor / "agents").mkdir(parents=True)
+    (repo_cursor / "agents" / "reviewer.md").write_text("# reviewer")
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: home_dir))
+
+    snapshots = build_session_customizations(
+        "cursor",
+        str(project_dir),
+        {
+            "Skill:review": 2,
+            "Task:reviewer": 1,
+            "mcp__linear__query": 4,
+        },
+    )
+
+    as_keys = {
+        (item.customization_type, item.state, item.identifier, item.provenance)
+        for item in snapshots
+    }
+    assert ("skill", "enabled", "review", "user_local") in as_keys
+    assert ("subagent", "enabled", "reviewer", "repo_defined") in as_keys
+    assert ("mcp", "enabled", "linear", "user_local") in as_keys
+    assert ("skill", "invoked", "review", "user_local") in as_keys
+    assert ("subagent", "invoked", "reviewer", "repo_defined") in as_keys
+    assert ("mcp", "invoked", "linear", "user_local") in as_keys
+
+    invoked_review = next(
+        item
+        for item in snapshots
+        if item.customization_type == "skill"
+        and item.state == "invoked"
+        and item.identifier == "review"
+    )
+    assert invoked_review.source_path == str(cursor_home / "skills" / "review.md")
+    assert invoked_review.details["raw_tool_name"] == "Skill:review"
