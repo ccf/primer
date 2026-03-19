@@ -1921,6 +1921,23 @@ class TeamCustomizationLandscape(BaseModel):
     unique_customizations: list[str] = []
 
 
+class CustomizationStateFunnel(BaseModel):
+    identifier: str
+    customization_type: str
+    provenance: CustomizationProvenance
+    source_classification: CustomizationSourceClassification
+    available_session_count: int
+    enabled_session_count: int
+    invoked_session_count: int
+    available_engineer_count: int
+    enabled_engineer_count: int
+    invoked_engineer_count: int
+    activation_rate: float | None = None
+    usage_rate: float | None = None
+    available_not_enabled_engineer_count: int = 0
+    enabled_not_invoked_engineer_count: int = 0
+
+
 class CustomizationOutcomeAttribution(BaseModel):
     dimension: str
     label: str
@@ -1954,6 +1971,7 @@ class MaturityAnalyticsResponse(BaseModel):
     customization_breakdown: list[CustomizationUsage] = []
     high_performer_stacks: list[HighPerformerStack] = []
     team_customization_landscape: list[TeamCustomizationLandscape] = []
+    customization_state_funnel: list[CustomizationStateFunnel] = []
     customization_outcomes: list[CustomizationOutcomeAttribution] = []
     project_readiness: list[ProjectReadinessEntry]
     sessions_analyzed: int

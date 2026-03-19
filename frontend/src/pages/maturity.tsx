@@ -7,6 +7,7 @@ import { MaturitySummary } from "@/components/maturity/maturity-summary"
 import { ToolCategoryChart } from "@/components/maturity/tool-category-chart"
 import { AgentSkillTable } from "@/components/maturity/agent-skill-table"
 import { CustomizationBreakdownTable } from "@/components/maturity/customization-breakdown-table"
+import { CustomizationStateFunnelTable } from "@/components/maturity/customization-state-funnel-table"
 import { HighPerformerStackCards } from "@/components/maturity/high-performer-stack-cards"
 import { CustomizationOutcomeTable } from "@/components/maturity/customization-outcome-table"
 import { TeamCustomizationLandscapeTable } from "@/components/maturity/team-customization-landscape-table"
@@ -77,6 +78,7 @@ export function MaturityPage({ teamId, dateRange }: MaturityPageProps) {
         <div className="space-y-6">
           <AgentSkillTable data={data.agent_skill_breakdown} />
           <CustomizationBreakdownTable data={data.customization_breakdown} />
+          <CustomizationStateFunnelTable rows={data.customization_state_funnel} />
           <TeamCustomizationLandscapeTable data={data.team_customization_landscape} />
           <CustomizationOutcomeTable rows={data.customization_outcomes} />
           <HighPerformerStackCards stacks={data.high_performer_stacks} />

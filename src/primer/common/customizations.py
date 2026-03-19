@@ -22,6 +22,7 @@ _AGENT_CUSTOMIZATION_ROOTS: dict[str, str] = {
     "gemini_cli": ".gemini",
     "codex_cli": ".codex",
 }
+_AGENT_FAMILIES_WITH_BUILT_INS = frozenset({"claude_code", "cursor"})
 _SETTINGS_FILE_NAMES = ("settings.json", "config.json")
 _EXPLICIT_PROVENANCE = frozenset({"user_local", "repo_defined", "org_managed", "marketplace"})
 _PROVENANCE_PRIORITY = {
@@ -113,12 +114,13 @@ def build_session_customizations(
     enabled_snapshots.extend(_collect_enabled_user_customizations(agent_type))
 
     enabled_snapshots = _dedupe_snapshots(enabled_snapshots)
+    available_snapshots = _collect_available_customizations(agent_type, enabled_snapshots)
     invoked_snapshots = _resolve_invoked_snapshot_provenance(
         _derive_invoked_customizations(tool_counts),
-        enabled_snapshots,
+        _dedupe_snapshots([*available_snapshots, *enabled_snapshots]),
         agent_type,
     )
-    return _dedupe_snapshots([*invoked_snapshots, *enabled_snapshots])
+    return _dedupe_snapshots([*available_snapshots, *enabled_snapshots, *invoked_snapshots])
 
 
 def derive_invoked_customizations_from_tool_usages(
@@ -277,6 +279,65 @@ def _collect_enabled_user_customizations(agent_type: str) -> list[CustomizationS
         )
     )
     return _dedupe_snapshots(snapshots)
+
+
+def _collect_available_customizations(
+    agent_type: str,
+    enabled_snapshots: list[CustomizationSnapshot],
+) -> list[CustomizationSnapshot]:
+    snapshots = _collect_available_built_in_customizations(agent_type)
+    snapshots.extend(_mirror_enabled_as_available(enabled_snapshots))
+    return _dedupe_snapshots(snapshots)
+
+
+def _collect_available_built_in_customizations(agent_type: str) -> list[CustomizationSnapshot]:
+    if agent_type not in _AGENT_FAMILIES_WITH_BUILT_INS:
+        return []
+
+    snapshots: list[CustomizationSnapshot] = []
+    for identifier in sorted(_BUILT_IN_SKILLS):
+        snapshots.append(
+            CustomizationSnapshot(
+                customization_type="skill",
+                state="available",
+                identifier=identifier,
+                display_name=identifier,
+                provenance="built_in",
+                source_classification="built_in",
+                details={"agent_family": agent_type, "built_in": True},
+            )
+        )
+    for identifier in sorted(_BUILT_IN_SUBAGENTS):
+        snapshots.append(
+            CustomizationSnapshot(
+                customization_type="subagent",
+                state="available",
+                identifier=identifier,
+                display_name=identifier,
+                provenance="built_in",
+                source_classification="built_in",
+                details={"agent_family": agent_type, "built_in": True},
+            )
+        )
+    return snapshots
+
+
+def _mirror_enabled_as_available(
+    enabled_snapshots: list[CustomizationSnapshot],
+) -> list[CustomizationSnapshot]:
+    return [
+        CustomizationSnapshot(
+            customization_type=snapshot.customization_type,
+            state="available",
+            identifier=snapshot.identifier,
+            provenance=snapshot.provenance,
+            source_classification=snapshot.source_classification,
+            display_name=snapshot.display_name,
+            source_path=snapshot.source_path,
+            details=snapshot.details,
+        )
+        for snapshot in enabled_snapshots
+    ]
 
 
 def _resolve_invoked_snapshot_provenance(

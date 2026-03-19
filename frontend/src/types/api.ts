@@ -1552,6 +1552,23 @@ export interface TeamCustomizationLandscape {
   unique_customizations: string[]
 }
 
+export interface CustomizationStateFunnel {
+  identifier: string
+  customization_type: string
+  provenance: CustomizationProvenance
+  source_classification: CustomizationSourceClassification
+  available_session_count: number
+  enabled_session_count: number
+  invoked_session_count: number
+  available_engineer_count: number
+  enabled_engineer_count: number
+  invoked_engineer_count: number
+  activation_rate: number | null
+  usage_rate: number | null
+  available_not_enabled_engineer_count: number
+  enabled_not_invoked_engineer_count: number
+}
+
 export interface CustomizationOutcomeAttribution {
   dimension: string
   label: string
@@ -1585,6 +1602,7 @@ export interface MaturityAnalyticsResponse {
   customization_breakdown: CustomizationUsage[]
   high_performer_stacks: HighPerformerStack[]
   team_customization_landscape: TeamCustomizationLandscape[]
+  customization_state_funnel: CustomizationStateFunnel[]
   customization_outcomes: CustomizationOutcomeAttribution[]
   project_readiness: ProjectReadinessEntry[]
   sessions_analyzed: number
