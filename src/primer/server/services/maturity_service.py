@@ -544,7 +544,10 @@ def get_maturity_analytics(
         ),
     ):
         label = " + ".join(identifier for _type, identifier, _provenance in stack_key)
-        stack_id = md5(label.encode(), usedforsecurity=False).hexdigest()[:12]
+        stack_id_source = "|".join(
+            f"{ctype}:{ident}:{prov}" for ctype, ident, prov in stack_key
+        )
+        stack_id = md5(stack_id_source.encode(), usedforsecurity=False).hexdigest()[:12]
         high_performer_stacks.append(
             HighPerformerStack(
                 stack_id=stack_id,
