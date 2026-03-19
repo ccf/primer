@@ -509,6 +509,12 @@ def get_maturity_analytics(
         cost_values = [eng_cost_per_success.get(eid) for eid in engineer_ids]
         merge_values = [eng_merge_rates.get(eid) for eid in engineer_ids]
 
+        avg_eff = _avg(effectiveness_values)
+        avg_lev = _avg(leverage_values)
+        avg_suc = _avg(success_values)
+        avg_cost = _avg(cost_values)
+        avg_merge = _avg(merge_values)
+
         customization_outcome_buckets[
             (
                 "customization",
@@ -522,19 +528,17 @@ def get_maturity_analytics(
             support_engineer_count=len(engineer_ids),
             support_session_count=len(bucket["sessions"]),
             avg_effectiveness_score=(
-                round(_avg(effectiveness_values), 1)
-                if _avg(effectiveness_values) is not None
-                else None
+                round(avg_eff, 1) if avg_eff is not None else None
             ),
-            avg_leverage_score=round(_avg(leverage_values) or 0.0, 1),
+            avg_leverage_score=round(avg_lev or 0.0, 1),
             avg_success_rate=(
-                round(_avg(success_values), 3) if _avg(success_values) is not None else None
+                round(avg_suc, 3) if avg_suc is not None else None
             ),
             avg_cost_per_successful_outcome=(
-                round(_avg(cost_values), 4) if _avg(cost_values) is not None else None
+                round(avg_cost, 4) if avg_cost is not None else None
             ),
             avg_pr_merge_rate=(
-                round(_avg(merge_values), 3) if _avg(merge_values) is not None else None
+                round(avg_merge, 3) if avg_merge is not None else None
             ),
             cohort_share=round(cohort_share, 3) if cohort_share is not None else None,
         )
@@ -651,6 +655,9 @@ def get_maturity_analytics(
             for engineer_id in bucket["engineers"]
             if eng_merge_rates.get(engineer_id) is not None
         ]
+        avg_stack_suc = _avg(stack_success_values)
+        avg_stack_cost = _avg(stack_cost_values)
+        avg_stack_merge = _avg(stack_merge_values)
         stack_outcome = CustomizationOutcomeAttribution(
             dimension="stack",
             label=label,
@@ -669,15 +676,13 @@ def get_maturity_analytics(
                 1,
             ),
             avg_success_rate=(
-                round(_avg(stack_success_values), 3)
-                if _avg(stack_success_values) is not None
-                else None
+                round(avg_stack_suc, 3) if avg_stack_suc is not None else None
             ),
             avg_cost_per_successful_outcome=(
-                round(_avg(stack_cost_values), 4) if _avg(stack_cost_values) is not None else None
+                round(avg_stack_cost, 4) if avg_stack_cost is not None else None
             ),
             avg_pr_merge_rate=(
-                round(_avg(stack_merge_values), 3) if _avg(stack_merge_values) is not None else None
+                round(avg_stack_merge, 3) if avg_stack_merge is not None else None
             ),
             cohort_share=(
                 round(len(bucket["engineers"]) / total_engineers, 3)
@@ -685,7 +690,7 @@ def get_maturity_analytics(
                 else None
             ),
         )
-        customization_outcome_buckets[("stack", label)] = stack_outcome
+        customization_outcome_buckets[("stack", stack_id)] = stack_outcome
 
     customization_outcomes = sorted(
         customization_outcome_buckets.values(),
