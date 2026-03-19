@@ -32,6 +32,7 @@ _PROVENANCE_PRIORITY = {
     "built_in": -1,
     "unknown": -2,
 }
+_PROJECT_ROOT_MARKERS = frozenset({".git", *_AGENT_CUSTOMIZATION_ROOTS.values()})
 
 
 @dataclass(slots=True)
@@ -345,7 +346,7 @@ def _scan_mcp_settings(
                 display_name=identifier,
                 provenance=provenance,
                 source_path=str(settings_path),
-                details={"agent_family": agent_family, **details},
+                details={**details, "agent_family": agent_family},
             )
         )
     return snapshots
@@ -381,7 +382,7 @@ def _candidate_project_roots(project_path: str) -> list[Path]:
     for candidate in [path.resolve(), *path.resolve().parents]:
         if candidate == home or candidate in home.parents:
             break
-        if (candidate / ".claude").exists() or (candidate / ".git").exists():
+        if any((candidate / marker).exists() for marker in _PROJECT_ROOT_MARKERS):
             results.append(candidate)
     if not results:
         results.append(path.resolve())
