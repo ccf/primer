@@ -57,7 +57,7 @@ export function TeamCustomizationLandscapeTable({ data }: TeamCustomizationLands
                     <div className="flex flex-wrap gap-2">
                       {row.top_customizations.map((item) => (
                         <Badge key={`${row.team_id}:${item}`} variant="secondary">
-                          {item}
+                          {formatLabel(item)}
                         </Badge>
                       ))}
                     </div>

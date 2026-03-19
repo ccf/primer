@@ -91,9 +91,9 @@ def get_maturity_analytics(
     )
     session_engineer: dict[str, tuple[str, str]] = {}
     engineer_team_ids: dict[str, str | None] = {}
-    for sid, eid, ename, team_id in eng_rows:
+    for sid, eid, ename, engineer_team_id in eng_rows:
         session_engineer[sid] = (eid, ename)
-        engineer_team_ids[eid] = team_id
+        engineer_team_ids[eid] = engineer_team_id
 
     # Aggregate per-engineer tool counts
     eng_tools: dict[str, Counter[str]] = defaultdict(Counter)
@@ -522,22 +522,15 @@ def get_maturity_analytics(
                 else 0.0
             ),
             avg_effectiveness_score=(
-                round(
-                    _avg(
+                round(avg_team_effectiveness, 1)
+                if (
+                    avg_team_effectiveness := _avg(
                         [
                             profile_by_engineer_id[engineer_id].effectiveness_score
                             for engineer_id in team_engineers.get(team_key, set())
                             if engineer_id in profile_by_engineer_id
                         ]
-                    ),
-                    1,
-                )
-                if _avg(
-                    [
-                        profile_by_engineer_id[engineer_id].effectiveness_score
-                        for engineer_id in team_engineers.get(team_key, set())
-                        if engineer_id in profile_by_engineer_id
-                    ]
+                    )
                 )
                 is not None
                 else None
