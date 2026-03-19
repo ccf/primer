@@ -1532,6 +1532,18 @@ export interface HighPerformerStack {
   top_engineers: string[]
 }
 
+export interface TeamCustomizationLandscape {
+  team_id: string
+  team_name: string
+  engineer_count: number
+  engineers_using_explicit_customizations: number
+  explicit_customization_count: number
+  adoption_rate: number
+  avg_effectiveness_score: number | null
+  top_customizations: string[]
+  unique_customizations: string[]
+}
+
 export interface CustomizationOutcomeAttribution {
   dimension: string
   label: string
@@ -1563,6 +1575,7 @@ export interface MaturityAnalyticsResponse {
   agent_skill_breakdown: AgentSkillUsage[]
   customization_breakdown: CustomizationUsage[]
   high_performer_stacks: HighPerformerStack[]
+  team_customization_landscape: TeamCustomizationLandscape[]
   customization_outcomes: CustomizationOutcomeAttribution[]
   project_readiness: ProjectReadinessEntry[]
   sessions_analyzed: number

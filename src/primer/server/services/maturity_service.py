@@ -18,6 +18,7 @@ from primer.common.models import (
     SessionCommit,
     SessionCustomization,
     SessionFacets,
+    Team,
     ToolUsage,
 )
 from primer.common.models import Session as SessionModel
@@ -33,6 +34,7 @@ from primer.common.schemas import (
     MaturityAnalyticsResponse,
     ProjectReadinessEntry,
     StackCustomization,
+    TeamCustomizationLandscape,
     ToolCategoryBreakdown,
 )
 from primer.common.tool_classification import (
@@ -82,14 +84,16 @@ def get_maturity_analytics(
 
     # Map session_id -> engineer info
     eng_rows = (
-        db.query(SessionModel.id, Engineer.id, Engineer.name)
+        db.query(SessionModel.id, Engineer.id, Engineer.name, Engineer.team_id)
         .join(Engineer, SessionModel.engineer_id == Engineer.id)
         .filter(SessionModel.id.in_(db.query(session_id_subq.c.id)))
         .all()
     )
     session_engineer: dict[str, tuple[str, str]] = {}
-    for sid, eid, ename in eng_rows:
+    engineer_team_ids: dict[str, str | None] = {}
+    for sid, eid, ename, team_id in eng_rows:
         session_engineer[sid] = (eid, ename)
+        engineer_team_ids[eid] = team_id
 
     # Aggregate per-engineer tool counts
     eng_tools: dict[str, Counter[str]] = defaultdict(Counter)
@@ -102,6 +106,8 @@ def get_maturity_analytics(
     engineer_names: dict[str, str] = {}
     for _sid, (eid, ename) in session_engineer.items():
         engineer_names[eid] = ename
+    team_ids = {tid for tid in engineer_team_ids.values() if tid}
+    team_names = {team.id: team.name for team in db.query(Team).filter(Team.id.in_(team_ids)).all()}
 
     # Cache hit rates per engineer
     eng_cache = (
@@ -404,6 +410,8 @@ def get_maturity_analytics(
     engineer_customization_projects: dict[str, dict[tuple[str, str, str], Counter[str]]] = (
         defaultdict(lambda: defaultdict(Counter))
     )
+    team_customizations: dict[str, Counter[tuple[str, str, str]]] = defaultdict(Counter)
+    team_customization_engineers: dict[str, set[str]] = defaultdict(set)
     engineers_using_explicit_customizations: set[str] = set()
     customization_rows = (
         db.query(
@@ -435,10 +443,13 @@ def get_maturity_analytics(
 
         engineers_using_explicit_customizations.add(engineer_id)
         key = (customization_type, identifier, provenance)
+        team_key = engineer_team_ids.get(engineer_id) or "unassigned"
         engineer_explicit_customizations[engineer_id][key] += invocation_count or 0
         engineer_customization_sessions[engineer_id][key].add(session_id)
         if project_name:
             engineer_customization_projects[engineer_id][key][project_name] += 1
+        team_customizations[team_key][key] += invocation_count or 0
+        team_customization_engineers[team_key].add(engineer_id)
         bucket = customization_data.setdefault(
             key,
             {
@@ -487,6 +498,69 @@ def get_maturity_analytics(
     def _avg(values: list[float | None]) -> float | None:
         present = [value for value in values if value is not None]
         return sum(present) / len(present) if present else None
+
+    customization_presence_by_team: dict[tuple[str, str, str], set[str]] = defaultdict(set)
+    for team_key, counts in team_customizations.items():
+        for customization_key in counts:
+            customization_presence_by_team[customization_key].add(team_key)
+
+    team_engineers: dict[str, set[str]] = defaultdict(set)
+    for engineer_id, team_id in engineer_team_ids.items():
+        team_engineers[team_id or "unassigned"].add(engineer_id)
+
+    team_customization_landscape = [
+        TeamCustomizationLandscape(
+            team_id=team_key,
+            team_name=team_names.get(team_key, "Unassigned"),
+            engineer_count=len(team_engineers.get(team_key, set())),
+            engineers_using_explicit_customizations=len(team_customization_engineers[team_key]),
+            explicit_customization_count=len(counts),
+            adoption_rate=(
+                len(team_customization_engineers[team_key])
+                / len(team_engineers.get(team_key, set()))
+                if team_engineers.get(team_key)
+                else 0.0
+            ),
+            avg_effectiveness_score=(
+                round(
+                    _avg(
+                        [
+                            profile_by_engineer_id[engineer_id].effectiveness_score
+                            for engineer_id in team_engineers.get(team_key, set())
+                            if engineer_id in profile_by_engineer_id
+                        ]
+                    ),
+                    1,
+                )
+                if _avg(
+                    [
+                        profile_by_engineer_id[engineer_id].effectiveness_score
+                        for engineer_id in team_engineers.get(team_key, set())
+                        if engineer_id in profile_by_engineer_id
+                    ]
+                )
+                is not None
+                else None
+            ),
+            top_customizations=[
+                identifier for (_ctype, identifier, _prov), _count in counts.most_common(5)
+            ],
+            unique_customizations=[
+                identifier
+                for (customization_type, identifier, provenance), _count in counts.most_common()
+                if len(customization_presence_by_team[(customization_type, identifier, provenance)])
+                == 1
+            ][:5],
+        )
+        for team_key, counts in sorted(
+            team_customizations.items(),
+            key=lambda item: (
+                -len(item[1]),
+                -len(team_customization_engineers[item[0]]),
+                item[0],
+            ),
+        )
+    ]
 
     customization_outcome_buckets: dict[tuple[str, ...], dict] = {}
     for bucket in customization_data.values():
@@ -756,6 +830,7 @@ def get_maturity_analytics(
         agent_skill_breakdown=agent_skill_breakdown,
         customization_breakdown=customization_breakdown,
         high_performer_stacks=high_performer_stacks,
+        team_customization_landscape=team_customization_landscape,
         customization_outcomes=customization_outcomes,
         project_readiness=project_readiness,
         sessions_analyzed=sessions_analyzed,

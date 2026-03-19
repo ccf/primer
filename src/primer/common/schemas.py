@@ -1904,6 +1904,18 @@ class HighPerformerStack(BaseModel):
     top_engineers: list[str] = []
 
 
+class TeamCustomizationLandscape(BaseModel):
+    team_id: str
+    team_name: str
+    engineer_count: int
+    engineers_using_explicit_customizations: int
+    explicit_customization_count: int
+    adoption_rate: float
+    avg_effectiveness_score: float | None = None
+    top_customizations: list[str] = []
+    unique_customizations: list[str] = []
+
+
 class CustomizationOutcomeAttribution(BaseModel):
     dimension: str
     label: str
@@ -1935,6 +1947,7 @@ class MaturityAnalyticsResponse(BaseModel):
     agent_skill_breakdown: list[AgentSkillUsage]
     customization_breakdown: list[CustomizationUsage] = []
     high_performer_stacks: list[HighPerformerStack] = []
+    team_customization_landscape: list[TeamCustomizationLandscape] = []
     customization_outcomes: list[CustomizationOutcomeAttribution] = []
     project_readiness: list[ProjectReadinessEntry]
     sessions_analyzed: int

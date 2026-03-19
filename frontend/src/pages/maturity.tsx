@@ -9,6 +9,7 @@ import { AgentSkillTable } from "@/components/maturity/agent-skill-table"
 import { CustomizationBreakdownTable } from "@/components/maturity/customization-breakdown-table"
 import { HighPerformerStackCards } from "@/components/maturity/high-performer-stack-cards"
 import { CustomizationOutcomeTable } from "@/components/maturity/customization-outcome-table"
+import { TeamCustomizationLandscapeTable } from "@/components/maturity/team-customization-landscape-table"
 import { LeverageScoreTable } from "@/components/maturity/leverage-score-table"
 import { LeverageTrendChart } from "@/components/maturity/leverage-trend-chart"
 import { EffectivenessScatter } from "@/components/maturity/effectiveness-scatter"
@@ -76,6 +77,7 @@ export function MaturityPage({ teamId, dateRange }: MaturityPageProps) {
         <div className="space-y-6">
           <AgentSkillTable data={data.agent_skill_breakdown} />
           <CustomizationBreakdownTable data={data.customization_breakdown} />
+          <TeamCustomizationLandscapeTable data={data.team_customization_landscape} />
           <CustomizationOutcomeTable rows={data.customization_outcomes} />
           <HighPerformerStackCards stacks={data.high_performer_stacks} />
         </div>
