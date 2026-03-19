@@ -32,7 +32,7 @@ export function HighPerformerStackCards({ stacks }: HighPerformerStackCardsProps
               <CardTitle className="text-base">{stack.label}</CardTitle>
               <p className="text-sm text-muted-foreground">
                 Used by {stack.engineer_count} engineer{stack.engineer_count === 1 ? "" : "s"} across{" "}
-                {stack.session_count} sessions.
+                {stack.session_count} session{stack.session_count === 1 ? "" : "s"}.
               </p>
             </div>
           </CardHeader>
@@ -40,7 +40,7 @@ export function HighPerformerStackCards({ stacks }: HighPerformerStackCardsProps
             <div className="flex flex-wrap gap-2">
               {stack.customizations.map((item) => (
                 <Badge
-                  key={`${stack.stack_id}:${item.customization_type}:${item.identifier}`}
+                  key={`${stack.stack_id}:${item.customization_type}:${item.identifier}:${item.provenance}`}
                   variant="secondary"
                 >
                   {item.identifier}
