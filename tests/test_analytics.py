@@ -892,6 +892,7 @@ def test_session_detail_includes_customizations_when_present(
                 "state": "enabled",
                 "identifier": "github",
                 "provenance": "user_local",
+                "source_classification": "marketplace",
                 "display_name": "github",
                 "source_path": "/Users/test/.claude/settings.json",
                 "details": {"command": "npx"},
@@ -901,6 +902,7 @@ def test_session_detail_includes_customizations_when_present(
                 "state": "invoked",
                 "identifier": "commit",
                 "provenance": "unknown",
+                "source_classification": "unknown",
                 "display_name": "commit",
                 "invocation_count": 2,
             },
@@ -914,7 +916,9 @@ def test_session_detail_includes_customizations_when_present(
     assert len(data["customizations"]) == 2
     assert data["customizations"][0]["customization_type"] == "mcp"
     assert data["customizations"][0]["state"] == "enabled"
+    assert data["customizations"][0]["source_classification"] == "marketplace"
     assert data["customizations"][1]["customization_type"] == "skill"
+    assert data["customizations"][1]["source_classification"] == "unknown"
     assert data["customizations"][1]["invocation_count"] == 2
 
 

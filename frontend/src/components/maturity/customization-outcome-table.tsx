@@ -64,6 +64,9 @@ export function CustomizationOutcomeTable({ rows }: CustomizationOutcomeTablePro
                       {row.provenance && (
                         <Badge variant="secondary">{formatLabel(row.provenance)}</Badge>
                       )}
+                      {row.source_classification && (
+                        <Badge variant="outline">{formatLabel(row.source_classification)}</Badge>
+                      )}
                     </div>
                   </td>
                   <td className="py-2 text-right">{row.support_engineer_count}</td>

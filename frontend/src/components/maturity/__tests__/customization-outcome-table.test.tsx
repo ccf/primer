@@ -18,6 +18,7 @@ describe("CustomizationOutcomeTable", () => {
             label: "github",
             customization_type: "mcp",
             provenance: "user_local",
+            source_classification: "marketplace",
             support_engineer_count: 2,
             support_session_count: 4,
             avg_effectiveness_score: 88.2,
@@ -35,6 +36,7 @@ describe("CustomizationOutcomeTable", () => {
     expect(screen.getByText("Customization")).toBeInTheDocument()
     expect(screen.getByText("Mcp")).toBeInTheDocument()
     expect(screen.getByText("User Local")).toBeInTheDocument()
+    expect(screen.getByText("Marketplace")).toBeInTheDocument()
     expect(screen.getAllByText("100%")).toHaveLength(2)
     expect(screen.getByText("$0.42")).toBeInTheDocument()
   })

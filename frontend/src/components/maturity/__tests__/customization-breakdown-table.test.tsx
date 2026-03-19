@@ -17,6 +17,7 @@ describe("CustomizationBreakdownTable", () => {
             identifier: "github",
             customization_type: "mcp",
             provenance: "user_local",
+            source_classification: "marketplace",
             total_invocations: 4,
             session_count: 2,
             engineer_count: 1,
@@ -31,6 +32,7 @@ describe("CustomizationBreakdownTable", () => {
     expect(screen.getByText("github")).toBeInTheDocument()
     expect(screen.getByText("Mcp")).toBeInTheDocument()
     expect(screen.getByText("User Local")).toBeInTheDocument()
+    expect(screen.getByText("Marketplace")).toBeInTheDocument()
     expect(screen.getByText("4")).toBeInTheDocument()
   })
 })

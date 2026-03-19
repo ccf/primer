@@ -32,6 +32,40 @@ _PROVENANCE_PRIORITY = {
     "built_in": -1,
     "unknown": -2,
 }
+_BUILT_IN_SKILLS = frozenset(
+    {
+        "explore",
+        "general-purpose",
+        "research-analyst",
+        "web-search-researcher",
+        "frontend-developer",
+        "react-specialist",
+        "python-pro",
+        "typescript-pro",
+        "test-automator",
+        "ui-designer",
+        "claude-code-guide",
+        "quant-analyst",
+        "plan",
+    }
+)
+_BUILT_IN_SUBAGENTS = frozenset(
+    {
+        "explore",
+        "plan",
+        "frontend-developer",
+        "react-specialist",
+        "python-pro",
+        "typescript-pro",
+        "test-automator",
+        "ui-designer",
+        "research-analyst",
+        "web-search-researcher",
+        "quant-analyst",
+        "general-purpose",
+        "bash",
+    }
+)
 
 
 @dataclass(slots=True)
@@ -40,17 +74,19 @@ class CustomizationSnapshot:
     state: str
     identifier: str
     provenance: str
+    source_classification: str = "unknown"
     display_name: str | None = None
     source_path: str | None = None
     invocation_count: int = 0
     details: dict[str, object] | None = None
 
-    def key(self) -> tuple[str, str, str, str, str | None]:
+    def key(self) -> tuple[str, str, str, str, str, str | None]:
         return (
             self.customization_type,
             self.state,
             self.identifier,
             self.provenance,
+            self.source_classification,
             self.source_path,
         )
 
@@ -60,6 +96,7 @@ class CustomizationSnapshot:
             "state": self.state,
             "identifier": self.identifier,
             "provenance": self.provenance,
+            "source_classification": self.source_classification,
             "display_name": self.display_name,
             "source_path": self.source_path,
             "invocation_count": self.invocation_count,
@@ -139,6 +176,9 @@ def _derive_invoked_customizations(
                     identifier=identifier,
                     display_name=identifier,
                     provenance="unknown",
+                    source_classification=(
+                        "built_in" if identifier.lower() in _BUILT_IN_SKILLS else "unknown"
+                    ),
                     invocation_count=call_count,
                     details={"raw_tool_name": tool_name},
                 )
@@ -154,6 +194,9 @@ def _derive_invoked_customizations(
                     identifier=identifier,
                     display_name=identifier,
                     provenance="unknown",
+                    source_classification=(
+                        "built_in" if identifier.lower() in _BUILT_IN_SUBAGENTS else "unknown"
+                    ),
                     invocation_count=call_count,
                     details={"raw_tool_name": tool_name},
                 )
@@ -172,6 +215,7 @@ def _derive_invoked_customizations(
                 identifier=identifier,
                 display_name=identifier,
                 provenance="unknown",
+                source_classification="unknown",
                 invocation_count=call_count,
             )
         )
@@ -267,6 +311,7 @@ def _resolve_invoked_snapshot_provenance(
                 state=snapshot.state,
                 identifier=snapshot.identifier,
                 provenance=best_match.provenance,
+                source_classification=best_match.source_classification,
                 display_name=best_match.display_name or snapshot.display_name,
                 source_path=best_match.source_path,
                 invocation_count=snapshot.invocation_count,
@@ -300,6 +345,7 @@ def _scan_customization_dirs(
                     identifier=identifier,
                     display_name=path.stem,
                     provenance=provenance,
+                    source_classification="custom",
                     source_path=str(path),
                     details={"folder": folder_label, "agent_family": agent_family},
                 )
@@ -346,6 +392,7 @@ def _scan_mcp_settings(
                 identifier=identifier,
                 display_name=identifier,
                 provenance=provenance,
+                source_classification=_classify_mcp_source(details),
                 source_path=str(settings_path),
                 details={**details, "agent_family": agent_family},
             )
@@ -404,6 +451,25 @@ def _snapshot_agent_family(snapshot: CustomizationSnapshot) -> str | None:
     return family if isinstance(family, str) else None
 
 
+def _classify_mcp_source(details: dict[str, object]) -> str:
+    command = details.get("command")
+    args = details.get("args")
+    if isinstance(command, str) and command in {"npx", "npm", "pnpm", "bunx", "uvx", "pipx"}:
+        return "marketplace"
+    if isinstance(command, str) and (
+        command.startswith(".")
+        or command.startswith("/")
+        or command.endswith(".py")
+        or command.endswith(".js")
+    ):
+        return "custom"
+    if isinstance(args, list) and args:
+        first_arg = args[0]
+        if isinstance(first_arg, str) and (first_arg.startswith("@") or "/" in first_arg):
+            return "marketplace"
+    return "unknown"
+
+
 def _mcp_identifier(tool_name: str) -> str | None:
     if not tool_name.startswith("mcp__"):
         return None
@@ -417,7 +483,7 @@ def _mcp_identifier(tool_name: str) -> str | None:
 def _dedupe_snapshots(
     snapshots: list[CustomizationSnapshot],
 ) -> list[CustomizationSnapshot]:
-    merged: dict[tuple[str, str, str, str, str | None], CustomizationSnapshot] = {}
+    merged: dict[tuple[str, str, str, str, str, str | None], CustomizationSnapshot] = {}
     for snapshot in snapshots:
         key = snapshot.key()
         existing = merged.get(key)
@@ -430,6 +496,7 @@ def _dedupe_snapshots(
             state=snapshot.state,
             identifier=snapshot.identifier,
             provenance=snapshot.provenance,
+            source_classification=snapshot.source_classification,
             display_name=snapshot.display_name or existing.display_name,
             source_path=snapshot.source_path or existing.source_path,
             invocation_count=existing.invocation_count + snapshot.invocation_count,

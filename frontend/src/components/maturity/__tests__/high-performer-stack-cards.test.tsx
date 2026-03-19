@@ -21,12 +21,14 @@ describe("HighPerformerStackCards", () => {
                 identifier: "github",
                 customization_type: "mcp",
                 provenance: "user_local",
+                source_classification: "marketplace",
                 invocation_count: 3,
               },
               {
                 identifier: "review-pr",
                 customization_type: "skill",
                 provenance: "repo_defined",
+                source_classification: "custom",
                 invocation_count: 1,
               },
             ],
@@ -46,6 +48,8 @@ describe("HighPerformerStackCards", () => {
     expect(screen.getByText("88.2")).toBeInTheDocument()
     expect(screen.getByText("91.4")).toBeInTheDocument()
     expect(screen.getByText("User Local")).toBeInTheDocument()
+    expect(screen.getByText("Marketplace")).toBeInTheDocument()
+    expect(screen.getByText("Custom")).toBeInTheDocument()
     expect(screen.getByText("Alice")).toBeInTheDocument()
   })
 })

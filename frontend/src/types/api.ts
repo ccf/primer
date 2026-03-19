@@ -43,6 +43,11 @@ export type CustomizationProvenance =
   | "org_managed"
   | "marketplace"
   | "unknown"
+export type CustomizationSourceClassification =
+  | "built_in"
+  | "marketplace"
+  | "custom"
+  | "unknown"
 
 export interface SessionResponse {
   id: string
@@ -174,6 +179,7 @@ export interface SessionCustomizationResponse {
   state: CustomizationState
   identifier: string
   provenance: CustomizationProvenance
+  source_classification: CustomizationSourceClassification
   display_name: string | null
   source_path: string | null
   invocation_count: number
@@ -1505,6 +1511,7 @@ export interface CustomizationUsage {
   identifier: string
   customization_type: string
   provenance: CustomizationProvenance
+  source_classification: CustomizationSourceClassification
   total_invocations: number
   session_count: number
   engineer_count: number
@@ -1517,6 +1524,7 @@ export interface StackCustomization {
   identifier: string
   customization_type: string
   provenance: CustomizationProvenance
+  source_classification: CustomizationSourceClassification
   invocation_count: number
 }
 
@@ -1549,6 +1557,7 @@ export interface CustomizationOutcomeAttribution {
   label: string
   customization_type: string | null
   provenance: CustomizationProvenance | null
+  source_classification: CustomizationSourceClassification | null
   support_engineer_count: number
   support_session_count: number
   avg_effectiveness_score: number | null

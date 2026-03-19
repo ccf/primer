@@ -342,6 +342,8 @@ export function SessionDetailPanel({ session }: SessionDetailPanelProps) {
                       {formatLabel(customization.customization_type)}
                       {" • "}
                       {formatLabel(customization.provenance)}
+                      {" • "}
+                      {formatLabel(customization.source_classification)}
                       {customization.source_path ? ` • ${customization.source_path}` : ""}
                     </p>
                   </div>
