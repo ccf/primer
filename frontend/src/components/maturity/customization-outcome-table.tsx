@@ -35,6 +35,7 @@ export function CustomizationOutcomeTable({ rows }: CustomizationOutcomeTablePro
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="pb-2 font-medium">Label</th>
                 <th className="pb-2 font-medium">Dimension</th>
+                <th className="pb-2 font-medium">Details</th>
                 <th className="pb-2 text-right font-medium">Engineers</th>
                 <th className="pb-2 text-right font-medium">Success</th>
                 <th className="pb-2 text-right font-medium">Merge Rate</th>
@@ -54,6 +55,16 @@ export function CustomizationOutcomeTable({ rows }: CustomizationOutcomeTablePro
                   </td>
                   <td className="py-2">
                     <Badge variant="outline">{formatLabel(row.dimension)}</Badge>
+                  </td>
+                  <td className="py-2">
+                    <div className="flex flex-wrap gap-2">
+                      {row.customization_type && (
+                        <Badge variant="outline">{formatLabel(row.customization_type)}</Badge>
+                      )}
+                      {row.provenance && (
+                        <Badge variant="secondary">{formatLabel(row.provenance)}</Badge>
+                      )}
+                    </div>
                   </td>
                   <td className="py-2 text-right">{row.support_engineer_count}</td>
                   <td className="py-2 text-right">{formatPercent(row.avg_success_rate)}</td>

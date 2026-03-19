@@ -525,21 +525,15 @@ def get_maturity_analytics(
         ] = CustomizationOutcomeAttribution(
             dimension="customization",
             label=bucket["identifier"],
+            customization_type=bucket["customization_type"],
+            provenance=bucket["provenance"],
             support_engineer_count=len(engineer_ids),
             support_session_count=len(bucket["sessions"]),
-            avg_effectiveness_score=(
-                round(avg_eff, 1) if avg_eff is not None else None
-            ),
+            avg_effectiveness_score=(round(avg_eff, 1) if avg_eff is not None else None),
             avg_leverage_score=round(avg_lev or 0.0, 1),
-            avg_success_rate=(
-                round(avg_suc, 3) if avg_suc is not None else None
-            ),
-            avg_cost_per_successful_outcome=(
-                round(avg_cost, 4) if avg_cost is not None else None
-            ),
-            avg_pr_merge_rate=(
-                round(avg_merge, 3) if avg_merge is not None else None
-            ),
+            avg_success_rate=(round(avg_suc, 3) if avg_suc is not None else None),
+            avg_cost_per_successful_outcome=(round(avg_cost, 4) if avg_cost is not None else None),
+            avg_pr_merge_rate=(round(avg_merge, 3) if avg_merge is not None else None),
             cohort_share=round(cohort_share, 3) if cohort_share is not None else None,
         )
 
@@ -661,6 +655,8 @@ def get_maturity_analytics(
         stack_outcome = CustomizationOutcomeAttribution(
             dimension="stack",
             label=label,
+            customization_type=None,
+            provenance=None,
             support_engineer_count=len(bucket["engineers"]),
             support_session_count=len(bucket["sessions"]),
             avg_effectiveness_score=(
@@ -675,15 +671,11 @@ def get_maturity_analytics(
                 sum(bucket["leverage_scores"]) / len(bucket["leverage_scores"]),
                 1,
             ),
-            avg_success_rate=(
-                round(avg_stack_suc, 3) if avg_stack_suc is not None else None
-            ),
+            avg_success_rate=(round(avg_stack_suc, 3) if avg_stack_suc is not None else None),
             avg_cost_per_successful_outcome=(
                 round(avg_stack_cost, 4) if avg_stack_cost is not None else None
             ),
-            avg_pr_merge_rate=(
-                round(avg_stack_merge, 3) if avg_stack_merge is not None else None
-            ),
+            avg_pr_merge_rate=(round(avg_stack_merge, 3) if avg_stack_merge is not None else None),
             cohort_share=(
                 round(len(bucket["engineers"]) / total_engineers, 3)
                 if total_engineers > 0
