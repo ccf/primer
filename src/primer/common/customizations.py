@@ -16,6 +16,13 @@ _CUSTOMIZATION_DIRS: dict[str, tuple[str, str]] = {
     "skills": ("skill", "skills"),
     "templates": ("template", "templates"),
 }
+_AGENT_CUSTOMIZATION_ROOTS: dict[str, str] = {
+    "claude_code": ".claude",
+    "cursor": ".cursor",
+    "gemini_cli": ".gemini",
+    "codex_cli": ".codex",
+}
+_SETTINGS_FILE_NAMES = ("settings.json", "config.json")
 _EXPLICIT_PROVENANCE = frozenset({"user_local", "repo_defined", "org_managed", "marketplace"})
 _PROVENANCE_PRIORITY = {
     "repo_defined": 3,
@@ -65,14 +72,14 @@ def build_session_customizations(
     project_path: str | None,
     tool_counts: Mapping[str, int],
 ) -> list[CustomizationSnapshot]:
-    enabled_snapshots = _collect_enabled_project_customizations(project_path)
-    if agent_type == "claude_code":
-        enabled_snapshots.extend(_collect_enabled_claude_user_customizations())
+    enabled_snapshots = _collect_enabled_project_customizations(agent_type, project_path)
+    enabled_snapshots.extend(_collect_enabled_user_customizations(agent_type))
 
     enabled_snapshots = _dedupe_snapshots(enabled_snapshots)
     invoked_snapshots = _resolve_invoked_snapshot_provenance(
         _derive_invoked_customizations(tool_counts),
         enabled_snapshots,
+        agent_type,
     )
     return _dedupe_snapshots([*invoked_snapshots, *enabled_snapshots])
 
@@ -173,37 +180,54 @@ def _derive_invoked_customizations(
 
 
 def _collect_enabled_project_customizations(
+    agent_type: str,
     project_path: str | None,
 ) -> list[CustomizationSnapshot]:
     if not project_path:
         return []
 
     snapshots: list[CustomizationSnapshot] = []
+    root_dir_name = _AGENT_CUSTOMIZATION_ROOTS.get(agent_type, ".claude")
     for root in _candidate_project_roots(project_path):
-        claude_dir = root / ".claude"
-        if not claude_dir.exists():
+        custom_dir = root / root_dir_name
+        if not custom_dir.exists():
             continue
-        snapshots.extend(_scan_customization_dirs(claude_dir, provenance="repo_defined"))
-        settings_path = claude_dir / "settings.json"
         snapshots.extend(
-            _scan_mcp_settings(
-                settings_path,
+            _scan_customization_dirs(
+                custom_dir,
                 provenance="repo_defined",
+                agent_family=agent_type,
+            )
+        )
+        snapshots.extend(
+            _scan_possible_settings_files(
+                custom_dir,
+                provenance="repo_defined",
+                agent_family=agent_type,
             )
         )
     return _dedupe_snapshots(snapshots)
 
 
-def _collect_enabled_claude_user_customizations() -> list[CustomizationSnapshot]:
-    claude_home = Path.home() / ".claude"
-    if not claude_home.exists():
+def _collect_enabled_user_customizations(agent_type: str) -> list[CustomizationSnapshot]:
+    root_dir_name = _AGENT_CUSTOMIZATION_ROOTS.get(agent_type)
+    if not root_dir_name:
         return []
 
-    snapshots = _scan_customization_dirs(claude_home, provenance="user_local")
+    agent_home = Path.home() / root_dir_name
+    if not agent_home.exists():
+        return []
+
+    snapshots = _scan_customization_dirs(
+        agent_home,
+        provenance="user_local",
+        agent_family=agent_type,
+    )
     snapshots.extend(
-        _scan_mcp_settings(
-            claude_home / "settings.json",
+        _scan_possible_settings_files(
+            agent_home,
             provenance="user_local",
+            agent_family=agent_type,
         )
     )
     return _dedupe_snapshots(snapshots)
@@ -212,6 +236,7 @@ def _collect_enabled_claude_user_customizations() -> list[CustomizationSnapshot]
 def _resolve_invoked_snapshot_provenance(
     invoked_snapshots: list[CustomizationSnapshot],
     enabled_snapshots: list[CustomizationSnapshot],
+    agent_type: str,
 ) -> list[CustomizationSnapshot]:
     enabled_by_key: dict[tuple[str, str], list[CustomizationSnapshot]] = {}
     for snapshot in enabled_snapshots:
@@ -229,7 +254,10 @@ def _resolve_invoked_snapshot_provenance(
 
         best_match = max(
             candidates,
-            key=lambda item: _PROVENANCE_PRIORITY.get(item.provenance, -10),
+            key=lambda item: (
+                _PROVENANCE_PRIORITY.get(item.provenance, -10),
+                1 if _snapshot_agent_family(item) == agent_type else 0,
+            ),
         )
         resolved.append(
             CustomizationSnapshot(
@@ -251,6 +279,7 @@ def _scan_customization_dirs(
     root: Path,
     *,
     provenance: str,
+    agent_family: str,
 ) -> list[CustomizationSnapshot]:
     snapshots: list[CustomizationSnapshot] = []
     for dirname, (customization_type, folder_label) in _CUSTOMIZATION_DIRS.items():
@@ -270,7 +299,7 @@ def _scan_customization_dirs(
                     display_name=path.stem,
                     provenance=provenance,
                     source_path=str(path),
-                    details={"folder": folder_label},
+                    details={"folder": folder_label, "agent_family": agent_family},
                 )
             )
     return snapshots
@@ -288,6 +317,7 @@ def _scan_mcp_settings(
     settings_path: Path,
     *,
     provenance: str,
+    agent_family: str,
 ) -> list[CustomizationSnapshot]:
     if not settings_path.exists():
         return []
@@ -315,7 +345,25 @@ def _scan_mcp_settings(
                 display_name=identifier,
                 provenance=provenance,
                 source_path=str(settings_path),
-                details=details,
+                details={"agent_family": agent_family, **details},
+            )
+        )
+    return snapshots
+
+
+def _scan_possible_settings_files(
+    root: Path,
+    *,
+    provenance: str,
+    agent_family: str,
+) -> list[CustomizationSnapshot]:
+    snapshots: list[CustomizationSnapshot] = []
+    for filename in _SETTINGS_FILE_NAMES:
+        snapshots.extend(
+            _scan_mcp_settings(
+                root / filename,
+                provenance=provenance,
+                agent_family=agent_family,
             )
         )
     return snapshots
@@ -338,6 +386,12 @@ def _candidate_project_roots(project_path: str) -> list[Path]:
     if not results:
         results.append(path.resolve())
     return results[:3]
+
+
+def _snapshot_agent_family(snapshot: CustomizationSnapshot) -> str | None:
+    details = snapshot.details or {}
+    family = details.get("agent_family")
+    return family if isinstance(family, str) else None
 
 
 def _mcp_identifier(tool_name: str) -> str | None:
