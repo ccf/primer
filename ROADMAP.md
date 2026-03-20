@@ -104,7 +104,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] [P1] Delegation graph capture for multi-agent and subagent workflows
 - [x] [P2] Exemplar session library for high-value workflows and onboarding examples
 - [x] [P2] Skill, command, and template reuse analytics by workflow and outcome
-- [ ] [P2] Prompt reuse analytics by workflow and outcome
+- [x] [P2] Prompt reuse analytics by workflow and outcome
 
 ## Friction & Bottleneck Analysis
 

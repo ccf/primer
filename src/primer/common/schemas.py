@@ -1163,11 +1163,28 @@ class ReusableAssetAnalytics(BaseModel):
     top_projects: list[str] = []
 
 
+class PromptReusePattern(BaseModel):
+    prompt_pattern_id: str
+    prompt_preview: str
+    normalized_prompt: str
+    engineer_count: int
+    session_count: int
+    adoption_rate: float
+    success_rate: float | None = None
+    avg_session_cost: float | None = None
+    cost_per_successful_outcome: float | None = None
+    primary_workflow_archetype: str | None = None
+    workflow_archetypes: list[str] = []
+    top_projects: list[str] = []
+
+
 class SkillInventoryResponse(BaseModel):
     engineer_profiles: list[EngineerSkillProfile]
     team_skill_gaps: list[TeamSkillGap]
     reusable_assets: list[ReusableAssetAnalytics] = []
     underused_reusable_assets: list[ReusableAssetAnalytics] = []
+    prompt_patterns: list[PromptReusePattern] = []
+    underused_prompt_patterns: list[PromptReusePattern] = []
     total_engineers: int
     total_session_types: int
     total_tools_used: int

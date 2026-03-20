@@ -27,6 +27,8 @@ import { TeamSkillGaps } from "@/components/insights/team-skill-gaps"
 import { SkillUniverseChart } from "@/components/growth/skill-universe-chart"
 import { LearningPathCards } from "@/components/growth/learning-path-cards"
 import { ReuseOpportunityCards } from "@/components/growth/reuse-opportunity-cards"
+import { PromptOpportunityCards } from "@/components/growth/prompt-opportunity-cards"
+import { PromptReuseTable } from "@/components/growth/prompt-reuse-table"
 import { ReusableAssetTable } from "@/components/growth/reusable-asset-table"
 import { WorkflowPlaybookCards } from "@/components/growth/workflow-playbook-cards"
 import { EngineerSkillTable } from "@/components/insights/engineer-skill-table"
@@ -119,7 +121,11 @@ function SkillsTab({ teamId, startDate, endDate }: TabProps) {
       {skills && (
         <ReuseOpportunityCards assets={skills.underused_reusable_assets} />
       )}
+      {skills && (
+        <PromptOpportunityCards patterns={skills.underused_prompt_patterns} />
+      )}
       {skills && <ReusableAssetTable assets={skills.reusable_assets} />}
+      {skills && <PromptReuseTable patterns={skills.prompt_patterns} />}
       {skills && <EngineerSkillTable data={skills.engineer_profiles} />}
     </div>
   )

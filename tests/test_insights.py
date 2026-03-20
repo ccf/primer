@@ -464,6 +464,129 @@ class TestSkillInventory:
         assert bugfix["success_rate"] == 1.0
         assert bugfix["workflow_archetypes"] == ["feature_delivery"]
 
+    def test_prompt_reuse_analytics_groups_patterns_and_highlights_underused_prompts(
+        self, client, db_session, admin_headers
+    ):
+        team = Team(name=f"Prompt Team {uuid.uuid4().hex[:6]}")
+        db_session.add(team)
+        db_session.flush()
+
+        engineers = []
+        for i in range(2):
+            raw_key = f"primer_{secrets.token_urlsafe(32)}"
+            hashed = bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt()).decode()
+            engineer = Engineer(
+                name=f"Prompt Eng {i}",
+                email=f"prompt{i}_{uuid.uuid4().hex[:6]}@test.com",
+                team_id=team.id,
+                api_key_hash=hashed,
+            )
+            db_session.add(engineer)
+            db_session.flush()
+            engineers.append(engineer)
+
+        now = datetime.now(UTC)
+        s1 = _create_session(
+            db_session,
+            engineers[0],
+            started_at=now - timedelta(hours=3),
+            project_name="primer",
+            first_prompt="Fix the auth bug for tenant 123",
+        )
+        s2 = _create_session(
+            db_session,
+            engineers[1],
+            started_at=now - timedelta(hours=2),
+            project_name="primer",
+            first_prompt="Fix the auth bug for tenant 456",
+        )
+        s3 = _create_session(
+            db_session,
+            engineers[0],
+            started_at=now - timedelta(hours=1),
+            project_name="docs",
+            first_prompt="Generate a concise release checklist for repo 42",
+        )
+        s4 = _create_session(
+            db_session,
+            engineers[0],
+            started_at=now - timedelta(minutes=30),
+            project_name="docs",
+            first_prompt="Generate a concise release checklist for repo 77",
+        )
+
+        db_session.add_all(
+            [
+                SessionFacets(session_id=s1.id, session_type="debugging", outcome="success"),
+                SessionFacets(session_id=s2.id, session_type="debugging", outcome="success"),
+                SessionFacets(session_id=s3.id, session_type="docs", outcome="success"),
+                SessionFacets(session_id=s4.id, session_type="docs", outcome="success"),
+                SessionWorkflowProfile(session_id=s1.id, archetype="debugging"),
+                SessionWorkflowProfile(session_id=s2.id, archetype="debugging"),
+                SessionWorkflowProfile(session_id=s3.id, archetype="docs"),
+                SessionWorkflowProfile(session_id=s4.id, archetype="docs"),
+                ModelUsage(
+                    session_id=s1.id,
+                    model_name="claude-sonnet-4-5-20250929",
+                    input_tokens=1000,
+                    output_tokens=500,
+                    cache_read_tokens=0,
+                    cache_creation_tokens=0,
+                ),
+                ModelUsage(
+                    session_id=s2.id,
+                    model_name="claude-sonnet-4-5-20250929",
+                    input_tokens=1000,
+                    output_tokens=500,
+                    cache_read_tokens=0,
+                    cache_creation_tokens=0,
+                ),
+                ModelUsage(
+                    session_id=s3.id,
+                    model_name="claude-haiku-4-5-20251001",
+                    input_tokens=400,
+                    output_tokens=150,
+                    cache_read_tokens=0,
+                    cache_creation_tokens=0,
+                ),
+                ModelUsage(
+                    session_id=s4.id,
+                    model_name="claude-haiku-4-5-20251001",
+                    input_tokens=400,
+                    output_tokens=150,
+                    cache_read_tokens=0,
+                    cache_creation_tokens=0,
+                ),
+            ]
+        )
+        db_session.flush()
+
+        r = client.get(
+            f"/api/v1/analytics/skill-inventory?team_id={team.id}",
+            headers=admin_headers,
+        )
+        assert r.status_code == 200
+        data = r.json()
+
+        patterns = {pattern["normalized_prompt"]: pattern for pattern in data["prompt_patterns"]}
+        auth_bug = patterns["fix the auth bug for tenant <id>"]
+        assert auth_bug["engineer_count"] == 2
+        assert auth_bug["session_count"] == 2
+        assert auth_bug["adoption_rate"] == 1.0
+        assert auth_bug["success_rate"] == 1.0
+        assert auth_bug["primary_workflow_archetype"] == "debugging"
+        assert auth_bug["workflow_archetypes"] == ["debugging"]
+
+        underused = {
+            pattern["normalized_prompt"]: pattern for pattern in data["underused_prompt_patterns"]
+        }
+        checklist = underused["generate a concise release checklist for repo <id>"]
+        assert checklist["engineer_count"] == 1
+        assert checklist["session_count"] == 2
+        assert checklist["adoption_rate"] == 0.5
+        assert checklist["success_rate"] == 1.0
+        assert checklist["workflow_archetypes"] == ["docs"]
+
     def test_requires_auth(self, client):
         r = client.get("/api/v1/analytics/skill-inventory")
         assert r.status_code == 401

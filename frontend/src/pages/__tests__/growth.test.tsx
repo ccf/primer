@@ -61,6 +61,12 @@ vi.mock("@/components/growth/learning-path-cards", () => ({
 vi.mock("@/components/growth/reuse-opportunity-cards", () => ({
   ReuseOpportunityCards: () => <div>reuse opportunities</div>,
 }))
+vi.mock("@/components/growth/prompt-opportunity-cards", () => ({
+  PromptOpportunityCards: () => <div>prompt opportunities</div>,
+}))
+vi.mock("@/components/growth/prompt-reuse-table", () => ({
+  PromptReuseTable: () => <div>prompt reuse table</div>,
+}))
 vi.mock("@/components/growth/reusable-asset-table", () => ({
   ReusableAssetTable: () => <div>reusable assets</div>,
 }))
@@ -208,6 +214,8 @@ describe("GrowthPage", () => {
         team_skill_gaps: [],
         reusable_assets: [],
         underused_reusable_assets: [],
+        prompt_patterns: [],
+        underused_prompt_patterns: [],
         total_engineers: 1,
         total_session_types: 1,
         total_tools_used: 1,
@@ -242,6 +250,8 @@ describe("GrowthPage", () => {
     expect(screen.getByText("Learning Paths")).toBeInTheDocument()
     expect(screen.getByText("learning paths")).toBeInTheDocument()
     expect(screen.getByText("reuse opportunities")).toBeInTheDocument()
+    expect(screen.getByText("prompt opportunities")).toBeInTheDocument()
+    expect(screen.getByText("prompt reuse table")).toBeInTheDocument()
     expect(screen.getByText("reusable assets")).toBeInTheDocument()
   })
 

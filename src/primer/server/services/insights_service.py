@@ -1,6 +1,7 @@
 import hashlib
 import json
 import math
+import re
 from collections import Counter, defaultdict
 from datetime import UTC, datetime
 
@@ -39,6 +40,7 @@ from primer.common.schemas import (
     PatternSharingResponse,
     PersonalizedTip,
     PersonalizedTipsResponse,
+    PromptReusePattern,
     ReusableAssetAnalytics,
     SharedPattern,
     SimilarSession,
@@ -49,6 +51,9 @@ from primer.common.schemas import (
     WeeklySuccessPoint,
 )
 from primer.server.services.analytics_service import base_session_query
+
+_PROMPT_REUSE_ID_RE = re.compile(r"\b(?:\d+|[0-9a-f]{7,}|[0-9a-f]{8}-[0-9a-f-]{27,})\b")
+_PROMPT_REUSE_WHITESPACE_RE = re.compile(r"\s+")
 
 
 def _shannon_entropy(counts: dict[str, int]) -> float:
@@ -80,6 +85,17 @@ def _sortable_started_at(value: datetime | None) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
+
+
+def _normalize_prompt_pattern(text: str) -> str:
+    normalized = text.strip().lower()
+    normalized = _PROMPT_REUSE_ID_RE.sub("<id>", normalized)
+    normalized = _PROMPT_REUSE_WHITESPACE_RE.sub(" ", normalized)
+    return normalized[:300]
+
+
+def _prompt_preview(text: str) -> str:
+    return _PROMPT_REUSE_WHITESPACE_RE.sub(" ", text.strip())[:160]
 
 
 # ---------------------------------------------------------------------------
@@ -495,6 +511,8 @@ def get_skill_inventory(
             team_skill_gaps=[],
             reusable_assets=[],
             underused_reusable_assets=[],
+            prompt_patterns=[],
+            underused_prompt_patterns=[],
             total_engineers=0,
             total_session_types=0,
             total_tools_used=0,
@@ -592,6 +610,42 @@ def get_skill_inventory(
             row.cache_read_tokens or 0,
             row.cache_creation_tokens or 0,
         )
+
+    prompt_pattern_data: dict[str, dict] = {}
+    for session in sessions:
+        prompt_text = (session.first_prompt or "").strip()
+        if not prompt_text:
+            continue
+
+        normalized_prompt = _normalize_prompt_pattern(prompt_text)
+        if not normalized_prompt:
+            continue
+
+        bucket = prompt_pattern_data.setdefault(
+            normalized_prompt,
+            {
+                "prompt_preview": _prompt_preview(prompt_text),
+                "normalized_prompt": normalized_prompt,
+                "sessions": set(),
+                "engineers": set(),
+                "projects": Counter(),
+                "workflow_archetypes": Counter(),
+                "success_sessions": set(),
+                "costs": [],
+            },
+        )
+        bucket["sessions"].add(session.id)
+        bucket["engineers"].add(session.engineer_id)
+        if session.project_name:
+            bucket["projects"][session.project_name] += 1
+        workflow_archetype = session_workflow_archetypes.get(session.id)
+        if workflow_archetype:
+            bucket["workflow_archetypes"][workflow_archetype] += 1
+        outcome = session_to_outcome.get(session.id)
+        if outcome and is_success_outcome(outcome):
+            bucket["success_sessions"].add(session.id)
+        if session.id in session_costs:
+            bucket["costs"].append(session_costs[session.id])
 
     # Build profiles
     all_session_types: set[str] = set()
@@ -784,11 +838,76 @@ def get_skill_inventory(
         ),
     )[:5]
 
+    prompt_patterns = [
+        PromptReusePattern(
+            prompt_pattern_id=hashlib.md5(
+                bucket["normalized_prompt"].encode(), usedforsecurity=False
+            ).hexdigest()[:12],
+            prompt_preview=bucket["prompt_preview"],
+            normalized_prompt=bucket["normalized_prompt"],
+            engineer_count=len(bucket["engineers"]),
+            session_count=len(bucket["sessions"]),
+            adoption_rate=(
+                round(len(bucket["engineers"]) / total_engineers, 3) if total_engineers else 0.0
+            ),
+            success_rate=(
+                round(len(bucket["success_sessions"]) / len(bucket["sessions"]), 3)
+                if bucket["sessions"]
+                else None
+            ),
+            avg_session_cost=(
+                round(sum(bucket["costs"]) / len(bucket["costs"]), 4) if bucket["costs"] else None
+            ),
+            cost_per_successful_outcome=(
+                round(sum(bucket["costs"]) / len(bucket["success_sessions"]), 4)
+                if bucket["costs"] and bucket["success_sessions"]
+                else None
+            ),
+            primary_workflow_archetype=(
+                bucket["workflow_archetypes"].most_common(1)[0][0]
+                if bucket["workflow_archetypes"]
+                else None
+            ),
+            workflow_archetypes=[
+                archetype for archetype, _count in bucket["workflow_archetypes"].most_common(3)
+            ],
+            top_projects=[project for project, _count in bucket["projects"].most_common(3)],
+        )
+        for bucket in sorted(
+            prompt_pattern_data.values(),
+            key=lambda item: (
+                -len(item["engineers"]),
+                -len(item["sessions"]),
+                item["prompt_preview"],
+            ),
+        )
+        if len(bucket["sessions"]) >= 2
+    ]
+
+    underused_prompt_patterns = sorted(
+        [
+            pattern
+            for pattern in prompt_patterns
+            if pattern.engineer_count > 0
+            and pattern.adoption_rate <= 0.5
+            and pattern.success_rate is not None
+            and pattern.success_rate >= 0.75
+        ],
+        key=lambda pattern: (
+            -(pattern.success_rate or 0.0),
+            pattern.adoption_rate,
+            -pattern.session_count,
+            pattern.prompt_preview,
+        ),
+    )[:5]
+
     return SkillInventoryResponse(
         engineer_profiles=profiles,
         team_skill_gaps=gaps,
         reusable_assets=reusable_assets,
         underused_reusable_assets=underused_reusable_assets,
+        prompt_patterns=prompt_patterns,
+        underused_prompt_patterns=underused_prompt_patterns,
         total_engineers=total_engineers,
         total_session_types=len(all_session_types),
         total_tools_used=len(all_tool_names),
