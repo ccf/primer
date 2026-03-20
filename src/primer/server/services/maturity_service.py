@@ -604,7 +604,9 @@ def get_maturity_analytics(
         )
         reliability_bucket["sessions"].add(session_id)
         reliability_bucket["engineers"].add(engineer_id)
-        session_metric = session_metrics[session_id]
+        session_metric = session_metrics.get(session_id)
+        if session_metric is None:
+            continue
         if session_metric["has_friction"]:
             reliability_bucket["friction_sessions"].add(session_id)
             reliability_bucket["friction_type_counts"].update(session_metric["friction_counts"])
