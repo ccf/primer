@@ -474,6 +474,29 @@ def get_maturity_analytics(
             },
         )
 
+    def _apply_session_reliability_metrics(
+        bucket: dict,
+        session_id: str,
+        session_metric: dict[str, object] | None,
+    ) -> None:
+        if session_metric is None:
+            return
+        if session_metric["has_friction"]:
+            bucket["friction_sessions"].add(session_id)
+            bucket["friction_type_counts"].update(session_metric["friction_counts"])
+        if session_metric["has_failure"]:
+            bucket["failure_sessions"].add(session_id)
+        outcome = session_metric["outcome"]
+        if outcome and is_success_outcome(outcome):
+            bucket["success_sessions"].add(session_id)
+        if session_metric["recovery_result"] == "recovered":
+            bucket["recovered_sessions"].add(session_id)
+        if session_metric["recovery_result"] == "abandoned":
+            bucket["abandoned_sessions"].add(session_id)
+        recovery_steps = session_metric["recovery_step_count"]
+        if isinstance(recovery_steps, int) and recovery_steps > 0:
+            bucket["recovery_steps"].append(recovery_steps)
+
     for sid, tools in per_session.items():
         for tool_name, call_count in tools.items():
             if call_count <= 0 or tool_name.startswith("Skill:") or tool_name.startswith("Task:"):
@@ -487,21 +510,7 @@ def get_maturity_analytics(
                 engineer_id_for_session = session_metric["engineer_id"]
                 if engineer_id_for_session:
                     bucket["engineers"].add(engineer_id_for_session)
-                if session_metric["has_friction"]:
-                    bucket["friction_sessions"].add(sid)
-                    bucket["friction_type_counts"].update(session_metric["friction_counts"])
-                if session_metric["has_failure"]:
-                    bucket["failure_sessions"].add(sid)
-                outcome = session_metric["outcome"]
-                if outcome and is_success_outcome(outcome):
-                    bucket["success_sessions"].add(sid)
-                if session_metric["recovery_result"] == "recovered":
-                    bucket["recovered_sessions"].add(sid)
-                if session_metric["recovery_result"] == "abandoned":
-                    bucket["abandoned_sessions"].add(sid)
-                recovery_steps = session_metric["recovery_step_count"]
-                if isinstance(recovery_steps, int) and recovery_steps > 0:
-                    bucket["recovery_steps"].append(recovery_steps)
+                _apply_session_reliability_metrics(bucket, sid, session_metric)
 
     # 5. Explicit customization breakdown
     customization_data: dict[tuple[str, str, str, str], dict] = {}
@@ -605,24 +614,11 @@ def get_maturity_analytics(
         )
         reliability_bucket["sessions"].add(session_id)
         reliability_bucket["engineers"].add(engineer_id)
-        session_metric = session_metrics.get(session_id)
-        if session_metric is None:
-            continue
-        if session_metric["has_friction"]:
-            reliability_bucket["friction_sessions"].add(session_id)
-            reliability_bucket["friction_type_counts"].update(session_metric["friction_counts"])
-        if session_metric["has_failure"]:
-            reliability_bucket["failure_sessions"].add(session_id)
-        outcome = session_metric["outcome"]
-        if outcome and is_success_outcome(outcome):
-            reliability_bucket["success_sessions"].add(session_id)
-        if session_metric["recovery_result"] == "recovered":
-            reliability_bucket["recovered_sessions"].add(session_id)
-        if session_metric["recovery_result"] == "abandoned":
-            reliability_bucket["abandoned_sessions"].add(session_id)
-        recovery_steps = session_metric["recovery_step_count"]
-        if isinstance(recovery_steps, int) and recovery_steps > 0:
-            reliability_bucket["recovery_steps"].append(recovery_steps)
+        _apply_session_reliability_metrics(
+            reliability_bucket,
+            session_id,
+            session_metrics.get(session_id),
+        )
 
     customization_breakdown = [
         CustomizationUsage(
