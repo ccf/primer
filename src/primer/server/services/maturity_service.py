@@ -28,6 +28,7 @@ from primer.common.models import Session as SessionModel
 from primer.common.pricing import estimate_cost, get_cost_tier
 from primer.common.schemas import (
     AgentSkillUsage,
+    AgentTeamModeSummary,
     CustomizationOutcomeAttribution,
     CustomizationStateFunnel,
     CustomizationUsage,
@@ -49,6 +50,7 @@ from primer.common.tool_classification import (
     classify_tools,
     compute_leverage_score,
 )
+from primer.server.services.agent_team_service import detect_session_agent_team
 from primer.server.services.analytics_service import base_session_query
 from primer.server.services.delegation_graph_service import extract_session_delegation_edges
 from primer.server.services.effectiveness_service import build_effectiveness_score
@@ -147,7 +149,9 @@ def get_maturity_analytics(
     )
     eng_model_tokens: dict[str, Counter[str]] = defaultdict(Counter)
     eng_model_tier_tokens: dict[str, Counter[str]] = defaultdict(Counter)
+    session_costs: dict[str, float] = defaultdict(float)
     for sid, model_name, input_tok, output_tok in model_rows:
+        session_costs[sid] += estimate_cost(model_name, input_tok or 0, output_tok or 0)
         if sid in session_engineer:
             eid = session_engineer[sid][0]
             total_tok = (input_tok or 0) + (output_tok or 0)
@@ -548,6 +552,81 @@ def get_maturity_analytics(
                 -len(item["sessions"]),
                 -item["total_calls"],
                 item["target_node"],
+            ),
+        )
+    ]
+
+    agent_team_mode_data: dict[str, dict] = {}
+    for sid in session_engineer:
+        tool_usage_fallback = [
+            {"tool_name": tool_name, "call_count": count}
+            for tool_name, count in per_session.get(sid, {}).items()
+        ]
+        detection = detect_session_agent_team(messages_by_session.get(sid, []), tool_usage_fallback)
+        bucket = agent_team_mode_data.setdefault(
+            detection.coordination_mode,
+            {
+                "coordination_mode": detection.coordination_mode,
+                "sessions": set(),
+                "engineers": set(),
+                "success_sessions": set(),
+                "session_costs": [],
+                "delegation_counts": [],
+                "targets": Counter(),
+                "workflow_archetypes": Counter(),
+            },
+        )
+        bucket["sessions"].add(sid)
+        engineer_id_for_session = session_engineer.get(sid, (None, ""))[0]
+        if engineer_id_for_session:
+            bucket["engineers"].add(engineer_id_for_session)
+        session_metric = session_metrics.get(sid)
+        if session_metric:
+            outcome = session_metric["outcome"]
+            if outcome and is_success_outcome(outcome):
+                bucket["success_sessions"].add(sid)
+        if sid in session_costs:
+            bucket["session_costs"].append(session_costs[sid])
+        bucket["delegation_counts"].append(detection.delegation_edge_count)
+        bucket["targets"].update(detection.target_nodes)
+        workflow_archetype = session_workflow_archetypes.get(sid)
+        if workflow_archetype:
+            bucket["workflow_archetypes"][workflow_archetype] += 1
+
+    agent_team_modes = [
+        AgentTeamModeSummary(
+            coordination_mode=bucket["coordination_mode"],
+            session_count=len(bucket["sessions"]),
+            engineer_count=len(bucket["engineers"]),
+            session_share=round(len(bucket["sessions"]) / sessions_analyzed, 3)
+            if sessions_analyzed > 0
+            else 0.0,
+            success_rate=(
+                round(len(bucket["success_sessions"]) / len(bucket["sessions"]), 3)
+                if bucket["sessions"]
+                else None
+            ),
+            avg_cost_per_session=(
+                round(sum(bucket["session_costs"]) / len(bucket["session_costs"]), 4)
+                if bucket["session_costs"]
+                else None
+            ),
+            avg_delegation_edges=round(
+                sum(bucket["delegation_counts"]) / len(bucket["delegation_counts"]),
+                2,
+            )
+            if bucket["delegation_counts"]
+            else 0.0,
+            top_targets=[target for target, _count in bucket["targets"].most_common(3)],
+            top_workflow_archetypes=[
+                archetype for archetype, _count in bucket["workflow_archetypes"].most_common(3)
+            ],
+        )
+        for bucket in sorted(
+            agent_team_mode_data.values(),
+            key=lambda item: (
+                {"agent_team": 0, "delegated": 1, "solo": 2}.get(item["coordination_mode"], 3),
+                -len(item["sessions"]),
             ),
         )
     ]
@@ -1240,6 +1319,7 @@ def get_maturity_analytics(
         customization_state_funnel=customization_state_funnel,
         toolchain_reliability=toolchain_reliability,
         delegation_patterns=delegation_patterns,
+        agent_team_modes=agent_team_modes,
         customization_outcomes=customization_outcomes,
         project_readiness=project_readiness,
         sessions_analyzed=sessions_analyzed,

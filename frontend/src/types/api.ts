@@ -131,6 +131,7 @@ export type DelegationEdgeType =
   | "team_setup"
   | "team_message"
   | "worktree_handoff"
+export type AgentTeamCoordinationMode = "solo" | "delegated" | "agent_team"
 
 export interface SessionExecutionEvidenceResponse {
   ordinal: number
@@ -1632,6 +1633,18 @@ export interface DelegationPatternSummary {
   top_workflow_archetypes: string[]
 }
 
+export interface AgentTeamModeSummary {
+  coordination_mode: AgentTeamCoordinationMode
+  session_count: number
+  engineer_count: number
+  session_share: number
+  success_rate: number | null
+  avg_cost_per_session: number | null
+  avg_delegation_edges: number
+  top_targets: string[]
+  top_workflow_archetypes: string[]
+}
+
 export interface CustomizationOutcomeAttribution {
   dimension: string
   label: string
@@ -1668,6 +1681,7 @@ export interface MaturityAnalyticsResponse {
   customization_state_funnel: CustomizationStateFunnel[]
   toolchain_reliability: ToolchainReliabilityEntry[]
   delegation_patterns: DelegationPatternSummary[]
+  agent_team_modes: AgentTeamModeSummary[]
   customization_outcomes: CustomizationOutcomeAttribution[]
   project_readiness: ProjectReadinessEntry[]
   sessions_analyzed: number
