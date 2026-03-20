@@ -40,3 +40,25 @@ def test_extract_session_delegation_edges_falls_back_to_tool_usages():
         ("subagent_task", "explore", 2),
         ("team_message", "team", 1),
     ]
+
+
+def test_extract_session_delegation_edges_uses_fallback_count_for_matching_message_edge():
+    messages = [
+        {
+            "ordinal": 1,
+            "tool_calls": [
+                {
+                    "name": "Task",
+                    "input_preview": '{"subagent_type":"reviewer","prompt":"Review the diff"}',
+                }
+            ],
+        }
+    ]
+    tool_usages = [{"tool_name": "Task:reviewer", "call_count": 3}]
+
+    edges = extract_session_delegation_edges(messages, tool_usages)
+
+    assert len(edges) == 1
+    assert edges[0].target_node == "reviewer"
+    assert edges[0].call_count == 3
+    assert edges[0].prompt_preview == "Review the diff"

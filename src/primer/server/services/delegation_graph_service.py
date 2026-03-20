@@ -53,6 +53,11 @@ def extract_session_delegation_edges(
     for edge in fallback_edges:
         if edge.key() not in message_keys:
             message_edges.append(edge)
+            continue
+        for existing_edge in message_edges:
+            if existing_edge.key() == edge.key():
+                existing_edge.call_count = max(existing_edge.call_count, edge.call_count)
+                break
     return sorted(message_edges, key=lambda edge: (edge.ordinal, edge.edge_type, edge.target_node))
 
 
