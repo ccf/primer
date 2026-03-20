@@ -307,6 +307,8 @@ class SessionDelegationEdgeResponse(BaseModel):
     call_count: int
     prompt_preview: str | None = None
 
+    model_config = {"from_attributes": True}
+
 
 # --- Session Messages ---
 
