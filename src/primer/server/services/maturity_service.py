@@ -50,7 +50,7 @@ from primer.common.tool_classification import (
     classify_tools,
     compute_leverage_score,
 )
-from primer.server.services.agent_team_service import detect_session_agent_team
+from primer.server.services.agent_team_service import classify_agent_team_from_edges
 from primer.server.services.analytics_service import base_session_query
 from primer.server.services.delegation_graph_service import extract_session_delegation_edges
 from primer.server.services.effectiveness_service import build_effectiveness_score
@@ -492,6 +492,7 @@ def get_maturity_analytics(
     ]
 
     delegation_pattern_data: dict[tuple[str, str], dict] = {}
+    session_delegation_edges: dict[str, list] = {}
     for sid in session_engineer:
         tool_usage_fallback = [
             {"tool_name": tool_name, "call_count": count}
@@ -501,6 +502,7 @@ def get_maturity_analytics(
             messages_by_session.get(sid, []),
             tool_usage_fallback,
         )
+        session_delegation_edges[sid] = edges
         if not edges:
             continue
         session_metric = session_metrics.get(sid)
@@ -558,11 +560,7 @@ def get_maturity_analytics(
 
     agent_team_mode_data: dict[str, dict] = {}
     for sid in session_engineer:
-        tool_usage_fallback = [
-            {"tool_name": tool_name, "call_count": count}
-            for tool_name, count in per_session.get(sid, {}).items()
-        ]
-        detection = detect_session_agent_team(messages_by_session.get(sid, []), tool_usage_fallback)
+        detection = classify_agent_team_from_edges(session_delegation_edges.get(sid, []))
         bucket = agent_team_mode_data.setdefault(
             detection.coordination_mode,
             {
