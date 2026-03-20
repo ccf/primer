@@ -12,6 +12,7 @@ from primer.common.models import (
     SessionCommit,
     SessionCustomization,
     SessionFacets,
+    SessionMessage,
     SessionRecoveryPath,
     SessionWorkflowProfile,
     Team,
@@ -551,6 +552,49 @@ def test_maturity_builds_delegation_patterns(
     assert explore["total_calls"] == 3
     assert explore["success_rate"] == 1.0
     assert explore["top_workflow_archetypes"] == ["debugging"]
+
+
+def test_maturity_builds_agent_team_modes(client, admin_headers, seeded_maturity_data, db_session):
+    s1 = seeded_maturity_data["s1"]
+    s2 = seeded_maturity_data["s2"]
+
+    db_session.add_all(
+        [
+            SessionFacets(session_id=s1.id, outcome="success"),
+            SessionFacets(session_id=s2.id, outcome="failure"),
+            SessionWorkflowProfile(session_id=s1.id, archetype="debugging"),
+            SessionWorkflowProfile(session_id=s2.id, archetype="investigation"),
+            SessionMessage(
+                session_id=s1.id,
+                ordinal=0,
+                role="assistant",
+                tool_calls=[
+                    {
+                        "name": "Task",
+                        "input_preview": '{"subagent_type":"reviewer","prompt":"Review the diff"}',
+                    },
+                    {
+                        "name": "SendMessage",
+                        "input_preview": '{"recipient":"qa","message":"Smoke test it"}',
+                    },
+                ],
+            ),
+        ]
+    )
+    db_session.flush()
+
+    response = client.get("/api/v1/analytics/maturity", headers=admin_headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    rows = {row["coordination_mode"]: row for row in data["agent_team_modes"]}
+    assert rows["agent_team"]["session_count"] == 1
+    assert rows["agent_team"]["engineer_count"] == 1
+    assert rows["agent_team"]["success_rate"] == 1.0
+    assert rows["agent_team"]["avg_delegation_edges"] == 3.0
+    assert rows["agent_team"]["top_targets"] == ["explore", "qa", "reviewer"]
+    assert rows["solo"]["session_count"] == 1
+    assert rows["solo"]["success_rate"] == 0.0
 
 
 def test_maturity_toolchain_reliability_deduplicates_duplicate_tool_rows(

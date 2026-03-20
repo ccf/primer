@@ -50,6 +50,7 @@ DelegationEdgeType = Literal[
     "team_message",
     "worktree_handoff",
 ]
+AgentTeamCoordinationMode = Literal["solo", "delegated", "agent_team"]
 RecoveryStrategy = Literal[
     "inspect_context",
     "edit_fix",
@@ -2004,6 +2005,18 @@ class DelegationPatternSummary(BaseModel):
     top_workflow_archetypes: list[str] = []
 
 
+class AgentTeamModeSummary(BaseModel):
+    coordination_mode: AgentTeamCoordinationMode
+    session_count: int
+    engineer_count: int
+    session_share: float
+    success_rate: float | None = None
+    avg_cost_per_session: float | None = None
+    avg_delegation_edges: float = 0.0
+    top_targets: list[str] = []
+    top_workflow_archetypes: list[str] = []
+
+
 class CustomizationOutcomeAttribution(BaseModel):
     dimension: str
     label: str
@@ -2040,6 +2053,7 @@ class MaturityAnalyticsResponse(BaseModel):
     customization_state_funnel: list[CustomizationStateFunnel] = []
     toolchain_reliability: list[ToolchainReliabilityEntry] = []
     delegation_patterns: list[DelegationPatternSummary] = []
+    agent_team_modes: list[AgentTeamModeSummary] = []
     customization_outcomes: list[CustomizationOutcomeAttribution] = []
     project_readiness: list[ProjectReadinessEntry]
     sessions_analyzed: int
