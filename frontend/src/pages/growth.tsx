@@ -26,6 +26,8 @@ import { CoverageSummary } from "@/components/growth/coverage-summary"
 import { TeamSkillGaps } from "@/components/insights/team-skill-gaps"
 import { SkillUniverseChart } from "@/components/growth/skill-universe-chart"
 import { LearningPathCards } from "@/components/growth/learning-path-cards"
+import { ReuseOpportunityCards } from "@/components/growth/reuse-opportunity-cards"
+import { ReusableAssetTable } from "@/components/growth/reusable-asset-table"
 import { WorkflowPlaybookCards } from "@/components/growth/workflow-playbook-cards"
 import { EngineerSkillTable } from "@/components/insights/engineer-skill-table"
 import { Card, CardContent } from "@/components/ui/card"
@@ -114,6 +116,10 @@ function SkillsTab({ teamId, startDate, endDate }: TabProps) {
           <LearningPathCards paths={learning.engineer_paths} />
         </div>
       )}
+      {skills && (
+        <ReuseOpportunityCards assets={skills.underused_reusable_assets} />
+      )}
+      {skills && <ReusableAssetTable assets={skills.reusable_assets} />}
       {skills && <EngineerSkillTable data={skills.engineer_profiles} />}
     </div>
   )

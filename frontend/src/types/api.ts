@@ -778,9 +778,28 @@ export interface TeamSkillGap {
   engineers_with_skill: number
 }
 
+export interface ReusableAssetAnalytics {
+  identifier: string
+  customization_type: string
+  provenance: CustomizationProvenance
+  source_classification: CustomizationSourceClassification
+  engineer_count: number
+  session_count: number
+  total_invocations: number
+  adoption_rate: number
+  success_rate: number | null
+  avg_session_cost: number | null
+  cost_per_successful_outcome: number | null
+  primary_workflow_archetype: string | null
+  workflow_archetypes: string[]
+  top_projects: string[]
+}
+
 export interface SkillInventoryResponse {
   engineer_profiles: EngineerSkillProfile[]
   team_skill_gaps: TeamSkillGap[]
+  reusable_assets: ReusableAssetAnalytics[]
+  underused_reusable_assets: ReusableAssetAnalytics[]
   total_engineers: number
   total_session_types: number
   total_tools_used: number

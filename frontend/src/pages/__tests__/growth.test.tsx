@@ -58,6 +58,12 @@ vi.mock("@/components/growth/skill-universe-chart", () => ({
 vi.mock("@/components/growth/learning-path-cards", () => ({
   LearningPathCards: () => <div>learning paths</div>,
 }))
+vi.mock("@/components/growth/reuse-opportunity-cards", () => ({
+  ReuseOpportunityCards: () => <div>reuse opportunities</div>,
+}))
+vi.mock("@/components/growth/reusable-asset-table", () => ({
+  ReusableAssetTable: () => <div>reusable assets</div>,
+}))
 vi.mock("@/components/insights/engineer-skill-table", () => ({
   EngineerSkillTable: () => <div>engineer skill table</div>,
 }))
@@ -200,6 +206,8 @@ describe("GrowthPage", () => {
       data: {
         engineer_profiles: [],
         team_skill_gaps: [],
+        reusable_assets: [],
+        underused_reusable_assets: [],
         total_engineers: 1,
         total_session_types: 1,
         total_tools_used: 1,
@@ -233,6 +241,8 @@ describe("GrowthPage", () => {
 
     expect(screen.getByText("Learning Paths")).toBeInTheDocument()
     expect(screen.getByText("learning paths")).toBeInTheDocument()
+    expect(screen.getByText("reuse opportunities")).toBeInTheDocument()
+    expect(screen.getByText("reusable assets")).toBeInTheDocument()
   })
 
   it("shows an engineer chooser for API-key admins without a selected context", () => {

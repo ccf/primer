@@ -7,10 +7,12 @@ from datetime import UTC, datetime
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from primer.common.customizations import is_explicit_customization_provenance
 from primer.common.facet_taxonomy import canonical_outcome, is_success_outcome
 from primer.common.models import (
     Engineer,
     ModelUsage,
+    SessionCustomization,
     SessionFacets,
     SessionWorkflowProfile,
     ToolUsage,
@@ -37,6 +39,7 @@ from primer.common.schemas import (
     PatternSharingResponse,
     PersonalizedTip,
     PersonalizedTipsResponse,
+    ReusableAssetAnalytics,
     SharedPattern,
     SimilarSession,
     SimilarSessionsResponse,
@@ -490,6 +493,8 @@ def get_skill_inventory(
         return SkillInventoryResponse(
             engineer_profiles=[],
             team_skill_gaps=[],
+            reusable_assets=[],
+            underused_reusable_assets=[],
             total_engineers=0,
             total_session_types=0,
             total_tools_used=0,
@@ -501,8 +506,10 @@ def get_skill_inventory(
 
     # Group sessions by engineer
     eng_sessions: dict[str, list] = defaultdict(list)
+    session_by_id: dict[str, SessionModel] = {}
     for s in sessions:
         eng_sessions[s.engineer_id].append(s)
+        session_by_id[s.id] = s
 
     # Get engineer names
     engineer_ids = list(eng_sessions.keys())
@@ -511,14 +518,24 @@ def get_skill_inventory(
 
     # Get all facets for session types
     all_facets = (
-        db.query(SessionFacets.session_id, SessionFacets.session_type)
+        db.query(
+            SessionFacets.session_id,
+            SessionFacets.session_type,
+            SessionFacets.outcome,
+        )
         .filter(
             SessionFacets.session_id.in_(session_ids_q),
-            SessionFacets.session_type.isnot(None),
         )
         .all()
     )
-    session_to_type: dict[str, str] = {f.session_id: f.session_type for f in all_facets}
+    session_to_type: dict[str, str] = {
+        f.session_id: f.session_type for f in all_facets if f.session_type is not None
+    }
+    session_to_outcome: dict[str, str] = {
+        f.session_id: canonical_outcome(f.outcome)
+        for f in all_facets
+        if canonical_outcome(f.outcome) is not None
+    }
 
     # Get all tool usages
     all_tools = (
@@ -539,6 +556,42 @@ def get_skill_inventory(
         eid = session_to_engineer.get(tu.session_id)
         if eid:
             eng_tool_calls[eid][tu.tool_name] += tu.call_count
+
+    session_workflow_archetypes = {
+        row.session_id: row.archetype
+        for row in (
+            db.query(
+                SessionWorkflowProfile.session_id,
+                SessionWorkflowProfile.archetype,
+            )
+            .filter(
+                SessionWorkflowProfile.session_id.in_(session_ids_q),
+                SessionWorkflowProfile.archetype.isnot(None),
+            )
+            .all()
+        )
+    }
+
+    session_costs: dict[str, float] = defaultdict(float)
+    for row in (
+        db.query(
+            ModelUsage.session_id,
+            ModelUsage.model_name,
+            ModelUsage.input_tokens,
+            ModelUsage.output_tokens,
+            ModelUsage.cache_read_tokens,
+            ModelUsage.cache_creation_tokens,
+        )
+        .filter(ModelUsage.session_id.in_(session_ids_q))
+        .all()
+    ):
+        session_costs[row.session_id] += estimate_cost(
+            row.model_name,
+            row.input_tokens or 0,
+            row.output_tokens or 0,
+            row.cache_read_tokens or 0,
+            row.cache_creation_tokens or 0,
+        )
 
     # Build profiles
     all_session_types: set[str] = set()
@@ -607,9 +660,135 @@ def get_skill_inventory(
                 )
             )
 
+    reusable_asset_rows = (
+        db.query(
+            SessionCustomization.session_id,
+            SessionCustomization.customization_type,
+            SessionCustomization.identifier,
+            SessionCustomization.provenance,
+            SessionCustomization.source_classification,
+            SessionCustomization.invocation_count,
+        )
+        .filter(
+            SessionCustomization.session_id.in_(session_ids_q),
+            SessionCustomization.state == "invoked",
+            SessionCustomization.customization_type.in_(["skill", "command", "template"]),
+        )
+        .all()
+    )
+
+    reusable_asset_data: dict[tuple[str, str, str, str], dict] = {}
+    for row in reusable_asset_rows:
+        if not is_explicit_customization_provenance(row.provenance):
+            continue
+
+        key = (
+            row.customization_type,
+            row.identifier,
+            row.provenance,
+            row.source_classification,
+        )
+        bucket = reusable_asset_data.setdefault(
+            key,
+            {
+                "identifier": row.identifier,
+                "customization_type": row.customization_type,
+                "provenance": row.provenance,
+                "source_classification": row.source_classification,
+                "sessions": set(),
+                "engineers": set(),
+                "projects": Counter(),
+                "workflow_archetypes": Counter(),
+                "success_sessions": set(),
+                "costs": [],
+                "total_invocations": 0,
+            },
+        )
+        bucket["sessions"].add(row.session_id)
+        engineer_id = session_to_engineer.get(row.session_id)
+        if engineer_id:
+            bucket["engineers"].add(engineer_id)
+        session = session_by_id.get(row.session_id)
+        if session and session.project_name:
+            bucket["projects"][session.project_name] += 1
+        workflow_archetype = session_workflow_archetypes.get(row.session_id)
+        if workflow_archetype:
+            bucket["workflow_archetypes"][workflow_archetype] += 1
+        outcome = session_to_outcome.get(row.session_id)
+        if outcome and is_success_outcome(outcome):
+            bucket["success_sessions"].add(row.session_id)
+        if row.session_id in session_costs:
+            bucket["costs"].append(session_costs[row.session_id])
+        bucket["total_invocations"] += row.invocation_count or 0
+
+    reusable_assets = [
+        ReusableAssetAnalytics(
+            identifier=bucket["identifier"],
+            customization_type=bucket["customization_type"],
+            provenance=bucket["provenance"],
+            source_classification=bucket["source_classification"],
+            engineer_count=len(bucket["engineers"]),
+            session_count=len(bucket["sessions"]),
+            total_invocations=bucket["total_invocations"],
+            adoption_rate=(
+                round(len(bucket["engineers"]) / total_engineers, 3) if total_engineers else 0.0
+            ),
+            success_rate=(
+                round(len(bucket["success_sessions"]) / len(bucket["sessions"]), 3)
+                if bucket["sessions"]
+                else None
+            ),
+            avg_session_cost=(
+                round(sum(bucket["costs"]) / len(bucket["costs"]), 4) if bucket["costs"] else None
+            ),
+            cost_per_successful_outcome=(
+                round(sum(bucket["costs"]) / len(bucket["success_sessions"]), 4)
+                if bucket["costs"] and bucket["success_sessions"]
+                else None
+            ),
+            primary_workflow_archetype=(
+                bucket["workflow_archetypes"].most_common(1)[0][0]
+                if bucket["workflow_archetypes"]
+                else None
+            ),
+            workflow_archetypes=[
+                archetype for archetype, _count in bucket["workflow_archetypes"].most_common(3)
+            ],
+            top_projects=[project for project, _count in bucket["projects"].most_common(3)],
+        )
+        for bucket in sorted(
+            reusable_asset_data.values(),
+            key=lambda item: (
+                -len(item["engineers"]),
+                -len(item["sessions"]),
+                -item["total_invocations"],
+                item["identifier"],
+            ),
+        )
+    ]
+
+    underused_reusable_assets = sorted(
+        [
+            asset
+            for asset in reusable_assets
+            if asset.engineer_count > 0
+            and asset.adoption_rate <= 0.5
+            and asset.success_rate is not None
+            and asset.success_rate >= 0.75
+        ],
+        key=lambda asset: (
+            -(asset.success_rate or 0.0),
+            asset.adoption_rate,
+            -asset.session_count,
+            asset.identifier,
+        ),
+    )[:5]
+
     return SkillInventoryResponse(
         engineer_profiles=profiles,
         team_skill_gaps=gaps,
+        reusable_assets=reusable_assets,
+        underused_reusable_assets=underused_reusable_assets,
         total_engineers=total_engineers,
         total_session_types=len(all_session_types),
         total_tools_used=len(all_tool_names),

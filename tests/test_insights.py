@@ -1,7 +1,19 @@
+import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from primer.common.models import Session, SessionFacets, ToolUsage
+import bcrypt
+
+from primer.common.models import (
+    Engineer,
+    ModelUsage,
+    Session,
+    SessionCustomization,
+    SessionFacets,
+    SessionWorkflowProfile,
+    Team,
+    ToolUsage,
+)
 
 
 def _create_session(db_session, engineer, **kwargs):
@@ -213,6 +225,8 @@ class TestSkillInventory:
         assert data["total_tools_used"] == 0
         assert data["engineer_profiles"] == []
         assert data["team_skill_gaps"] == []
+        assert data["reusable_assets"] == []
+        assert data["underused_reusable_assets"] == []
 
     def test_profiles_with_varied_sessions(
         self, client, db_session, engineer_with_key, admin_headers
@@ -318,6 +332,137 @@ class TestSkillInventory:
         assert profile["tool_proficiency"]["Write"] == "proficient"
         assert profile["tool_proficiency"]["Grep"] == "moderate"
         assert profile["tool_proficiency"]["Bash"] == "novice"
+
+    def test_reuse_analytics_tracks_reusable_assets_by_workflow_and_outcome(
+        self, client, db_session, admin_headers
+    ):
+        team = Team(name=f"Reuse Team {uuid.uuid4().hex[:6]}")
+        db_session.add(team)
+        db_session.flush()
+
+        engineers = []
+        for i in range(2):
+            raw_key = f"primer_{secrets.token_urlsafe(32)}"
+            hashed = bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt()).decode()
+            engineer = Engineer(
+                name=f"Reuse Eng {i}",
+                email=f"reuse{i}_{uuid.uuid4().hex[:6]}@test.com",
+                team_id=team.id,
+                api_key_hash=hashed,
+            )
+            db_session.add(engineer)
+            db_session.flush()
+            engineers.append(engineer)
+
+        now = datetime.now(UTC)
+        s1 = _create_session(
+            db_session,
+            engineers[0],
+            started_at=now - timedelta(hours=3),
+            project_name="primer",
+        )
+        s2 = _create_session(
+            db_session,
+            engineers[1],
+            started_at=now - timedelta(hours=2),
+            project_name="primer",
+        )
+        s3 = _create_session(
+            db_session,
+            engineers[0],
+            started_at=now - timedelta(hours=1),
+            project_name="sdk",
+        )
+
+        db_session.add_all(
+            [
+                SessionFacets(session_id=s1.id, session_type="debugging", outcome="success"),
+                SessionFacets(session_id=s2.id, session_type="debugging", outcome="success"),
+                SessionFacets(session_id=s3.id, session_type="feature", outcome="success"),
+                SessionWorkflowProfile(session_id=s1.id, archetype="debugging"),
+                SessionWorkflowProfile(session_id=s2.id, archetype="debugging"),
+                SessionWorkflowProfile(session_id=s3.id, archetype="feature_delivery"),
+                ModelUsage(
+                    session_id=s1.id,
+                    model_name="claude-sonnet-4-5-20250929",
+                    input_tokens=1000,
+                    output_tokens=500,
+                    cache_read_tokens=0,
+                    cache_creation_tokens=0,
+                ),
+                ModelUsage(
+                    session_id=s2.id,
+                    model_name="claude-sonnet-4-5-20250929",
+                    input_tokens=1000,
+                    output_tokens=500,
+                    cache_read_tokens=0,
+                    cache_creation_tokens=0,
+                ),
+                ModelUsage(
+                    session_id=s3.id,
+                    model_name="claude-haiku-4-5-20251001",
+                    input_tokens=500,
+                    output_tokens=200,
+                    cache_read_tokens=0,
+                    cache_creation_tokens=0,
+                ),
+                SessionCustomization(
+                    session_id=s1.id,
+                    customization_type="skill",
+                    state="invoked",
+                    identifier="review-pr",
+                    provenance="repo_defined",
+                    source_classification="custom",
+                    invocation_count=3,
+                ),
+                SessionCustomization(
+                    session_id=s2.id,
+                    customization_type="skill",
+                    state="invoked",
+                    identifier="review-pr",
+                    provenance="repo_defined",
+                    source_classification="custom",
+                    invocation_count=2,
+                ),
+                SessionCustomization(
+                    session_id=s3.id,
+                    customization_type="template",
+                    state="invoked",
+                    identifier="bugfix",
+                    provenance="repo_defined",
+                    source_classification="custom",
+                    invocation_count=1,
+                ),
+            ]
+        )
+        db_session.flush()
+
+        r = client.get(
+            f"/api/v1/analytics/skill-inventory?team_id={team.id}",
+            headers=admin_headers,
+        )
+        assert r.status_code == 200
+        data = r.json()
+
+        assets = {asset["identifier"]: asset for asset in data["reusable_assets"]}
+        review_pr = assets["review-pr"]
+        assert review_pr["customization_type"] == "skill"
+        assert review_pr["engineer_count"] == 2
+        assert review_pr["session_count"] == 2
+        assert review_pr["adoption_rate"] == 1.0
+        assert review_pr["success_rate"] == 1.0
+        assert review_pr["primary_workflow_archetype"] == "debugging"
+        assert review_pr["workflow_archetypes"] == ["debugging"]
+        assert review_pr["top_projects"] == ["primer"]
+        assert review_pr["cost_per_successful_outcome"] is not None
+
+        underused = {asset["identifier"]: asset for asset in data["underused_reusable_assets"]}
+        bugfix = underused["bugfix"]
+        assert bugfix["customization_type"] == "template"
+        assert bugfix["engineer_count"] == 1
+        assert bugfix["adoption_rate"] == 0.5
+        assert bugfix["success_rate"] == 1.0
+        assert bugfix["workflow_archetypes"] == ["feature_delivery"]
 
     def test_requires_auth(self, client):
         r = client.get("/api/v1/analytics/skill-inventory")

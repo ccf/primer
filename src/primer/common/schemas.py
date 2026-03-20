@@ -1126,9 +1126,28 @@ class TeamSkillGap(BaseModel):
     engineers_with_skill: int
 
 
+class ReusableAssetAnalytics(BaseModel):
+    identifier: str
+    customization_type: str
+    provenance: CustomizationProvenance
+    source_classification: CustomizationSourceClassification
+    engineer_count: int
+    session_count: int
+    total_invocations: int
+    adoption_rate: float
+    success_rate: float | None = None
+    avg_session_cost: float | None = None
+    cost_per_successful_outcome: float | None = None
+    primary_workflow_archetype: str | None = None
+    workflow_archetypes: list[str] = []
+    top_projects: list[str] = []
+
+
 class SkillInventoryResponse(BaseModel):
     engineer_profiles: list[EngineerSkillProfile]
     team_skill_gaps: list[TeamSkillGap]
+    reusable_assets: list[ReusableAssetAnalytics] = []
+    underused_reusable_assets: list[ReusableAssetAnalytics] = []
     total_engineers: int
     total_session_types: int
     total_tools_used: int
