@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/shared/page-header"
 import { MaturitySummary } from "@/components/maturity/maturity-summary"
 import { ToolCategoryChart } from "@/components/maturity/tool-category-chart"
 import { AgentSkillTable } from "@/components/maturity/agent-skill-table"
+import { DelegationPatternTable } from "@/components/maturity/delegation-pattern-table"
 import { CustomizationBreakdownTable } from "@/components/maturity/customization-breakdown-table"
 import { CustomizationStateFunnelTable } from "@/components/maturity/customization-state-funnel-table"
 import { ToolchainReliabilityTable } from "@/components/maturity/toolchain-reliability-table"
@@ -78,6 +79,7 @@ export function MaturityPage({ teamId, dateRange }: MaturityPageProps) {
       {data && activeTab === "agents" && (
         <div className="space-y-6">
           <AgentSkillTable data={data.agent_skill_breakdown} />
+          <DelegationPatternTable rows={data.delegation_patterns} />
           <CustomizationBreakdownTable data={data.customization_breakdown} />
           <CustomizationStateFunnelTable rows={data.customization_state_funnel} />
           <ToolchainReliabilityTable rows={data.toolchain_reliability} />

@@ -56,6 +56,7 @@ const baseSession: SessionDetailResponse = {
       cache_creation_tokens: 100,
     },
   ],
+  delegation_edges: [],
   execution_evidence: [
     {
       ordinal: 3,
@@ -185,6 +186,32 @@ describe("SessionDetailPanel", () => {
     expect(screen.getByText("Workflow Steps")).toBeInTheDocument()
     expect(screen.getByText("Top Tools")).toBeInTheDocument()
     expect(screen.getByText("Mapped from the extracted session type 'code_modification'.")).toBeInTheDocument()
+  })
+
+  it("renders delegation graph when present", () => {
+    render(
+      <SessionDetailPanel
+        session={{
+          ...baseSession,
+          delegation_edges: [
+            {
+              source_node: "primary_agent",
+              target_node: "reviewer",
+              edge_type: "subagent_task",
+              tool_name: "Task:reviewer",
+              call_count: 2,
+              prompt_preview: "Review the auth diff",
+            },
+          ],
+        }}
+      />,
+    )
+
+    expect(screen.getByText("Delegation Graph")).toBeInTheDocument()
+    expect(screen.getByText("primary_agent -> reviewer")).toBeInTheDocument()
+    expect(screen.getByText(/Task:reviewer/)).toBeInTheDocument()
+    expect(screen.getByText("Review the auth diff")).toBeInTheDocument()
+    expect(screen.getAllByText("2 calls").length).toBeGreaterThan(0)
   })
 
   it("renders customizations when present", () => {

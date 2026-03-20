@@ -125,6 +125,12 @@ export type SessionArchetype =
   | "docs"
   | "investigation"
 export type ArchetypeSource = "session_type" | "heuristic"
+export type DelegationEdgeType =
+  | "subagent_task"
+  | "agent_spawn"
+  | "team_setup"
+  | "team_message"
+  | "worktree_handoff"
 
 export interface SessionExecutionEvidenceResponse {
   ordinal: number
@@ -174,6 +180,15 @@ export interface SessionWorkflowProfileResponse {
   verification_run_count: number
 }
 
+export interface SessionDelegationEdgeResponse {
+  source_node: string
+  target_node: string
+  edge_type: DelegationEdgeType
+  tool_name: string
+  call_count: number
+  prompt_preview: string | null
+}
+
 export interface SessionCustomizationResponse {
   customization_type: CustomizationType
   state: CustomizationState
@@ -190,6 +205,7 @@ export interface SessionDetailResponse extends SessionResponse {
   facets: SessionFacetsResponse | null
   tool_usages: ToolUsageResponse[]
   customizations: SessionCustomizationResponse[]
+  delegation_edges: SessionDelegationEdgeResponse[]
   model_usages: ModelUsageResponse[]
   execution_evidence: SessionExecutionEvidenceResponse[]
   change_shape: SessionChangeShapeResponse | null
@@ -1606,6 +1622,16 @@ export interface ToolchainReliabilityEntry {
   top_friction_types: string[]
 }
 
+export interface DelegationPatternSummary {
+  target_node: string
+  edge_type: DelegationEdgeType
+  session_count: number
+  engineer_count: number
+  total_calls: number
+  success_rate: number | null
+  top_workflow_archetypes: string[]
+}
+
 export interface CustomizationOutcomeAttribution {
   dimension: string
   label: string
@@ -1641,6 +1667,7 @@ export interface MaturityAnalyticsResponse {
   team_customization_landscape: TeamCustomizationLandscape[]
   customization_state_funnel: CustomizationStateFunnel[]
   toolchain_reliability: ToolchainReliabilityEntry[]
+  delegation_patterns: DelegationPatternSummary[]
   customization_outcomes: CustomizationOutcomeAttribution[]
   project_readiness: ProjectReadinessEntry[]
   sessions_analyzed: number

@@ -78,6 +78,7 @@ const mockDetailSession = {
   },
   tool_usages: [{ tool_name: "Read", call_count: 10 }],
   customizations: [],
+  delegation_edges: [],
   model_usages: [
     {
       model_name: "claude-sonnet-4-5-20250929",

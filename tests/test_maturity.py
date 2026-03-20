@@ -13,6 +13,7 @@ from primer.common.models import (
     SessionCustomization,
     SessionFacets,
     SessionRecoveryPath,
+    SessionWorkflowProfile,
     Team,
     ToolUsage,
 )
@@ -521,6 +522,35 @@ def test_maturity_builds_toolchain_reliability_view(
     assert read_tool["recovery_rate"] == 0.5
     assert read_tool["success_rate"] == 0.5
     assert read_tool["abandonment_rate"] == 0.5
+
+
+def test_maturity_builds_delegation_patterns(
+    client, admin_headers, seeded_maturity_data, db_session
+):
+    s1 = seeded_maturity_data["s1"]
+    s2 = seeded_maturity_data["s2"]
+
+    db_session.add_all(
+        [
+            SessionFacets(session_id=s1.id, outcome="success"),
+            SessionFacets(session_id=s2.id, outcome="failure"),
+            SessionWorkflowProfile(session_id=s1.id, archetype="debugging"),
+            SessionWorkflowProfile(session_id=s2.id, archetype="investigation"),
+        ]
+    )
+    db_session.flush()
+
+    response = client.get("/api/v1/analytics/maturity", headers=admin_headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    explore = next(row for row in data["delegation_patterns"] if row["target_node"] == "explore")
+    assert explore["edge_type"] == "subagent_task"
+    assert explore["session_count"] == 1
+    assert explore["engineer_count"] == 1
+    assert explore["total_calls"] == 3
+    assert explore["success_rate"] == 1.0
+    assert explore["top_workflow_archetypes"] == ["debugging"]
 
 
 def test_maturity_toolchain_reliability_deduplicates_duplicate_tool_rows(
