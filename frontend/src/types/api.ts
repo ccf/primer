@@ -812,11 +812,28 @@ export interface ReusableAssetAnalytics {
   top_projects: string[]
 }
 
+export interface PromptReusePattern {
+  prompt_pattern_id: string
+  prompt_preview: string
+  normalized_prompt: string
+  engineer_count: number
+  session_count: number
+  adoption_rate: number
+  success_rate: number | null
+  avg_session_cost: number | null
+  cost_per_successful_outcome: number | null
+  primary_workflow_archetype: string | null
+  workflow_archetypes: string[]
+  top_projects: string[]
+}
+
 export interface SkillInventoryResponse {
   engineer_profiles: EngineerSkillProfile[]
   team_skill_gaps: TeamSkillGap[]
   reusable_assets: ReusableAssetAnalytics[]
   underused_reusable_assets: ReusableAssetAnalytics[]
+  prompt_patterns: PromptReusePattern[]
+  underused_prompt_patterns: PromptReusePattern[]
   total_engineers: number
   total_session_types: number
   total_tools_used: number
