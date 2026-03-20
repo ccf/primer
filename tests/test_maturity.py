@@ -12,6 +12,7 @@ from primer.common.models import (
     SessionCommit,
     SessionCustomization,
     SessionFacets,
+    SessionRecoveryPath,
     Team,
     ToolUsage,
 )
@@ -447,6 +448,79 @@ def test_maturity_builds_team_customization_landscape(client, admin_headers, db_
     assert team_rows["Platform"]["top_customizations"] == ["github", "review-pr"]
     assert team_rows["Platform"]["unique_customizations"] == ["github", "review-pr"]
     assert team_rows["Product"]["top_customizations"] == ["linear"]
+
+
+def test_maturity_builds_toolchain_reliability_view(
+    client, admin_headers, seeded_maturity_data, db_session
+):
+    s1 = seeded_maturity_data["s1"]
+    s2 = seeded_maturity_data["s2"]
+
+    db_session.add_all(
+        [
+            SessionFacets(
+                session_id=s1.id,
+                outcome="success",
+                friction_counts={"tool_error": 2, "timeout": 1},
+            ),
+            SessionFacets(
+                session_id=s2.id,
+                outcome="failure",
+                friction_counts={"permission_denied": 1},
+            ),
+            SessionRecoveryPath(
+                session_id=s1.id,
+                friction_detected=True,
+                recovery_step_count=2,
+                recovery_result="recovered",
+                final_outcome="success",
+            ),
+            SessionRecoveryPath(
+                session_id=s2.id,
+                friction_detected=True,
+                recovery_step_count=1,
+                recovery_result="abandoned",
+                final_outcome="failure",
+            ),
+            SessionCustomization(
+                session_id=s1.id,
+                customization_type="mcp",
+                state="invoked",
+                identifier="github",
+                provenance="user_local",
+                source_classification="marketplace",
+                invocation_count=3,
+            ),
+        ]
+    )
+    db_session.flush()
+
+    response = client.get("/api/v1/analytics/maturity", headers=admin_headers)
+
+    assert response.status_code == 200
+    data = response.json()
+
+    reliability_rows = {
+        (row["surface_type"], row["identifier"]): row for row in data["toolchain_reliability"]
+    }
+    github = reliability_rows[("mcp", "github")]
+    assert github["session_count"] == 1
+    assert github["engineer_count"] == 1
+    assert github["friction_session_rate"] == 1.0
+    assert github["failure_session_rate"] == 1.0
+    assert github["recovery_rate"] == 1.0
+    assert github["success_rate"] == 1.0
+    assert github["abandonment_rate"] == 0.0
+    assert github["top_friction_types"] == ["tool_error", "timeout"]
+
+    read_tool = reliability_rows[("built_in_tool", "Read")]
+    assert read_tool["session_count"] == 2
+    assert read_tool["engineer_count"] == 2
+    assert read_tool["friction_session_rate"] == 1.0
+    assert read_tool["failure_session_rate"] == 0.5
+    assert read_tool["recovery_rate"] == 0.5
+    assert read_tool["success_rate"] == 0.5
+    assert read_tool["abandonment_rate"] == 0.5
 
 
 def test_maturity_date_filtering(client, admin_headers, seeded_maturity_data):

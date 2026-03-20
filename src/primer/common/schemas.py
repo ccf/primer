@@ -1938,6 +1938,24 @@ class CustomizationStateFunnel(BaseModel):
     enabled_not_invoked_engineer_count: int = 0
 
 
+class ToolchainReliabilityEntry(BaseModel):
+    identifier: str
+    surface_type: str
+    provenance: CustomizationProvenance | None = None
+    source_classification: CustomizationSourceClassification | None = None
+    session_count: int
+    engineer_count: int
+    friction_session_count: int
+    friction_session_rate: float | None = None
+    failure_session_count: int
+    failure_session_rate: float | None = None
+    recovery_rate: float | None = None
+    success_rate: float | None = None
+    abandonment_rate: float | None = None
+    avg_recovery_steps: float | None = None
+    top_friction_types: list[str] = []
+
+
 class CustomizationOutcomeAttribution(BaseModel):
     dimension: str
     label: str
@@ -1972,6 +1990,7 @@ class MaturityAnalyticsResponse(BaseModel):
     high_performer_stacks: list[HighPerformerStack] = []
     team_customization_landscape: list[TeamCustomizationLandscape] = []
     customization_state_funnel: list[CustomizationStateFunnel] = []
+    toolchain_reliability: list[ToolchainReliabilityEntry] = []
     customization_outcomes: list[CustomizationOutcomeAttribution] = []
     project_readiness: list[ProjectReadinessEntry]
     sessions_analyzed: int
