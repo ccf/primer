@@ -1569,6 +1569,24 @@ export interface CustomizationStateFunnel {
   enabled_not_invoked_engineer_count: number
 }
 
+export interface ToolchainReliabilityEntry {
+  identifier: string
+  surface_type: string
+  provenance: CustomizationProvenance | null
+  source_classification: CustomizationSourceClassification | null
+  session_count: number
+  engineer_count: number
+  friction_session_count: number
+  friction_session_rate: number | null
+  failure_session_count: number
+  failure_session_rate: number | null
+  recovery_rate: number | null
+  success_rate: number | null
+  abandonment_rate: number | null
+  avg_recovery_steps: number | null
+  top_friction_types: string[]
+}
+
 export interface CustomizationOutcomeAttribution {
   dimension: string
   label: string
@@ -1603,6 +1621,7 @@ export interface MaturityAnalyticsResponse {
   high_performer_stacks: HighPerformerStack[]
   team_customization_landscape: TeamCustomizationLandscape[]
   customization_state_funnel: CustomizationStateFunnel[]
+  toolchain_reliability: ToolchainReliabilityEntry[]
   customization_outcomes: CustomizationOutcomeAttribution[]
   project_readiness: ProjectReadinessEntry[]
   sessions_analyzed: number

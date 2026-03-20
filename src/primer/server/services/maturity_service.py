@@ -18,6 +18,7 @@ from primer.common.models import (
     SessionCommit,
     SessionCustomization,
     SessionFacets,
+    SessionRecoveryPath,
     Team,
     ToolUsage,
 )
@@ -37,14 +38,18 @@ from primer.common.schemas import (
     StackCustomization,
     TeamCustomizationLandscape,
     ToolCategoryBreakdown,
+    ToolchainReliabilityEntry,
 )
 from primer.common.tool_classification import (
     CATEGORIES,
+    classify_tool,
     classify_tools,
     compute_leverage_score,
 )
 from primer.server.services.analytics_service import base_session_query
 from primer.server.services.effectiveness_service import build_effectiveness_score
+
+_RELIABILITY_FAILURE_FRICTION_TYPES = frozenset({"tool_error", "exec_error", "timeout"})
 
 
 def get_maturity_analytics(
@@ -167,6 +172,47 @@ def get_maturity_analytics(
         successes = sum(1 for outcome in outcomes if is_success_outcome(outcome))
         eng_success_counts[eid] = successes
         eng_success_rates[eid] = successes / len(outcomes) if outcomes else 0.0
+
+    session_state_rows = (
+        db.query(
+            SessionModel.id,
+            SessionModel.engineer_id,
+            SessionFacets.outcome,
+            SessionFacets.friction_counts,
+            SessionRecoveryPath.recovery_result,
+            SessionRecoveryPath.recovery_step_count,
+        )
+        .outerjoin(SessionFacets, SessionModel.id == SessionFacets.session_id)
+        .outerjoin(SessionRecoveryPath, SessionModel.id == SessionRecoveryPath.session_id)
+        .filter(SessionModel.id.in_(db.query(session_id_subq.c.id)))
+        .all()
+    )
+    session_metrics: dict[str, dict[str, object]] = {}
+    for (
+        session_id,
+        engineer_id_for_session,
+        outcome,
+        friction_counts,
+        recovery_result,
+        recovery_step_count,
+    ) in session_state_rows:
+        positive_friction_counts = {
+            friction_type: count
+            for friction_type, count in (friction_counts or {}).items()
+            if count and count > 0
+        }
+        session_metrics[session_id] = {
+            "engineer_id": engineer_id_for_session,
+            "outcome": canonical_outcome(outcome),
+            "friction_counts": positive_friction_counts,
+            "has_friction": bool(positive_friction_counts),
+            "has_failure": any(
+                friction_type in _RELIABILITY_FAILURE_FRICTION_TYPES
+                for friction_type in positive_friction_counts
+            ),
+            "recovery_result": recovery_result,
+            "recovery_step_count": recovery_step_count or 0,
+        }
 
     eng_session_counts = {
         eid: count
@@ -400,6 +446,62 @@ def get_maturity_analytics(
         for d in sorted(agent_skill_data.values(), key=lambda x: x["total_calls"], reverse=True)
     ]
 
+    # 4b. Toolchain reliability
+    reliability_data: dict[tuple[str, str, str | None, str | None], dict] = {}
+
+    def _ensure_reliability_bucket(
+        surface_type: str,
+        identifier: str,
+        provenance: str | None,
+        source_classification: str | None,
+    ) -> dict:
+        return reliability_data.setdefault(
+            (surface_type, identifier, provenance, source_classification),
+            {
+                "identifier": identifier,
+                "surface_type": surface_type,
+                "provenance": provenance,
+                "source_classification": source_classification,
+                "sessions": set(),
+                "engineers": set(),
+                "friction_sessions": set(),
+                "failure_sessions": set(),
+                "recovered_sessions": set(),
+                "abandoned_sessions": set(),
+                "recovery_steps": [],
+                "success_sessions": set(),
+                "friction_type_counts": Counter(),
+            },
+        )
+
+    for sid, tool_name, call_count in tool_rows:
+        if call_count <= 0 or tool_name.startswith("Skill:") or tool_name.startswith("Task:"):
+            continue
+        if classify_tool(tool_name) == "mcp":
+            continue
+        bucket = _ensure_reliability_bucket("built_in_tool", tool_name, "built_in", "built_in")
+        bucket["sessions"].add(sid)
+        if sid in session_metrics:
+            session_metric = session_metrics[sid]
+            engineer_id_for_session = session_metric["engineer_id"]
+            if engineer_id_for_session:
+                bucket["engineers"].add(engineer_id_for_session)
+            if session_metric["has_friction"]:
+                bucket["friction_sessions"].add(sid)
+                bucket["friction_type_counts"].update(session_metric["friction_counts"])
+            if session_metric["has_failure"]:
+                bucket["failure_sessions"].add(sid)
+            outcome = session_metric["outcome"]
+            if outcome and is_success_outcome(outcome):
+                bucket["success_sessions"].add(sid)
+            if session_metric["recovery_result"] == "recovered":
+                bucket["recovered_sessions"].add(sid)
+            if session_metric["recovery_result"] == "abandoned":
+                bucket["abandoned_sessions"].add(sid)
+            recovery_steps = session_metric["recovery_step_count"]
+            if isinstance(recovery_steps, int) and recovery_steps > 0:
+                bucket["recovery_steps"].append(recovery_steps)
+
     # 5. Explicit customization breakdown
     customization_data: dict[tuple[str, str, str, str], dict] = {}
     customization_state_data: dict[tuple[str, str, str, str], dict] = {}
@@ -494,6 +596,31 @@ def get_maturity_analytics(
             bucket["projects"][project_name] += 1
         bucket["engineer_names"][engineer_names.get(engineer_id, "Unknown")] += 1
 
+        reliability_bucket = _ensure_reliability_bucket(
+            customization_type,
+            identifier,
+            provenance,
+            source_classification,
+        )
+        reliability_bucket["sessions"].add(session_id)
+        reliability_bucket["engineers"].add(engineer_id)
+        session_metric = session_metrics[session_id]
+        if session_metric["has_friction"]:
+            reliability_bucket["friction_sessions"].add(session_id)
+            reliability_bucket["friction_type_counts"].update(session_metric["friction_counts"])
+        if session_metric["has_failure"]:
+            reliability_bucket["failure_sessions"].add(session_id)
+        outcome = session_metric["outcome"]
+        if outcome and is_success_outcome(outcome):
+            reliability_bucket["success_sessions"].add(session_id)
+        if session_metric["recovery_result"] == "recovered":
+            reliability_bucket["recovered_sessions"].add(session_id)
+        if session_metric["recovery_result"] == "abandoned":
+            reliability_bucket["abandoned_sessions"].add(session_id)
+        recovery_steps = session_metric["recovery_step_count"]
+        if isinstance(recovery_steps, int) and recovery_steps > 0:
+            reliability_bucket["recovery_steps"].append(recovery_steps)
+
     customization_breakdown = [
         CustomizationUsage(
             identifier=bucket["identifier"],
@@ -558,6 +685,65 @@ def get_maturity_analytics(
                 -len(item["invoked_engineers"]),
                 -len(item["enabled_engineers"]),
                 -len(item["available_engineers"]),
+                item["identifier"],
+            ),
+        )
+    ]
+
+    toolchain_reliability = [
+        ToolchainReliabilityEntry(
+            identifier=bucket["identifier"],
+            surface_type=bucket["surface_type"],
+            provenance=bucket["provenance"],
+            source_classification=bucket["source_classification"],
+            session_count=len(bucket["sessions"]),
+            engineer_count=len(bucket["engineers"]),
+            friction_session_count=len(bucket["friction_sessions"]),
+            friction_session_rate=(
+                round(len(bucket["friction_sessions"]) / len(bucket["sessions"]), 3)
+                if bucket["sessions"]
+                else None
+            ),
+            failure_session_count=len(bucket["failure_sessions"]),
+            failure_session_rate=(
+                round(len(bucket["failure_sessions"]) / len(bucket["sessions"]), 3)
+                if bucket["sessions"]
+                else None
+            ),
+            recovery_rate=(
+                round(
+                    len(bucket["recovered_sessions"]) / len(bucket["friction_sessions"]),
+                    3,
+                )
+                if bucket["friction_sessions"]
+                else None
+            ),
+            success_rate=(
+                round(len(bucket["success_sessions"]) / len(bucket["sessions"]), 3)
+                if bucket["sessions"]
+                else None
+            ),
+            abandonment_rate=(
+                round(len(bucket["abandoned_sessions"]) / len(bucket["sessions"]), 3)
+                if bucket["sessions"]
+                else None
+            ),
+            avg_recovery_steps=(
+                round(sum(bucket["recovery_steps"]) / len(bucket["recovery_steps"]), 1)
+                if bucket["recovery_steps"]
+                else None
+            ),
+            top_friction_types=[
+                friction_type
+                for friction_type, _count in bucket["friction_type_counts"].most_common(3)
+            ],
+        )
+        for bucket in sorted(
+            reliability_data.values(),
+            key=lambda item: (
+                -len(item["failure_sessions"]),
+                -len(item["friction_sessions"]),
+                -len(item["sessions"]),
                 item["identifier"],
             ),
         )
@@ -947,6 +1133,7 @@ def get_maturity_analytics(
         high_performer_stacks=high_performer_stacks,
         team_customization_landscape=team_customization_landscape,
         customization_state_funnel=customization_state_funnel,
+        toolchain_reliability=toolchain_reliability,
         customization_outcomes=customization_outcomes,
         project_readiness=project_readiness,
         sessions_analyzed=sessions_analyzed,
