@@ -43,6 +43,13 @@ SessionArchetype = Literal[
     "investigation",
 ]
 ArchetypeSource = Literal["session_type", "heuristic"]
+DelegationEdgeType = Literal[
+    "subagent_task",
+    "agent_spawn",
+    "team_setup",
+    "team_message",
+    "worktree_handoff",
+]
 RecoveryStrategy = Literal[
     "inspect_context",
     "edit_fix",
@@ -292,6 +299,15 @@ class SessionWorkflowProfileResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class SessionDelegationEdgeResponse(BaseModel):
+    source_node: str
+    target_node: str
+    edge_type: DelegationEdgeType
+    tool_name: str
+    call_count: int
+    prompt_preview: str | None = None
+
+
 # --- Session Messages ---
 
 
@@ -438,6 +454,7 @@ class SessionDetailResponse(SessionResponse):
     facets: SessionFacetsResponse | None = None
     tool_usages: list[ToolUsageResponse] = []
     customizations: list[SessionCustomizationResponse] = []
+    delegation_edges: list[SessionDelegationEdgeResponse] = []
     model_usages: list[ModelUsageResponse] = []
     execution_evidence: list[SessionExecutionEvidenceResponse] = []
     change_shape: SessionChangeShapeResponse | None = None
@@ -1975,6 +1992,16 @@ class ToolchainReliabilityEntry(BaseModel):
     top_friction_types: list[str] = []
 
 
+class DelegationPatternSummary(BaseModel):
+    target_node: str
+    edge_type: DelegationEdgeType
+    session_count: int
+    engineer_count: int
+    total_calls: int
+    success_rate: float | None = None
+    top_workflow_archetypes: list[str] = []
+
+
 class CustomizationOutcomeAttribution(BaseModel):
     dimension: str
     label: str
@@ -2010,6 +2037,7 @@ class MaturityAnalyticsResponse(BaseModel):
     team_customization_landscape: list[TeamCustomizationLandscape] = []
     customization_state_funnel: list[CustomizationStateFunnel] = []
     toolchain_reliability: list[ToolchainReliabilityEntry] = []
+    delegation_patterns: list[DelegationPatternSummary] = []
     customization_outcomes: list[CustomizationOutcomeAttribution] = []
     project_readiness: list[ProjectReadinessEntry]
     sessions_analyzed: int

@@ -922,6 +922,44 @@ def test_session_detail_includes_customizations_when_present(
     assert data["customizations"][1]["invocation_count"] == 2
 
 
+def test_session_detail_includes_delegation_edges_when_present(
+    client, engineer_with_key, admin_headers
+):
+    _eng, api_key = engineer_with_key
+    sid = _ingest_session(
+        client,
+        api_key,
+        tool_usages=[
+            {"tool_name": "Task:reviewer", "call_count": 2},
+            {"tool_name": "SendMessage", "call_count": 1},
+        ],
+        messages=[
+            {
+                "ordinal": 0,
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "name": "Task",
+                        "input_preview": (
+                            '{"subagent_type":"reviewer","prompt":"Review the auth diff"}'
+                        ),
+                    }
+                ],
+            }
+        ],
+    )
+
+    response = client.get(f"/api/v1/sessions/{sid}", headers=admin_headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["delegation_edges"]) == 2
+    assert data["delegation_edges"][0]["edge_type"] == "subagent_task"
+    assert data["delegation_edges"][0]["target_node"] == "reviewer"
+    assert data["delegation_edges"][0]["prompt_preview"] == "Review the auth diff"
+    assert data["delegation_edges"][1]["edge_type"] == "team_message"
+
+
 def test_cost_analytics(client, engineer_with_key, admin_headers):
     _eng, api_key = engineer_with_key
     _ingest_session(

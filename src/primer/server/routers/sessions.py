@@ -15,6 +15,7 @@ from primer.common.schemas import (
     SimilarSessionsResponse,
 )
 from primer.server.deps import AuthContext, get_auth_context
+from primer.server.services.delegation_graph_service import extract_session_delegation_edges
 
 router = APIRouter(prefix="/api/v1/sessions", tags=["sessions"])
 
@@ -103,6 +104,10 @@ def get_session(
         if not eng or eng.team_id != auth.team_id:
             raise HTTPException(status_code=403, detail="Not your team's session")
 
+    session.delegation_edges = extract_session_delegation_edges(
+        session.messages,
+        session.tool_usages,
+    )
     return session
 
 

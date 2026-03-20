@@ -322,6 +322,43 @@ export function SessionDetailPanel({ session }: SessionDetailPanelProps) {
         </Card>
       )}
 
+      {session.delegation_edges.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Delegation Graph</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {session.delegation_edges.map((edge) => (
+              <div
+                key={`${edge.edge_type}:${edge.target_node}:${edge.tool_name}`}
+                className="rounded-lg border border-border/70 p-3"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">
+                      {edge.source_node}
+                      {" -> "}
+                      {edge.target_node}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatLabel(edge.edge_type)}
+                      {" • "}
+                      {edge.tool_name}
+                    </p>
+                    {edge.prompt_preview && (
+                      <p className="text-xs text-muted-foreground">
+                        {edge.prompt_preview}
+                      </p>
+                    )}
+                  </div>
+                  <Badge variant="secondary">{edge.call_count} calls</Badge>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {session.customizations.length > 0 && (
         <Card>
           <CardHeader>

@@ -18,7 +18,9 @@ from primer.common.models import (
     SessionCommit,
     SessionCustomization,
     SessionFacets,
+    SessionMessage,
     SessionRecoveryPath,
+    SessionWorkflowProfile,
     Team,
     ToolUsage,
 )
@@ -30,6 +32,7 @@ from primer.common.schemas import (
     CustomizationStateFunnel,
     CustomizationUsage,
     DailyLeverageEntry,
+    DelegationPatternSummary,
     EngineerLeverageProfile,
     HighPerformerStack,
     LeverageBreakdown,
@@ -47,6 +50,7 @@ from primer.common.tool_classification import (
     compute_leverage_score,
 )
 from primer.server.services.analytics_service import base_session_query
+from primer.server.services.delegation_graph_service import extract_session_delegation_edges
 from primer.server.services.effectiveness_service import build_effectiveness_score
 
 _RELIABILITY_FAILURE_FRICTION_TYPES = frozenset({"tool_error", "exec_error", "timeout"})
@@ -213,6 +217,43 @@ def get_maturity_analytics(
             "recovery_result": recovery_result,
             "recovery_step_count": recovery_step_count or 0,
         }
+
+    session_workflow_archetypes = {
+        row.session_id: row.archetype
+        for row in (
+            db.query(
+                SessionWorkflowProfile.session_id,
+                SessionWorkflowProfile.archetype,
+            )
+            .filter(
+                SessionWorkflowProfile.session_id.in_(db.query(session_id_subq.c.id)),
+                SessionWorkflowProfile.archetype.isnot(None),
+            )
+            .all()
+        )
+    }
+
+    delegation_message_rows = (
+        db.query(
+            SessionMessage.session_id,
+            SessionMessage.ordinal,
+            SessionMessage.tool_calls,
+        )
+        .filter(
+            SessionMessage.session_id.in_(db.query(session_id_subq.c.id)),
+            SessionMessage.tool_calls.isnot(None),
+        )
+        .order_by(SessionMessage.session_id.asc(), SessionMessage.ordinal.asc())
+        .all()
+    )
+    messages_by_session: dict[str, list[dict[str, object]]] = defaultdict(list)
+    for row in delegation_message_rows:
+        messages_by_session[row.session_id].append(
+            {
+                "ordinal": row.ordinal,
+                "tool_calls": row.tool_calls,
+            }
+        )
 
     eng_session_counts = {
         eid: count
@@ -444,6 +485,71 @@ def get_maturity_analytics(
             engineer_count=len(d["engineers"]),
         )
         for d in sorted(agent_skill_data.values(), key=lambda x: x["total_calls"], reverse=True)
+    ]
+
+    delegation_pattern_data: dict[tuple[str, str], dict] = {}
+    for sid in session_engineer:
+        tool_usage_fallback = [
+            {"tool_name": tool_name, "call_count": count}
+            for tool_name, count in per_session.get(sid, {}).items()
+        ]
+        edges = extract_session_delegation_edges(
+            messages_by_session.get(sid, []),
+            tool_usage_fallback,
+        )
+        if not edges:
+            continue
+        session_metric = session_metrics.get(sid)
+        engineer_id_for_session = session_engineer.get(sid, (None, ""))[0]
+        workflow_archetype = session_workflow_archetypes.get(sid)
+        for edge in edges:
+            bucket = delegation_pattern_data.setdefault(
+                (edge.edge_type, edge.target_node),
+                {
+                    "target_node": edge.target_node,
+                    "edge_type": edge.edge_type,
+                    "sessions": set(),
+                    "engineers": set(),
+                    "total_calls": 0,
+                    "success_sessions": set(),
+                    "workflow_archetypes": Counter(),
+                },
+            )
+            bucket["sessions"].add(sid)
+            if engineer_id_for_session:
+                bucket["engineers"].add(engineer_id_for_session)
+            bucket["total_calls"] += edge.call_count
+            if session_metric:
+                outcome = session_metric["outcome"]
+                if outcome and is_success_outcome(outcome):
+                    bucket["success_sessions"].add(sid)
+            if workflow_archetype:
+                bucket["workflow_archetypes"][workflow_archetype] += edge.call_count
+
+    delegation_patterns = [
+        DelegationPatternSummary(
+            target_node=bucket["target_node"],
+            edge_type=bucket["edge_type"],
+            session_count=len(bucket["sessions"]),
+            engineer_count=len(bucket["engineers"]),
+            total_calls=bucket["total_calls"],
+            success_rate=(
+                round(len(bucket["success_sessions"]) / len(bucket["sessions"]), 3)
+                if bucket["sessions"]
+                else None
+            ),
+            top_workflow_archetypes=[
+                archetype for archetype, _count in bucket["workflow_archetypes"].most_common(3)
+            ],
+        )
+        for bucket in sorted(
+            delegation_pattern_data.values(),
+            key=lambda item: (
+                -len(item["sessions"]),
+                -item["total_calls"],
+                item["target_node"],
+            ),
+        )
     ]
 
     # 4b. Toolchain reliability
@@ -1133,6 +1239,7 @@ def get_maturity_analytics(
         team_customization_landscape=team_customization_landscape,
         customization_state_funnel=customization_state_funnel,
         toolchain_reliability=toolchain_reliability,
+        delegation_patterns=delegation_patterns,
         customization_outcomes=customization_outcomes,
         project_readiness=project_readiness,
         sessions_analyzed=sessions_analyzed,
