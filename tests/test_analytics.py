@@ -956,6 +956,7 @@ def test_session_detail_includes_delegation_edges_when_present(
     assert len(data["delegation_edges"]) == 2
     assert data["delegation_edges"][0]["edge_type"] == "subagent_task"
     assert data["delegation_edges"][0]["target_node"] == "reviewer"
+    assert data["delegation_edges"][0]["call_count"] == 2
     assert data["delegation_edges"][0]["prompt_preview"] == "Review the auth diff"
     assert data["delegation_edges"][1]["edge_type"] == "team_message"
 
