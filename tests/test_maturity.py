@@ -523,6 +523,49 @@ def test_maturity_builds_toolchain_reliability_view(
     assert read_tool["abandonment_rate"] == 0.5
 
 
+def test_maturity_toolchain_reliability_deduplicates_duplicate_tool_rows(
+    client, admin_headers, seeded_maturity_data, db_session
+):
+    s1 = seeded_maturity_data["s1"]
+    s2 = seeded_maturity_data["s2"]
+
+    db_session.add(ToolUsage(session_id=s1.id, tool_name="Read", call_count=7))
+    db_session.add_all(
+        [
+            SessionFacets(session_id=s1.id, outcome="success", friction_counts={"tool_error": 1}),
+            SessionFacets(session_id=s2.id, outcome="failure", friction_counts={"timeout": 1}),
+            SessionRecoveryPath(
+                session_id=s1.id,
+                friction_detected=True,
+                recovery_step_count=1,
+                recovery_result="recovered",
+                final_outcome="success",
+            ),
+            SessionRecoveryPath(
+                session_id=s2.id,
+                friction_detected=True,
+                recovery_step_count=3,
+                recovery_result="abandoned",
+                final_outcome="failure",
+            ),
+        ]
+    )
+    db_session.flush()
+
+    response = client.get("/api/v1/analytics/maturity", headers=admin_headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    read_tool = next(
+        row
+        for row in data["toolchain_reliability"]
+        if row["surface_type"] == "built_in_tool" and row["identifier"] == "Read"
+    )
+    assert read_tool["session_count"] == 2
+    assert read_tool["friction_session_count"] == 2
+    assert read_tool["avg_recovery_steps"] == 2.0
+
+
 def test_maturity_date_filtering(client, admin_headers, seeded_maturity_data):
     now = datetime.now(tz=UTC)
     # Filter to only include yesterday (Alice's session)
