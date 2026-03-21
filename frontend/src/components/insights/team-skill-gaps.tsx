@@ -1,5 +1,6 @@
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { cn } from "@/lib/utils"
+import { cn, formatLabel } from "@/lib/utils"
 import type { TeamSkillGap } from "@/types/api"
 
 interface TeamSkillGapsProps {
@@ -35,11 +36,35 @@ export function TeamSkillGaps({ data }: TeamSkillGapsProps) {
           {sorted.map((gap) => (
             <div key={gap.skill} className="space-y-1">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-medium">{gap.skill}</span>
+                <div className="space-y-1">
+                  <span className="font-medium">{gap.skill}</span>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline">{formatLabel(gap.gap_type)}</Badge>
+                    {gap.workflow_archetype && (
+                      <Badge variant="outline">{formatLabel(gap.workflow_archetype)}</Badge>
+                    )}
+                    {gap.tool_category && (
+                      <Badge variant="outline">{formatLabel(gap.tool_category)}</Badge>
+                    )}
+                    {gap.project_context && (
+                      <Badge variant="outline">{gap.project_context}</Badge>
+                    )}
+                    {gap.recommended_identifier && (
+                      <Badge variant="secondary">
+                        {gap.recommended_asset_type
+                          ? `${formatLabel(gap.recommended_asset_type)}: ${gap.recommended_identifier}`
+                          : gap.recommended_identifier}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
                 <span className="text-muted-foreground">
                   {gap.engineers_with_skill}/{gap.total_engineers} engineers ({gap.coverage_pct.toFixed(0)}%)
                 </span>
               </div>
+              {gap.evidence_summary && (
+                <p className="text-xs text-muted-foreground">{gap.evidence_summary}</p>
+              )}
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                 <div
                   className={cn(

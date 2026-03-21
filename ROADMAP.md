@@ -147,7 +147,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Shared behavior pattern discovery with approach comparison
 - [x] [P1] Bright spot detection: explicitly surface high performers and cross-pollinate their patterns
 - [x] [P1] Exemplar-session-to-learning-path pipeline
-- [ ] [P1] Team skill gap mapping by workflow, tool category, and project context
+- [x] [P1] Team skill gap mapping by workflow, tool category, and project context
 - [ ] [P2] Coaching program measurement: which onboarding or training changes improved outcomes
 
 ## Project Intelligence

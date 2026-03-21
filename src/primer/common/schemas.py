@@ -1144,6 +1144,13 @@ class TeamSkillGap(BaseModel):
     coverage_pct: float
     total_engineers: int
     engineers_with_skill: int
+    gap_type: str = "skill"
+    workflow_archetype: str | None = None
+    tool_category: str | None = None
+    project_context: str | None = None
+    recommended_asset_type: str | None = None
+    recommended_identifier: str | None = None
+    evidence_summary: str | None = None
 
 
 class ReusableAssetAnalytics(BaseModel):

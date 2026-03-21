@@ -793,6 +793,13 @@ export interface TeamSkillGap {
   coverage_pct: number
   total_engineers: number
   engineers_with_skill: number
+  gap_type: string
+  workflow_archetype: string | null
+  tool_category: string | null
+  project_context: string | null
+  recommended_asset_type: string | null
+  recommended_identifier: string | null
+  evidence_summary: string | null
 }
 
 export interface ReusableAssetAnalytics {
