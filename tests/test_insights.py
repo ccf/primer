@@ -14,6 +14,7 @@ from primer.common.models import (
     Team,
     ToolUsage,
 )
+from primer.server.services.insights_service import _normalize_prompt_pattern
 
 
 def _create_session(db_session, engineer, **kwargs):
@@ -216,6 +217,13 @@ class TestPersonalizedTips:
 
 
 class TestSkillInventory:
+    def test_prompt_normalization_replaces_full_uuid_before_hex_chunks(self):
+        normalized = _normalize_prompt_pattern(
+            "Investigate workspace 550e8400-e29b-41d4-a716-446655440000 for tenant 123"
+        )
+
+        assert normalized == "investigate workspace <id> for tenant <id>"
+
     def test_empty_state(self, client, admin_headers):
         r = client.get("/api/v1/analytics/skill-inventory", headers=admin_headers)
         assert r.status_code == 200
