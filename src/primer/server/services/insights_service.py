@@ -52,7 +52,7 @@ from primer.common.schemas import (
 )
 from primer.server.services.analytics_service import base_session_query
 
-_PROMPT_REUSE_ID_RE = re.compile(r"\b(?:\d+|[0-9a-f]{7,}|[0-9a-f]{8}-[0-9a-f-]{27,})\b")
+_PROMPT_REUSE_ID_RE = re.compile(r"\b(?:[0-9a-f]{8}-[0-9a-f-]{27,}|\d+|[0-9a-f]{7,})\b")
 _PROMPT_REUSE_WHITESPACE_RE = re.compile(r"\s+")
 
 
