@@ -50,6 +50,7 @@ from primer.common.schemas import (
     TimeToTeamAverageResponse,
     WeeklySuccessPoint,
 )
+from primer.common.tool_classification import classify_tool
 from primer.server.services.analytics_service import base_session_query
 
 _PROMPT_REUSE_ID_RE = re.compile(r"\b(?:[0-9a-f]{8}-[0-9a-f-]{27,}|\d+|[0-9a-f]{7,})\b")
@@ -96,6 +97,38 @@ def _normalize_prompt_pattern(text: str) -> str:
 
 def _prompt_preview(text: str) -> str:
     return _PROMPT_REUSE_WHITESPACE_RE.sub(" ", text.strip())[:160]
+
+
+def _append_gap(
+    gaps: list[TeamSkillGap],
+    *,
+    skill: str,
+    coverage: float,
+    total_engineers: int,
+    engineers_with: int,
+    gap_type: str = "skill",
+    workflow_archetype: str | None = None,
+    tool_category: str | None = None,
+    project_context: str | None = None,
+    recommended_asset_type: str | None = None,
+    recommended_identifier: str | None = None,
+    evidence_summary: str | None = None,
+) -> None:
+    gaps.append(
+        TeamSkillGap(
+            skill=skill,
+            coverage_pct=round(coverage * 100, 1),
+            total_engineers=total_engineers,
+            engineers_with_skill=engineers_with,
+            gap_type=gap_type,
+            workflow_archetype=workflow_archetype,
+            tool_category=tool_category,
+            project_context=project_context,
+            recommended_asset_type=recommended_asset_type,
+            recommended_identifier=recommended_identifier,
+            evidence_summary=evidence_summary,
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -682,37 +715,8 @@ def get_skill_inventory(
             )
         )
 
-    # Team skill gaps — check coverage for session types and tools
     total_engineers = len(engineer_ids)
     gaps: list[TeamSkillGap] = []
-
-    # Session type coverage
-    for stype in sorted(all_session_types):
-        engineers_with = sum(1 for p in profiles if stype in p.session_types)
-        coverage = engineers_with / total_engineers if total_engineers else 0
-        if coverage < 0.3:
-            gaps.append(
-                TeamSkillGap(
-                    skill=stype,
-                    coverage_pct=round(coverage * 100, 1),
-                    total_engineers=total_engineers,
-                    engineers_with_skill=engineers_with,
-                )
-            )
-
-    # Tool coverage
-    for tool in sorted(all_tool_names):
-        engineers_with = sum(1 for p in profiles if tool in p.tool_proficiency)
-        coverage = engineers_with / total_engineers if total_engineers else 0
-        if coverage < 0.3:
-            gaps.append(
-                TeamSkillGap(
-                    skill=tool,
-                    coverage_pct=round(coverage * 100, 1),
-                    total_engineers=total_engineers,
-                    engineers_with_skill=engineers_with,
-                )
-            )
 
     reusable_asset_rows = (
         db.query(
@@ -900,6 +904,140 @@ def get_skill_inventory(
             pattern.prompt_preview,
         ),
     )[:5]
+
+    # Team skill gaps — context-aware workflow/tool/project gaps
+    for stype in sorted(all_session_types):
+        engineers_with = sum(1 for p in profiles if stype in p.session_types)
+        coverage = engineers_with / total_engineers if total_engineers else 0
+        if coverage < 0.3:
+            supporting_prompt = next(
+                (
+                    pattern
+                    for pattern in prompt_patterns
+                    if pattern.primary_workflow_archetype == stype
+                    or stype in pattern.workflow_archetypes
+                ),
+                None,
+            )
+            _append_gap(
+                gaps,
+                skill=stype,
+                coverage=coverage,
+                total_engineers=total_engineers,
+                engineers_with=engineers_with,
+                gap_type="workflow",
+                workflow_archetype=stype,
+                recommended_asset_type="prompt" if supporting_prompt is not None else None,
+                recommended_identifier=(
+                    supporting_prompt.prompt_preview if supporting_prompt is not None else None
+                ),
+                evidence_summary=(
+                    f"Only {engineers_with}/{total_engineers} engineers show this workflow pattern."
+                ),
+            )
+
+    for tool in sorted(all_tool_names):
+        engineers_with = sum(1 for p in profiles if tool in p.tool_proficiency)
+        coverage = engineers_with / total_engineers if total_engineers else 0
+        if coverage < 0.3:
+            _append_gap(
+                gaps,
+                skill=tool,
+                coverage=coverage,
+                total_engineers=total_engineers,
+                engineers_with=engineers_with,
+            )
+
+    tool_category_engineers: dict[str, set[str]] = defaultdict(set)
+    for eid, counts in eng_tool_calls.items():
+        categories = {classify_tool(tool_name) for tool_name in counts}
+        for category in categories:
+            tool_category_engineers[category].add(eid)
+
+    for category in ("search", "orchestration", "mcp", "skill"):
+        engineers_with = len(tool_category_engineers.get(category, set()))
+        coverage = engineers_with / total_engineers if total_engineers else 0
+        if coverage < 0.3:
+            supporting_asset = next(
+                (
+                    asset
+                    for asset in reusable_assets
+                    if asset.customization_type in {"skill", "command"} and category == "skill"
+                ),
+                None,
+            )
+            _append_gap(
+                gaps,
+                skill=category,
+                coverage=coverage,
+                total_engineers=total_engineers,
+                engineers_with=engineers_with,
+                gap_type="tool_category",
+                tool_category=category,
+                recommended_asset_type=(
+                    supporting_asset.customization_type if supporting_asset is not None else None
+                ),
+                recommended_identifier=(
+                    supporting_asset.identifier if supporting_asset is not None else None
+                ),
+                evidence_summary=(
+                    f"Only {engineers_with}/{total_engineers} engineers use "
+                    f"the {category} tool category."
+                ),
+            )
+
+    project_engineers: dict[str, set[str]] = defaultdict(set)
+    for session in sessions:
+        if session.project_name:
+            project_engineers[session.project_name].add(session.engineer_id)
+
+    for project_name, engineers_in_project in sorted(project_engineers.items()):
+        if len(engineers_in_project) < 2:
+            continue
+        project_assets = [
+            asset
+            for asset in reusable_assets
+            if project_name in asset.top_projects
+            and asset.engineer_count < len(engineers_in_project)
+        ]
+        if not project_assets:
+            continue
+        best_asset = sorted(
+            project_assets,
+            key=lambda asset: (
+                -(asset.success_rate or 0.0),
+                asset.engineer_count,
+                -asset.session_count,
+            ),
+        )[0]
+        coverage = best_asset.engineer_count / len(engineers_in_project)
+        if coverage >= 0.6:
+            continue
+        _append_gap(
+            gaps,
+            skill=f"{project_name}: {best_asset.identifier}",
+            coverage=coverage,
+            total_engineers=len(engineers_in_project),
+            engineers_with=best_asset.engineer_count,
+            gap_type="project_context",
+            project_context=project_name,
+            workflow_archetype=best_asset.primary_workflow_archetype,
+            recommended_asset_type=best_asset.customization_type,
+            recommended_identifier=best_asset.identifier,
+            evidence_summary=(
+                f"{best_asset.identifier} performs well in {project_name}, but only "
+                f"{best_asset.engineer_count}/{len(engineers_in_project)} engineers use it there."
+            ),
+        )
+
+    gaps = sorted(
+        gaps,
+        key=lambda gap: (
+            gap.coverage_pct,
+            0 if gap.gap_type == "project_context" else 1,
+            gap.skill,
+        ),
+    )[:12]
 
     return SkillInventoryResponse(
         engineer_profiles=profiles,

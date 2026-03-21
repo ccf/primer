@@ -319,6 +319,8 @@ class TestSkillInventory:
         gap_skills = [g["skill"] for g in data["team_skill_gaps"]]
         assert "RareTool" in gap_skills
         assert "Read" not in gap_skills
+        rare_tool_gap = next(g for g in data["team_skill_gaps"] if g["skill"] == "RareTool")
+        assert rare_tool_gap["gap_type"] == "skill"
 
     def test_tool_proficiency_levels(self, client, db_session, engineer_with_key, admin_headers):
         eng, _key = engineer_with_key
@@ -594,6 +596,103 @@ class TestSkillInventory:
         assert checklist["adoption_rate"] == 0.5
         assert checklist["success_rate"] == 1.0
         assert checklist["workflow_archetypes"] == ["docs"]
+
+    def test_team_skill_gaps_include_project_and_workflow_context(
+        self, client, db_session, admin_headers
+    ):
+        team = Team(name=f"Gap Team {uuid.uuid4().hex[:6]}")
+        db_session.add(team)
+        db_session.flush()
+
+        engineers = []
+        for i in range(4):
+            raw_key = f"primer_{secrets.token_urlsafe(32)}"
+            hashed = bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt()).decode()
+            engineer = Engineer(
+                name=f"Gap Eng {i}",
+                email=f"gap{i}_{uuid.uuid4().hex[:6]}@test.com",
+                team_id=team.id,
+                api_key_hash=hashed,
+            )
+            db_session.add(engineer)
+            db_session.flush()
+            engineers.append(engineer)
+
+        now = datetime.now(UTC)
+        s1 = _create_session(
+            db_session,
+            engineers[0],
+            started_at=now - timedelta(hours=3),
+            project_name="primer",
+        )
+        s2 = _create_session(
+            db_session,
+            engineers[1],
+            started_at=now - timedelta(hours=2),
+            project_name="primer",
+        )
+        s3 = _create_session(
+            db_session,
+            engineers[2],
+            started_at=now - timedelta(hours=1),
+            project_name="primer",
+        )
+        s4 = _create_session(
+            db_session,
+            engineers[3],
+            started_at=now - timedelta(minutes=30),
+            project_name="primer",
+        )
+
+        db_session.add_all(
+            [
+                SessionFacets(session_id=s1.id, session_type="debugging", outcome="success"),
+                SessionFacets(session_id=s2.id, session_type="feature", outcome="success"),
+                SessionFacets(session_id=s3.id, session_type="feature", outcome="success"),
+                SessionFacets(session_id=s4.id, session_type="feature", outcome="success"),
+                SessionWorkflowProfile(session_id=s1.id, archetype="debugging"),
+                SessionWorkflowProfile(session_id=s2.id, archetype="feature_delivery"),
+                SessionWorkflowProfile(session_id=s3.id, archetype="feature_delivery"),
+                SessionWorkflowProfile(session_id=s4.id, archetype="feature_delivery"),
+                SessionCustomization(
+                    session_id=s1.id,
+                    customization_type="skill",
+                    state="invoked",
+                    identifier="review-pr",
+                    provenance="repo_defined",
+                    source_classification="custom",
+                    invocation_count=3,
+                ),
+            ]
+        )
+        db_session.flush()
+
+        r = client.get(
+            f"/api/v1/analytics/skill-inventory?team_id={team.id}",
+            headers=admin_headers,
+        )
+        assert r.status_code == 200
+        data = r.json()
+
+        project_gap = next(
+            gap
+            for gap in data["team_skill_gaps"]
+            if gap["gap_type"] == "project_context" and gap["project_context"] == "primer"
+        )
+        assert project_gap["recommended_asset_type"] == "skill"
+        assert project_gap["recommended_identifier"] == "review-pr"
+        assert project_gap["workflow_archetype"] == "debugging"
+
+        workflow_gap = next(
+            gap
+            for gap in data["team_skill_gaps"]
+            if gap["gap_type"] == "workflow" and gap["workflow_archetype"] == "debugging"
+        )
+        assert workflow_gap["engineers_with_skill"] == 1
+        assert (
+            workflow_gap["recommended_asset_type"] is None
+            or workflow_gap["recommended_asset_type"] == "prompt"
+        )
 
     def test_requires_auth(self, client):
         r = client.get("/api/v1/analytics/skill-inventory")
