@@ -1252,6 +1252,22 @@ class ToolRecommendation(BaseModel):
     exemplar: LearningRecommendationExemplar | None = None
 
 
+class ModelRecommendation(BaseModel):
+    current_model: str
+    recommended_model: str
+    recommendation_type: str  # "downshift" | "upgrade"
+    workflow_archetype: str | None = None
+    title: str
+    description: str
+    priority: str
+    current_success_rate: float | None = None
+    recommended_success_rate: float | None = None
+    current_avg_cost: float | None = None
+    recommended_avg_cost: float | None = None
+    supporting_session_count: int = 0
+    supporting_engineer_count: int = 0
+
+
 # --- Pattern Sharing ---
 
 
@@ -1804,6 +1820,7 @@ class EngineerProfileResponse(BaseModel):
     strengths: SkillInventoryResponse
     learning_paths: list[EngineerLearningPath]
     tool_recommendations: list[ToolRecommendation] = []
+    model_recommendations: list[ModelRecommendation] = []
     quality: dict  # flexible dict for quality metrics
     leverage_score: float | None = None
     effectiveness: EffectivenessScore | None = None

@@ -5,11 +5,18 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from primer.common.facet_taxonomy import canonical_outcome, is_success_outcome
-from primer.common.models import Engineer, ModelUsage, SessionFacets, ToolUsage
+from primer.common.models import (
+    Engineer,
+    ModelUsage,
+    SessionFacets,
+    SessionWorkflowProfile,
+    ToolUsage,
+)
 from primer.common.models import Session as SessionModel
 from primer.common.pricing import estimate_cost
 from primer.common.schemas import (
     EngineerProfileResponse,
+    ModelRecommendation,
     ToolRecommendation,
     WeeklyMetricPoint,
 )
@@ -38,6 +45,275 @@ _RECOMMENDATION_PRIORITY_SCORE = {
     "medium": 2,
     "low": 1,
 }
+
+
+def _build_model_recommendations(
+    db: Session,
+    engineer_id: str,
+    team_id: str | None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    limit: int = 4,
+) -> list[ModelRecommendation]:
+    session_query = (
+        db.query(
+            SessionModel.id,
+            SessionModel.engineer_id,
+            SessionModel.primary_model,
+            SessionModel.input_tokens,
+            SessionModel.output_tokens,
+            SessionModel.cache_read_tokens,
+            SessionModel.cache_creation_tokens,
+            SessionWorkflowProfile.archetype,
+            SessionFacets.outcome,
+        )
+        .join(SessionWorkflowProfile, SessionWorkflowProfile.session_id == SessionModel.id)
+        .outerjoin(SessionFacets, SessionFacets.session_id == SessionModel.id)
+        .filter(
+            SessionModel.primary_model.isnot(None),
+            SessionWorkflowProfile.archetype.isnot(None),
+        )
+    )
+    if team_id:
+        session_query = session_query.join(
+            Engineer, Engineer.id == SessionModel.engineer_id
+        ).filter(Engineer.team_id == team_id)
+    if start_date:
+        session_query = session_query.filter(SessionModel.started_at >= start_date)
+    if end_date:
+        session_query = session_query.filter(SessionModel.started_at <= end_date)
+
+    session_rows = session_query.all()
+    if not session_rows:
+        return []
+
+    session_ids = [row.id for row in session_rows]
+    session_costs: dict[str, float] = {}
+    for row in (
+        db.query(
+            ModelUsage.session_id,
+            ModelUsage.model_name,
+            ModelUsage.input_tokens,
+            ModelUsage.output_tokens,
+            ModelUsage.cache_read_tokens,
+            ModelUsage.cache_creation_tokens,
+        )
+        .filter(ModelUsage.session_id.in_(session_ids))
+        .all()
+    ):
+        session_costs[row.session_id] = session_costs.get(row.session_id, 0.0) + estimate_cost(
+            row.model_name,
+            row.input_tokens or 0,
+            row.output_tokens or 0,
+            row.cache_read_tokens or 0,
+            row.cache_creation_tokens or 0,
+        )
+
+    for row in session_rows:
+        if row.id not in session_costs:
+            session_costs[row.id] = estimate_cost(
+                row.primary_model,
+                row.input_tokens or 0,
+                row.output_tokens or 0,
+                row.cache_read_tokens or 0,
+                row.cache_creation_tokens or 0,
+            )
+
+    def _bucket_value() -> dict[str, object]:
+        return {
+            "sessions": set(),
+            "engineers": set(),
+            "success_sessions": set(),
+            "costs": [],
+        }
+
+    engineer_stats: dict[tuple[str, str], dict[str, object]] = {}
+    peer_stats: dict[tuple[str, str], dict[str, object]] = {}
+    engineer_model_counts: dict[str, Counter[str]] = {}
+
+    for row in session_rows:
+        workflow = row.archetype
+        model = row.primary_model
+        if not workflow or not model:
+            continue
+        outcome = canonical_outcome(row.outcome)
+        cost = session_costs.get(row.id)
+
+        if row.engineer_id == engineer_id:
+            engineer_model_counts.setdefault(workflow, Counter())[model] += 1
+            bucket = engineer_stats.setdefault((workflow, model), _bucket_value())
+        else:
+            bucket = peer_stats.setdefault((workflow, model), _bucket_value())
+
+        sessions_bucket = bucket["sessions"]
+        engineers_bucket = bucket["engineers"]
+        success_bucket = bucket["success_sessions"]
+        costs_bucket = bucket["costs"]
+        assert isinstance(sessions_bucket, set)
+        assert isinstance(engineers_bucket, set)
+        assert isinstance(success_bucket, set)
+        assert isinstance(costs_bucket, list)
+        sessions_bucket.add(row.id)
+        engineers_bucket.add(row.engineer_id)
+        if outcome and is_success_outcome(outcome):
+            success_bucket.add(row.id)
+        if cost is not None:
+            costs_bucket.append(cost)
+
+    recommendations: list[ModelRecommendation] = []
+    for workflow, model_counts in engineer_model_counts.items():
+        if not model_counts:
+            continue
+        current_model = model_counts.most_common(1)[0][0]
+        current_bucket = engineer_stats.get((workflow, current_model))
+        if current_bucket is None:
+            continue
+
+        current_sessions = current_bucket["sessions"]
+        current_success_sessions = current_bucket["success_sessions"]
+        current_costs = current_bucket["costs"]
+        assert isinstance(current_sessions, set)
+        assert isinstance(current_success_sessions, set)
+        assert isinstance(current_costs, list)
+        if len(current_sessions) < 2:
+            continue
+
+        current_success_rate = (
+            len(current_success_sessions) / len(current_sessions) if current_sessions else None
+        )
+        current_avg_cost = sum(current_costs) / len(current_costs) if current_costs else None
+
+        candidates: list[dict[str, object]] = []
+        for (candidate_workflow, candidate_model), bucket in peer_stats.items():
+            if candidate_workflow != workflow or candidate_model == current_model:
+                continue
+            sessions_bucket = bucket["sessions"]
+            engineers_bucket = bucket["engineers"]
+            success_bucket = bucket["success_sessions"]
+            costs_bucket = bucket["costs"]
+            assert isinstance(sessions_bucket, set)
+            assert isinstance(engineers_bucket, set)
+            assert isinstance(success_bucket, set)
+            assert isinstance(costs_bucket, list)
+            if len(sessions_bucket) < 2:
+                continue
+            success_rate = len(success_bucket) / len(sessions_bucket) if sessions_bucket else None
+            avg_cost = sum(costs_bucket) / len(costs_bucket) if costs_bucket else None
+            candidates.append(
+                {
+                    "model": candidate_model,
+                    "session_count": len(sessions_bucket),
+                    "engineer_count": len(engineers_bucket),
+                    "success_rate": success_rate,
+                    "avg_cost": avg_cost,
+                }
+            )
+
+        if not candidates:
+            continue
+
+        cheaper_candidates = [
+            candidate
+            for candidate in candidates
+            if candidate["avg_cost"] is not None
+            and current_avg_cost is not None
+            and candidate["avg_cost"] < current_avg_cost * 0.8
+            and candidate["success_rate"] is not None
+            and (
+                current_success_rate is None
+                or candidate["success_rate"] >= max(current_success_rate - 0.05, 0.7)
+            )
+        ]
+        if cheaper_candidates:
+            candidate = sorted(
+                cheaper_candidates,
+                key=lambda item: (
+                    item["avg_cost"],
+                    -(item["success_rate"] or 0.0),
+                ),
+            )[0]
+            assert current_avg_cost is not None
+            savings = current_avg_cost - candidate["avg_cost"]
+            priority = "high" if savings >= 0.2 else "medium"
+            recommendations.append(
+                ModelRecommendation(
+                    current_model=current_model,
+                    recommended_model=candidate["model"],
+                    recommendation_type="downshift",
+                    workflow_archetype=workflow,
+                    title=f"Use {candidate['model']} for {workflow.replace('_', ' ')} work",
+                    description=(
+                        f"Peers handling {workflow.replace('_', ' ')} sessions succeed with "
+                        f"{candidate['model']} at lower average cost."
+                    ),
+                    priority=priority,
+                    current_success_rate=(
+                        round(current_success_rate, 3) if current_success_rate is not None else None
+                    ),
+                    recommended_success_rate=(
+                        round(candidate["success_rate"], 3)
+                        if candidate["success_rate"] is not None
+                        else None
+                    ),
+                    current_avg_cost=round(current_avg_cost, 4),
+                    recommended_avg_cost=round(candidate["avg_cost"], 4),
+                    supporting_session_count=int(candidate["session_count"]),
+                    supporting_engineer_count=int(candidate["engineer_count"]),
+                )
+            )
+            continue
+
+        upgrade_candidates = [
+            candidate
+            for candidate in candidates
+            if candidate["avg_cost"] is not None
+            and current_avg_cost is not None
+            and candidate["avg_cost"] > current_avg_cost
+            and candidate["success_rate"] is not None
+            and current_success_rate is not None
+            and current_success_rate < 0.6
+            and candidate["success_rate"] >= current_success_rate + 0.15
+        ]
+        if upgrade_candidates:
+            candidate = sorted(
+                upgrade_candidates,
+                key=lambda item: (
+                    -(item["success_rate"] or 0.0),
+                    item["avg_cost"],
+                ),
+            )[0]
+            recommendations.append(
+                ModelRecommendation(
+                    current_model=current_model,
+                    recommended_model=candidate["model"],
+                    recommendation_type="upgrade",
+                    workflow_archetype=workflow,
+                    title=f"Try {candidate['model']} for {workflow.replace('_', ' ')} work",
+                    description=(
+                        f"Peers see materially better success on {workflow.replace('_', ' ')} "
+                        f"sessions with {candidate['model']}."
+                    ),
+                    priority="high",
+                    current_success_rate=round(current_success_rate, 3),
+                    recommended_success_rate=round(candidate["success_rate"], 3),
+                    current_avg_cost=round(current_avg_cost, 4)
+                    if current_avg_cost is not None
+                    else None,
+                    recommended_avg_cost=round(candidate["avg_cost"], 4),
+                    supporting_session_count=int(candidate["session_count"]),
+                    supporting_engineer_count=int(candidate["engineer_count"]),
+                )
+            )
+
+    recommendations.sort(
+        key=lambda recommendation: (
+            -_RECOMMENDATION_PRIORITY_SCORE.get(recommendation.priority, 0),
+            -recommendation.supporting_session_count,
+            recommendation.workflow_archetype or "",
+            recommendation.recommended_model,
+        )
+    )
+    return recommendations[:limit]
 
 
 def _build_tool_recommendations(
@@ -433,6 +709,13 @@ def get_engineer_profile(
         start_date=start_date,
         end_date=end_date,
     )
+    model_recommendations = _build_model_recommendations(
+        db,
+        engineer_id,
+        engineer.team_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
 
     # Leverage score from maturity analytics
     leverage_score: float | None = None
@@ -489,6 +772,7 @@ def get_engineer_profile(
         strengths=skills,
         learning_paths=eng_paths,
         tool_recommendations=tool_recommendations,
+        model_recommendations=model_recommendations,
         quality=quality,
         leverage_score=leverage_score,
         effectiveness=effectiveness,

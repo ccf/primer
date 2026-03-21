@@ -900,6 +900,22 @@ export interface ToolRecommendation {
   exemplar: LearningRecommendationExemplar | null
 }
 
+export interface ModelRecommendation {
+  current_model: string
+  recommended_model: string
+  recommendation_type: string
+  workflow_archetype: string | null
+  title: string
+  description: string
+  priority: string
+  current_success_rate: number | null
+  recommended_success_rate: number | null
+  current_avg_cost: number | null
+  recommended_avg_cost: number | null
+  supporting_session_count: number
+  supporting_engineer_count: number
+}
+
 // --- Pattern Sharing ---
 
 export interface EngineerApproach {
@@ -1436,6 +1452,7 @@ export interface EngineerProfileResponse {
   strengths: SkillInventoryResponse
   learning_paths: EngineerLearningPath[]
   tool_recommendations: ToolRecommendation[]
+  model_recommendations: ModelRecommendation[]
   quality: Record<string, unknown>
   leverage_score: number | null
   effectiveness: EffectivenessScore | null
