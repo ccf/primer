@@ -110,6 +110,7 @@ export function EngineerProfilePage({ dateRange }: EngineerProfilePageProps) {
                 strengths={profile.strengths}
                 learningPaths={profile.learning_paths}
                 toolRecommendations={profile.tool_recommendations}
+                modelRecommendations={profile.model_recommendations}
               />
             )}
             {activeTab === "quality" && (

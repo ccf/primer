@@ -14,6 +14,7 @@ from primer.common.models import (
     SessionCommit,
     SessionFacets,
     SessionMessage,
+    SessionWorkflowProfile,
     Team,
     ToolUsage,
 )
@@ -382,6 +383,77 @@ class TestEngineerProfileOverview:
         assert recommendation["supporting_exemplar_count"] >= 1
         assert recommendation["exemplar"]["project_name"] == "primer"
         assert recommendation["exemplar"]["relevance_reason"]
+
+    def test_profile_includes_model_recommendations_by_workflow(
+        self, client, db_session, admin_headers
+    ):
+        team = Team(name=f"Model Coach Team {uuid.uuid4().hex[:6]}")
+        db_session.add(team)
+        db_session.flush()
+
+        engineer, _key = _make_engineer(db_session, team, name="Learner")
+        peer_one, _peer_key_one = _make_engineer(db_session, team, name="Peer One")
+        peer_two, _peer_key_two = _make_engineer(db_session, team, name="Peer Two")
+        now = datetime.now(UTC)
+
+        for idx in range(2):
+            session = _create_session(
+                db_session,
+                engineer,
+                started_at=now - timedelta(hours=idx + 1),
+                project_name="primer",
+                primary_model="claude-opus-4",
+            )
+            db_session.add(SessionFacets(session_id=session.id, outcome="success"))
+            db_session.add(SessionWorkflowProfile(session_id=session.id, archetype="debugging"))
+            db_session.add(
+                ModelUsage(
+                    session_id=session.id,
+                    model_name="claude-opus-4",
+                    input_tokens=1000,
+                    output_tokens=500,
+                    cache_read_tokens=0,
+                    cache_creation_tokens=0,
+                )
+            )
+
+        for idx, peer in enumerate((peer_one, peer_two), start=1):
+            session = _create_session(
+                db_session,
+                peer,
+                started_at=now - timedelta(hours=idx + 4),
+                project_name="primer",
+                primary_model="claude-sonnet-4-5-20250929",
+            )
+            db_session.add(SessionFacets(session_id=session.id, outcome="success"))
+            db_session.add(SessionWorkflowProfile(session_id=session.id, archetype="debugging"))
+            db_session.add(
+                ModelUsage(
+                    session_id=session.id,
+                    model_name="claude-sonnet-4-5-20250929",
+                    input_tokens=1000,
+                    output_tokens=500,
+                    cache_read_tokens=0,
+                    cache_creation_tokens=0,
+                )
+            )
+
+        db_session.flush()
+
+        response = client.get(
+            f"/api/v1/analytics/engineers/{engineer.id}/profile",
+            headers=admin_headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+
+        assert len(data["model_recommendations"]) >= 1
+        recommendation = data["model_recommendations"][0]
+        assert recommendation["workflow_archetype"] == "debugging"
+        assert recommendation["current_model"] == "claude-opus-4"
+        assert recommendation["recommended_model"] == "claude-sonnet-4-5-20250929"
+        assert recommendation["recommendation_type"] == "downshift"
+        assert recommendation["supporting_session_count"] >= 2
 
     def test_profile_overview_treats_legacy_outcomes_as_canonical(
         self, client, db_session, engineer_with_key, admin_headers

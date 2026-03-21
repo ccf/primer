@@ -1,10 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { ModelRecommendationList } from "@/components/insights/model-recommendation-list"
 import { ToolRecommendationList } from "@/components/insights/tool-recommendation-list"
 import { cn } from "@/lib/utils"
 import type {
   SkillInventoryResponse,
   EngineerLearningPath,
+  ModelRecommendation,
   ToolRecommendation,
 } from "@/types/api"
 
@@ -12,6 +14,7 @@ interface StrengthsTabProps {
   strengths: SkillInventoryResponse
   learningPaths: EngineerLearningPath[]
   toolRecommendations?: ToolRecommendation[]
+  modelRecommendations?: ModelRecommendation[]
 }
 
 const proficiencyColor: Record<string, string> = {
@@ -31,6 +34,7 @@ export function StrengthsTab({
   strengths,
   learningPaths,
   toolRecommendations = [],
+  modelRecommendations = [],
 }: StrengthsTabProps) {
   const profiles = strengths.engineer_profiles
   const hasProfiles = profiles.length > 0
@@ -162,6 +166,13 @@ export function StrengthsTab({
         <div className="space-y-3">
           <h3 className="text-sm font-medium">Tool Recommendations</h3>
           <ToolRecommendationList recommendations={toolRecommendations} />
+        </div>
+      )}
+
+      {modelRecommendations.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium">Model Selection Coach</h3>
+          <ModelRecommendationList recommendations={modelRecommendations} />
         </div>
       )}
     </div>

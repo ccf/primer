@@ -23,6 +23,7 @@ export function ProfileInsightsTab({ profile, teamId, startDate, endDate }: Prof
           strengths={profile.strengths}
           learningPaths={profile.learning_paths}
           toolRecommendations={profile.tool_recommendations}
+          modelRecommendations={profile.model_recommendations}
         />
       </div>
 
