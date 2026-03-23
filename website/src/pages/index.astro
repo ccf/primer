@@ -209,7 +209,7 @@ const audiences = [
         </p>
       </div>
 
-      <div class="agent-cluster hidden lg:grid" aria-hidden="true">
+      <div class="agent-cluster hidden lg:grid lg:grid-cols-2" aria-hidden="true">
         {agentMarks.map((mark) => (
           <div class="agent-cluster__mark">
             <span class="agent-cluster__name">{mark.name}</span>
@@ -218,7 +218,7 @@ const audiences = [
         ))}
       </div>
 
-      <div class="agent-cluster mt-8 lg:hidden">
+      <div class="mt-8 grid gap-3 lg:hidden">
         {agentMarks.map((mark) => (
           <div class="agent-cluster__mark">
             <span class="agent-cluster__name">{mark.name}</span>
