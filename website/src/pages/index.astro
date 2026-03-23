@@ -88,6 +88,12 @@ const workflowLoop = [
     description:
       "Promote bright spots into playbooks, exemplars, model guidance, and experiments instead of leaving the signal trapped in dashboards.",
   },
+  {
+    step: "Measure",
+    title: "Verify what changed",
+    description:
+      "Track whether rollouts, interventions, and experiments improved quality, reduced friction, or lowered cost per successful outcome.",
+  },
 ];
 
 const audiences = [
@@ -237,8 +243,8 @@ const differentiators = [
           Cost, quality, exemplars, and agent stacks in one product story
         </h2>
         <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
-          The website should lead with these views because they show how Primer connects spend,
-          outcomes, reusable behavior, and coaching.
+          These are the views that show how Primer connects spend, outcomes, reusable behavior,
+          and coaching across the product.
         </p>
       </div>
 
@@ -279,7 +285,7 @@ const differentiators = [
         </p>
       </div>
 
-      <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+      <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
         {workflowLoop.map((item, idx) => (
           <div
             class="rounded-2xl border border-border bg-card p-6 animate-fade-in-up"
