@@ -213,11 +213,6 @@ pre.astro-code:hover::before {
   transform-origin: left;
 }
 
-@keyframes drift-mark {
-  0%, 100% { transform: translate3d(0, 0, 0); }
-  50% { transform: translate3d(0, -10px, 0); }
-}
-
 .agent-atmosphere {
   position: relative;
 }
@@ -232,35 +227,35 @@ pre.astro-code:hover::before {
   pointer-events: none;
 }
 
-.agent-atmosphere__marks {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
+.agent-cluster {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: stretch;
 }
 
-.agent-atmosphere__mark {
-  position: absolute;
+.agent-cluster__mark {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  padding: 1rem 1.1rem;
+  justify-content: center;
+  min-height: 9rem;
+  gap: 0.4rem;
+  padding: 1.2rem 1.3rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 1.25rem;
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(14px);
-  box-shadow: 0 18px 45px rgba(7, 10, 22, 0.22);
-  animation: drift-mark 8s ease-in-out infinite;
-  opacity: 0.52;
+  border-radius: 1.35rem;
+  background: rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(16px);
+  opacity: 0.5;
 }
 
-.agent-atmosphere__name {
+.agent-cluster__name {
   font-family: "Space Grotesk", system-ui, sans-serif;
   font-size: clamp(1.5rem, 2vw, 2.2rem);
   letter-spacing: -0.04em;
   color: rgba(255, 255, 255, 0.68);
 }
 
-.agent-atmosphere__sub {
+.agent-cluster__sub {
   font-size: 0.78rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -307,30 +302,6 @@ pre.astro-code:hover::before {
   background: rgba(228, 228, 231, 0.16);
 }
 
-.story-frame__callouts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  padding: 0.4rem 1.2rem 1rem;
-}
-
-.story-frame__callouts span {
-  border: 1px solid rgba(99, 102, 241, 0.18);
-  border-radius: 999px;
-  background: rgba(99, 102, 241, 0.08);
-  color: var(--color-primer-700);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  padding: 0.42rem 0.72rem;
-}
-
-.dark .story-frame__callouts span {
-  background: rgba(99, 102, 241, 0.12);
-  color: rgba(199, 210, 254, 0.92);
-}
-
 .story-frame__image {
   width: 100%;
   display: block;
@@ -352,5 +323,4 @@ pre.astro-code:hover::before {
   .animate-fade-in-up,
   .animate-fade-in { animation: none; }
   .nav-link::after { transition: none; }
-  .agent-atmosphere__mark { animation: none; }
 }
