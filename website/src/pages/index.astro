@@ -9,143 +9,122 @@ const heroChips = [
   "Exemplar sessions",
 ];
 
-const proofPoints = [
+const proofSignals = [
   {
-    eyebrow: "Workflow intelligence",
-    title: "See which AI workflows actually work.",
-    description:
-      "Primer fingerprints sessions into repeatable workflows, then shows which patterns are associated with better quality, faster merges, and lower cost per success.",
+    label: "Fingerprint workflows",
+    detail: "Archetypes and session fingerprints tied to what happened next.",
   },
   {
-    eyebrow: "Customization intelligence",
-    title: "Understand what engineers configure differently.",
-    description:
-      "Track MCPs, skills, commands, subagents, and templates by provenance, state, reliability, and outcome so you can separate explicit choices from defaults.",
+    label: "Prove quality and cost",
+    detail: "See which workflows lead to better PR outcomes per dollar.",
   },
   {
-    eyebrow: "Multi-agent orchestration",
-    title: "Measure delegation and agent-team patterns.",
-    description:
-      "Capture delegation graphs, classify agent-team modes, and learn when coordinated multi-agent work outperforms solo sessions.",
+    label: "Standardize what works",
+    detail: "Turn bright spots into exemplars, playbooks, and reusable assets.",
   },
   {
-    eyebrow: "Operational proof",
-    title: "Turn recommendations into experiments.",
-    description:
-      "Promote promising workflows, models, and enablement changes into structured experiments, then measure whether the rollout actually improved outcomes.",
+    label: "Measure rollout impact",
+    detail: "Track whether interventions and experiments actually improved outcomes.",
   },
 ];
 
-const screenshots = [
+const agentMarks = [
+  { name: "Anthropic", sublabel: "Claude Code", top: "10%", left: "8%", width: "14rem", delay: "0s" },
+  { name: "Cursor", sublabel: "Native editor workflows", top: "20%", left: "63%", width: "12rem", delay: "1.4s" },
+  { name: "Codex", sublabel: "CLI agent runtime", top: "56%", left: "16%", width: "11rem", delay: "2.2s" },
+  { name: "Gemini", sublabel: "CLI and experimentation", top: "62%", left: "66%", width: "12rem", delay: "0.8s" },
+];
+
+const chapters = [
   {
-    name: "Workflow Cost Attribution",
-    image: "readme-finops-dark.png",
-    caption:
-      "Break down spend by workflow archetype and fingerprint instead of looking at model bills in isolation.",
-  },
-  {
-    name: "Workflow Quality Attribution",
+    eyebrow: "Chapter 01",
+    title: "Fingerprint how work actually gets done",
+    description:
+      "Primer turns noisy sessions into workflow archetypes and fingerprints, then shows which patterns lead to cleaner reviews, stronger merge rates, and better follow-through.",
+    bullets: [
+      "Compare workflow archetypes by merge rate, review load, findings, and time to merge",
+      "See which workflows create quality without overspending",
+      "Move from raw transcripts to durable workflow evidence",
+    ],
+    callouts: ["Workflow quality attribution", "Compare mode", "Cost per successful outcome"],
     image: "readme-quality-dark.png",
     caption:
-      "Connect workflow patterns to merge rate, review findings, review load, and time to merge.",
+      "Quality becomes much more useful once it is grouped by the workflow patterns behind it.",
   },
   {
-    name: "Growth and Exemplars",
+    eyebrow: "Chapter 02",
+    title: "See cost through the lens of successful workflows",
+    description:
+      "FinOps is stronger when it stops treating model spend as the whole story. Primer shows which workflows are efficient, which are expensive but justified, and where teams are overspending without better outcomes.",
+    bullets: [
+      "Break down spend by workflow archetype and fingerprint",
+      "Tie workflow cost to successful outcomes instead of raw activity",
+      "Spot where model choice and workflow shape drift apart",
+    ],
+    callouts: ["Workflow cost attribution", "Model coach", "Burn-rate context"],
+    image: "readme-finops-dark.png",
+    caption:
+      "The aha moment is seeing spend clustered around workflows, not just models or people.",
+  },
+  {
+    eyebrow: "Chapter 03",
+    title: "Turn bright spots into exemplars your team can copy",
+    description:
+      "Primer surfaces reusable prompts, skills, commands, templates, and exemplar sessions so teams can standardize what is already working inside the org.",
+    bullets: [
+      "Promote strong sessions into bright spots and exemplar libraries",
+      "Find underused high-value assets worth spreading to other teams",
+      "Coach with evidence instead of generic enablement advice",
+    ],
+    callouts: ["Exemplar sessions", "Prompt reuse", "Team skill gaps"],
     image: "readme-growth-dark.png",
     caption:
-      "Surface bright spots, exemplar sessions, reusable assets, and team skill gaps worth acting on.",
+      "Growth becomes concrete when the platform can point at exact sessions and reusable assets worth copying.",
   },
   {
-    name: "Agent Stacks and Reliability",
+    eyebrow: "Chapter 04",
+    title: "Understand the agent stacks behind high performers",
+    description:
+      "Capture MCPs, skills, commands, templates, delegation, and agent-team modes so you can see which explicit configurations differentiate top performers and which toolchains create friction.",
+    bullets: [
+      "Separate built-ins from user, repo, and org-defined customizations",
+      "Measure toolchain reliability, explicit stacks, and delegation patterns",
+      "See when coordinated agent teams outperform solo work",
+    ],
+    callouts: ["Customization intelligence", "Delegation graphs", "Toolchain reliability"],
     image: "readme-maturity-dark.png",
     caption:
-      "See which customizations, toolchains, and agent-team modes top performers use and which ones create friction.",
-  },
-];
-
-const workflowLoop = [
-  {
-    step: "Capture",
-    title: "Collect multi-agent evidence",
-    description:
-      "Hooks, sync, and imports ingest Claude Code, Cursor, Codex CLI, and Gemini CLI sessions alongside PRs, review findings, and repo context.",
+      "Agentic engineering is not just prompts. The stack, orchestration pattern, and reliability all matter.",
   },
   {
-    step: "Normalize",
-    title: "Build a trustworthy semantic layer",
+    eyebrow: "Chapter 05",
+    title: "Turn recommendations into experiments and measured change",
     description:
-      "Primer derives workflows, recovery paths, change shape, customization state, delegation graphs, and source-aware integrity signals.",
-  },
-  {
-    step: "Surface",
-    title: "Show evidence by persona",
-    description:
-      "Engineering leaders, platform teams, leads, and engineers each get the views they need across quality, cost, growth, maturity, and projects.",
-  },
-  {
-    step: "Act",
-    title: "Standardize what works",
-    description:
-      "Promote bright spots into playbooks, exemplars, model guidance, and experiments instead of leaving the signal trapped in dashboards.",
-  },
-  {
-    step: "Measure",
-    title: "Verify what changed",
-    description:
-      "Track whether rollouts, interventions, and experiments improved quality, reduced friction, or lowered cost per successful outcome.",
+      "Primer closes the loop. Recommendations become interventions, interventions become experiments, and the platform measures whether rollouts, playbooks, and model changes actually improved outcomes.",
+    bullets: [
+      "Track before-and-after changes by team, project, and engineer cohort",
+      "Measure whether a playbook or training program moved the needle",
+      "Move from insight to operating cadence instead of accumulating dashboards",
+    ],
+    callouts: ["Intervention evidence", "Experiment types", "Measured rollout impact"],
+    image: "readme-dashboard-dark.png",
+    caption:
+      "The product is strongest when teams can turn a recommendation into something they can test and measure.",
   },
 ];
 
 const audiences = [
   {
     audience: "Engineering leadership",
-    summary: "Decide where AI is paying off and where it is leaking money or quality.",
-    bullets: [
-      "Which workflows deliver the best quality per dollar",
-      "Which teams have figured out reusable high-performing patterns",
-      "Which experiments and rollout changes are improving outcomes",
-    ],
+    summary: "Decide where AI is compounding engineering output and where it is leaking money or quality.",
   },
   {
-    audience: "Platform and enablement teams",
-    summary: "See where repo setup, tooling, and agent configuration help or hurt engineers.",
-    bullets: [
-      "Which customizations and MCP stacks top performers rely on",
-      "Which toolchains are brittle, underused, or worth standardizing",
-      "Which projects need workflow playbooks, skills, or repo enablement next",
-    ],
+    audience: "Platform and enablement",
+    summary: "See which repo setup, customizations, and agent stacks help engineers move faster.",
   },
   {
     audience: "Team leads and managers",
-    summary: "Coach teams with evidence instead of intuition.",
-    bullets: [
-      "Which prompt patterns, assets, and exemplars are worth copying",
-      "Which teams have workflow or skill gaps by project context",
-      "Which engineers should try a different model or delegation pattern next",
-    ],
-  },
-];
-
-const differentiators = [
-  {
-    title: "Not just usage tracking",
-    description:
-      "Primer links workflow fingerprint -> quality -> cost -> intervention so you can decide what to standardize, not just count sessions.",
-  },
-  {
-    title: "Not Claude-only analytics",
-    description:
-      "The platform is built for cross-agent intelligence across Claude Code, Cursor, Codex CLI, and Gemini CLI with capability-aware trust boundaries.",
-  },
-  {
-    title: "Not just prompts and transcripts",
-    description:
-      "It models customizations, delegation, reliability, reusable assets, and project context so the data reflects how agentic engineering actually works.",
-  },
-  {
-    title: "Not just dashboards",
-    description:
-      "Primer closes the loop with recommendations, interventions, experiments, and before-and-after measurement.",
+    summary: "Coach with workflow evidence, exemplars, and concrete experiments instead of instinct alone.",
   },
 ];
 ---
@@ -158,7 +137,7 @@ const differentiators = [
     <div class="absolute inset-0 overflow-hidden">
       <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(129,140,248,0.22),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(99,102,241,0.18),transparent_32%)]"></div>
       <div
-        class="absolute inset-0 opacity-60"
+        class="absolute inset-0 opacity-55"
         style="background-image: linear-gradient(rgba(129,140,248,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(129,140,248,0.08) 1px, transparent 1px); background-size: 44px 44px;"
       ></div>
     </div>
@@ -167,7 +146,7 @@ const differentiators = [
       <div class="mx-auto max-w-4xl text-center">
         <div class="mb-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-4 py-1.5 text-sm text-white/75 animate-fade-in-up">
           <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-          Workflow intelligence for agentic engineering
+          Open source workflow intelligence for agentic engineering
         </div>
         <h1 class="font-display mb-6 text-4xl tracking-tight md:text-5xl lg:text-7xl animate-fade-in-up" style="--delay: 80ms">
           See which AI workflows
@@ -186,10 +165,10 @@ const differentiators = [
             Read the docs
           </a>
           <a
-            href={`${import.meta.env.BASE_URL}#proof`}
+            href={`${import.meta.env.BASE_URL}#tour`}
             class="inline-flex items-center rounded-lg border border-white/15 bg-white/8 px-6 py-3 font-medium text-white transition-colors hover:bg-white/12"
           >
-            See the workflow proof
+            Explore the product story
           </a>
         </div>
         <div class="flex flex-wrap items-center justify-center gap-2 animate-fade-in-up" style="--delay: 320ms">
@@ -207,156 +186,143 @@ const differentiators = [
     </div>
   </section>
 
-  <section id="proof" class="py-18 md:py-24">
-    <div class="mx-auto max-w-6xl px-6">
-      <div class="mb-14 max-w-3xl">
-        <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand">Core proof</p>
-        <h2 class="font-display mb-4 text-3xl tracking-tight md:text-4xl">
-          Primer is becoming the intelligence layer for agentic engineering.
+  <section id="proof" class="border-y border-border bg-background py-8">
+    <div class="mx-auto grid max-w-6xl gap-4 px-6 md:grid-cols-2 xl:grid-cols-4">
+      {proofSignals.map((signal, idx) => (
+        <div
+          class="rounded-2xl border border-border/80 bg-card/70 px-5 py-4 animate-fade-in-up"
+          style={`--delay: ${idx * 70}ms`}
+        >
+          <p class="mb-1 text-sm font-semibold">{signal.label}</p>
+          <p class="text-sm leading-relaxed text-muted-foreground">{signal.detail}</p>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <section class="agent-atmosphere relative overflow-hidden bg-hero-bg text-hero-text">
+    <div class="mx-auto max-w-6xl px-6 py-20 md:py-24">
+      <div class="relative z-10 max-w-3xl">
+        <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-400">Multi-agent by design</p>
+        <h2 class="font-display mb-4 text-3xl tracking-tight md:text-5xl">
+          One intelligence layer across four fast-moving agent ecosystems
         </h2>
-        <p class="text-lg text-muted-foreground">
-          The product is strongest when it links behavior to outcomes. These are the proof points
-          that now define the platform.
+        <p class="max-w-2xl text-lg leading-relaxed text-white/66">
+          Primer unifies Claude Code, Cursor, Codex CLI, and Gemini CLI without pretending they all
+          emit the same telemetry. The platform is built around source-aware trust, so cross-agent
+          analytics stay credible.
         </p>
       </div>
 
-      <div class="grid gap-6 md:grid-cols-2">
-        {proofPoints.map((point, idx) => (
+      <div class="agent-atmosphere__marks hidden md:block" aria-hidden="true">
+        {agentMarks.map((mark) => (
           <div
-            class="rounded-2xl border border-border bg-card p-6 shadow-sm transition-all duration-200 hover:border-primer-border hover:shadow-lg animate-fade-in-up"
-            style={`--delay: ${idx * 80}ms`}
+            class="agent-atmosphere__mark"
+            style={`top: ${mark.top}; left: ${mark.left}; width: ${mark.width}; animation-delay: ${mark.delay};`}
           >
-            <p class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-primer-brand">{point.eyebrow}</p>
-            <h3 class="mb-3 font-display text-2xl tracking-tight">{point.title}</h3>
-            <p class="text-sm leading-relaxed text-muted-foreground">{point.description}</p>
+            <span class="agent-atmosphere__name">{mark.name}</span>
+            <span class="agent-atmosphere__sub">{mark.sublabel}</span>
           </div>
         ))}
       </div>
+
+      <div class="mt-10 grid gap-3 md:hidden">
+        {agentMarks.map((mark) => (
+          <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+            <p class="font-display text-lg tracking-tight text-white/82">{mark.name}</p>
+            <p class="text-sm text-white/48">{mark.sublabel}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section id="tour" class="py-18 md:py-24">
+    <div class="mx-auto max-w-6xl px-6">
+      <div class="mb-16 max-w-3xl">
+        <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand">Product tour</p>
+        <h2 class="font-display mb-4 text-3xl tracking-tight md:text-5xl">
+          Scroll through the five product stories that matter most
+        </h2>
+        <p class="text-lg leading-relaxed text-muted-foreground">
+          Primer is easiest to understand when each chapter shows one operating decision the
+          platform helps teams make, with the product evidence behind it.
+        </p>
+      </div>
+    </div>
+
+    <div class="space-y-18 md:space-y-24">
+      {chapters.map((chapter, idx) => (
+        <section class={idx % 2 === 1 ? "bg-muted/45 py-18 md:py-22" : "py-18 md:py-22"}>
+          <div
+            class={`mx-auto grid max-w-6xl items-center gap-10 px-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] ${
+              idx % 2 === 1 ? "lg:[&>*:first-child]:order-2 lg:[&>*:last-child]:order-1" : ""
+            }`}
+          >
+            <div class="space-y-6">
+              <p class="text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand">{chapter.eyebrow}</p>
+              <h3 class="font-display text-3xl tracking-tight md:text-4xl">{chapter.title}</h3>
+              <p class="text-lg leading-relaxed text-muted-foreground">{chapter.description}</p>
+              <ul class="space-y-3 text-sm leading-relaxed text-foreground/90">
+                {chapter.bullets.map((bullet) => (
+                  <li class="flex gap-3">
+                    <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primer-brand"></span>
+                    <span>{bullet}</span>
+                  </li>
+                ))}
+              </ul>
+              <div class="flex flex-wrap gap-3">
+                {chapter.callouts.map((callout) => (
+                  <span class="rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    {callout}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div class="story-frame animate-fade-in-up" style={`--delay: ${idx * 70}ms`}>
+              <div class="story-frame__ornament"></div>
+              <div class="story-frame__header">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              <div class="story-frame__callouts">
+                {chapter.callouts.slice(0, 2).map((callout) => (
+                  <span>{callout}</span>
+                ))}
+              </div>
+              <img
+                src={`${import.meta.env.BASE_URL}screenshots/${chapter.image}`}
+                alt={chapter.caption}
+                class="story-frame__image"
+                loading="lazy"
+              />
+              <p class="story-frame__caption">{chapter.caption}</p>
+            </div>
+          </div>
+        </section>
+      ))}
     </div>
   </section>
 
   <section class="bg-muted/50 py-18 md:py-24">
     <div class="mx-auto max-w-6xl px-6">
       <div class="mb-12 text-center">
-        <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand">Screens that prove it</p>
-        <h2 class="font-display mb-4 text-3xl tracking-tight md:text-4xl">
-          Cost, quality, exemplars, and agent stacks in one product story
-        </h2>
-        <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
-          These are the views that show how Primer connects spend, outcomes, reusable behavior,
-          and coaching across the product.
-        </p>
-      </div>
-
-      <div class="grid gap-6 md:grid-cols-2">
-        {screenshots.map((view, idx) => (
-          <div
-            class="group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-200 hover:border-primer-border hover:shadow-lg animate-fade-in-up"
-            style={`--delay: ${idx * 70}ms`}
-          >
-            <div class="aspect-[16/10] overflow-hidden bg-[#111827]">
-              <img
-                src={`${import.meta.env.BASE_URL}screenshots/${view.image}`}
-                alt={view.caption}
-                class="h-full w-full object-cover object-top opacity-92 transition-transform duration-300 group-hover:scale-[1.01] group-hover:opacity-100"
-                loading="lazy"
-              />
-            </div>
-            <div class="p-5">
-              <h3 class="mb-2 text-lg font-semibold">{view.name}</h3>
-              <p class="text-sm leading-relaxed text-muted-foreground">{view.caption}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  </section>
-
-  <section class="py-18 md:py-24">
-    <div class="mx-auto max-w-6xl px-6">
-      <div class="mb-14 max-w-3xl">
-        <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand">Product loop</p>
-        <h2 class="font-display mb-4 text-3xl tracking-tight md:text-4xl">
-          From raw sessions to decisions your team can act on
-        </h2>
-        <p class="text-lg text-muted-foreground">
-          The product loop matters as much as the metrics: capture, normalize, surface, act, and
-          measure what changed.
-        </p>
-      </div>
-
-      <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
-        {workflowLoop.map((item, idx) => (
-          <div
-            class="rounded-2xl border border-border bg-card p-6 animate-fade-in-up"
-            style={`--delay: ${idx * 90}ms`}
-          >
-            <div class="mb-4 flex items-center gap-3">
-              <span class="flex h-10 w-10 items-center justify-center rounded-full bg-primer-surface text-sm font-semibold text-primer-brand">
-                {idx + 1}
-              </span>
-              <span class="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">{item.step}</span>
-            </div>
-            <h3 class="mb-2 text-lg font-semibold">{item.title}</h3>
-            <p class="text-sm leading-relaxed text-muted-foreground">{item.description}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  </section>
-
-  <section id="features" class="bg-muted/50 py-18 md:py-24">
-    <div class="mx-auto max-w-6xl px-6">
-      <div class="mb-12 text-center">
         <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand">Who it is for</p>
         <h2 class="font-display mb-4 text-3xl tracking-tight md:text-4xl">
-          Different questions, one intelligence layer
+          One product, three kinds of operating decisions
         </h2>
       </div>
 
       <div class="grid gap-6 lg:grid-cols-3">
         {audiences.map((group, idx) => (
           <div
-            class="rounded-2xl border border-border bg-card p-6 animate-fade-in-up"
-            style={`--delay: ${idx * 90}ms`}
-          >
-            <h3 class="mb-3 font-display text-2xl tracking-tight">{group.audience}</h3>
-            <p class="mb-5 text-sm leading-relaxed text-muted-foreground">{group.summary}</p>
-            <ul class="space-y-3 text-sm text-foreground/90">
-              {group.bullets.map((bullet) => (
-                <li class="flex gap-3">
-                  <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primer-brand"></span>
-                  <span>{bullet}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
-    </div>
-  </section>
-
-  <section class="py-18 md:py-24">
-    <div class="mx-auto max-w-6xl px-6">
-      <div class="mb-12 max-w-3xl">
-        <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand">Why Primer</p>
-        <h2 class="font-display mb-4 text-3xl tracking-tight md:text-4xl">
-          Workflow intelligence, not generic AI analytics
-        </h2>
-        <p class="text-lg text-muted-foreground">
-          Plenty of tools can tell you that AI usage went up. Primer is built to show what should
-          change next.
-        </p>
-      </div>
-
-      <div class="grid gap-6 md:grid-cols-2">
-        {differentiators.map((item, idx) => (
-          <div
             class="rounded-2xl border border-border bg-card p-6 shadow-sm animate-fade-in-up"
             style={`--delay: ${idx * 80}ms`}
           >
-            <h3 class="mb-3 text-lg font-semibold">{item.title}</h3>
-            <p class="text-sm leading-relaxed text-muted-foreground">{item.description}</p>
+            <h3 class="mb-3 font-display text-2xl tracking-tight">{group.audience}</h3>
+            <p class="text-sm leading-relaxed text-muted-foreground">{group.summary}</p>
           </div>
         ))}
       </div>
@@ -371,7 +337,7 @@ const differentiators = [
       </h2>
       <p class="mx-auto mb-8 max-w-2xl text-lg leading-relaxed text-white/68">
         Self-host Primer, connect your agents and GitHub data, and start seeing which workflows,
-        assets, and agent stacks are worth standardizing.
+        assets, agent stacks, and experiments are worth standardizing.
       </p>
       <div class="mb-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
         <a
