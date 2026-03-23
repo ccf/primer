@@ -2,192 +2,263 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import TerminalAnimation from "../components/TerminalAnimation";
 
-const questions = [
+const heroChips = [
+  "Workflow fingerprints",
+  "Quality attribution",
+  "Cost per successful outcome",
+  "Exemplar sessions",
+];
+
+const proofPoints = [
   {
-    audience: "Engineering Leadership",
-    items: [
-      { q: "Is our AI investment paying off?", detail: "Cost per successful outcome, ROI ratio, and time saved vs. dollars spent" },
-      { q: "Which teams have figured it out?", detail: "Cross-team comparison of adoption rates, success rates, and leverage scores" },
-      { q: "What systemic issues tank AI effectiveness?", detail: "Friction impact scoring — not just errors, but which errors cost you the most" },
-      { q: "Are we spending efficiently?", detail: "Per-engineer plan modeling, cache optimization, and budget burn-rate tracking" },
+    eyebrow: "Workflow intelligence",
+    title: "See which AI workflows actually work.",
+    description:
+      "Primer fingerprints sessions into repeatable workflows, then shows which patterns are associated with better quality, faster merges, and lower cost per success.",
+  },
+  {
+    eyebrow: "Customization intelligence",
+    title: "Understand what engineers configure differently.",
+    description:
+      "Track MCPs, skills, commands, subagents, and templates by provenance, state, reliability, and outcome so you can separate explicit choices from defaults.",
+  },
+  {
+    eyebrow: "Multi-agent orchestration",
+    title: "Measure delegation and agent-team patterns.",
+    description:
+      "Capture delegation graphs, classify agent-team modes, and learn when coordinated multi-agent work outperforms solo sessions.",
+  },
+  {
+    eyebrow: "Operational proof",
+    title: "Turn recommendations into experiments.",
+    description:
+      "Promote promising workflows, models, and enablement changes into structured experiments, then measure whether the rollout actually improved outcomes.",
+  },
+];
+
+const screenshots = [
+  {
+    name: "Workflow Cost Attribution",
+    image: "readme-finops-dark.png",
+    caption:
+      "Break down spend by workflow archetype and fingerprint instead of looking at model bills in isolation.",
+  },
+  {
+    name: "Workflow Quality Attribution",
+    image: "readme-quality-dark.png",
+    caption:
+      "Connect workflow patterns to merge rate, review findings, review load, and time to merge.",
+  },
+  {
+    name: "Growth and Exemplars",
+    image: "readme-growth-dark.png",
+    caption:
+      "Surface bright spots, exemplar sessions, reusable assets, and team skill gaps worth acting on.",
+  },
+  {
+    name: "Agent Stacks and Reliability",
+    image: "readme-maturity-dark.png",
+    caption:
+      "See which customizations, toolchains, and agent-team modes top performers use and which ones create friction.",
+  },
+];
+
+const workflowLoop = [
+  {
+    step: "Capture",
+    title: "Collect multi-agent evidence",
+    description:
+      "Hooks, sync, and imports ingest Claude Code, Cursor, Codex CLI, and Gemini CLI sessions alongside PRs, review findings, and repo context.",
+  },
+  {
+    step: "Normalize",
+    title: "Build a trustworthy semantic layer",
+    description:
+      "Primer derives workflows, recovery paths, change shape, customization state, delegation graphs, and source-aware integrity signals.",
+  },
+  {
+    step: "Surface",
+    title: "Show evidence by persona",
+    description:
+      "Engineering leaders, platform teams, leads, and engineers each get the views they need across quality, cost, growth, maturity, and projects.",
+  },
+  {
+    step: "Act",
+    title: "Standardize what works",
+    description:
+      "Promote bright spots into playbooks, exemplars, model guidance, and experiments instead of leaving the signal trapped in dashboards.",
+  },
+];
+
+const audiences = [
+  {
+    audience: "Engineering leadership",
+    summary: "Decide where AI is paying off and where it is leaking money or quality.",
+    bullets: [
+      "Which workflows deliver the best quality per dollar",
+      "Which teams have figured out reusable high-performing patterns",
+      "Which experiments and rollout changes are improving outcomes",
     ],
   },
   {
-    audience: "Team Leads",
-    items: [
-      { q: "Who needs help and what kind?", detail: "Skill gaps, tool diversity analysis, and personalized improvement suggestions" },
-      { q: "How fast are new hires ramping up?", detail: "Cohort analysis comparing onboarding curves against team baselines" },
-      { q: "Are AI-assisted PRs actually better?", detail: "Merge time, review comments, merge rate, and automated review findings — Claude PRs vs. non-Claude, with severity tracking from BugBot and other review bots" },
-      { q: "Where should I invest in training?", detail: "Tool proficiency scoring per engineer with learning path recommendations" },
+    audience: "Platform and enablement teams",
+    summary: "See where repo setup, tooling, and agent configuration help or hurt engineers.",
+    bullets: [
+      "Which customizations and MCP stacks top performers rely on",
+      "Which toolchains are brittle, underused, or worth standardizing",
+      "Which projects need workflow playbooks, skills, or repo enablement next",
     ],
   },
   {
-    audience: "Individual Engineers",
-    items: [
-      { q: "How am I trending?", detail: "Weekly trajectory with success rate, cost, and session pattern evolution" },
-      { q: "What keeps tripping me up?", detail: "Personal friction breakdown — permission blocks, context limits, tool errors" },
-      { q: "Am I using the right tools?", detail: "Config optimization suggestions based on high-performer patterns in your org" },
-      { q: "What should I try next?", detail: "Learning paths generated from what works best for engineers like you" },
+    audience: "Team leads and managers",
+    summary: "Coach teams with evidence instead of intuition.",
+    bullets: [
+      "Which prompt patterns, assets, and exemplars are worth copying",
+      "Which teams have workflow or skill gaps by project context",
+      "Which engineers should try a different model or delegation pattern next",
     ],
   },
 ];
 
 const differentiators = [
   {
-    title: "Friction intelligence",
-    subtitle: "Not just usage tracking",
-    description: "LLM-powered facet extraction classifies every session: goals, satisfaction, friction types. Then scores their impact on outcomes. You learn that permission_denied errors cause 40% lower success rates — not just that they happen sometimes.",
-    icon: "M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z",
+    title: "Not just usage tracking",
+    description:
+      "Primer links workflow fingerprint -> quality -> cost -> intervention so you can decide what to standardize, not just count sessions.",
   },
   {
-    title: "Individual intelligence",
-    subtitle: "Not just org dashboards",
-    description: "Every engineer gets a trajectory view, strengths profile, friction breakdown, and AI-generated narrative. The MCP sidecar lets Claude query your own stats mid-session without leaving your editor.",
-    icon: "M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z",
+    title: "Not Claude-only analytics",
+    description:
+      "The platform is built for cross-agent intelligence across Claude Code, Cursor, Codex CLI, and Gemini CLI with capability-aware trust boundaries.",
   },
   {
-    title: "Cost optimization",
-    subtitle: "Not just cost tracking",
-    description: "Models whether each engineer should be on API billing, Pro, or Max based on actual usage. Measures cache hit rates per person and surfaces how much money is left on the table. Budget burn-rate alerts catch overruns before they happen.",
-    icon: "M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+    title: "Not just prompts and transcripts",
+    description:
+      "It models customizations, delegation, reliability, reusable assets, and project context so the data reflects how agentic engineering actually works.",
   },
   {
-    title: "Maturity scoring",
-    subtitle: "Not just adoption metrics",
-    description: "A composite leverage score per engineer based on tool diversity, orchestration adoption, and cache efficiency. Track your org's maturity curve. Detect which projects have proper AI configuration — and which don't.",
-    icon: "M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941",
+    title: "Not just dashboards",
+    description:
+      "Primer closes the loop with recommendations, interventions, experiments, and before-and-after measurement.",
   },
-];
-
-const views = [
-  { name: "Organization", image: "readme-dashboard-dark.png", caption: "Org-level KPIs, activity trends, outcomes, alerts, and deep-dive navigation" },
-  { name: "Engineers", image: "readme-engineers-dark.png", caption: "Leaderboard with success rates, costs, PR counts, and leverage scores" },
-  { name: "Engineer Profile", image: "readme-engineer-profile-dark.png", caption: "Individual trajectory, friction analysis, and AI-generated insights report" },
-  { name: "FinOps", image: "readme-finops-dark.png", caption: "Cost tracking, cache analytics, subscription modeling, and budget management" },
-  { name: "AI Maturity", image: "readme-maturity-dark.png", caption: "Leverage scores, tool categories, orchestration adoption, and project readiness" },
-  { name: "Friction", image: "readme-friction-dark.png", caption: "Friction trends, impact scoring by type, and project-level breakdown" },
-  { name: "Code Quality", image: "readme-quality-dark.png", caption: "PR metrics, Claude-assisted comparison, automated review findings with severity tracking, and engineer quality rankings" },
-  { name: "Growth", image: "readme-growth-dark.png", caption: "Onboarding cohorts, shared patterns, skill gaps, and learning paths" },
-  { name: "Synthesis", image: "readme-synthesis-dark.png", caption: "AI-generated narrative reports at org, team, and engineer scope" },
 ];
 ---
 
-<BaseLayout>
-  <!-- Hero -->
-  <section class="relative bg-hero-bg text-hero-text overflow-hidden">
-    <!-- Background decoration -->
+<BaseLayout
+  title="Primer — Workflow Intelligence for Agentic Engineering"
+  description="See which AI workflows actually work. Primer turns session telemetry into workflow intelligence, cost and quality proof, exemplars, and experiments for agentic engineering teams."
+>
+  <section class="relative overflow-hidden bg-hero-bg text-hero-text">
     <div class="absolute inset-0 overflow-hidden">
-      <div class="absolute top-20 left-1/4 w-96 h-96 bg-primer-brand/5 rounded-full blur-3xl"></div>
-      <div class="absolute bottom-20 right-1/4 w-64 h-64 bg-primer-brand/10 rounded-full blur-3xl"></div>
-      <div class="absolute inset-0" style="background-image: radial-gradient(circle, rgba(99,102,241,0.12) 1px, transparent 1px); background-size: 32px 32px;"></div>
+      <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(129,140,248,0.22),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(99,102,241,0.18),transparent_32%)]"></div>
+      <div
+        class="absolute inset-0 opacity-60"
+        style="background-image: linear-gradient(rgba(129,140,248,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(129,140,248,0.08) 1px, transparent 1px); background-size: 44px 44px;"
+      ></div>
     </div>
 
-    <div class="relative max-w-6xl mx-auto px-6 py-24 md:py-32 lg:py-40">
-      <div class="max-w-3xl mx-auto text-center mb-12">
-        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-sm text-white/70 mb-8 animate-fade-in-up">
-          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-          Open source &middot; Self-hosted &middot; Privacy-first
+    <div class="relative mx-auto max-w-6xl px-6 py-24 md:py-30 lg:py-36">
+      <div class="mx-auto max-w-4xl text-center">
+        <div class="mb-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-4 py-1.5 text-sm text-white/75 animate-fade-in-up">
+          <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+          Workflow intelligence for agentic engineering
         </div>
-        <h1 class="font-display text-4xl md:text-5xl lg:text-6xl tracking-tight mb-6 animate-fade-in-up" style="--delay: 80ms">
-          Understand how your engineers use AI<span class="text-primer-400"> — </span><br class="hidden lg:block" />
-          <span class="text-primer-400">and make them better at it</span>
+        <h1 class="font-display mb-6 text-4xl tracking-tight md:text-5xl lg:text-7xl animate-fade-in-up" style="--delay: 80ms">
+          See which AI workflows
+          <span class="text-primer-400"> actually work</span>
         </h1>
-        <p class="text-lg md:text-xl text-white/60 max-w-2xl mx-auto mb-10 animate-fade-in-up" style="--delay: 160ms">
-          Your team adopted Claude Code, Codex CLI, and Gemini CLI. Now answer the questions
-          that no other tool can — from org-level ROI down to individual learning paths.
+        <p class="mx-auto mb-10 max-w-3xl text-lg leading-relaxed text-white/68 md:text-xl animate-fade-in-up" style="--delay: 160ms">
+          Primer captures work across Claude Code, Cursor, Codex CLI, and Gemini CLI, then turns
+          that telemetry into workflow fingerprints, quality attribution, cost proof, exemplars,
+          and experiments your team can standardize.
         </p>
-        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up" style="--delay: 240ms">
+        <div class="mb-8 flex flex-col items-center justify-center gap-4 sm:flex-row animate-fade-in-up" style="--delay: 240ms">
           <a
             href={`${import.meta.env.BASE_URL}docs/`}
-            class="inline-flex items-center px-6 py-3 rounded-lg bg-primer-brand text-white font-medium hover:bg-primer-600 transition-colors"
+            class="inline-flex items-center rounded-lg bg-primer-brand px-6 py-3 font-medium text-white transition-colors hover:bg-primer-600"
           >
-            Get Started
+            Read the docs
           </a>
           <a
-            href="https://github.com/ccf/primer"
-            target="_blank"
-            rel="noopener"
-            class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-white/10 text-white font-medium hover:bg-white/15 transition-colors"
+            href={`${import.meta.env.BASE_URL}compare/`}
+            class="inline-flex items-center rounded-lg border border-white/15 bg-white/8 px-6 py-3 font-medium text-white transition-colors hover:bg-white/12"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-            </svg>
-            View on GitHub
+            See the proof points
           </a>
+        </div>
+        <div class="flex flex-wrap items-center justify-center gap-2 animate-fade-in-up" style="--delay: 320ms">
+          {heroChips.map((chip) => (
+            <span class="rounded-full border border-white/12 bg-white/6 px-3 py-1 text-xs uppercase tracking-[0.18em] text-white/62">
+              {chip}
+            </span>
+          ))}
         </div>
       </div>
 
-      <!-- Terminal animation -->
-      <div class="animate-fade-in-up" style="--delay: 320ms">
+      <div class="mt-14 animate-fade-in-up" style="--delay: 400ms">
         <TerminalAnimation client:visible />
       </div>
     </div>
   </section>
 
-  <!-- Questions Section -->
-  <section id="features" class="py-16 md:py-24">
-    <div class="max-w-6xl mx-auto px-6">
-      <div class="text-center mb-16">
-        <h2 class="font-display text-3xl md:text-4xl tracking-tight mb-4">
-          Questions only Primer can answer
+  <section id="proof" class="py-18 md:py-24">
+    <div class="mx-auto max-w-6xl px-6">
+      <div class="mb-14 max-w-3xl">
+        <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand">Core proof</p>
+        <h2 class="font-display mb-4 text-3xl tracking-tight md:text-4xl">
+          Primer is becoming the intelligence layer for agentic engineering.
         </h2>
-        <p class="text-lg text-muted-foreground max-w-2xl mx-auto">
-          From boardroom ROI to an engineer's Friday afternoon friction — insights
-          at every level of your organization.
+        <p class="text-lg text-muted-foreground">
+          The product is strongest when it links behavior to outcomes. These are the proof points
+          that now define the platform.
         </p>
       </div>
 
-      <div class="grid lg:grid-cols-3 gap-8">
-        {questions.map((group, gIdx) => (
+      <div class="grid gap-6 md:grid-cols-2">
+        {proofPoints.map((point, idx) => (
           <div
-            class="space-y-4 animate-fade-in-up"
-            style={`--delay: ${gIdx * 100}ms`}
+            class="rounded-2xl border border-border bg-card p-6 shadow-sm transition-all duration-200 hover:border-primer-border hover:shadow-lg animate-fade-in-up"
+            style={`--delay: ${idx * 80}ms`}
           >
-            <h3 class="font-display text-sm uppercase tracking-widest text-primer-brand mb-2">{group.audience}</h3>
-            <div class="space-y-3">
-              {group.items.map((item) => (
-                <div class="p-4 rounded-xl border border-border bg-card hover:border-primer-border transition-colors">
-                  <p class="font-semibold text-sm mb-1">{item.q}</p>
-                  <p class="text-xs text-muted-foreground leading-relaxed">{item.detail}</p>
-                </div>
-              ))}
-            </div>
+            <p class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-primer-brand">{point.eyebrow}</p>
+            <h3 class="mb-3 font-display text-2xl tracking-tight">{point.title}</h3>
+            <p class="text-sm leading-relaxed text-muted-foreground">{point.description}</p>
           </div>
         ))}
       </div>
     </div>
   </section>
 
-  <!-- Product Views -->
-  <section class="py-16 md:py-24 bg-muted/50">
-    <div class="max-w-6xl mx-auto px-6">
-      <div class="text-center mb-12">
-        <h2 class="font-display text-3xl md:text-4xl tracking-tight mb-4">
-          See every layer of AI usage
+  <section class="bg-muted/50 py-18 md:py-24">
+    <div class="mx-auto max-w-6xl px-6">
+      <div class="mb-12 text-center">
+        <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand">Screens that prove it</p>
+        <h2 class="font-display mb-4 text-3xl tracking-tight md:text-4xl">
+          Cost, quality, exemplars, and agent stacks in one product story
         </h2>
-        <p class="text-lg text-muted-foreground max-w-2xl mx-auto">
-          Org-wide trends, team comparisons, individual trajectories, cost modeling,
-          maturity scoring, and AI-generated narrative reports.
+        <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
+          The website should lead with these views because they show how Primer connects spend,
+          outcomes, reusable behavior, and coaching.
         </p>
       </div>
 
-      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {views.map((view, idx) => (
+      <div class="grid gap-6 md:grid-cols-2">
+        {screenshots.map((view, idx) => (
           <div
-            class="group rounded-xl border border-border bg-card overflow-hidden hover:border-primer-border hover:shadow-lg transition-all duration-200 animate-fade-in-up"
-            style={`--delay: ${idx * 60}ms`}
+            class="group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-200 hover:border-primer-border hover:shadow-lg animate-fade-in-up"
+            style={`--delay: ${idx * 70}ms`}
           >
             <div class="aspect-[16/10] overflow-hidden bg-[#111827]">
               <img
                 src={`${import.meta.env.BASE_URL}screenshots/${view.image}`}
                 alt={view.caption}
-                class="w-full h-full object-cover object-top opacity-90 group-hover:opacity-100 transition-opacity"
+                class="h-full w-full object-cover object-top opacity-92 transition-transform duration-300 group-hover:scale-[1.01] group-hover:opacity-100"
                 loading="lazy"
               />
             </div>
-            <div class="p-4">
-              <h3 class="font-semibold text-sm mb-1">{view.name}</h3>
-              <p class="text-xs text-muted-foreground leading-relaxed">{view.caption}</p>
+            <div class="p-5">
+              <h3 class="mb-2 text-lg font-semibold">{view.name}</h3>
+              <p class="text-sm leading-relaxed text-muted-foreground">{view.caption}</p>
             </div>
           </div>
         ))}
@@ -195,120 +266,124 @@ const views = [
     </div>
   </section>
 
-  <!-- Differentiators -->
-  <section class="py-16 md:py-24">
-    <div class="max-w-6xl mx-auto px-6">
-      <div class="text-center mb-16">
-        <h2 class="font-display text-3xl md:text-4xl tracking-tight mb-4">
-          What makes this different
+  <section class="py-18 md:py-24">
+    <div class="mx-auto max-w-6xl px-6">
+      <div class="mb-14 max-w-3xl">
+        <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand">Product loop</p>
+        <h2 class="font-display mb-4 text-3xl tracking-tight md:text-4xl">
+          From raw sessions to decisions your team can act on
         </h2>
-        <p class="text-lg text-muted-foreground max-w-2xl mx-auto">
-          Not another dashboard. An intelligence layer that turns AI tool usage into organizational learning.
+        <p class="text-lg text-muted-foreground">
+          The product loop matters as much as the metrics: capture, normalize, surface, act, and
+          measure what changed.
         </p>
       </div>
 
-      <div class="grid md:grid-cols-2 gap-6">
-        {differentiators.map((d, idx) => (
+      <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        {workflowLoop.map((item, idx) => (
           <div
-            class="p-6 rounded-2xl border border-border bg-card hover:border-primer-border hover:shadow-lg transition-all duration-200 animate-fade-in-up"
+            class="rounded-2xl border border-border bg-card p-6 animate-fade-in-up"
+            style={`--delay: ${idx * 90}ms`}
+          >
+            <div class="mb-4 flex items-center gap-3">
+              <span class="flex h-10 w-10 items-center justify-center rounded-full bg-primer-surface text-sm font-semibold text-primer-brand">
+                {idx + 1}
+              </span>
+              <span class="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">{item.step}</span>
+            </div>
+            <h3 class="mb-2 text-lg font-semibold">{item.title}</h3>
+            <p class="text-sm leading-relaxed text-muted-foreground">{item.description}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section id="features" class="bg-muted/50 py-18 md:py-24">
+    <div class="mx-auto max-w-6xl px-6">
+      <div class="mb-12 text-center">
+        <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand">Who it is for</p>
+        <h2 class="font-display mb-4 text-3xl tracking-tight md:text-4xl">
+          Different questions, one intelligence layer
+        </h2>
+      </div>
+
+      <div class="grid gap-6 lg:grid-cols-3">
+        {audiences.map((group, idx) => (
+          <div
+            class="rounded-2xl border border-border bg-card p-6 animate-fade-in-up"
+            style={`--delay: ${idx * 90}ms`}
+          >
+            <h3 class="mb-3 font-display text-2xl tracking-tight">{group.audience}</h3>
+            <p class="mb-5 text-sm leading-relaxed text-muted-foreground">{group.summary}</p>
+            <ul class="space-y-3 text-sm text-foreground/90">
+              {group.bullets.map((bullet) => (
+                <li class="flex gap-3">
+                  <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primer-brand"></span>
+                  <span>{bullet}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="py-18 md:py-24">
+    <div class="mx-auto max-w-6xl px-6">
+      <div class="mb-12 max-w-3xl">
+        <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand">Why Primer</p>
+        <h2 class="font-display mb-4 text-3xl tracking-tight md:text-4xl">
+          Workflow intelligence, not generic AI analytics
+        </h2>
+        <p class="text-lg text-muted-foreground">
+          Plenty of tools can tell you that AI usage went up. Primer is built to show what should
+          change next.
+        </p>
+      </div>
+
+      <div class="grid gap-6 md:grid-cols-2">
+        {differentiators.map((item, idx) => (
+          <div
+            class="rounded-2xl border border-border bg-card p-6 shadow-sm animate-fade-in-up"
             style={`--delay: ${idx * 80}ms`}
           >
-            <div class="flex items-start gap-4">
-              <div class="w-10 h-10 rounded-lg bg-primer-surface flex items-center justify-center shrink-0">
-                <svg class="w-5 h-5 text-primer-brand" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" d={d.icon} />
-                </svg>
-              </div>
-              <div>
-                <h3 class="font-semibold text-lg">{d.title}</h3>
-                <p class="text-xs text-primer-brand font-medium mb-2">{d.subtitle}</p>
-                <p class="text-sm text-muted-foreground leading-relaxed">{d.description}</p>
-              </div>
-            </div>
+            <h3 class="mb-3 text-lg font-semibold">{item.title}</h3>
+            <p class="text-sm leading-relaxed text-muted-foreground">{item.description}</p>
           </div>
         ))}
       </div>
     </div>
   </section>
 
-  <!-- How it works -->
-  <section class="py-24 md:py-32 bg-muted/50">
-    <div class="max-w-6xl mx-auto px-6">
-      <div class="text-center mb-16">
-        <h2 class="font-display text-3xl md:text-4xl tracking-tight mb-4">
-          How it works
-        </h2>
-        <p class="text-lg text-muted-foreground max-w-2xl mx-auto">
-          Three components. Five minutes to install. Your data never leaves your network.
-        </p>
-      </div>
-
-      <div class="relative grid md:grid-cols-3 gap-8">
-        <div class="hidden md:block absolute top-6 left-[16.67%] right-[16.67%] h-px border-t-2 border-dashed border-primer-brand/30"></div>
-
-        <div class="relative text-center animate-fade-in-up" style="--delay: 0ms">
-          <div class="w-12 h-12 rounded-full bg-primer-brand text-white flex items-center justify-center text-lg font-semibold mx-auto mb-4 relative z-10">1</div>
-          <h3 class="font-semibold text-lg mb-2">Hook captures sessions</h3>
-          <p class="text-sm text-muted-foreground">
-            A lightweight SessionEnd hook runs after each AI coding session. LLM-powered extraction classifies goals, friction, and satisfaction automatically.
-          </p>
-        </div>
-        <div class="relative text-center animate-fade-in-up" style="--delay: 100ms">
-          <div class="w-12 h-12 rounded-full bg-primer-brand text-white flex items-center justify-center text-lg font-semibold mx-auto mb-4 relative z-10">2</div>
-          <h3 class="font-semibold text-lg mb-2">Server builds intelligence</h3>
-          <p class="text-sm text-muted-foreground">
-            The self-hosted API computes analytics, detects anomalies, models costs, scores maturity, and generates AI narratives from your data.
-          </p>
-        </div>
-        <div class="relative text-center animate-fade-in-up" style="--delay: 200ms">
-          <div class="w-12 h-12 rounded-full bg-primer-brand text-white flex items-center justify-center text-lg font-semibold mx-auto mb-4 relative z-10">3</div>
-          <h3 class="font-semibold text-lg mb-2">Insights reach everyone</h3>
-          <p class="text-sm text-muted-foreground">
-            Leadership sees the dashboard. Engineers see their profiles. Claude queries your data mid-session via the MCP sidecar. Everyone levels up.
-          </p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Install CTA -->
-  <section class="py-24 md:py-32">
-    <div class="max-w-3xl mx-auto px-6 text-center">
-      <h2 class="font-display text-3xl md:text-4xl tracking-tight mb-4">
-        Get started in minutes
+  <section class="bg-hero-bg py-18 text-hero-text md:py-24">
+    <div class="mx-auto max-w-5xl px-6 text-center">
+      <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-400">Get started</p>
+      <h2 class="font-display mb-4 text-3xl tracking-tight md:text-5xl">
+        Build your workflow intelligence layer on your own infrastructure
       </h2>
-      <p class="text-lg text-muted-foreground mb-10">
-        Self-hosted. Your data stays on your infrastructure. No telemetry leaves your network.
+      <p class="mx-auto mb-8 max-w-2xl text-lg leading-relaxed text-white/68">
+        Self-host Primer, connect your agents and GitHub data, and start seeing which workflows,
+        assets, and agent stacks are worth standardizing.
       </p>
-
-      <div class="bg-hero-bg rounded-xl p-6 text-left font-mono text-sm mb-10">
-        <div class="flex items-center gap-2 mb-4 text-white/40 text-xs">
-          <span class="w-3 h-3 rounded-full bg-[#ff5f57]"></span>
-          <span class="w-3 h-3 rounded-full bg-[#febc2e]"></span>
-          <span class="w-3 h-3 rounded-full bg-[#28c840]"></span>
-        </div>
-        <pre class="text-white/80 whitespace-pre"><span class="text-primer-brand">$</span> pip install primer
-<span class="text-primer-brand">$</span> primer init
-<span class="text-primer-brand">$</span> primer server start
-<span class="text-primer-brand">$</span> primer hook install</pre>
-      </div>
-
-      <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+      <div class="mb-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
         <a
-          href={`${import.meta.env.BASE_URL}docs/`}
-          class="inline-flex items-center px-6 py-3 rounded-lg bg-primer-brand text-white font-medium hover:bg-primer-600 transition-colors"
+          href={`${import.meta.env.BASE_URL}docs/installation/`}
+          class="inline-flex items-center rounded-lg bg-primer-brand px-6 py-3 font-medium text-white transition-colors hover:bg-primer-600"
         >
-          Read the Docs
+          Install Primer
         </a>
         <a
           href="https://github.com/ccf/primer"
           target="_blank"
           rel="noopener"
-          class="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-border text-foreground font-medium hover:bg-muted transition-colors"
+          class="inline-flex items-center rounded-lg border border-white/15 bg-white/8 px-6 py-3 font-medium text-white transition-colors hover:bg-white/12"
         >
-          View on GitHub
+          Explore the repo
         </a>
       </div>
+      <p class="text-sm text-white/52">Open source. Self-hosted. Privacy-first.</p>
     </div>
   </section>
 </BaseLayout>
