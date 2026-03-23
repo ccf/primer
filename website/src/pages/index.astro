@@ -29,15 +29,15 @@ const proofSignals = [
 ];
 
 const agentMarks = [
-  { name: "Anthropic", sublabel: "Claude Code", top: "10%", left: "8%", width: "14rem", delay: "0s" },
-  { name: "Cursor", sublabel: "Native editor workflows", top: "20%", left: "63%", width: "12rem", delay: "1.4s" },
-  { name: "Codex", sublabel: "CLI agent runtime", top: "56%", left: "16%", width: "11rem", delay: "2.2s" },
-  { name: "Gemini", sublabel: "CLI and experimentation", top: "62%", left: "66%", width: "12rem", delay: "0.8s" },
+  { name: "Anthropic", sublabel: "Claude Code" },
+  { name: "Cursor", sublabel: "Native editor workflows" },
+  { name: "Codex", sublabel: "CLI agent runtime" },
+  { name: "Gemini", sublabel: "CLI and experimentation" },
 ];
 
 const chapters = [
   {
-    eyebrow: "Chapter 01",
+    eyebrow: "Workflow intelligence",
     title: "Fingerprint how work actually gets done",
     description:
       "Primer turns noisy sessions into workflow archetypes and fingerprints, then shows which patterns lead to cleaner reviews, stronger merge rates, and better follow-through.",
@@ -46,13 +46,12 @@ const chapters = [
       "See which workflows create quality without overspending",
       "Move from raw transcripts to durable workflow evidence",
     ],
-    callouts: ["Workflow quality attribution", "Compare mode", "Cost per successful outcome"],
     image: "readme-quality-dark.png",
     caption:
       "Quality becomes much more useful once it is grouped by the workflow patterns behind it.",
   },
   {
-    eyebrow: "Chapter 02",
+    eyebrow: "Cost intelligence",
     title: "See cost through the lens of successful workflows",
     description:
       "FinOps is stronger when it stops treating model spend as the whole story. Primer shows which workflows are efficient, which are expensive but justified, and where teams are overspending without better outcomes.",
@@ -61,13 +60,12 @@ const chapters = [
       "Tie workflow cost to successful outcomes instead of raw activity",
       "Spot where model choice and workflow shape drift apart",
     ],
-    callouts: ["Workflow cost attribution", "Model coach", "Burn-rate context"],
     image: "readme-finops-dark.png",
     caption:
       "The aha moment is seeing spend clustered around workflows, not just models or people.",
   },
   {
-    eyebrow: "Chapter 03",
+    eyebrow: "Reusable behavior",
     title: "Turn bright spots into exemplars your team can copy",
     description:
       "Primer surfaces reusable prompts, skills, commands, templates, and exemplar sessions so teams can standardize what is already working inside the org.",
@@ -76,13 +74,12 @@ const chapters = [
       "Find underused high-value assets worth spreading to other teams",
       "Coach with evidence instead of generic enablement advice",
     ],
-    callouts: ["Exemplar sessions", "Prompt reuse", "Team skill gaps"],
     image: "readme-growth-dark.png",
     caption:
       "Growth becomes concrete when the platform can point at exact sessions and reusable assets worth copying.",
   },
   {
-    eyebrow: "Chapter 04",
+    eyebrow: "Agent stacks",
     title: "Understand the agent stacks behind high performers",
     description:
       "Capture MCPs, skills, commands, templates, delegation, and agent-team modes so you can see which explicit configurations differentiate top performers and which toolchains create friction.",
@@ -91,13 +88,12 @@ const chapters = [
       "Measure toolchain reliability, explicit stacks, and delegation patterns",
       "See when coordinated agent teams outperform solo work",
     ],
-    callouts: ["Customization intelligence", "Delegation graphs", "Toolchain reliability"],
     image: "readme-maturity-dark.png",
     caption:
       "Agentic engineering is not just prompts. The stack, orchestration pattern, and reliability all matter.",
   },
   {
-    eyebrow: "Chapter 05",
+    eyebrow: "Measured change",
     title: "Turn recommendations into experiments and measured change",
     description:
       "Primer closes the loop. Recommendations become interventions, interventions become experiments, and the platform measures whether rollouts, playbooks, and model changes actually improved outcomes.",
@@ -106,7 +102,6 @@ const chapters = [
       "Measure whether a playbook or training program moved the needle",
       "Move from insight to operating cadence instead of accumulating dashboards",
     ],
-    callouts: ["Intervention evidence", "Experiment types", "Measured rollout impact"],
     image: "readme-dashboard-dark.png",
     caption:
       "The product is strongest when teams can turn a recommendation into something they can test and measure.",
@@ -168,14 +163,15 @@ const audiences = [
             href={`${import.meta.env.BASE_URL}#tour`}
             class="inline-flex items-center rounded-lg border border-white/15 bg-white/8 px-6 py-3 font-medium text-white transition-colors hover:bg-white/12"
           >
-            Explore the product story
+            See how it works
           </a>
         </div>
-        <div class="flex flex-wrap items-center justify-center gap-2 animate-fade-in-up" style="--delay: 320ms">
-          {heroChips.map((chip) => (
-            <span class="rounded-full border border-white/12 bg-white/6 px-3 py-1 text-xs uppercase tracking-[0.18em] text-white/62">
-              {chip}
-            </span>
+        <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm text-white/50 animate-fade-in-up" style="--delay: 320ms">
+          {heroChips.map((chip, idx) => (
+            <div class="flex items-center gap-4">
+              <span class="uppercase tracking-[0.18em]">{chip}</span>
+              {idx < heroChips.length - 1 && <span class="hidden sm:inline-block h-1 w-1 rounded-full bg-white/22"></span>}
+            </div>
           ))}
         </div>
       </div>
@@ -201,36 +197,32 @@ const audiences = [
   </section>
 
   <section class="agent-atmosphere relative overflow-hidden bg-hero-bg text-hero-text">
-    <div class="mx-auto max-w-6xl px-6 py-20 md:py-24">
+    <div class="mx-auto grid max-w-6xl items-center gap-10 px-6 py-20 md:py-24 lg:grid-cols-[1.05fr_0.95fr]">
       <div class="relative z-10 max-w-3xl">
-        <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-400">Multi-agent by design</p>
         <h2 class="font-display mb-4 text-3xl tracking-tight md:text-5xl">
-          One intelligence layer across four fast-moving agent ecosystems
+          Primer stays credible across the agent stack
         </h2>
         <p class="max-w-2xl text-lg leading-relaxed text-white/66">
-          Primer unifies Claude Code, Cursor, Codex CLI, and Gemini CLI without pretending they all
-          emit the same telemetry. The platform is built around source-aware trust, so cross-agent
-          analytics stay credible.
+          Claude Code, Cursor, Codex CLI, and Gemini CLI all move quickly and emit different kinds
+          of evidence. Primer is built around source-aware trust, so cross-agent analytics stay
+          comparable instead of collapsing into false precision.
         </p>
       </div>
 
-      <div class="agent-atmosphere__marks hidden md:block" aria-hidden="true">
+      <div class="agent-cluster hidden lg:grid" aria-hidden="true">
         {agentMarks.map((mark) => (
-          <div
-            class="agent-atmosphere__mark"
-            style={`top: ${mark.top}; left: ${mark.left}; width: ${mark.width}; animation-delay: ${mark.delay};`}
-          >
-            <span class="agent-atmosphere__name">{mark.name}</span>
-            <span class="agent-atmosphere__sub">{mark.sublabel}</span>
+          <div class="agent-cluster__mark">
+            <span class="agent-cluster__name">{mark.name}</span>
+            <span class="agent-cluster__sub">{mark.sublabel}</span>
           </div>
         ))}
       </div>
 
-      <div class="mt-10 grid gap-3 md:hidden">
+      <div class="agent-cluster mt-8 lg:hidden">
         {agentMarks.map((mark) => (
-          <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-            <p class="font-display text-lg tracking-tight text-white/82">{mark.name}</p>
-            <p class="text-sm text-white/48">{mark.sublabel}</p>
+          <div class="agent-cluster__mark">
+            <span class="agent-cluster__name">{mark.name}</span>
+            <span class="agent-cluster__sub">{mark.sublabel}</span>
           </div>
         ))}
       </div>
@@ -240,13 +232,12 @@ const audiences = [
   <section id="tour" class="py-18 md:py-24">
     <div class="mx-auto max-w-6xl px-6">
       <div class="mb-16 max-w-3xl">
-        <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand">Product tour</p>
         <h2 class="font-display mb-4 text-3xl tracking-tight md:text-5xl">
-          Scroll through the five product stories that matter most
+          From workflow proof to measured change
         </h2>
         <p class="text-lg leading-relaxed text-muted-foreground">
-          Primer is easiest to understand when each chapter shows one operating decision the
-          platform helps teams make, with the product evidence behind it.
+          Each section below shows a different layer of evidence Primer turns into an operating
+          decision.
         </p>
       </div>
     </div>
@@ -271,13 +262,6 @@ const audiences = [
                   </li>
                 ))}
               </ul>
-              <div class="flex flex-wrap gap-3">
-                {chapter.callouts.map((callout) => (
-                  <span class="rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    {callout}
-                  </span>
-                ))}
-              </div>
             </div>
 
             <div class="story-frame animate-fade-in-up" style={`--delay: ${idx * 70}ms`}>
@@ -286,11 +270,6 @@ const audiences = [
                 <span></span>
                 <span></span>
                 <span></span>
-              </div>
-              <div class="story-frame__callouts">
-                {chapter.callouts.slice(0, 2).map((callout) => (
-                  <span>{callout}</span>
-                ))}
               </div>
               <img
                 src={`${import.meta.env.BASE_URL}screenshots/${chapter.image}`}
