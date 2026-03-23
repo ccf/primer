@@ -3,91 +3,97 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 
 const base = import.meta.env.BASE_URL;
 
+const tracks = [
+  {
+    title: "Launch Primer",
+    description: "Install the platform, configure auth and storage, and get your first high-signal data in quickly.",
+    href: `${base}docs/installation/`,
+  },
+  {
+    title: "Understand the intelligence model",
+    description: "See how workflows, customizations, delegation, quality, and cost fit together into one semantic layer.",
+    href: `${base}docs/server/`,
+  },
+  {
+    title: "Operationalize the loop",
+    description: "Turn insights into interventions, experiments, and repo enablement instead of leaving them in dashboards.",
+    href: `${base}docs/insights/`,
+  },
+];
+
 const sections = [
   {
-    title: "Getting Started",
+    title: "Start Here",
     cards: [
       {
-        title: "What You Can Learn",
-        description: "The questions Primer answers at every level — org, team, and individual.",
-        href: `${base}docs/insights/`,
-        icon: "M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18",
-      },
-      {
         title: "Installation",
-        description: "Install Primer and get up and running in under 5 minutes.",
+        description: "Install Primer, initialize the database, and start the API and dashboard.",
         href: `${base}docs/installation/`,
-        icon: "M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3",
       },
       {
         title: "Configuration",
-        description: "Configure the server, database, and authentication settings.",
+        description: "Set up environment variables, auth, storage, and deployment defaults.",
         href: `${base}docs/configuration/`,
-        icon: "M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z",
-      },
-      {
-        title: "CLI Reference",
-        description: "Complete reference for the primer CLI commands.",
-        href: `${base}docs/cli/`,
-        icon: "M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z",
-      },
-    ],
-  },
-  {
-    title: "Architecture",
-    cards: [
-      {
-        title: "Server & API",
-        description: "FastAPI server, REST API endpoints, and authentication.",
-        href: `${base}docs/server/`,
-        icon: "M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z",
-      },
-      {
-        title: "Hook System",
-        description: "How session data is captured from AI coding tools.",
-        href: `${base}docs/hooks/`,
-        icon: "M11.42 15.17l-5.1-5.1m0 0L12 4.37m-5.68 5.7h15.36",
-      },
-      {
-        title: "MCP Sidecar",
-        description: "Model Context Protocol server for in-editor insights.",
-        href: `${base}docs/mcp/`,
-        icon: "M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.686-5.747l4.5-4.5a4.5 4.5 0 016.364 6.364l-1.757 1.757",
-      },
-    ],
-  },
-  {
-    title: "Guides",
-    cards: [
-      {
-        title: "Team Setup",
-        description: "Register engineers, create teams, and assign roles.",
-        href: `${base}docs/teams/`,
-        icon: "M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z",
       },
       {
         title: "GitHub Integration",
-        description: "Link AI sessions to pull requests automatically.",
+        description: "Connect GitHub OAuth, PR sync, and repository context to Primer's workflow intelligence.",
         href: `${base}docs/github/`,
-        icon: "M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z",
+      },
+    ],
+  },
+  {
+    title: "Understand the Platform",
+    cards: [
+      {
+        title: "What Primer Can Tell You",
+        description: "A product-level overview of the questions Primer answers across leaders, platform teams, leads, and engineers.",
+        href: `${base}docs/insights/`,
       },
       {
-        title: "FinOps & Cost Management",
-        description: "Cache savings, cost modeling, forecasting, and budget alerts.",
+        title: "Server & Intelligence Model",
+        description: "Architecture, data model, API surfaces, and the derived semantic layer behind workflows, exemplars, and experiments.",
+        href: `${base}docs/server/`,
+      },
+      {
+        title: "Hooks & Capture",
+        description: "How Primer captures session evidence from multiple agent environments and keeps that telemetry trustworthy.",
+        href: `${base}docs/hooks/`,
+      },
+      {
+        title: "MCP Sidecar",
+        description: "Bring stats, recommendations, and coaching into the engineer workflow.",
+        href: `${base}docs/mcp/`,
+      },
+    ],
+  },
+  {
+    title: "Operate and Expand",
+    cards: [
+      {
+        title: "Teams & Access",
+        description: "Model teams, roles, and access so insights land with the right audience.",
+        href: `${base}docs/teams/`,
+      },
+      {
+        title: "FinOps",
+        description: "Forecast spend, compare workflows, and reduce cost per successful outcome.",
         href: `${base}docs/finops/`,
-        icon: "M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-      },
-      {
-        title: "Alert Thresholds",
-        description: "Set up cost and usage alerts for your team.",
-        href: `${base}docs/alerts/`,
-        icon: "M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0",
       },
       {
         title: "Deployment",
-        description: "Deploy Primer with Docker Compose or Kubernetes.",
+        description: "Run Primer with Docker, production infrastructure, and long-lived shared environments.",
         href: `${base}docs/deployment/`,
-        icon: "M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z",
+      },
+      {
+        title: "CLI Reference",
+        description: "Reference for the `primer` CLI, sync flows, and operational commands.",
+        href: `${base}docs/cli/`,
+      },
+      {
+        title: "Alerts",
+        description: "Configure thresholds, notifications, and operational signals for rollout management.",
+        href: `${base}docs/alerts/`,
       },
     ],
   },
@@ -95,51 +101,57 @@ const sections = [
 ---
 
 <BaseLayout
-  title="Documentation — Primer"
-  description="Learn how to install, configure, and use Primer to track AI coding tool usage across your team."
+  title="Documentation — Primer Workflow Intelligence"
+  description="Documentation for Primer: installation, architecture, workflow intelligence, multi-agent capture, and operational playbooks."
 >
-  <div class="max-w-6xl mx-auto px-6 py-20">
+  <div class="mx-auto max-w-6xl px-6 py-20">
     <header class="mb-16 animate-fade-in-up">
-      <h1 class="font-display text-4xl md:text-5xl tracking-tight mb-4">Documentation</h1>
-      <p class="text-lg text-muted-foreground max-w-2xl">
-        Learn what Primer can tell you about your organization's AI usage, then set it up and start getting insights.
+      <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand">Documentation</p>
+      <h1 class="font-display mb-4 text-4xl tracking-tight md:text-5xl">
+        Docs for building a workflow intelligence layer
+      </h1>
+      <p class="max-w-3xl text-lg leading-relaxed text-muted-foreground">
+        Primer is no longer just a usage dashboard. These docs explain how to capture trustworthy
+        multi-agent telemetry, normalize it into workflows and customizations, and turn the result
+        into coaching, experiments, and operating decisions.
       </p>
-      <p class="text-sm text-muted-foreground/60 mt-2">
-        13 guides across Getting Started, Architecture, and Guides
-      </p>
-      <!-- Gradient accent line -->
-      <div class="mt-6 h-px bg-gradient-to-r from-primer-brand via-primer-400 to-transparent"></div>
+      <div class="mt-8 grid gap-4 md:grid-cols-3">
+        {tracks.map((track, idx) => (
+          <a
+            href={track.href}
+            class="rounded-2xl border border-border bg-card p-5 transition-all duration-200 hover:border-primer-border hover:shadow-md animate-fade-in-up"
+            style={`--delay: ${idx * 80}ms`}
+          >
+            <h2 class="mb-2 text-lg font-semibold">{track.title}</h2>
+            <p class="text-sm leading-relaxed text-muted-foreground">{track.description}</p>
+          </a>
+        ))}
+      </div>
     </header>
 
     {sections.map((section, sectionIdx) => (
-      <div class="mb-12">
-        <div class="flex items-center gap-3 mb-6">
+      <section class="mb-14">
+        <div class="mb-6 flex items-center gap-3">
           <h2 class="font-display text-2xl tracking-tight">{section.title}</h2>
-          <div class="flex-1 h-px bg-border"></div>
+          <div class="h-px flex-1 bg-border"></div>
         </div>
-        <div class="grid md:grid-cols-3 gap-4">
+        <div class={`grid gap-4 ${section.cards.length >= 4 ? "md:grid-cols-2 xl:grid-cols-3" : "md:grid-cols-3"}`}>
           {section.cards.map((card, cardIdx) => (
             <a
               href={card.href}
-              class="group relative p-5 rounded-xl border border-border bg-card hover:border-primer-border hover:shadow-md transition-all duration-200 hover:border-l-primer-brand animate-fade-in-up"
-              style={`--delay: ${sectionIdx * 100 + cardIdx * 60}ms`}
+              class="group rounded-2xl border border-border bg-card p-5 transition-all duration-200 hover:border-primer-border hover:shadow-md animate-fade-in-up"
+              style={`--delay: ${sectionIdx * 100 + cardIdx * 50}ms`}
             >
-              <div class="flex items-start justify-between">
-                <div class="w-9 h-9 rounded-lg bg-primer-surface flex items-center justify-center mb-3">
-                  <svg class="w-4.5 h-4.5 text-primer-brand" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d={card.icon} />
-                  </svg>
-                </div>
-                <svg class="w-4 h-4 text-muted-foreground/0 group-hover:text-muted-foreground transition-all duration-200 translate-x-0 group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                </svg>
+              <div class="mb-3 flex items-center justify-between">
+                <span class="text-xs font-semibold uppercase tracking-[0.22em] text-primer-brand">Guide</span>
+                <span class="text-muted-foreground transition-transform duration-200 group-hover:translate-x-1">→</span>
               </div>
-              <h3 class="font-semibold mb-1 group-hover:text-primer-brand transition-colors">{card.title}</h3>
-              <p class="text-sm text-muted-foreground">{card.description}</p>
+              <h3 class="mb-2 text-lg font-semibold group-hover:text-primer-brand transition-colors">{card.title}</h3>
+              <p class="text-sm leading-relaxed text-muted-foreground">{card.description}</p>
             </a>
           ))}
         </div>
-      </div>
+      </section>
     ))}
   </div>
 </BaseLayout>

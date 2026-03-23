@@ -1,99 +1,155 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 
-const features = [
-  { name: "Open source (MIT)", primer: true, agentsview: false, diy: true },
-  { name: "Self-hosted", primer: true, agentsview: false, diy: true },
-  { name: "Data stays on your infra", primer: true, agentsview: false, diy: true },
-  { name: "Claude Code support", primer: true, agentsview: true, diy: "manual" },
-  { name: "Codex CLI support", primer: true, agentsview: false, diy: "manual" },
-  { name: "Gemini CLI support", primer: true, agentsview: false, diy: "manual" },
-  { name: "Usage dashboard", primer: true, agentsview: true, diy: false },
-  { name: "Cost analysis", primer: true, agentsview: true, diy: false },
-  { name: "Friction detection", primer: true, agentsview: true, diy: false },
-  { name: "MCP sidecar", primer: true, agentsview: false, diy: false },
-  { name: "GitHub PR linking", primer: true, agentsview: true, diy: false },
-  { name: "Alert thresholds", primer: true, agentsview: true, diy: false },
-  { name: "Team management", primer: true, agentsview: true, diy: false },
-  { name: "REST API", primer: true, agentsview: false, diy: "manual" },
-  { name: "Audit trail", primer: true, agentsview: false, diy: false },
-  { name: "No vendor lock-in", primer: true, agentsview: false, diy: true },
+const rows = [
+  {
+    feature: "Workflow fingerprints tied to cost and quality",
+    primer: "Core product surface",
+    analytics: "Rare or partial",
+    diy: "High lift",
+  },
+  {
+    feature: "Exemplar sessions and bright spots",
+    primer: "Built in",
+    analytics: "Usually absent",
+    diy: "Manual curation",
+  },
+  {
+    feature: "Prompt, skill, template, and command reuse analytics",
+    primer: "Built in",
+    analytics: "Usually absent",
+    diy: "Fragmented scripts",
+  },
+  {
+    feature: "Customization intelligence for MCPs, skills, commands, and subagents",
+    primer: "Built in",
+    analytics: "Rare",
+    diy: "Custom collectors",
+  },
+  {
+    feature: "Delegation graphs and agent-team mode analysis",
+    primer: "Built in",
+    analytics: "Rare",
+    diy: "Very high lift",
+  },
+  {
+    feature: "Recommendation -> intervention -> experiment loop",
+    primer: "Built in",
+    analytics: "Usually absent",
+    diy: "Operational overhead",
+  },
+  {
+    feature: "Self-hosted and privacy-first",
+    primer: "Yes",
+    analytics: "Varies",
+    diy: "Yes",
+  },
+  {
+    feature: "Open source and extensible",
+    primer: "Yes",
+    analytics: "Usually no",
+    diy: "Depends on your stack",
+  },
+  {
+    feature: "Cross-agent support with source-aware trust model",
+    primer: "Yes",
+    analytics: "Often uneven",
+    diy: "Manual normalization",
+  },
 ];
 
-function renderCell(value: boolean | string) {
-  if (value === true) return { text: "\u2713", class: "text-emerald-500 font-semibold" };
-  if (value === false) return { text: "\u2014", class: "text-muted-foreground/40" };
-  return { text: value, class: "text-muted-foreground text-xs" };
-}
+const differentiators = [
+  {
+    title: "Primer vs generic analytics dashboards",
+    description:
+      "Most usage dashboards stop at activity, adoption, and spend. Primer is built to connect workflows, reusable assets, customizations, delegation, quality, and cost into one operating model.",
+  },
+  {
+    title: "Primer vs DIY pipelines",
+    description:
+      "You can always stitch together event collectors, SQL, notebooks, and internal dashboards. Primer shortens the distance from raw evidence to coaching, experiments, and standardized playbooks.",
+  },
+  {
+    title: "Primer's position",
+    description:
+      "The product is strongest when it answers: which workflows should we copy, which customizations matter, and which changes actually improved outcomes.",
+  },
+];
 ---
 
 <BaseLayout
-  title="Compare — Primer vs Alternatives"
-  description="See how Primer compares to AgentsView, DIY solutions, and other AI usage tracking tools."
+  title="Compare — Primer vs Usage Dashboards and DIY"
+  description="Compare Primer to generic AI analytics dashboards and DIY stacks. Primer is built for workflow intelligence, exemplars, experiments, and agent stack analysis."
 >
-  <div class="max-w-5xl mx-auto px-6 py-20">
-    <header class="text-center mb-16">
-      <h1 class="font-display text-4xl md:text-5xl tracking-tight mb-4">
-        How Primer compares
+  <div class="mx-auto max-w-6xl px-6 py-20">
+    <header class="mb-14 text-center">
+      <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand">Compare</p>
+      <h1 class="font-display mb-4 text-4xl tracking-tight md:text-5xl">
+        Primer is built for workflow intelligence, not just usage reporting
       </h1>
-      <p class="text-lg text-muted-foreground max-w-2xl mx-auto">
-        The only open-source, self-hosted platform for AI coding tool analytics
-        with built-in MCP integration.
+      <p class="mx-auto max-w-3xl text-lg leading-relaxed text-muted-foreground">
+        The real differentiator is not that Primer captures AI usage. It is that Primer helps you
+        decide which workflows, assets, customizations, and rollout changes are worth standardizing.
       </p>
     </header>
 
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm">
+    <div class="mb-14 grid gap-6 md:grid-cols-3">
+      {differentiators.map((item, idx) => (
+        <div
+          class="rounded-2xl border border-border bg-card p-6 shadow-sm animate-fade-in-up"
+          style={`--delay: ${idx * 80}ms`}
+        >
+          <h2 class="mb-3 text-xl font-semibold">{item.title}</h2>
+          <p class="text-sm leading-relaxed text-muted-foreground">{item.description}</p>
+        </div>
+      ))}
+    </div>
+
+    <div class="overflow-x-auto rounded-2xl border border-border bg-card shadow-sm">
+      <table class="w-full min-w-[760px] text-sm">
         <thead>
-          <tr class="border-b border-border">
-            <th class="text-left py-4 pr-4 font-semibold">Feature</th>
-            <th class="text-center py-4 px-4">
-              <div class="flex flex-col items-center gap-1">
-                <img src="/logo-mark.svg" alt="" width="20" height="20" class="dark:hidden" />
-                <img src="/logo-mark-light.svg" alt="" width="20" height="20" class="hidden dark:block" />
-                <span class="font-semibold text-primer-brand">Primer</span>
-              </div>
-            </th>
-            <th class="text-center py-4 px-4">
-              <div class="flex flex-col items-center gap-1">
-                <span class="text-lg">A</span>
-                <span class="font-semibold">AgentsView</span>
-              </div>
-            </th>
-            <th class="text-center py-4 px-4">
-              <div class="flex flex-col items-center gap-1">
-                <span class="text-lg">&gt;_</span>
-                <span class="font-semibold">DIY</span>
-              </div>
-            </th>
+          <tr class="border-b border-border bg-muted/40">
+            <th class="px-5 py-4 text-left font-semibold">Capability</th>
+            <th class="px-5 py-4 text-center font-semibold text-primer-brand">Primer</th>
+            <th class="px-5 py-4 text-center font-semibold">Typical analytics tool</th>
+            <th class="px-5 py-4 text-center font-semibold">DIY stack</th>
           </tr>
         </thead>
         <tbody>
-          {features.map((f, i) => (
-            <tr class={`border-b border-border/50 ${i % 2 === 0 ? "bg-muted/30" : ""}`}>
-              <td class="py-3 pr-4">{f.name}</td>
-              <td class="py-3 px-4 text-center">
-                <span class={renderCell(f.primer).class}>{renderCell(f.primer).text}</span>
-              </td>
-              <td class="py-3 px-4 text-center">
-                <span class={renderCell(f.agentsview).class}>{renderCell(f.agentsview).text}</span>
-              </td>
-              <td class="py-3 px-4 text-center">
-                <span class={renderCell(f.diy).class}>{renderCell(f.diy).text}</span>
-              </td>
+          {rows.map((row, idx) => (
+            <tr class={idx % 2 === 0 ? "border-b border-border/60" : "border-b border-border/60 bg-muted/20"}>
+              <td class="px-5 py-4 align-top">{row.feature}</td>
+              <td class="px-5 py-4 text-center align-top font-medium text-primer-brand">{row.primer}</td>
+              <td class="px-5 py-4 text-center align-top text-muted-foreground">{row.analytics}</td>
+              <td class="px-5 py-4 text-center align-top text-muted-foreground">{row.diy}</td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
 
-    <div class="mt-16 text-center">
-      <a
-        href="/docs/"
-        class="inline-flex items-center px-6 py-3 rounded-lg bg-primer-brand text-white font-medium hover:bg-primer-600 transition-colors"
-      >
-        Get Started with Primer
-      </a>
+    <div class="mt-14 rounded-2xl bg-hero-bg px-8 py-10 text-center text-hero-text">
+      <h2 class="font-display mb-3 text-3xl tracking-tight">What Primer helps you decide</h2>
+      <p class="mx-auto mb-8 max-w-3xl text-lg leading-relaxed text-white/66">
+        Which workflows deserve standardization. Which prompts and assets are worth copying. Which
+        customizations differentiate high performers. Which changes actually improved outcomes.
+      </p>
+      <div class="flex flex-col items-center justify-center gap-4 sm:flex-row">
+        <a
+          href={`${import.meta.env.BASE_URL}docs/`}
+          class="inline-flex items-center rounded-lg bg-primer-brand px-6 py-3 font-medium text-white transition-colors hover:bg-primer-600"
+        >
+          Read the docs
+        </a>
+        <a
+          href="https://github.com/ccf/primer"
+          target="_blank"
+          rel="noopener"
+          class="inline-flex items-center rounded-lg border border-white/15 bg-white/8 px-6 py-3 font-medium text-white transition-colors hover:bg-white/12"
+        >
+          Explore the repo
+        </a>
+      </div>
     </div>
   </div>
 </BaseLayout>

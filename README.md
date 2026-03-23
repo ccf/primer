@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <b>Understand how your engineers use AI — and how to make them better at it.</b>
+  <b>See which AI workflows actually work.</b>
 </p>
 
 <p align="center">
@@ -36,14 +36,14 @@
 
 ---
 
-Your team adopted AI coding tools. Now what?
+Your team adopted AI coding tools. Now you need to know what to standardize.
 
-Primer is an open-source intelligence platform for agentic engineering. It captures session data
-from [Claude Code](https://docs.anthropic.com/en/docs/claude-code),
+Primer is an open-source workflow intelligence platform for agentic engineering. It captures
+session data from [Claude Code](https://docs.anthropic.com/en/docs/claude-code),
 [Codex CLI](https://github.com/openai/codex),
 [Gemini CLI](https://github.com/google-gemini/gemini-cli), and Cursor, then turns that telemetry
-into coaching, project enablement, quality attribution, and operational decisions. Self-hosted.
-Privacy-first. Your data never leaves your network.
+into workflow fingerprints, quality attribution, cost proof, exemplar sessions, coaching, and
+experiments. Self-hosted. Privacy-first. Your data never leaves your network.
 
 ## Questions Primer Answers
 
@@ -74,16 +74,28 @@ Privacy-first. Your data never leaves your network.
 
 ## What Makes This Different
 
-**Friction analysis, not just usage tracking.** Primer doesn't just count sessions — it classifies *why* sessions fail. LLM-powered facet extraction identifies goals, satisfaction, and friction types from every transcript, then scores their impact on outcomes. You learn that `permission_denied` errors cause 40% lower success rates, not just that they happen sometimes.
+**Workflow intelligence, not just usage tracking.** Primer links workflow fingerprint to quality,
+cost, reusable assets, and interventions so you can decide which patterns should be standardized
+across the org.
+
+**Friction analysis, not just error counting.** Primer doesn't just count failures. It classifies
+*why* sessions fail, what engineers tried next, and which recoveries actually worked. You learn
+that `permission_denied` errors cause lower success rates, not just that they happened sometimes.
+
+**Customization and orchestration intelligence.** Primer captures MCPs, skills, commands,
+subagents, delegation patterns, and agent-team modes so you can see which explicit agent stacks
+differentiate high performers and which ones create friction.
 
 **Individual intelligence, not just org dashboards.** Every engineer gets a trajectory view,
-strengths profile, friction breakdown, and AI-generated narrative about their patterns. The MCP
-sidecar brings stats, friction reports, recommendations, and coaching into the session without
-forcing context switching.
+strengths profile, friction breakdown, AI-generated narrative, model coach, and learning paths.
+The MCP sidecar brings stats, friction reports, recommendations, and coaching into the session
+without forcing context switching.
 
 **Cost optimization, not just cost tracking.** Primer models whether each engineer should be on API billing, Pro ($20/mo), or Max ($100/mo) based on actual usage. It measures cache hit rates per engineer and surfaces how much money is being left on the table. Budget burn-rate alerts catch overruns before they happen.
 
-**AI maturity scoring.** A composite leverage score (0-100) per engineer based on tool category diversity, orchestration adoption, and cache efficiency. Track your org's maturity curve over time. Detect which projects have CLAUDE.md, AGENTS.md, and proper AI configuration — and which don't.
+**Experiments, not just recommendations.** Primer turns recommendations into interventions and
+structured experiments so you can measure whether a rollout, training change, or playbook
+actually improved outcomes.
 
 <p align="center">
   <img src="docs/images/finops-dark.png" alt="FinOps — cost tracking, cache analytics, subscription modeling, and budget management" width="100%">
