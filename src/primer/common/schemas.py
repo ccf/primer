@@ -21,6 +21,14 @@ class PaginatedResponse[T](BaseModel):
 AgentType = Literal["claude_code", "codex_cli", "gemini_cli", "cursor"]
 TelemetryParity = Literal["required", "optional", "unavailable"]
 InterventionStatus = Literal["planned", "in_progress", "completed", "dismissed"]
+InterventionExperimentType = Literal[
+    "training_rollout",
+    "tool_change",
+    "enablement_playbook",
+    "prompt_standardization",
+    "model_rollout",
+    "workflow_playbook",
+]
 ExecutionEvidenceType = Literal["test", "lint", "build", "verification"]
 ExecutionEvidenceStatus = Literal["passed", "failed", "unknown"]
 WorkflowStep = Literal[
@@ -533,6 +541,13 @@ class InterventionEngineerSummary(BaseModel):
     email: str
 
 
+class InterventionExperimentConfig(BaseModel):
+    experiment_type: InterventionExperimentType
+    hypothesis: str
+    target_cohort: str | None = None
+    success_criteria: str | None = None
+
+
 class InterventionCreate(BaseModel):
     title: str
     description: str
@@ -547,6 +562,7 @@ class InterventionCreate(BaseModel):
     source_type: str | None = None
     source_title: str | None = None
     evidence: dict[str, Any] | None = None
+    experiment: InterventionExperimentConfig | None = None
     baseline_start_at: datetime | None = None
     baseline_end_at: datetime | None = None
 
@@ -565,6 +581,7 @@ class InterventionUpdate(BaseModel):
     source_type: str | None = None
     source_title: str | None = None
     evidence: dict[str, Any] | None = None
+    experiment: InterventionExperimentConfig | None = None
 
 
 class InterventionResponse(BaseModel):
@@ -587,6 +604,7 @@ class InterventionResponse(BaseModel):
     source_type: str | None
     source_title: str | None
     evidence: dict[str, Any] | None
+    experiment: InterventionExperimentConfig | None = None
     baseline_start_at: datetime | None
     baseline_end_at: datetime | None
     baseline_metrics: InterventionMetricsSnapshot | None = None
@@ -627,6 +645,7 @@ class InterventionEffectivenessResponse(BaseModel):
     by_team: list[InterventionEffectivenessGroup]
     by_project: list[InterventionEffectivenessGroup]
     by_engineer_cohort: list[InterventionEffectivenessGroup]
+    by_experiment_type: list[InterventionEffectivenessGroup]
 
 
 # --- Daily Stats ---

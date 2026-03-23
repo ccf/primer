@@ -246,6 +246,12 @@ export function useCreateIntervention() {
       source_type?: string | null
       source_title?: string | null
       evidence?: Record<string, unknown> | null
+      experiment?: {
+        experiment_type: string
+        hypothesis: string
+        target_cohort?: string | null
+        success_criteria?: string | null
+      } | null
       baseline_start_at?: string | null
       baseline_end_at?: string | null
     }) =>
@@ -278,6 +284,12 @@ export function useUpdateIntervention() {
       source_type?: string | null
       source_title?: string | null
       evidence?: Record<string, unknown> | null
+      experiment?: {
+        experiment_type: string
+        hypothesis: string
+        target_cohort?: string | null
+        success_criteria?: string | null
+      } | null
     }) =>
       apiFetch(`/api/v1/interventions/${id}`, {
         method: "PATCH",
