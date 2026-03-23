@@ -12,6 +12,7 @@ from primer.common.schemas import (
     InterventionEffectivenessResponse,
     InterventionEffectivenessSummary,
     InterventionEngineerSummary,
+    InterventionExperimentConfig,
     InterventionMetricsSnapshot,
     InterventionResponse,
     InterventionUpdate,
@@ -123,6 +124,12 @@ def create_intervention(
         source_type=payload.source_type,
         source_title=payload.source_title,
         evidence=payload.evidence,
+        experiment_type=payload.experiment.experiment_type if payload.experiment else None,
+        experiment_hypothesis=payload.experiment.hypothesis if payload.experiment else None,
+        experiment_target_cohort=payload.experiment.target_cohort if payload.experiment else None,
+        experiment_success_criteria=(
+            payload.experiment.success_criteria if payload.experiment else None
+        ),
         baseline_start_at=baseline_start,
         baseline_end_at=baseline_end,
         baseline_metrics=baseline_metrics.model_dump(mode="json"),
@@ -148,8 +155,21 @@ def update_intervention(
         intervention.project_name,
     )
     updates = payload.model_dump(exclude_unset=True)
+    experiment_payload = updates.pop("experiment", None)
     for update_field, value in updates.items():
         setattr(intervention, update_field, value)
+
+    if "experiment" in payload.model_fields_set:
+        if experiment_payload is None:
+            intervention.experiment_type = None
+            intervention.experiment_hypothesis = None
+            intervention.experiment_target_cohort = None
+            intervention.experiment_success_criteria = None
+        else:
+            intervention.experiment_type = experiment_payload["experiment_type"]
+            intervention.experiment_hypothesis = experiment_payload["hypothesis"]
+            intervention.experiment_target_cohort = experiment_payload.get("target_cohort")
+            intervention.experiment_success_criteria = experiment_payload.get("success_criteria")
 
     if payload.status is not None:
         intervention.completed_at = datetime.now(UTC) if payload.status == "completed" else None
@@ -418,6 +438,7 @@ def _build_responses(
                 source_type=intervention.source_type,
                 source_title=intervention.source_title,
                 evidence=intervention.evidence,
+                experiment=_experiment_config(intervention),
                 baseline_start_at=intervention.baseline_start_at,
                 baseline_end_at=intervention.baseline_end_at,
                 baseline_metrics=baseline_metrics,
@@ -502,6 +523,7 @@ def _build_effectiveness_report(
             by_team=[],
             by_project=[],
             by_engineer_cohort=[],
+            by_experiment_type=[],
         )
 
     team_ids = {intervention.team_id for intervention in completed if intervention.team_id}
@@ -537,6 +559,7 @@ def _build_effectiveness_report(
     team_rollups: dict[str, _EffectivenessRollup] = {}
     project_rollups: dict[str, _EffectivenessRollup] = {}
     cohort_rollups: dict[str, _EffectivenessRollup] = {}
+    experiment_rollups: dict[str, _EffectivenessRollup] = {}
 
     for intervention in completed:
         baseline_metrics = (
@@ -611,12 +634,18 @@ def _build_effectiveness_report(
         cohort_rollups.setdefault(cohort_key, _EffectivenessRollup(cohort_key, cohort_label)).add(
             **rollup_kwargs
         )
+        experiment_key, experiment_label = _experiment_group(intervention)
+        experiment_rollups.setdefault(
+            experiment_key,
+            _EffectivenessRollup(experiment_key, experiment_label),
+        ).add(**rollup_kwargs)
 
     return InterventionEffectivenessResponse(
         summary=_rollup_to_summary(summary_rollup, total_interventions=len(interventions)),
         by_team=_sorted_group_rollups(team_rollups),
         by_project=_sorted_group_rollups(project_rollups),
         by_engineer_cohort=_sorted_group_rollups(cohort_rollups),
+        by_experiment_type=_sorted_group_rollups(experiment_rollups),
     )
 
 
@@ -730,6 +759,12 @@ def _project_group(intervention: Intervention) -> tuple[str, str]:
     return intervention.project_name, intervention.project_name
 
 
+def _experiment_group(intervention: Intervention) -> tuple[str, str]:
+    if not intervention.experiment_type:
+        return "non_experiment", "Non-Experiment"
+    return intervention.experiment_type, intervention.experiment_type.replace("_", " ").title()
+
+
 def _cohort_group(
     engineer_id: str | None,
     first_session_by_engineer: dict[str, datetime],
@@ -812,3 +847,14 @@ def _engineer_summary(engineer: Engineer | None) -> InterventionEngineerSummary 
     if engineer is None:
         return None
     return InterventionEngineerSummary(id=engineer.id, name=engineer.name, email=engineer.email)
+
+
+def _experiment_config(intervention: Intervention) -> InterventionExperimentConfig | None:
+    if not intervention.experiment_type or not intervention.experiment_hypothesis:
+        return None
+    return InterventionExperimentConfig(
+        experiment_type=intervention.experiment_type,
+        hypothesis=intervention.experiment_hypothesis,
+        target_cohort=intervention.experiment_target_cohort,
+        success_criteria=intervention.experiment_success_criteria,
+    )

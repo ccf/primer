@@ -262,6 +262,13 @@ export interface Recommendation {
 }
 
 export type InterventionStatus = "planned" | "in_progress" | "completed" | "dismissed"
+export type InterventionExperimentType =
+  | "training_rollout"
+  | "tool_change"
+  | "enablement_playbook"
+  | "prompt_standardization"
+  | "model_rollout"
+  | "workflow_playbook"
 
 export interface InterventionMetricsSnapshot {
   window_start: string
@@ -279,6 +286,13 @@ export interface InterventionEngineerSummary {
   id: string
   name: string
   email: string
+}
+
+export interface InterventionExperimentConfig {
+  experiment_type: InterventionExperimentType
+  hypothesis: string
+  target_cohort: string | null
+  success_criteria: string | null
 }
 
 export interface InterventionResponse {
@@ -301,6 +315,7 @@ export interface InterventionResponse {
   source_type: string | null
   source_title: string | null
   evidence: Record<string, unknown> | null
+  experiment: InterventionExperimentConfig | null
   baseline_start_at: string | null
   baseline_end_at: string | null
   baseline_metrics: InterventionMetricsSnapshot | null
@@ -341,6 +356,7 @@ export interface InterventionEffectivenessResponse {
   by_team: InterventionEffectivenessGroup[]
   by_project: InterventionEffectivenessGroup[]
   by_engineer_cohort: InterventionEffectivenessGroup[]
+  by_experiment_type: InterventionEffectivenessGroup[]
 }
 
 export interface DailyStatsResponse {

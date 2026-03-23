@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { ClipboardList, PlayCircle, CheckCircle2, Target, Plus } from "lucide-react"
+import { ClipboardList, PlayCircle, CheckCircle2, Target, Plus, Gauge } from "lucide-react"
 import { PageHeader } from "@/components/shared/page-header"
 import { CardSkeleton } from "@/components/shared/loading-skeleton"
 import { EmptyState } from "@/components/shared/empty-state"
@@ -61,6 +61,7 @@ export function InterventionsPage({ teamId }: InterventionsPageProps) {
   const inProgressCount = interventions.filter((item) => item.status === "in_progress").length
   const completedCount = interventions.filter((item) => item.status === "completed").length
   const assignedCount = interventions.filter((item) => item.owner_engineer_id).length
+  const experimentCount = interventions.filter((item) => item.experiment).length
 
   return (
     <div className="space-y-8">
@@ -75,11 +76,12 @@ export function InterventionsPage({ teamId }: InterventionsPageProps) {
         </Button>
       </PageHeader>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <InlineStat label="Planned" value={String(plannedCount)} icon={Target} />
         <InlineStat label="In Progress" value={String(inProgressCount)} icon={PlayCircle} />
         <InlineStat label="Completed" value={String(completedCount)} icon={CheckCircle2} />
         <InlineStat label="Assigned" value={String(assignedCount)} icon={ClipboardList} />
+        <InlineStat label="Experiments" value={String(experimentCount)} icon={Gauge} />
       </div>
 
       {effectiveness && <InterventionEffectivenessSection data={effectiveness} />}

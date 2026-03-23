@@ -121,6 +121,35 @@ def test_engineer_can_create_intervention_with_metrics(client, engineer_with_key
     assert data["source_type"] == "recommendation"
 
 
+def test_intervention_create_persists_experiment_config(client, engineer_with_key):
+    _engineer, api_key = engineer_with_key
+    _ingest_measured_session(client, api_key, project_name="alpha")
+
+    response = client.post(
+        "/api/v1/interventions",
+        headers={"x-api-key": api_key},
+        json={
+            "title": "Roll out the debugging checklist",
+            "description": "Measure whether the checklist improves triage quality.",
+            "category": "coaching",
+            "project_name": "alpha",
+            "experiment": {
+                "experiment_type": "training_rollout",
+                "hypothesis": "A checklist should reduce triage friction.",
+                "target_cohort": "new hires",
+                "success_criteria": "Reduce friction events by 25%.",
+            },
+        },
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["experiment"]["experiment_type"] == "training_rollout"
+    assert data["experiment"]["hypothesis"] == "A checklist should reduce triage friction."
+    assert data["experiment"]["target_cohort"] == "new hires"
+    assert data["experiment"]["success_criteria"] == "Reduce friction events by 25%."
+
+
 def test_engineer_only_sees_assigned_or_targeted_interventions(
     client, admin_headers, engineer_with_key, db_session
 ):
@@ -384,6 +413,7 @@ def test_intervention_effectiveness_endpoint_groups_by_scope_and_cohort(client, 
     assert data["by_team"][0]["key"] == engineer.team_id
     assert data["by_team"][0]["label"] == "Test Team"
     assert data["by_engineer_cohort"][0]["key"] == "experienced"
+    assert data["by_experiment_type"][0]["key"] == "non_experiment"
 
 
 def test_team_lead_lists_and_reports_org_scoped_team_interventions(
@@ -447,3 +477,54 @@ def test_team_lead_lists_and_reports_org_scoped_team_interventions(
     assert report_data["summary"]["total_interventions"] == 1
     assert report_data["summary"]["completed_interventions"] == 1
     assert report_data["by_team"][0]["label"] == "Lead Team"
+
+
+def test_intervention_effectiveness_groups_by_experiment_type(client, engineer_with_key):
+    _engineer, api_key = engineer_with_key
+    now = datetime.now(UTC)
+    baseline_end = now - timedelta(days=90)
+    baseline_start = baseline_end - timedelta(days=30)
+
+    _ingest_measured_session(
+        client,
+        api_key,
+        project_name="primer",
+        started_at=now - timedelta(days=95),
+        outcome="failure",
+        friction_events=3,
+    )
+    _ingest_measured_session(
+        client,
+        api_key,
+        project_name="primer",
+        started_at=now - timedelta(days=2),
+        outcome="success",
+        friction_events=1,
+    )
+
+    created = client.post(
+        "/api/v1/interventions",
+        headers={"x-api-key": api_key},
+        json={
+            "title": "Model rollout experiment",
+            "description": "Test a lighter model for debugging work.",
+            "category": "workflow",
+            "project_name": "primer",
+            "status": "completed",
+            "baseline_start_at": baseline_start.isoformat(),
+            "baseline_end_at": baseline_end.isoformat(),
+            "experiment": {
+                "experiment_type": "model_rollout",
+                "hypothesis": "A lighter model can keep success stable at lower cost.",
+                "target_cohort": "debugging sessions",
+                "success_criteria": "Keep success above 80%.",
+            },
+        },
+    )
+    assert created.status_code == 201
+
+    response = client.get("/api/v1/interventions/effectiveness", headers={"x-api-key": api_key})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["by_experiment_type"][0]["key"] == "model_rollout"
+    assert data["by_experiment_type"][0]["label"] == "Model Rollout"

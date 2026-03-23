@@ -107,9 +107,19 @@ export function InterventionCard({
               </Badge>
               <Badge variant={statusVariant[intervention.status]}>{formatStatus(intervention.status)}</Badge>
               <Badge variant="outline">{intervention.category}</Badge>
+              {intervention.experiment && (
+                <Badge variant="warning">
+                  {intervention.experiment.experiment_type.replaceAll("_", " ")}
+                </Badge>
+              )}
             </div>
             <CardTitle className="text-base">{intervention.title}</CardTitle>
             <p className="max-w-3xl text-sm text-muted-foreground">{intervention.description}</p>
+            {intervention.experiment && (
+              <p className="max-w-3xl text-sm text-muted-foreground">
+                Hypothesis: {intervention.experiment.hypothesis}
+              </p>
+            )}
           </div>
 
           <div className="text-right text-xs text-muted-foreground">
@@ -124,6 +134,11 @@ export function InterventionCard({
               {bit}
             </span>
           ))}
+          {intervention.experiment?.target_cohort && (
+            <span className="rounded-full bg-muted px-2.5 py-1">
+              Cohort {intervention.experiment.target_cohort}
+            </span>
+          )}
           <span className="rounded-full bg-muted px-2.5 py-1">
             Owner {intervention.owner_engineer?.name ?? "Unassigned"}
           </span>
@@ -217,20 +232,34 @@ export function InterventionCard({
             <h3 className="text-sm font-semibold text-muted-foreground">Evidence</h3>
             <div className="rounded-xl border border-border/60 bg-background p-4">
               {evidenceEntries.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No linked evidence was captured for this intervention yet.
-                </p>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    No linked evidence was captured for this intervention yet.
+                  </p>
+                  {intervention.experiment?.success_criteria && (
+                    <p className="text-sm text-muted-foreground">
+                      Success criteria: {intervention.experiment.success_criteria}
+                    </p>
+                  )}
+                </div>
               ) : (
-                <dl className="space-y-2 text-sm">
-                  {evidenceEntries.map(([key, value]) => (
-                    <div key={key} className="flex items-start justify-between gap-4">
-                      <dt className="text-muted-foreground">{key.replaceAll("_", " ")}</dt>
-                      <dd className="text-right font-medium">
-                        {typeof value === "number" ? value : String(value)}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
+                <div className="space-y-2">
+                  <dl className="space-y-2 text-sm">
+                    {evidenceEntries.map(([key, value]) => (
+                      <div key={key} className="flex items-start justify-between gap-4">
+                        <dt className="text-muted-foreground">{key.replaceAll("_", " ")}</dt>
+                        <dd className="text-right font-medium">
+                          {typeof value === "number" ? value : String(value)}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                  {intervention.experiment?.success_criteria && (
+                    <p className="text-sm text-muted-foreground">
+                      Success criteria: {intervention.experiment.success_criteria}
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           </section>

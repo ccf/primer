@@ -24,6 +24,11 @@ interface FormState {
   severity: string
   dueDate: string
   ownerEngineerId: string
+  trackExperiment: boolean
+  experimentType: string
+  experimentHypothesis: string
+  experimentTargetCohort: string
+  experimentSuccessCriteria: string
 }
 
 function buildInitialState(
@@ -37,6 +42,11 @@ function buildInitialState(
     severity: recommendation?.severity ?? "info",
     dueDate: "",
     ownerEngineerId: defaultOwnerEngineerId ?? "",
+    trackExperiment: false,
+    experimentType: "training_rollout",
+    experimentHypothesis: "",
+    experimentTargetCohort: "",
+    experimentSuccessCriteria: "",
   }
 }
 
@@ -117,6 +127,14 @@ function InterventionFormBody({
         source_type: recommendation ? "recommendation" : "manual",
         source_title: recommendation?.title,
         evidence: recommendation?.evidence ?? null,
+        experiment: form.trackExperiment
+          ? {
+              experiment_type: form.experimentType,
+              hypothesis: form.experimentHypothesis,
+              target_cohort: form.experimentTargetCohort || null,
+              success_criteria: form.experimentSuccessCriteria || null,
+            }
+          : null,
         baseline_start_at: startDate,
         baseline_end_at: endDate,
       },
@@ -228,6 +246,75 @@ function InterventionFormBody({
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none ring-0 transition-colors focus:border-primary"
               />
             </div>
+          </div>
+
+          <div className="space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={form.trackExperiment}
+                onChange={(event) => updateField("trackExperiment", event.target.checked)}
+              />
+              Track this as an experiment
+            </label>
+
+            {form.trackExperiment && (
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Experiment Type</label>
+                    <select
+                      value={form.experimentType}
+                      onChange={(event) => updateField("experimentType", event.target.value)}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none ring-0 transition-colors focus:border-primary"
+                    >
+                      <option value="training_rollout">Training Rollout</option>
+                      <option value="tool_change">Tool Change</option>
+                      <option value="enablement_playbook">Enablement Playbook</option>
+                      <option value="prompt_standardization">Prompt Standardization</option>
+                      <option value="model_rollout">Model Rollout</option>
+                      <option value="workflow_playbook">Workflow Playbook</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Target Cohort</label>
+                    <input
+                      value={form.experimentTargetCohort}
+                      onChange={(event) =>
+                        updateField("experimentTargetCohort", event.target.value)
+                      }
+                      placeholder="New hires, Team A, API engineers..."
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none ring-0 transition-colors focus:border-primary"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Hypothesis</label>
+                  <textarea
+                    value={form.experimentHypothesis}
+                    onChange={(event) =>
+                      updateField("experimentHypothesis", event.target.value)
+                    }
+                    className="min-h-20 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none ring-0 transition-colors focus:border-primary"
+                    placeholder="What change do you expect and why?"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Success Criteria</label>
+                  <textarea
+                    value={form.experimentSuccessCriteria}
+                    onChange={(event) =>
+                      updateField("experimentSuccessCriteria", event.target.value)
+                    }
+                    className="min-h-20 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none ring-0 transition-colors focus:border-primary"
+                    placeholder="What metric change will count as success?"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-end gap-2 pt-2">

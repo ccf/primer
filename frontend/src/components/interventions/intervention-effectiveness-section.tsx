@@ -149,6 +149,12 @@ export function InterventionEffectivenessSection({
           rows={data.by_engineer_cohort}
         />
       </div>
+
+      <EffectivenessTable
+        title="By Experiment Type"
+        labelHeader="Experiment Type"
+        rows={data.by_experiment_type}
+      />
     </section>
   )
 }
