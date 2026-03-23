@@ -29,10 +29,10 @@ const proofSignals = [
 ];
 
 const agentMarks = [
-  { name: "Anthropic", sublabel: "Claude Code" },
-  { name: "Cursor", sublabel: "Native editor workflows" },
-  { name: "Codex", sublabel: "CLI agent runtime" },
-  { name: "Gemini", sublabel: "CLI and experimentation" },
+  { name: "Anthropic", src: "anthropic.svg", alt: "Anthropic logo" },
+  { name: "Cursor", src: "cursor.svg", alt: "Cursor logo" },
+  { name: "Codex", src: "codex.svg", alt: "Codex logo" },
+  { name: "Gemini", src: "gemini.svg", alt: "Gemini logo" },
 ];
 
 const chapters = [
@@ -160,7 +160,7 @@ const audiences = [
             Read the docs
           </a>
           <a
-            href={`${import.meta.env.BASE_URL}#tour`}
+            href={`${import.meta.env.BASE_URL}#product`}
             class="inline-flex items-center rounded-lg border border-white/15 bg-white/8 px-6 py-3 font-medium text-white transition-colors hover:bg-white/12"
           >
             See how it works
@@ -170,7 +170,7 @@ const audiences = [
           {heroChips.map((chip, idx) => (
             <div class="flex items-center gap-4">
               <span class="uppercase tracking-[0.18em]">{chip}</span>
-              {idx < heroChips.length - 1 && <span class="hidden sm:inline-block h-1 w-1 rounded-full bg-white/22"></span>}
+              {idx < heroChips.length - 1 && <span class="hidden h-1 w-1 rounded-full bg-white/22 sm:inline-block"></span>}
             </div>
           ))}
         </div>
@@ -212,24 +212,33 @@ const audiences = [
       <div class="agent-cluster hidden lg:grid lg:grid-cols-2" aria-hidden="true">
         {agentMarks.map((mark) => (
           <div class="agent-cluster__mark">
-            <span class="agent-cluster__name">{mark.name}</span>
-            <span class="agent-cluster__sub">{mark.sublabel}</span>
+            <img
+              src={`${import.meta.env.BASE_URL}agent-marks/${mark.src}`}
+              alt=""
+              class="agent-cluster__logo"
+              loading="lazy"
+            />
           </div>
         ))}
       </div>
 
-      <div class="mt-8 grid gap-3 lg:hidden">
+      <div class="mt-8 grid grid-cols-2 gap-3 lg:hidden">
         {agentMarks.map((mark) => (
           <div class="agent-cluster__mark">
-            <span class="agent-cluster__name">{mark.name}</span>
-            <span class="agent-cluster__sub">{mark.sublabel}</span>
+            <img
+              src={`${import.meta.env.BASE_URL}agent-marks/${mark.src}`}
+              alt={mark.alt}
+              class="agent-cluster__logo"
+              loading="lazy"
+            />
+            <span class="agent-cluster__label">{mark.name}</span>
           </div>
         ))}
       </div>
     </div>
   </section>
 
-  <section id="tour" class="py-18 md:py-24">
+  <section id="product" class="py-18 md:py-24">
     <div class="mx-auto max-w-6xl px-6">
       <div class="mb-16 max-w-3xl">
         <h2 class="font-display mb-4 text-3xl tracking-tight md:text-5xl">
