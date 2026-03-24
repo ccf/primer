@@ -4,6 +4,7 @@ import type { QualityAttributionRow } from "@/types/api"
 
 interface Props {
   rows: QualityAttributionRow[]
+  framed?: boolean
 }
 
 const DIMENSION_LABELS: Record<string, string> = {
@@ -19,16 +20,30 @@ function formatPercent(value: number | null): string {
   return value == null ? "-" : `${(value * 100).toFixed(0)}%`
 }
 
-export function QualityAttributionTable({ rows }: Props) {
+export function QualityAttributionTable({ rows, framed = true }: Props) {
   if (rows.length === 0) {
-    return (
+    const emptyBody = (
+      <>
+        {framed ? (
+          <CardHeader>
+            <CardTitle>Quality Attribution</CardTitle>
+            <CardDescription>No attributed PR outcomes yet.</CardDescription>
+          </CardHeader>
+        ) : null}
+        <CardContent className={framed ? undefined : "p-0"}>
+          {!framed ? (
+            <p className="text-sm text-muted-foreground">No attributed PR outcomes yet.</p>
+          ) : null}
+        </CardContent>
+      </>
+    )
+
+    return framed ? (
       <Card>
-        <CardHeader>
-          <CardTitle>Quality Attribution</CardTitle>
-          <CardDescription>No attributed PR outcomes yet.</CardDescription>
-        </CardHeader>
-        <CardContent />
+        {emptyBody}
       </Card>
+    ) : (
+      emptyBody
     )
   }
 
@@ -38,15 +53,17 @@ export function QualityAttributionTable({ rows }: Props) {
     return acc
   }, {})
 
-  return (
-    <Card>
+  const content = (
+    <>
+      {framed ? (
       <CardHeader>
         <CardTitle>Quality Attribution</CardTitle>
         <CardDescription>
           Group PR outcomes by workflow and behavior so strong patterns stand out faster.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-5">
+      ) : null}
+      <CardContent className={framed ? "space-y-5" : "space-y-5 p-0"}>
       {Object.entries(grouped).map(([dimension, items]) => (
         <section key={dimension} className="space-y-3 rounded-2xl border border-border/60 bg-muted/20 p-4">
           <div className="flex items-center justify-between gap-3">
@@ -101,6 +118,14 @@ export function QualityAttributionTable({ rows }: Props) {
         </section>
       ))}
       </CardContent>
+    </>
+  )
+
+  return framed ? (
+    <Card>
+      {content}
     </Card>
+  ) : (
+    content
   )
 }
