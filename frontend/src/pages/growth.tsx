@@ -77,11 +77,11 @@ function PatternsTab({ teamId, startDate, endDate }: TabProps) {
       <PatternSummary data={data} />
       <BrightSpotCards spots={data.bright_spots} />
         <div className="space-y-3">
-          <SectionHeader
-            title="Exemplar Session Library"
-            description="Browse concrete sessions worth copying, with workflow, support, and cost context."
-          />
-          <ExemplarSessionLibrary exemplars={data.exemplar_sessions ?? []} />
+        <SectionHeader
+          title="Exemplar Session Library"
+          description="Browse concrete sessions worth copying, with workflow, support, and cost context."
+        />
+        <ExemplarSessionLibrary exemplars={data.exemplar_sessions ?? []} showEmptyHeader={false} />
       </div>
       <SharedPatternCards patterns={data.patterns} />
     </div>

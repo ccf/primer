@@ -106,7 +106,7 @@ export function MaturityPage({ teamId, dateRange }: MaturityPageProps) {
             title="High-performer stacks"
             description="The customizations and stack combinations that repeatedly show up in strong outcomes."
           />
-          <HighPerformerStackCards stacks={data.high_performer_stacks} />
+          <HighPerformerStackCards stacks={data.high_performer_stacks} showEmptyHeader={false} />
         </div>
       )}
 

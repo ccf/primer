@@ -7,17 +7,28 @@ import type { ExemplarSession } from "@/types/api"
 
 interface ExemplarSessionLibraryProps {
   exemplars: ExemplarSession[]
+  showEmptyHeader?: boolean
 }
 
-export function ExemplarSessionLibrary({ exemplars }: ExemplarSessionLibraryProps) {
+export function ExemplarSessionLibrary({
+  exemplars,
+  showEmptyHeader = true,
+}: ExemplarSessionLibraryProps) {
   if (exemplars.length === 0) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Exemplar Session Library</CardTitle>
-          <CardDescription>No exemplar sessions identified yet.</CardDescription>
-        </CardHeader>
-        <CardContent />
+        {showEmptyHeader ? (
+          <CardHeader>
+            <CardTitle>Exemplar Session Library</CardTitle>
+            <CardDescription>No exemplar sessions identified yet.</CardDescription>
+          </CardHeader>
+        ) : (
+          <CardContent className="p-6">
+            <p className="text-sm text-muted-foreground">
+              No exemplar sessions identified yet.
+            </p>
+          </CardContent>
+        )}
       </Card>
     )
   }

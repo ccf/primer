@@ -5,17 +5,28 @@ import type { HighPerformerStack } from "@/types/api"
 
 interface HighPerformerStackCardsProps {
   stacks: HighPerformerStack[]
+  showEmptyHeader?: boolean
 }
 
-export function HighPerformerStackCards({ stacks }: HighPerformerStackCardsProps) {
+export function HighPerformerStackCards({
+  stacks,
+  showEmptyHeader = true,
+}: HighPerformerStackCardsProps) {
   if (stacks.length === 0) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">High-Performer Stacks</CardTitle>
-          <CardDescription>No explicit high-performer stacks detected yet.</CardDescription>
-        </CardHeader>
-        <CardContent />
+        {showEmptyHeader ? (
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">High-Performer Stacks</CardTitle>
+            <CardDescription>No explicit high-performer stacks detected yet.</CardDescription>
+          </CardHeader>
+        ) : (
+          <CardContent className="p-6">
+            <p className="text-sm text-muted-foreground">
+              No explicit high-performer stacks detected yet.
+            </p>
+          </CardContent>
+        )}
       </Card>
     )
   }
