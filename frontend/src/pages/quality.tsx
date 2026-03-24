@@ -11,6 +11,7 @@ import { FindingsOverviewSection } from "@/components/quality/findings-overview"
 import { FindingsTable } from "@/components/quality/findings-table"
 import { QualityAttributionTable } from "@/components/quality/quality-attribution-table"
 import { CardSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleton"
+import { SectionHeader } from "@/components/shared/section-header"
 import { GitPullRequest } from "lucide-react"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
@@ -65,9 +66,10 @@ export function QualityPage({ teamId, dateRange }: QualityPageProps) {
 
       {findingsData && findingsData.items.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground">
-            Review Findings Detail
-          </h2>
+          <SectionHeader
+            title="Review findings detail"
+            description="Inspect the actual automated review issues behind the summary metrics."
+          />
           <FindingsTable findings={findingsData.items} />
         </section>
       )}
@@ -75,17 +77,22 @@ export function QualityPage({ teamId, dateRange }: QualityPageProps) {
       <CodeVolumeChart data={quality.daily_volume} />
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground">Pull Requests</h2>
+        <SectionHeader
+          title="Recent pull requests"
+          description="A closer read on the PRs and review behavior feeding the quality view."
+        />
         <PRTable prs={quality.recent_prs} />
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground">Engineer Quality</h2>
+        <SectionHeader
+          title="Engineer quality"
+          description="See who is generating strong outcomes and where quality support is needed."
+        />
         <EngineerQualityTable engineers={quality.engineer_quality} />
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground">Quality Attribution</h2>
         <QualityAttributionTable rows={quality.attribution} />
       </section>
     </div>

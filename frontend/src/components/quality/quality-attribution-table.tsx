@@ -1,3 +1,4 @@
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatLabel, formatMetric } from "@/lib/utils"
 import type { QualityAttributionRow } from "@/types/api"
 
@@ -21,9 +22,13 @@ function formatPercent(value: number | null): string {
 export function QualityAttributionTable({ rows }: Props) {
   if (rows.length === 0) {
     return (
-      <div className="py-8 text-center text-sm text-muted-foreground">
-        No attributed PR outcomes yet.
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Quality Attribution</CardTitle>
+          <CardDescription>No attributed PR outcomes yet.</CardDescription>
+        </CardHeader>
+        <CardContent />
+      </Card>
     )
   }
 
@@ -34,13 +39,25 @@ export function QualityAttributionTable({ rows }: Props) {
   }, {})
 
   return (
-    <div className="space-y-5">
+    <Card>
+      <CardHeader>
+        <CardTitle>Quality Attribution</CardTitle>
+        <CardDescription>
+          Group PR outcomes by workflow and behavior so strong patterns stand out faster.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
       {Object.entries(grouped).map(([dimension, items]) => (
-        <section key={dimension} className="space-y-2">
-          <h3 className="text-sm font-semibold text-muted-foreground">
+        <section key={dimension} className="space-y-3 rounded-2xl border border-border/60 bg-muted/20 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-foreground">
             {DIMENSION_LABELS[dimension] ?? formatLabel(dimension)}
-          </h3>
-          <div className="overflow-x-auto rounded-xl border border-border/60">
+            </h3>
+            <span className="text-xs text-muted-foreground">
+              {items.length} behavior{items.length === 1 ? "" : "s"}
+            </span>
+          </div>
+          <div className="overflow-x-auto rounded-xl border border-border/60 bg-background">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/50 text-left text-xs font-medium text-muted-foreground">
@@ -83,6 +100,7 @@ export function QualityAttributionTable({ rows }: Props) {
           </div>
         </section>
       ))}
-    </div>
+      </CardContent>
+    </Card>
   )
 }

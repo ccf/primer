@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import type { WorkflowCostBreakdown } from "@/types/api"
 import { formatCost, formatLabel } from "@/lib/utils"
 
@@ -17,12 +17,11 @@ export function WorkflowCostTable({ rows }: WorkflowCostTableProps) {
       <Card>
         <CardHeader>
           <CardTitle>Workflow Cost Attribution</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
+          <CardDescription>
             No workflow cost attribution data available yet.
-          </p>
-        </CardContent>
+          </CardDescription>
+        </CardHeader>
+        <CardContent />
       </Card>
     )
   }
@@ -37,14 +36,22 @@ export function WorkflowCostTable({ rows }: WorkflowCostTableProps) {
     <Card>
       <CardHeader>
         <CardTitle>Workflow Cost Attribution</CardTitle>
+        <CardDescription>
+          See where spend clusters around reusable workflow patterns instead of reading cost only by model or engineer.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {Object.entries(grouped).map(([dimension, items]) => (
-          <section key={dimension} className="space-y-2">
-            <h3 className="text-sm font-semibold text-muted-foreground">
-              {DIMENSION_LABELS[dimension] ?? formatLabel(dimension)}
-            </h3>
-            <div className="overflow-x-auto rounded-xl border border-border/60">
+          <section key={dimension} className="space-y-3 rounded-2xl border border-border/60 bg-muted/20 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-foreground">
+                {DIMENSION_LABELS[dimension] ?? formatLabel(dimension)}
+              </h3>
+              <span className="text-xs text-muted-foreground">
+                {items.length} pattern{items.length === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div className="overflow-x-auto rounded-xl border border-border/60 bg-background">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/50 text-left text-xs font-medium text-muted-foreground">

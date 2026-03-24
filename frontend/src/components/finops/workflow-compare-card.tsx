@@ -1,6 +1,6 @@
 import { useState } from "react"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatCost, formatLabel, formatMetric, formatPercent } from "@/lib/utils"
 import type { QualityAttributionRow, WorkflowCostBreakdown } from "@/types/api"
 
@@ -56,12 +56,12 @@ export function WorkflowCompareCard({
       <Card>
         <CardHeader>
           <CardTitle>Workflow Compare</CardTitle>
+          <CardDescription>
+            Need at least two workflows with cost data to compare them.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="max-w-xs">{dimensionSelector}</div>
-          <p className="text-sm text-muted-foreground">
-            Need at least two workflows with cost data to compare them.
-          </p>
         </CardContent>
       </Card>
     )
@@ -91,9 +91,12 @@ export function WorkflowCompareCard({
     <Card>
       <CardHeader className="pb-4">
         <CardTitle>Workflow Compare</CardTitle>
+        <CardDescription>
+          Put cost and outcome evidence side by side to see which workflow shape you should actually standardize.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 rounded-2xl border border-border/60 bg-muted/20 p-4 md:grid-cols-3">
           {dimensionSelector}
 
           <label className="space-y-1">
@@ -127,7 +130,7 @@ export function WorkflowCompareCard({
           </label>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-border/60">
+        <div className="overflow-x-auto rounded-2xl border border-border/60 bg-background">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/50 text-left text-xs font-medium text-muted-foreground">

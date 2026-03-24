@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatCost, formatLabel, formatPercent } from "@/lib/utils"
 import type { CustomizationOutcomeAttribution } from "@/types/api"
@@ -12,13 +12,10 @@ export function CustomizationOutcomeTable({ rows }: CustomizationOutcomeTablePro
     return (
       <Card>
         <CardHeader>
-          <h3 className="text-sm font-medium">Customization Outcome Attribution</h3>
+          <CardTitle className="text-base">Customization Outcome Attribution</CardTitle>
+          <CardDescription>No customization outcome attribution available yet.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            No customization outcome attribution available yet.
-          </p>
-        </CardContent>
+        <CardContent />
       </Card>
     )
   }
@@ -26,26 +23,29 @@ export function CustomizationOutcomeTable({ rows }: CustomizationOutcomeTablePro
   return (
     <Card>
       <CardHeader>
-        <h3 className="text-sm font-medium">Customization Outcome Attribution</h3>
+        <CardTitle className="text-base">Customization Outcome Attribution</CardTitle>
+        <CardDescription>
+          See which explicit customizations and stacks are associated with better outcomes, not just more usage.
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-2xl border border-border/60 bg-background">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="bg-muted/50">
               <tr className="border-b border-border text-left text-muted-foreground">
-                <th className="pb-2 font-medium">Label</th>
-                <th className="pb-2 font-medium">Dimension</th>
-                <th className="pb-2 font-medium">Details</th>
-                <th className="pb-2 text-right font-medium">Engineers</th>
-                <th className="pb-2 text-right font-medium">Success</th>
-                <th className="pb-2 text-right font-medium">Merge Rate</th>
-                <th className="pb-2 text-right font-medium">Cost / Success</th>
+                <th className="px-4 py-3 font-medium">Label</th>
+                <th className="px-4 py-3 font-medium">Dimension</th>
+                <th className="px-4 py-3 font-medium">Details</th>
+                <th className="px-4 py-3 text-right font-medium">Engineers</th>
+                <th className="px-4 py-3 text-right font-medium">Success</th>
+                <th className="px-4 py-3 text-right font-medium">Merge Rate</th>
+                <th className="px-4 py-3 text-right font-medium">Cost / Success</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row, index) => (
                 <tr key={`${row.dimension}:${row.label}:${index}`} className="border-b border-border/40">
-                  <td className="py-2">
+                  <td className="px-4 py-3">
                     <div className="space-y-1">
                       <p className="font-medium">{row.label}</p>
                       <p className="text-xs text-muted-foreground">
@@ -53,10 +53,10 @@ export function CustomizationOutcomeTable({ rows }: CustomizationOutcomeTablePro
                       </p>
                     </div>
                   </td>
-                  <td className="py-2">
+                  <td className="px-4 py-3">
                     <Badge variant="outline">{formatLabel(row.dimension)}</Badge>
                   </td>
-                  <td className="py-2">
+                  <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-2">
                       {row.customization_type && (
                         <Badge variant="outline">{formatLabel(row.customization_type)}</Badge>
@@ -69,10 +69,10 @@ export function CustomizationOutcomeTable({ rows }: CustomizationOutcomeTablePro
                       )}
                     </div>
                   </td>
-                  <td className="py-2 text-right">{row.support_engineer_count}</td>
-                  <td className="py-2 text-right">{formatPercent(row.avg_success_rate)}</td>
-                  <td className="py-2 text-right">{formatPercent(row.avg_pr_merge_rate)}</td>
-                  <td className="py-2 text-right">
+                  <td className="px-4 py-3 text-right">{row.support_engineer_count}</td>
+                  <td className="px-4 py-3 text-right">{formatPercent(row.avg_success_rate)}</td>
+                  <td className="px-4 py-3 text-right">{formatPercent(row.avg_pr_merge_rate)}</td>
+                  <td className="px-4 py-3 text-right">
                     {row.avg_cost_per_successful_outcome != null
                       ? formatCost(row.avg_cost_per_successful_outcome)
                       : "-"}

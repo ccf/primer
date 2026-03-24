@@ -4,6 +4,7 @@ import { CostBreakdownChart } from "@/components/dashboard/cost-breakdown-chart"
 import { WorkflowCostTable } from "@/components/finops/workflow-cost-table"
 import { WorkflowCompareCard } from "@/components/finops/workflow-compare-card"
 import { CardSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleton"
+import { SectionHeader } from "@/components/shared/section-header"
 import { formatCost, getModelPricing } from "@/lib/utils"
 
 interface OverviewTabProps {
@@ -67,11 +68,21 @@ export function OverviewTab({ teamId, startDate, endDate }: OverviewTabProps) {
 
   return (
     <div className="space-y-6">
+      <SectionHeader
+        title="Financial snapshot"
+        description="Quick read on spend, efficiency, and what your workflow mix is doing to cost."
+      />
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map((kpi) => (
-          <div key={kpi.label} className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs font-medium text-muted-foreground">{kpi.label}</p>
-            <p className="mt-1 text-2xl font-semibold">{kpi.value}</p>
+          <div
+            key={kpi.label}
+            className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-primary/[0.03] p-5 shadow-sm"
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              {kpi.label}
+            </p>
+            <p className="mt-3 font-display text-3xl tracking-tight">{kpi.value}</p>
           </div>
         ))}
       </div>
@@ -81,12 +92,18 @@ export function OverviewTab({ teamId, startDate, endDate }: OverviewTabProps) {
         <CostBreakdownChart data={costData.model_breakdown} />
       </div>
 
-      <WorkflowCostTable rows={costData.workflow_breakdown} />
-
-      <WorkflowCompareCard
-        workflowCosts={costData.workflow_breakdown}
-        qualityRows={quality.data?.attribution ?? []}
+      <SectionHeader
+        title="Workflow economics"
+        description="The most important FinOps question is not just what models cost, but which workflows earn their keep."
       />
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <WorkflowCostTable rows={costData.workflow_breakdown} />
+        <WorkflowCompareCard
+          workflowCosts={costData.workflow_breakdown}
+          qualityRows={quality.data?.attribution ?? []}
+        />
+      </div>
     </div>
   )
 }

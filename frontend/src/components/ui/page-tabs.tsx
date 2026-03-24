@@ -14,26 +14,35 @@ interface PageTabsProps<T extends string> {
 
 export function PageTabs<T extends string>({ tabs, activeTab, onChange }: PageTabsProps<T>) {
   return (
-    <div className="flex gap-1 border-b border-border/60">
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          onClick={() => onChange(tab.id)}
-          className={cn(
-            "relative px-4 py-2.5 text-sm font-medium transition-colors",
-            activeTab === tab.id
-              ? "text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-primary after:content-['']"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {tab.label}
-          {tab.count != null && (
-            <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-              {tab.count.toLocaleString()}
-            </span>
-          )}
-        </button>
-      ))}
+    <div className="overflow-x-auto">
+      <div className="inline-flex min-w-full gap-1 rounded-2xl border border-border/60 bg-muted/30 p-1 sm:min-w-0">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => onChange(tab.id)}
+            className={cn(
+              "flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium transition-all",
+              activeTab === tab.id
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
+            )}
+          >
+            {tab.label}
+            {tab.count != null && (
+              <span
+                className={cn(
+                  "ml-1.5 rounded-full px-1.5 py-0.5 text-[11px]",
+                  activeTab === tab.id
+                    ? "bg-primary/10 text-primary"
+                    : "bg-background/80 text-muted-foreground",
+                )}
+              >
+                {tab.count.toLocaleString()}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
