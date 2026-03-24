@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react"
 import { useEngineerProfile } from "@/hooks/use-api-queries"
 import { PageTabs } from "@/components/ui/page-tabs"
 import { ProfileSidebar } from "@/components/shared/profile-sidebar"
+import { PersonalImpactReview } from "@/components/insights/personal-impact-review"
 import { TrajectorySparklines } from "@/components/engineer-profile/trajectory-sparklines"
 import { FrictionTab } from "@/components/engineer-profile/friction-tab"
 import { StrengthsTab } from "@/components/engineer-profile/strengths-tab"
@@ -13,6 +14,7 @@ import { CardSkeleton } from "@/components/shared/loading-skeleton"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
 const tabs = [
+  { id: "impact", label: "Impact" },
   { id: "insights", label: "Insights" },
   { id: "friction", label: "Friction" },
   { id: "strengths", label: "Strengths" },
@@ -32,7 +34,7 @@ export function EngineerProfilePage({ dateRange }: EngineerProfilePageProps) {
   const endDate = dateRange?.endDate
 
   const { data: profile, isLoading } = useEngineerProfile(engineerId, startDate, endDate)
-  const [activeTab, setActiveTab] = useState<TabId>("insights")
+  const [activeTab, setActiveTab] = useState<TabId>("impact")
 
   if (isLoading) {
     return (
@@ -86,6 +88,9 @@ export function EngineerProfilePage({ dateRange }: EngineerProfilePageProps) {
           <PageTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
           <div className="mt-6">
+            {activeTab === "impact" && (
+              <PersonalImpactReview profile={profile} />
+            )}
             {activeTab === "insights" && (
               <>
                 <TrajectorySparklines data={profile.weekly_trajectory} />

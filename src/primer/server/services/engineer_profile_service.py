@@ -16,7 +16,9 @@ from primer.common.models import Session as SessionModel
 from primer.common.pricing import estimate_cost
 from primer.common.schemas import (
     EngineerProfileResponse,
+    ImpactReviewWorkflowSummary,
     ModelRecommendation,
+    PersonalImpactReview,
     ToolRecommendation,
     WeeklyMetricPoint,
 )
@@ -45,6 +47,267 @@ _RECOMMENDATION_PRIORITY_SCORE = {
     "medium": 2,
     "low": 1,
 }
+
+
+def _format_label(value: str | None) -> str:
+    if not value:
+        return "Unknown"
+    return value.replace("_", " ").replace("-", " ").title()
+
+
+def _get_top_workflows(
+    db: Session,
+    engineer_id: str,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    limit: int = 3,
+) -> list[ImpactReviewWorkflowSummary]:
+    query = (
+        db.query(
+            SessionWorkflowProfile.archetype,
+            SessionModel.duration_seconds,
+            SessionFacets.outcome,
+        )
+        .join(SessionModel, SessionModel.id == SessionWorkflowProfile.session_id)
+        .outerjoin(SessionFacets, SessionFacets.session_id == SessionModel.id)
+        .filter(
+            SessionModel.engineer_id == engineer_id,
+            SessionWorkflowProfile.archetype.isnot(None),
+        )
+    )
+    if start_date:
+        query = query.filter(SessionModel.started_at >= start_date)
+    if end_date:
+        query = query.filter(SessionModel.started_at <= end_date)
+
+    buckets: dict[str, dict[str, object]] = {}
+    for archetype, duration_seconds, outcome in query.all():
+        key = archetype or "unknown"
+        bucket = buckets.setdefault(
+            key,
+            {
+                "session_count": 0,
+                "success_count": 0,
+                "durations": [],
+            },
+        )
+        bucket["session_count"] = int(bucket["session_count"]) + 1
+        if duration_seconds is not None:
+            durations = bucket["durations"]
+            assert isinstance(durations, list)
+            durations.append(float(duration_seconds))
+        normalized_outcome = canonical_outcome(outcome)
+        if normalized_outcome and is_success_outcome(normalized_outcome):
+            bucket["success_count"] = int(bucket["success_count"]) + 1
+
+    total_sessions = sum(int(bucket["session_count"]) for bucket in buckets.values())
+    rows: list[ImpactReviewWorkflowSummary] = []
+    for archetype, bucket in buckets.items():
+        session_count = int(bucket["session_count"])
+        success_count = int(bucket["success_count"])
+        durations = bucket["durations"]
+        assert isinstance(durations, list)
+        rows.append(
+            ImpactReviewWorkflowSummary(
+                archetype=archetype,
+                session_count=session_count,
+                share_of_sessions=(
+                    round(session_count / total_sessions, 3) if total_sessions else None
+                ),
+                success_rate=(round(success_count / session_count, 3) if session_count else None),
+                avg_duration_seconds=(
+                    round(sum(durations) / len(durations), 1) if durations else None
+                ),
+            )
+        )
+
+    rows.sort(
+        key=lambda row: (
+            -row.session_count,
+            -(row.success_rate or 0.0),
+            row.archetype,
+        )
+    )
+    return rows[:limit]
+
+
+def _get_trajectory_signal(points: list[WeeklyMetricPoint]) -> str | None:
+    recent_points = [point for point in points[-4:] if point.success_rate is not None]
+    if len(recent_points) < 2:
+        return None
+    delta = (recent_points[-1].success_rate or 0.0) - (recent_points[0].success_rate or 0.0)
+    if delta >= 0.08:
+        return "improving"
+    if delta <= -0.08:
+        return "cooling"
+    return "steady"
+
+
+def _get_workflow_maturity_label(leverage_score: float | None) -> str | None:
+    if leverage_score is None:
+        return None
+    if leverage_score >= 80:
+        return "high leverage"
+    if leverage_score >= 65:
+        return "advancing"
+    return "emerging"
+
+
+def _build_personal_impact_review(
+    engineer_name: str,
+    overview,
+    trajectory: list[WeeklyMetricPoint],
+    friction,
+    quality_metrics,
+    productivity,
+    leverage_score: float | None,
+    effectiveness,
+    top_workflows: list[ImpactReviewWorkflowSummary],
+    learning_paths: list,
+    tool_recommendations: list[ToolRecommendation],
+    model_recommendations: list[ModelRecommendation],
+    workflow_playbooks: list,
+) -> PersonalImpactReview:
+    trajectory_signal = _get_trajectory_signal(trajectory)
+    maturity_label = _get_workflow_maturity_label(leverage_score)
+    top_workflow = top_workflows[0] if top_workflows else None
+
+    success_rate = overview.success_rate
+    effectiveness_score = effectiveness.score if effectiveness else None
+    merge_rate = quality_metrics.overview.pr_merge_rate if quality_metrics else None
+    findings_fix_rate = (
+        quality_metrics.findings_overview.fix_rate
+        if quality_metrics and quality_metrics.findings_overview
+        else None
+    )
+    benchmark_cost = effectiveness.benchmark_cost_per_successful_outcome if effectiveness else None
+    current_cost_per_success = effectiveness.cost_per_successful_outcome if effectiveness else None
+
+    if (
+        effectiveness_score is not None
+        and effectiveness_score >= 80
+        and success_rate is not None
+        and success_rate >= 0.75
+    ):
+        headline = "High-impact momentum with strong workflow discipline"
+    elif trajectory_signal == "improving":
+        headline = "Momentum is improving and the workflow is getting sharper"
+    elif leverage_score is not None and leverage_score >= 65:
+        headline = "Solid impact with room to deepen workflow leverage"
+    else:
+        headline = "There is useful signal here, with a few high-leverage improvements available"
+
+    summary_parts = [
+        f"{engineer_name} logged {overview.total_sessions} session"
+        f"{'' if overview.total_sessions == 1 else 's'} in this period",
+    ]
+    if success_rate is not None:
+        summary_parts.append(f"{round(success_rate * 100)}% ended successfully")
+    if effectiveness_score is not None:
+        summary_parts.append(f"effectiveness is {effectiveness_score:.1f}")
+    if leverage_score is not None:
+        summary_parts.append(f"leverage is {leverage_score:.1f}")
+
+    summary = ", ".join(summary_parts) + "."
+    if top_workflow is not None:
+        workflow_summary = (
+            f" The most common workflow is {_format_label(top_workflow.archetype)}"
+            f" across {top_workflow.session_count} session"
+            f"{'' if top_workflow.session_count == 1 else 's'}"
+        )
+        if top_workflow.success_rate is not None:
+            workflow_summary += f", with {round(top_workflow.success_rate * 100)}% success."
+        else:
+            workflow_summary += "."
+        summary += workflow_summary
+
+    strengths: list[str] = []
+    focus_areas: list[str] = []
+
+    if success_rate is not None and success_rate >= 0.7:
+        strengths.append("Consistently converts sessions into successful outcomes.")
+    if leverage_score is not None and leverage_score >= 70:
+        strengths.append("Shows mature workflow and tool usage relative to peers.")
+    if merge_rate is not None and merge_rate >= 0.75:
+        strengths.append("PR work is landing cleanly with a strong merge rate.")
+    if top_workflow and top_workflow.success_rate is not None and top_workflow.success_rate >= 0.75:
+        strengths.append(
+            f"{_format_label(top_workflow.archetype)} is a reliable repeated workflow."
+        )
+    if (
+        current_cost_per_success is not None
+        and benchmark_cost is not None
+        and current_cost_per_success <= benchmark_cost * 1.05
+    ):
+        strengths.append(
+            "Cost per successful outcome is in line with or better than the team benchmark."
+        )
+
+    if success_rate is not None and success_rate < 0.6:
+        focus_areas.append("Raise the share of sessions that end in successful outcomes.")
+    if leverage_score is not None and leverage_score < 60:
+        focus_areas.append(
+            "Deepen workflow and tool maturity to reduce variability between sessions."
+        )
+    if merge_rate is not None and merge_rate < 0.65:
+        focus_areas.append("Improve follow-through on PR work so changes land more reliably.")
+    if findings_fix_rate is not None and findings_fix_rate < 0.7:
+        focus_areas.append("Close the loop on review findings faster after they are detected.")
+    if (
+        current_cost_per_success is not None
+        and benchmark_cost is not None
+        and current_cost_per_success > benchmark_cost * 1.15
+    ):
+        focus_areas.append(
+            "Lower cost per successful outcome by tightening workflows or model choice."
+        )
+    if friction:
+        top_friction = max(friction, key=lambda item: item.count, default=None)
+        if top_friction is not None and top_friction.count >= 3:
+            focus_areas.append(
+                f"{_format_label(top_friction.friction_type)} is still interrupting flow "
+                "more often than it should."
+            )
+    if not workflow_playbooks:
+        focus_areas.append(
+            "Adopt at least one peer-backed workflow playbook to standardize stronger patterns."
+        )
+
+    if not strengths:
+        strengths.append(
+            "There is enough activity here to identify repeatable patterns and build from them."
+        )
+    if not focus_areas:
+        focus_areas.append(
+            "Keep standardizing the workflows that already produce the best outcomes."
+        )
+
+    next_step_title: str | None = None
+    next_step_description: str | None = None
+    if model_recommendations:
+        next_step_title = model_recommendations[0].title
+        next_step_description = model_recommendations[0].description
+    elif tool_recommendations:
+        next_step_title = tool_recommendations[0].title
+        next_step_description = tool_recommendations[0].description
+    elif learning_paths and learning_paths[0].recommendations:
+        next_step_title = learning_paths[0].recommendations[0].title
+        next_step_description = learning_paths[0].recommendations[0].description
+    elif workflow_playbooks:
+        next_step_title = workflow_playbooks[0].title
+        next_step_description = workflow_playbooks[0].summary
+
+    return PersonalImpactReview(
+        headline=headline,
+        summary=summary,
+        workflow_maturity_label=maturity_label,
+        trajectory_signal=trajectory_signal,
+        strengths=strengths[:3],
+        focus_areas=focus_areas[:3],
+        top_workflows=top_workflows,
+        next_step_title=next_step_title,
+        next_step_description=next_step_description,
+    )
 
 
 def _build_model_recommendations(
@@ -690,6 +953,12 @@ def get_engineer_profile(
         start_date=start_date,
         end_date=end_date,
     )
+    top_workflows = _get_top_workflows(
+        db,
+        engineer_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
 
     # Distinct project names
     project_rows = (
@@ -754,6 +1023,21 @@ def get_engineer_profile(
             quality_metrics.overview.sessions_with_commits if quality_metrics else 0
         ),
     )
+    impact_review = _build_personal_impact_review(
+        engineer.display_name or engineer.name,
+        overview,
+        trajectory,
+        friction,
+        quality_metrics,
+        productivity,
+        leverage_score,
+        effectiveness,
+        top_workflows,
+        eng_paths,
+        tool_recommendations,
+        model_recommendations,
+        workflow_playbooks,
+    )
 
     return EngineerProfileResponse(
         engineer_id=engineer.id,
@@ -776,6 +1060,7 @@ def get_engineer_profile(
         quality=quality,
         leverage_score=leverage_score,
         effectiveness=effectiveness,
+        impact_review=impact_review,
         projects=projects,
         tool_rankings=tool_rankings,
         workflow_playbooks=workflow_playbooks,

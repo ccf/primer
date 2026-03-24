@@ -135,7 +135,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] [P0] Workflow playbooks derived from high-performing peer patterns
 - [x] [P1] Plugin and tool recommendation engine based on task type, project context, and similar successful sessions
 - [x] [P1] Model selection coach for cost-appropriate model choice by task
-- [ ] [P1] Personal impact review that combines trajectory, quality, cost, and workflow maturity
+- [x] [P1] Personal impact review that combines trajectory, quality, cost, and workflow maturity
 - [ ] [P2] Longitudinal growth view across quarters, role changes, and team moves
 
 ## Growth & Onboarding

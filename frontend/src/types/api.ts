@@ -1432,6 +1432,26 @@ export interface WeeklyMetricPoint {
   session_count: number
 }
 
+export interface ImpactReviewWorkflowSummary {
+  archetype: string
+  session_count: number
+  share_of_sessions: number | null
+  success_rate: number | null
+  avg_duration_seconds: number | null
+}
+
+export interface PersonalImpactReview {
+  headline: string
+  summary: string
+  workflow_maturity_label: string | null
+  trajectory_signal: string | null
+  strengths: string[]
+  focus_areas: string[]
+  top_workflows: ImpactReviewWorkflowSummary[]
+  next_step_title: string | null
+  next_step_description: string | null
+}
+
 export interface WorkflowPlaybook {
   playbook_id: string
   title: string
@@ -1472,6 +1492,7 @@ export interface EngineerProfileResponse {
   quality: Record<string, unknown>
   leverage_score: number | null
   effectiveness: EffectivenessScore | null
+  impact_review: PersonalImpactReview | null
   projects: string[]
   tool_rankings: ToolRanking[]
   workflow_playbooks: WorkflowPlaybook[]

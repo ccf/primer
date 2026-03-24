@@ -121,6 +121,7 @@ const engineerProfile = {
   quality: {},
   leverage_score: null,
   effectiveness: null,
+  impact_review: null,
   projects: [],
   tool_rankings: [],
   workflow_playbooks: [],

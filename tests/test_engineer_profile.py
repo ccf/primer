@@ -455,6 +455,114 @@ class TestEngineerProfileOverview:
         assert recommendation["recommendation_type"] == "downshift"
         assert recommendation["supporting_session_count"] >= 2
 
+    def test_profile_includes_personal_impact_review(self, client, db_session, admin_headers):
+        team = Team(name=f"Impact Review Team {uuid.uuid4().hex[:6]}")
+        db_session.add(team)
+        db_session.flush()
+
+        engineer, _key = _make_engineer(db_session, team, name="Impact Eng")
+        peer_one, _peer_key_one = _make_engineer(db_session, team, name="Peer One")
+        peer_two, _peer_key_two = _make_engineer(db_session, team, name="Peer Two")
+        now = datetime.now(UTC)
+
+        repo = GitRepository(full_name=f"acme/{uuid.uuid4().hex[:8]}")
+        db_session.add(repo)
+        db_session.flush()
+
+        for idx in range(2):
+            session = _create_session(
+                db_session,
+                engineer,
+                started_at=now - timedelta(hours=idx + 1),
+                project_name="primer",
+                primary_model="claude-opus-4",
+                duration_seconds=240 + (idx * 30),
+            )
+            db_session.add(
+                SessionFacets(session_id=session.id, session_type="debugging", outcome="success")
+            )
+            db_session.add(SessionWorkflowProfile(session_id=session.id, archetype="debugging"))
+            db_session.add(ToolUsage(session_id=session.id, tool_name="Read", call_count=3))
+            db_session.add(
+                ModelUsage(
+                    session_id=session.id,
+                    model_name="claude-opus-4",
+                    input_tokens=1000,
+                    output_tokens=500,
+                    cache_read_tokens=0,
+                    cache_creation_tokens=0,
+                )
+            )
+
+        pr = PullRequest(
+            repository_id=repo.id,
+            engineer_id=engineer.id,
+            github_pr_number=201,
+            title="Ship impact review quality example",
+            state="merged",
+            review_comments_count=1,
+            pr_created_at=now - timedelta(days=1),
+            merged_at=now - timedelta(hours=2),
+        )
+        db_session.add(pr)
+        db_session.flush()
+        db_session.add(
+            SessionCommit(
+                session_id=session.id,
+                repository_id=repo.id,
+                pull_request_id=pr.id,
+                commit_sha=uuid.uuid4().hex[:12],
+                commit_message="feat: impact review example",
+                committed_at=now - timedelta(hours=1),
+                files_changed=4,
+                lines_added=80,
+                lines_deleted=12,
+            )
+        )
+
+        for idx, peer in enumerate((peer_one, peer_two), start=1):
+            session = _create_session(
+                db_session,
+                peer,
+                started_at=now - timedelta(hours=idx + 4),
+                project_name="primer",
+                primary_model="claude-sonnet-4-5-20250929",
+                duration_seconds=180.0,
+            )
+            db_session.add(
+                SessionFacets(session_id=session.id, session_type="debugging", outcome="success")
+            )
+            db_session.add(SessionWorkflowProfile(session_id=session.id, archetype="debugging"))
+            db_session.add(
+                ModelUsage(
+                    session_id=session.id,
+                    model_name="claude-sonnet-4-5-20250929",
+                    input_tokens=1000,
+                    output_tokens=500,
+                    cache_read_tokens=0,
+                    cache_creation_tokens=0,
+                )
+            )
+
+        db_session.flush()
+
+        response = client.get(
+            f"/api/v1/analytics/engineers/{engineer.id}/profile",
+            headers=admin_headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+
+        impact = data["impact_review"]
+        assert impact["headline"]
+        assert "Impact Eng" in impact["summary"]
+        assert impact["workflow_maturity_label"] is not None
+        assert len(impact["strengths"]) >= 1
+        assert len(impact["focus_areas"]) >= 1
+        assert impact["top_workflows"][0]["archetype"] == "debugging"
+        assert impact["top_workflows"][0]["session_count"] == 2
+        assert impact["next_step_title"] is not None
+
     def test_profile_overview_treats_legacy_outcomes_as_canonical(
         self, client, db_session, engineer_with_key, admin_headers
     ):

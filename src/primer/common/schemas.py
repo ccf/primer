@@ -1803,6 +1803,26 @@ class WeeklyMetricPoint(BaseModel):
     session_count: int
 
 
+class ImpactReviewWorkflowSummary(BaseModel):
+    archetype: str
+    session_count: int
+    share_of_sessions: float | None = None
+    success_rate: float | None = None
+    avg_duration_seconds: float | None = None
+
+
+class PersonalImpactReview(BaseModel):
+    headline: str
+    summary: str
+    workflow_maturity_label: str | None = None
+    trajectory_signal: str | None = None
+    strengths: list[str] = Field(default_factory=list)
+    focus_areas: list[str] = Field(default_factory=list)
+    top_workflows: list[ImpactReviewWorkflowSummary] = Field(default_factory=list)
+    next_step_title: str | None = None
+    next_step_description: str | None = None
+
+
 class WorkflowPlaybook(BaseModel):
     playbook_id: str
     title: str
@@ -1843,6 +1863,7 @@ class EngineerProfileResponse(BaseModel):
     quality: dict  # flexible dict for quality metrics
     leverage_score: float | None = None
     effectiveness: EffectivenessScore | None = None
+    impact_review: PersonalImpactReview | None = None
     projects: list[str] = []
     tool_rankings: list[ToolRanking] = []
     workflow_playbooks: list[WorkflowPlaybook] = []
