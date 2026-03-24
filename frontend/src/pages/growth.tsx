@@ -34,6 +34,7 @@ import { WorkflowPlaybookCards } from "@/components/growth/workflow-playbook-car
 import { EngineerSkillTable } from "@/components/insights/engineer-skill-table"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { SectionHeader } from "@/components/shared/section-header"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
 const tabs = [
@@ -75,14 +76,12 @@ function PatternsTab({ teamId, startDate, endDate }: TabProps) {
     <div className="space-y-6">
       <PatternSummary data={data} />
       <BrightSpotCards spots={data.bright_spots} />
-      <div className="space-y-3">
-        <div className="space-y-1">
-          <h3 className="text-sm font-medium">Exemplar Session Library</h3>
-          <p className="text-sm text-muted-foreground">
-            Browse concrete sessions worth copying, with workflow, support, and cost context.
-          </p>
-        </div>
-        <ExemplarSessionLibrary exemplars={data.exemplar_sessions ?? []} />
+        <div className="space-y-3">
+          <SectionHeader
+            title="Exemplar Session Library"
+            description="Browse concrete sessions worth copying, with workflow, support, and cost context."
+          />
+          <ExemplarSessionLibrary exemplars={data.exemplar_sessions ?? []} />
       </div>
       <SharedPatternCards patterns={data.patterns} />
     </div>
@@ -109,12 +108,10 @@ function SkillsTab({ teamId, startDate, endDate }: TabProps) {
       )}
       {learning && learning.engineer_paths.length > 0 && (
         <div className="space-y-3">
-          <div className="space-y-1">
-            <h3 className="text-sm font-medium">Learning Paths</h3>
-            <p className="text-sm text-muted-foreground">
-              Personalized recommendations with exemplar peer sessions to study.
-            </p>
-          </div>
+          <SectionHeader
+            title="Learning Paths"
+            description="Personalized recommendations with exemplar peer sessions to study."
+          />
           <LearningPathCards paths={learning.engineer_paths} />
         </div>
       )}
@@ -191,13 +188,10 @@ function PlaybooksTab({ startDate, endDate }: Omit<TabProps, "teamId">) {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-1">
-        <h3 className="text-sm font-medium">Workflow Playbooks</h3>
-        <p className="text-sm text-muted-foreground">
-          Reusable high-performing patterns learned from peer sessions for{" "}
-          {profile.display_name ?? profile.name}.
-        </p>
-      </div>
+      <SectionHeader
+        title="Workflow Playbooks"
+        description={`Reusable high-performing patterns learned from peer sessions for ${profile.display_name ?? profile.name}.`}
+      />
 
       {isApiKeyUser && (
         <div>

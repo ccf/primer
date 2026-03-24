@@ -23,6 +23,7 @@ import { ToolAdoptionChart } from "@/components/tools/tool-adoption-chart"
 import { ToolTrendChart } from "@/components/tools/tool-trend-chart"
 import { EngineerToolTable } from "@/components/tools/engineer-tool-table"
 import { CardSkeleton, ChartSkeleton, TableSkeleton } from "@/components/shared/loading-skeleton"
+import { SectionHeader } from "@/components/shared/section-header"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
 const tabs = [
@@ -79,14 +80,32 @@ export function MaturityPage({ teamId, dateRange }: MaturityPageProps) {
 
       {data && activeTab === "agents" && (
         <div className="space-y-6">
+          <SectionHeader
+            title="Agent usage and coordination"
+            description="See how agent choice, delegation, and orchestration patterns vary across the team."
+          />
           <AgentSkillTable data={data.agent_skill_breakdown} />
-          <AgentTeamModeTable rows={data.agent_team_modes} />
-          <DelegationPatternTable rows={data.delegation_patterns} />
+          <div className="grid gap-6 xl:grid-cols-2">
+            <AgentTeamModeTable rows={data.agent_team_modes} />
+            <DelegationPatternTable rows={data.delegation_patterns} />
+          </div>
+
+          <SectionHeader
+            title="Customization signals"
+            description="Trace explicit customizations from availability through adoption, reliability, and outcome."
+          />
           <CustomizationBreakdownTable data={data.customization_breakdown} />
-          <CustomizationStateFunnelTable rows={data.customization_state_funnel} />
-          <ToolchainReliabilityTable rows={data.toolchain_reliability} />
+          <div className="grid gap-6 xl:grid-cols-2">
+            <CustomizationStateFunnelTable rows={data.customization_state_funnel} />
+            <ToolchainReliabilityTable rows={data.toolchain_reliability} />
+          </div>
           <TeamCustomizationLandscapeTable data={data.team_customization_landscape} />
           <CustomizationOutcomeTable rows={data.customization_outcomes} />
+
+          <SectionHeader
+            title="High-performer stacks"
+            description="The customizations and stack combinations that repeatedly show up in strong outcomes."
+          />
           <HighPerformerStackCards stacks={data.high_performer_stacks} />
         </div>
       )}

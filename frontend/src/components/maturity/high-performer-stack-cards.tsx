@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatLabel } from "@/lib/utils"
 import type { HighPerformerStack } from "@/types/api"
 
@@ -13,12 +13,9 @@ export function HighPerformerStackCards({ stacks }: HighPerformerStackCardsProps
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-medium">High-Performer Stacks</CardTitle>
+          <CardDescription>No explicit high-performer stacks detected yet.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            No explicit high-performer stacks detected yet.
-          </p>
-        </CardContent>
+        <CardContent />
       </Card>
     )
   }
@@ -26,7 +23,8 @@ export function HighPerformerStackCards({ stacks }: HighPerformerStackCardsProps
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       {stacks.map((stack) => (
-        <Card key={stack.stack_id}>
+        <Card key={stack.stack_id} className="overflow-hidden">
+          <div className="h-1 bg-gradient-to-r from-primary/60 via-primary/15 to-transparent" />
           <CardHeader className="pb-3">
             <div className="space-y-1">
               <CardTitle className="text-base">{stack.label}</CardTitle>
@@ -49,7 +47,7 @@ export function HighPerformerStackCards({ stacks }: HighPerformerStackCardsProps
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+              <div className="rounded-2xl border border-border/60 bg-muted/30 p-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
                   Avg Effectiveness
                 </p>
@@ -57,7 +55,7 @@ export function HighPerformerStackCards({ stacks }: HighPerformerStackCardsProps
                   {stack.avg_effectiveness_score != null ? stack.avg_effectiveness_score.toFixed(1) : "-"}
                 </p>
               </div>
-              <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+              <div className="rounded-2xl border border-border/60 bg-muted/30 p-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
                   Avg Leverage
                 </p>

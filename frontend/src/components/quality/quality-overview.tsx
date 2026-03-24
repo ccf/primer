@@ -36,10 +36,12 @@ export function QualityOverviewCards({ overview }: Props) {
       {cards.map((card) => (
         <div
           key={card.label}
-          className="rounded-lg border border-border bg-card p-4"
+          className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-primary/[0.03] p-5 shadow-sm"
         >
-          <p className="text-xs font-medium text-muted-foreground">{card.label}</p>
-          <p className="mt-1 text-2xl font-bold">{card.value}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            {card.label}
+          </p>
+          <p className="mt-3 font-display text-3xl tracking-tight">{card.value}</p>
         </div>
       ))}
     </div>
