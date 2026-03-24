@@ -4,6 +4,7 @@ import { useEngineerChooser } from "@/hooks/use-engineer-chooser"
 import { PageTabs } from "@/components/ui/page-tabs"
 import { EngineerChooserCard } from "@/components/shared/engineer-chooser-card"
 import { ProfileSidebar } from "@/components/shared/profile-sidebar"
+import { PersonalImpactReview } from "@/components/insights/personal-impact-review"
 import { ProfileOverviewTab } from "@/components/profile/profile-overview-tab"
 import { ProfileSessionsTab } from "@/components/profile/profile-sessions-tab"
 import { ProfileInsightsTab } from "@/components/profile/profile-insights-tab"
@@ -15,6 +16,7 @@ import type { DateRange } from "@/components/layout/date-range-picker"
 
 const tabs = [
   { id: "overview", label: "Overview" },
+  { id: "impact", label: "Impact" },
   { id: "sessions", label: "Sessions" },
   { id: "insights", label: "Insights" },
   { id: "growth", label: "Growth" },
@@ -147,6 +149,9 @@ export function ProfilePage({ teamId, dateRange }: ProfilePageProps) {
                 teamId={teamId}
                 dateRange={dateRange}
               />
+            )}
+            {activeTab === "impact" && (
+              <PersonalImpactReview profile={profile} />
             )}
             {activeTab === "insights" && (
               <ProfileInsightsTab
