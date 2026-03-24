@@ -350,7 +350,7 @@ export function ProjectWorkspacePage({ teamId, dateRange }: ProjectWorkspacePage
         </div>
         <Card>
           <CardContent className="pt-6">
-            <QualityAttributionTable rows={data.quality.attribution} />
+            <QualityAttributionTable rows={data.quality.attribution} framed={false} />
           </CardContent>
         </Card>
       </section>
