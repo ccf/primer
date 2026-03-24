@@ -237,8 +237,8 @@ pre.astro-code:hover::before {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 6.4rem;
-  padding: 0.55rem 0.7rem;
+  min-height: 5.4rem;
+  padding: 0.45rem 0.6rem;
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 1.35rem;
   background: rgba(255, 255, 255, 0.018);
@@ -247,9 +247,9 @@ pre.astro-code:hover::before {
 }
 
 .agent-cluster__logo {
-  width: 92%;
-  max-width: 14rem;
-  max-height: 7rem;
+  width: 52%;
+  max-width: 4.8rem;
+  max-height: 1.8rem;
   object-fit: contain;
   filter: brightness(0) invert(1);
   opacity: 0.16;
@@ -262,6 +262,17 @@ pre.astro-code:hover::before {
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.3);
+}
+
+.agent-cluster--desktop .agent-cluster__mark {
+  min-height: 6.4rem;
+  padding: 0.55rem 0.7rem;
+}
+
+.agent-cluster--desktop .agent-cluster__logo {
+  width: 92%;
+  max-width: 14rem;
+  max-height: 7rem;
 }
 
 .story-frame {
