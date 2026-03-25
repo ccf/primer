@@ -241,7 +241,7 @@ def _build_period_snapshots(
     if window <= timedelta(0):
         window = timedelta(days=30)
         current_start = current_end - window
-    previous_end = current_start
+    previous_end = current_start - timedelta(microseconds=1)
     previous_start = previous_end - window
 
     left = _build_period_snapshot(

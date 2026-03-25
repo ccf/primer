@@ -212,6 +212,14 @@ def test_compare_mode_period(client, db_session, admin_headers):
         db_session,
         engineer,
         project_name="primer",
+        started_at=current_start,
+        archetype="debugging",
+        outcome="success",
+    )
+    _create_session(
+        db_session,
+        engineer,
+        project_name="primer",
         started_at=current_start + timedelta(days=1),
         archetype="debugging",
         outcome="success",
@@ -240,5 +248,5 @@ def test_compare_mode_period(client, db_session, admin_headers):
     data = response.json()
     assert data["left"]["label"] == "Selected Period"
     assert data["right"]["label"] == "Previous Period"
-    assert data["left"]["total_sessions"] == 2
+    assert data["left"]["total_sessions"] == 3
     assert data["right"]["total_sessions"] == 1
