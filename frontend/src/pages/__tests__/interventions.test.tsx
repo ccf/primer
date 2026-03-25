@@ -104,6 +104,24 @@ describe("InterventionsPage", () => {
             avg_cost_per_session_delta: -0.3,
           },
         ],
+        coaching_programs: [
+          {
+            intervention_id: "int-1",
+            title: "Roll out the debugging checklist",
+            target_cohort: "new hires",
+            owner_name: "Lead",
+            project_name: "primer",
+            hypothesis: "A checklist should reduce triage friction.",
+            success_criteria: "Reduce friction events by 25%.",
+            measured: true,
+            improved: true,
+            completion_days: 3.5,
+            success_rate_delta: 0.2,
+            friction_delta: 2,
+            findings_per_pr_delta: 0.5,
+            avg_cost_per_session_delta: -0.3,
+          },
+        ],
       },
       isLoading: false,
     } as unknown as ReturnType<typeof useInterventionEffectiveness>)
@@ -181,6 +199,8 @@ describe("InterventionsPage", () => {
     expect(screen.getByText(/Recurring friction/)).toBeInTheDocument()
     expect(screen.getByText("By Team")).toBeInTheDocument()
     expect(screen.getByText("By Experiment Type")).toBeInTheDocument()
+    expect(screen.getByText("Coaching Program Measurement")).toBeInTheDocument()
+    expect(screen.getByText("Roll out the debugging checklist")).toBeInTheDocument()
     expect(screen.getByText("Team One")).toBeInTheDocument()
     expect(screen.getAllByText("-$0.30").length).toBeGreaterThan(0)
   })

@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom"
 import {
   useEngineerProfile,
   useOnboardingAcceleration,
+  useInterventionEffectiveness,
   usePatternSharing,
   useSkillInventory,
   useLearningPaths,
@@ -31,6 +32,7 @@ import { PromptOpportunityCards } from "@/components/growth/prompt-opportunity-c
 import { PromptReuseTable } from "@/components/growth/prompt-reuse-table"
 import { ReusableAssetTable } from "@/components/growth/reusable-asset-table"
 import { WorkflowPlaybookCards } from "@/components/growth/workflow-playbook-cards"
+import { CoachingProgramMeasurementSection } from "@/components/interventions/coaching-program-measurement"
 import { EngineerSkillTable } from "@/components/insights/engineer-skill-table"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -54,6 +56,7 @@ interface TabProps {
 
 function OnboardingTab({ teamId, startDate, endDate }: TabProps) {
   const { data, isLoading } = useOnboardingAcceleration(teamId, startDate, endDate)
+  const { data: effectiveness } = useInterventionEffectiveness({ teamId })
   if (isLoading) return <ChartSkeleton />
   if (!data) return null
   return (
@@ -64,6 +67,9 @@ function OnboardingTab({ teamId, startDate, endDate }: TabProps) {
         <VelocityChart progress={data.new_hire_progress} />
       </div>
       <OnboardingRecommendations recommendations={data.recommendations} />
+      {effectiveness && (
+        <CoachingProgramMeasurementSection programs={effectiveness.coaching_programs} />
+      )}
     </div>
   )
 }

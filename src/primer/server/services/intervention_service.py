@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from primer.common.models import Engineer, Intervention, Team
 from primer.common.models import Session as SessionModel
 from primer.common.schemas import (
+    CoachingProgramMeasurement,
     InterventionCreate,
     InterventionEffectivenessGroup,
     InterventionEffectivenessResponse,
@@ -524,6 +525,7 @@ def _build_effectiveness_report(
             by_project=[],
             by_engineer_cohort=[],
             by_experiment_type=[],
+            coaching_programs=[],
         )
 
     team_ids = {intervention.team_id for intervention in completed if intervention.team_id}
@@ -560,6 +562,7 @@ def _build_effectiveness_report(
     project_rollups: dict[str, _EffectivenessRollup] = {}
     cohort_rollups: dict[str, _EffectivenessRollup] = {}
     experiment_rollups: dict[str, _EffectivenessRollup] = {}
+    coaching_programs: list[CoachingProgramMeasurement] = []
 
     for intervention in completed:
         baseline_metrics = (
@@ -640,12 +643,43 @@ def _build_effectiveness_report(
             _EffectivenessRollup(experiment_key, experiment_label),
         ).add(**rollup_kwargs)
 
+        if _is_coaching_program(intervention):
+            coaching_programs.append(
+                CoachingProgramMeasurement(
+                    intervention_id=intervention.id,
+                    title=intervention.title,
+                    target_cohort=intervention.experiment_target_cohort,
+                    owner_name=engineer_map.get(intervention.owner_engineer_id).name
+                    if intervention.owner_engineer_id
+                    and engineer_map.get(intervention.owner_engineer_id)
+                    else None,
+                    project_name=intervention.project_name,
+                    hypothesis=intervention.experiment_hypothesis,
+                    success_criteria=intervention.experiment_success_criteria,
+                    measured=measured,
+                    improved=improved,
+                    completion_days=completion_days,
+                    success_rate_delta=success_rate_delta,
+                    friction_delta=friction_delta,
+                    findings_per_pr_delta=findings_per_pr_delta,
+                    avg_cost_per_session_delta=avg_cost_per_session_delta,
+                )
+            )
+
     return InterventionEffectivenessResponse(
         summary=_rollup_to_summary(summary_rollup, total_interventions=len(interventions)),
         by_team=_sorted_group_rollups(team_rollups),
         by_project=_sorted_group_rollups(project_rollups),
         by_engineer_cohort=_sorted_group_rollups(cohort_rollups),
         by_experiment_type=_sorted_group_rollups(experiment_rollups),
+        coaching_programs=sorted(
+            coaching_programs,
+            key=lambda row: (
+                not row.measured,
+                not row.improved,
+                row.title.lower(),
+            ),
+        ),
     )
 
 
@@ -763,6 +797,10 @@ def _experiment_group(intervention: Intervention) -> tuple[str, str]:
     if not intervention.experiment_type:
         return "non_experiment", "Non-Experiment"
     return intervention.experiment_type, intervention.experiment_type.replace("_", " ").title()
+
+
+def _is_coaching_program(intervention: Intervention) -> bool:
+    return intervention.experiment_type == "training_rollout" or intervention.category == "coaching"
 
 
 def _cohort_group(

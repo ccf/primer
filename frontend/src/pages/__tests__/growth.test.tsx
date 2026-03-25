@@ -13,6 +13,7 @@ vi.mock("@/lib/auth-context", () => ({
 vi.mock("@/hooks/use-api-queries", () => ({
   useEngineerProfile: vi.fn(),
   useEngineers: vi.fn(),
+  useInterventionEffectiveness: vi.fn(),
   useOnboardingAcceleration: vi.fn(),
   usePatternSharing: vi.fn(),
   useSkillInventory: vi.fn(),
@@ -73,12 +74,16 @@ vi.mock("@/components/growth/reusable-asset-table", () => ({
 vi.mock("@/components/insights/engineer-skill-table", () => ({
   EngineerSkillTable: () => <div>engineer skill table</div>,
 }))
+vi.mock("@/components/interventions/coaching-program-measurement", () => ({
+  CoachingProgramMeasurementSection: () => <div>coaching program measurement</div>,
+}))
 
 import { getApiKey } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
 import {
   useEngineerProfile,
   useEngineers,
+  useInterventionEffectiveness,
   useLearningPaths,
   useOnboardingAcceleration,
   usePatternSharing,
@@ -90,6 +95,7 @@ const mockGetApiKey = vi.mocked(getApiKey)
 const mockUseAuth = vi.mocked(useAuth)
 const mockUseEngineerProfile = vi.mocked(useEngineerProfile)
 const mockUseEngineers = vi.mocked(useEngineers)
+const mockUseInterventionEffectiveness = vi.mocked(useInterventionEffectiveness)
 const mockUseOnboardingAcceleration = vi.mocked(useOnboardingAcceleration)
 const mockUsePatternSharing = vi.mocked(usePatternSharing)
 const mockUseSkillInventory = vi.mocked(useSkillInventory)
@@ -120,6 +126,28 @@ describe("GrowthPage", () => {
       data: null,
       isLoading: false,
     } as unknown as ReturnType<typeof useOnboardingAcceleration>)
+    mockUseInterventionEffectiveness.mockReturnValue({
+      data: {
+        summary: {
+          total_interventions: 0,
+          completed_interventions: 0,
+          measured_interventions: 0,
+          improved_interventions: 0,
+          improvement_rate: null,
+          avg_completion_days: null,
+          avg_success_rate_delta: null,
+          avg_friction_delta: null,
+          avg_findings_per_pr_delta: null,
+          avg_cost_per_session_delta: null,
+        },
+        by_team: [],
+        by_project: [],
+        by_engineer_cohort: [],
+        by_experiment_type: [],
+        coaching_programs: [],
+      },
+      isLoading: false,
+    } as unknown as ReturnType<typeof useInterventionEffectiveness>)
     mockUsePatternSharing.mockReturnValue({
       data: null,
       isLoading: false,
