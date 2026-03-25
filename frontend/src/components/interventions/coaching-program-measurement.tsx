@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatCost } from "@/lib/utils"
 import type { CoachingProgramMeasurement } from "@/types/api"
 
 interface CoachingProgramMeasurementProps {
@@ -22,7 +23,7 @@ function formatSignedDelta(value: number | null | undefined): string {
 function formatSignedCost(value: number | null | undefined): string {
   if (value == null) return "-"
   const sign = value > 0 ? "+" : value < 0 ? "-" : ""
-  return `${sign}$${Math.abs(value).toFixed(2)}`
+  return `${sign}${formatCost(Math.abs(value))}`
 }
 
 export function CoachingProgramMeasurementSection({
