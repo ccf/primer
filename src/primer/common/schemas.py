@@ -640,12 +640,30 @@ class InterventionEffectivenessGroup(BaseModel):
     avg_cost_per_session_delta: float | None = None
 
 
+class CoachingProgramMeasurement(BaseModel):
+    intervention_id: str
+    title: str
+    target_cohort: str | None = None
+    owner_name: str | None = None
+    project_name: str | None = None
+    hypothesis: str | None = None
+    success_criteria: str | None = None
+    measured: bool
+    improved: bool
+    completion_days: float | None = None
+    success_rate_delta: float | None = None
+    friction_delta: float | None = None
+    findings_per_pr_delta: float | None = None
+    avg_cost_per_session_delta: float | None = None
+
+
 class InterventionEffectivenessResponse(BaseModel):
     summary: InterventionEffectivenessSummary
     by_team: list[InterventionEffectivenessGroup]
     by_project: list[InterventionEffectivenessGroup]
     by_engineer_cohort: list[InterventionEffectivenessGroup]
     by_experiment_type: list[InterventionEffectivenessGroup]
+    coaching_programs: list[CoachingProgramMeasurement] = []
 
 
 # --- Daily Stats ---

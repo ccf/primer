@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/shared/page-header"
 import { CardSkeleton } from "@/components/shared/loading-skeleton"
 import { EmptyState } from "@/components/shared/empty-state"
 import { InterventionCard } from "@/components/interventions/intervention-card"
+import { CoachingProgramMeasurementSection } from "@/components/interventions/coaching-program-measurement"
 import { InterventionEffectivenessSection } from "@/components/interventions/intervention-effectiveness-section"
 import { InterventionFormModal } from "@/components/interventions/intervention-form-modal"
 import { InlineStat } from "@/components/ui/inline-stat"
@@ -85,6 +86,9 @@ export function InterventionsPage({ teamId }: InterventionsPageProps) {
       </div>
 
       {effectiveness && <InterventionEffectivenessSection data={effectiveness} />}
+      {effectiveness && (
+        <CoachingProgramMeasurementSection programs={effectiveness.coaching_programs} />
+      )}
 
       {interventions.length === 0 ? (
         <EmptyState message="No interventions yet. Create one from a recommendation or start a manual experiment." />

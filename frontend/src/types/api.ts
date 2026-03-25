@@ -351,12 +351,30 @@ export interface InterventionEffectivenessGroup {
   avg_cost_per_session_delta: number | null
 }
 
+export interface CoachingProgramMeasurement {
+  intervention_id: string
+  title: string
+  target_cohort: string | null
+  owner_name: string | null
+  project_name: string | null
+  hypothesis: string | null
+  success_criteria: string | null
+  measured: boolean
+  improved: boolean
+  completion_days: number | null
+  success_rate_delta: number | null
+  friction_delta: number | null
+  findings_per_pr_delta: number | null
+  avg_cost_per_session_delta: number | null
+}
+
 export interface InterventionEffectivenessResponse {
   summary: InterventionEffectivenessSummary
   by_team: InterventionEffectivenessGroup[]
   by_project: InterventionEffectivenessGroup[]
   by_engineer_cohort: InterventionEffectivenessGroup[]
   by_experiment_type: InterventionEffectivenessGroup[]
+  coaching_programs: CoachingProgramMeasurement[]
 }
 
 export interface DailyStatsResponse {

@@ -528,3 +528,58 @@ def test_intervention_effectiveness_groups_by_experiment_type(client, engineer_w
     data = response.json()
     assert data["by_experiment_type"][0]["key"] == "model_rollout"
     assert data["by_experiment_type"][0]["label"] == "Model Rollout"
+
+
+def test_intervention_effectiveness_includes_coaching_programs(client, engineer_with_key):
+    _engineer, api_key = engineer_with_key
+    now = datetime.now(UTC)
+    baseline_end = now - timedelta(days=90)
+    baseline_start = baseline_end - timedelta(days=30)
+
+    _ingest_measured_session(
+        client,
+        api_key,
+        project_name="primer",
+        started_at=now - timedelta(days=95),
+        outcome="failure",
+        friction_events=4,
+    )
+    _ingest_measured_session(
+        client,
+        api_key,
+        project_name="primer",
+        started_at=now - timedelta(days=2),
+        outcome="success",
+        friction_events=1,
+    )
+
+    created = client.post(
+        "/api/v1/interventions",
+        headers={"x-api-key": api_key},
+        json={
+            "title": "Roll out the debugging checklist",
+            "description": "Measure whether the checklist improves onboarding quality.",
+            "category": "coaching",
+            "project_name": "primer",
+            "status": "completed",
+            "baseline_start_at": baseline_start.isoformat(),
+            "baseline_end_at": baseline_end.isoformat(),
+            "experiment": {
+                "experiment_type": "training_rollout",
+                "hypothesis": "A checklist should reduce triage friction.",
+                "target_cohort": "new hires",
+                "success_criteria": "Reduce friction events by 25%.",
+            },
+        },
+    )
+    assert created.status_code == 201
+
+    response = client.get("/api/v1/interventions/effectiveness", headers={"x-api-key": api_key})
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["coaching_programs"]) == 1
+    program = data["coaching_programs"][0]
+    assert program["title"] == "Roll out the debugging checklist"
+    assert program["target_cohort"] == "new hires"
+    assert program["measured"] is True
+    assert program["improved"] is True
