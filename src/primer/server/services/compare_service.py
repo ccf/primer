@@ -387,7 +387,8 @@ def _parse_percentish(value: object) -> float | None:
     if value is None:
         return None
     if isinstance(value, int | float):
-        return float(value)
+        numeric = float(value)
+        return numeric / 100.0 if numeric > 1 else numeric
     if isinstance(value, str) and value.endswith("%"):
         try:
             return float(value[:-1]) / 100.0

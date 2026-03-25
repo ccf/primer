@@ -224,7 +224,9 @@ def compare(
                     .filter(Engineer.id.in_(engineer_ids))
                     .all()
                 )
-                if any(team != auth.team_id for _id, team in engineers):
+                if len(engineers) != len(set(engineer_ids)) or any(
+                    team != auth.team_id for _id, team in engineers
+                ):
                     raise HTTPException(
                         status_code=403,
                         detail="Team leads can only compare engineers on their team",

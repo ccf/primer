@@ -8,7 +8,7 @@ from primer.common.models import Engineer, ModelUsage, SessionFacets, SessionWor
 from primer.common.models import Session as SessionModel
 
 
-def _make_engineer(db_session, team, *, name):
+def _make_engineer(db_session, team, *, name, role="engineer"):
     raw_key = f"primer_{secrets.token_urlsafe(32)}"
     hashed = bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt()).decode()
     engineer = Engineer(
@@ -16,10 +16,11 @@ def _make_engineer(db_session, team, *, name):
         email=f"{name.lower().replace(' ', '.')}@example.com",
         team_id=team.id,
         api_key_hash=hashed,
+        role=role,
     )
     db_session.add(engineer)
     db_session.flush()
-    return engineer
+    return engineer, raw_key
 
 
 def _create_session(
@@ -70,8 +71,8 @@ def test_compare_mode_team(client, db_session, admin_headers):
     team_b = Team(name="Beta")
     db_session.add_all([team_a, team_b])
     db_session.flush()
-    eng_a = _make_engineer(db_session, team_a, name="Alice")
-    eng_b = _make_engineer(db_session, team_b, name="Bob")
+    eng_a, _eng_a_key = _make_engineer(db_session, team_a, name="Alice")
+    eng_b, _eng_b_key = _make_engineer(db_session, team_b, name="Bob")
     now = datetime.now(UTC)
 
     _create_session(
@@ -118,8 +119,8 @@ def test_compare_mode_engineer(client, db_session, admin_headers):
     team = Team(name="Compare Engineers")
     db_session.add(team)
     db_session.flush()
-    eng_a = _make_engineer(db_session, team, name="Alice")
-    eng_b = _make_engineer(db_session, team, name="Bob")
+    eng_a, _eng_a_key = _make_engineer(db_session, team, name="Alice")
+    eng_b, _eng_b_key = _make_engineer(db_session, team, name="Bob")
     now = datetime.now(UTC)
 
     _create_session(
@@ -156,7 +157,7 @@ def test_compare_mode_project(client, db_session, admin_headers):
     team = Team(name="Project Compare")
     db_session.add(team)
     db_session.flush()
-    engineer = _make_engineer(db_session, team, name="Alice")
+    engineer, _engineer_key = _make_engineer(db_session, team, name="Alice")
     now = datetime.now(UTC)
 
     _create_session(
@@ -195,7 +196,7 @@ def test_compare_mode_period(client, db_session, admin_headers):
     team = Team(name="Period Compare")
     db_session.add(team)
     db_session.flush()
-    engineer = _make_engineer(db_session, team, name="Alice")
+    engineer, _engineer_key = _make_engineer(db_session, team, name="Alice")
     now = datetime.now(UTC)
     current_start = now - timedelta(days=7)
     previous_start = current_start - timedelta(days=7)
@@ -250,3 +251,31 @@ def test_compare_mode_period(client, db_session, admin_headers):
     assert data["right"]["label"] == "Previous Period"
     assert data["left"]["total_sessions"] == 3
     assert data["right"]["total_sessions"] == 1
+
+
+def test_compare_mode_team_lead_rejects_unknown_engineer_ids(client, db_session):
+    team = Team(name="Team Lead Compare")
+    db_session.add(team)
+    db_session.flush()
+    _lead, lead_key = _make_engineer(db_session, team, name="Lead", role="team_lead")
+    engineer, _engineer_key = _make_engineer(db_session, team, name="Alice")
+    db_session.commit()
+
+    response = client.get(
+        "/api/v1/analytics/compare",
+        params={
+            "mode": "engineer",
+            "left_key": engineer.id,
+            "right_key": "missing-engineer-id",
+        },
+        headers={"x-api-key": lead_key},
+    )
+    assert response.status_code == 403
+
+
+def test_parse_percentish_normalizes_numeric_percentages():
+    from primer.server.services.compare_service import _parse_percentish
+
+    assert _parse_percentish(80) == 0.8
+    assert _parse_percentish(0.8) == 0.8
+    assert _parse_percentish("80%") == 0.8
