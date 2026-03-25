@@ -66,12 +66,16 @@ export function CoachingProgramMeasurementSection({
                   </CardDescription>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Badge variant={program.improved ? "success" : "outline"}>
-                    {program.improved ? "Improved" : "Mixed"}
-                  </Badge>
-                  <Badge variant={program.measured ? "secondary" : "outline"}>
-                    {program.measured ? "Measured" : "Unmeasured"}
-                  </Badge>
+                  {program.measured ? (
+                    <>
+                      <Badge variant={program.improved ? "success" : "outline"}>
+                        {program.improved ? "Improved" : "Mixed"}
+                      </Badge>
+                      <Badge variant="secondary">Measured</Badge>
+                    </>
+                  ) : (
+                    <Badge variant="outline">Unmeasured</Badge>
+                  )}
                 </div>
               </div>
               {program.hypothesis ? (

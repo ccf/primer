@@ -38,6 +38,7 @@ describe("CoachingProgramMeasurementSection", () => {
     expect(screen.getByText("Coaching Program Measurement")).toBeInTheDocument()
     expect(screen.getByText("Roll out the debugging checklist")).toBeInTheDocument()
     expect(screen.getAllByText("Improved").length).toBeGreaterThan(0)
+    expect(screen.getByText("Measured")).toBeInTheDocument()
     expect(screen.getByText("Success Criteria")).toBeInTheDocument()
   })
 })
