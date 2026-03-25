@@ -212,7 +212,7 @@ def compare(
     if auth.role == "team_lead":
         effective_team_id = auth.team_id
         if mode == "team":
-            if left_key != auth.team_id or right_key != auth.team_id:
+            if left_key != auth.team_id and right_key != auth.team_id:
                 raise HTTPException(
                     status_code=403,
                     detail="Team leads can only compare within their own team scope",
