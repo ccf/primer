@@ -2,14 +2,8 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from primer.common.models import (
-    Session as SessionModel,
-)
-from primer.common.models import (
-    SessionFacets,
-    SessionWorkflowProfile,
-    Team,
-)
+from primer.common.models import Session as SessionModel
+from primer.common.models import SessionWorkflowProfile, Team
 from primer.common.schemas import (
     CompareDelta,
     CompareResponse,
@@ -339,7 +333,6 @@ def _get_top_workflows(
             project_name=project_name,
         )
         .join(SessionWorkflowProfile, SessionWorkflowProfile.session_id == SessionModel.id)
-        .outerjoin(SessionFacets, SessionFacets.session_id == SessionModel.id)
         .with_entities(SessionWorkflowProfile.archetype)
     )
     rows = [row[0] for row in query.all() if row[0]]

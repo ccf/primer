@@ -212,11 +212,10 @@ def compare(
     if auth.role == "team_lead":
         effective_team_id = auth.team_id
         if mode == "team":
-            if left_key != auth.team_id and right_key != auth.team_id:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Team leads can only compare within their own team scope",
-                )
+            raise HTTPException(
+                status_code=403,
+                detail="Team-level compare is only available to admins",
+            )
         elif mode == "engineer":
             engineer_ids = [value for value in (left_key, right_key) if value]
             if engineer_ids:
