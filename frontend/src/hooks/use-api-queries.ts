@@ -207,8 +207,9 @@ export function useCompareAnalytics(params: {
   endDate?: string
   enabled?: boolean
 }) {
+  const { enabled = true, ...queryParams } = params
   return useQuery({
-    queryKey: ["compare-analytics", params],
+    queryKey: ["compare-analytics", queryParams],
     queryFn: () =>
       apiFetch<CompareResponse>(
         `/api/v1/analytics/compare${buildParams({
@@ -220,7 +221,7 @@ export function useCompareAnalytics(params: {
           end_date: params.endDate,
         })}`,
       ),
-    enabled: params.enabled ?? true,
+    enabled,
   })
 }
 
