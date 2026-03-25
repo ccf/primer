@@ -278,4 +278,5 @@ def test_parse_percentish_normalizes_numeric_percentages():
 
     assert _parse_percentish(80) == 0.8
     assert _parse_percentish(0.8) == 0.8
+    assert _parse_percentish(1.01) is None
     assert _parse_percentish("80%") == 0.8
