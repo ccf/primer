@@ -1023,21 +1023,23 @@ def get_engineer_profile(
             quality_metrics.overview.sessions_with_commits if quality_metrics else 0
         ),
     )
-    impact_review = _build_personal_impact_review(
-        engineer.display_name or engineer.name,
-        overview,
-        trajectory,
-        friction,
-        quality_metrics,
-        productivity,
-        leverage_score,
-        effectiveness,
-        top_workflows,
-        eng_paths,
-        tool_recommendations,
-        model_recommendations,
-        workflow_playbooks,
-    )
+    impact_review = None
+    if overview.total_sessions > 0:
+        impact_review = _build_personal_impact_review(
+            engineer.display_name or engineer.name,
+            overview,
+            trajectory,
+            friction,
+            quality_metrics,
+            productivity,
+            leverage_score,
+            effectiveness,
+            top_workflows,
+            eng_paths,
+            tool_recommendations,
+            model_recommendations,
+            workflow_playbooks,
+        )
 
     return EngineerProfileResponse(
         engineer_id=engineer.id,

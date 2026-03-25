@@ -58,6 +58,21 @@ def _create_session(db_session, engineer, **kwargs):
 
 
 class TestEngineerProfileOverview:
+    def test_profile_omits_impact_review_without_sessions(
+        self, client, db_session, engineer_with_key, admin_headers
+    ):
+        eng, _key = engineer_with_key
+
+        response = client.get(
+            f"/api/v1/analytics/engineers/{eng.id}/profile",
+            headers=admin_headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["overview"]["total_sessions"] == 0
+        assert data["impact_review"] is None
+
     def test_profile_overview(self, client, db_session, engineer_with_key, admin_headers):
         """Create 1 engineer with 2 sessions, verify overview stats."""
         eng, _key = engineer_with_key
