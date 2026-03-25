@@ -226,14 +226,14 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Conversational data explorer (SSE-streamed tool-use chat)
 - [x] AI-powered recommendations panel
 - [ ] [P1] Saved explorer prompts and reusable report cards
-- [ ] [P1] Compare mode for engineer, team, project, and time-period analysis
+- [x] [P1] Compare mode for engineer, team, project, and time-period analysis
 - [ ] [P2] Weekly manager review packs that combine quality, friction, growth, and cost
 - [ ] [P2] Recommendation narratives that explain why a workflow is likely to help
 
 ## Website & Positioning
 
-- [ ] [P1] Reposition the website around workflow intelligence for agentic engineering
-- [ ] [P1] Showcase workflow cost, quality, compare mode, and exemplar sessions as the core proof points
+- [x] [P1] Reposition the website around workflow intelligence for agentic engineering
+- [x] [P1] Showcase workflow cost, quality, compare mode, and exemplar sessions as the core proof points
 
 ## Interventions & Experimentation
 

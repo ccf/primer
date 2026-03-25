@@ -27,6 +27,7 @@ import { GrowthPage } from "@/pages/growth"
 import { InterventionsPage } from "@/pages/interventions"
 import { ProjectsPage } from "@/pages/projects"
 import { ProjectWorkspacePage } from "@/pages/project-workspace"
+import { ComparePage } from "@/pages/compare"
 import { NotFoundPage } from "@/pages/not-found"
 import { FloatingExplorer } from "@/components/explorer/floating-explorer"
 import type { DateRange } from "@/components/layout/date-range-picker"
@@ -107,6 +108,7 @@ function AuthenticatedApp() {
           <Route path="/friction" element={<FrictionPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/interventions" element={<InterventionsPage teamId={teamId} />} />
           <Route path="/growth" element={<GrowthPage teamId={teamId} dateRange={dateRange} />} />
+          <Route path="/compare" element={<ComparePage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/projects" element={<ProjectsPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/projects/:projectName" element={<ProjectWorkspaceRoute teamId={teamId} dateRange={dateRange} />} />
 
