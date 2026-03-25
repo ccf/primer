@@ -506,6 +506,45 @@ export interface ProductivityMetrics {
   roi_ratio: number | null
 }
 
+export interface CompareWorkflowEntry {
+  label: string
+  session_count: number
+  share_of_sessions: number | null
+}
+
+export interface CompareSnapshot {
+  label: string
+  total_sessions: number
+  success_rate: number | null
+  total_cost: number | null
+  avg_cost_per_session: number | null
+  cost_per_successful_outcome: number | null
+  pr_merge_rate: number | null
+  findings_fix_rate: number | null
+  effectiveness_score: number | null
+  leverage_score: number | null
+  top_workflows: CompareWorkflowEntry[]
+}
+
+export interface CompareDelta {
+  total_sessions: number | null
+  success_rate: number | null
+  total_cost: number | null
+  avg_cost_per_session: number | null
+  cost_per_successful_outcome: number | null
+  pr_merge_rate: number | null
+  findings_fix_rate: number | null
+  effectiveness_score: number | null
+  leverage_score: number | null
+}
+
+export interface CompareResponse {
+  mode: string
+  left: CompareSnapshot
+  right: CompareSnapshot
+  delta: CompareDelta
+}
+
 export interface BenchmarkContext {
   team_avg_sessions: number
   team_avg_tokens: number

@@ -805,6 +805,45 @@ class ProductivityMetrics(BaseModel):
     roi_ratio: float | None
 
 
+class CompareWorkflowEntry(BaseModel):
+    label: str
+    session_count: int
+    share_of_sessions: float | None = None
+
+
+class CompareSnapshot(BaseModel):
+    label: str
+    total_sessions: int
+    success_rate: float | None = None
+    total_cost: float | None = None
+    avg_cost_per_session: float | None = None
+    cost_per_successful_outcome: float | None = None
+    pr_merge_rate: float | None = None
+    findings_fix_rate: float | None = None
+    effectiveness_score: float | None = None
+    leverage_score: float | None = None
+    top_workflows: list[CompareWorkflowEntry] = Field(default_factory=list)
+
+
+class CompareDelta(BaseModel):
+    total_sessions: int | None = None
+    success_rate: float | None = None
+    total_cost: float | None = None
+    avg_cost_per_session: float | None = None
+    cost_per_successful_outcome: float | None = None
+    pr_merge_rate: float | None = None
+    findings_fix_rate: float | None = None
+    effectiveness_score: float | None = None
+    leverage_score: float | None = None
+
+
+class CompareResponse(BaseModel):
+    mode: str
+    left: CompareSnapshot
+    right: CompareSnapshot
+    delta: CompareDelta
+
+
 # --- Peer Benchmarking ---
 
 

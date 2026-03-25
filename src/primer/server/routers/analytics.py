@@ -11,6 +11,7 @@ from primer.common.schemas import (
     BottleneckAnalytics,
     ClaudePRComparisonResponse,
     CoachingBrief,
+    CompareResponse,
     ConfigOptimizationResponse,
     CostAnalytics,
     CrossProjectComparisonResponse,
@@ -59,6 +60,7 @@ from primer.server.services.analytics_service import (
     get_tool_adoption_analytics,
     get_tool_rankings,
 )
+from primer.server.services.compare_service import get_compare_response
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["analytics"])
 
@@ -73,6 +75,11 @@ def _resolve_scope(
         return auth.team_id, None
     # engineer
     return None, auth.engineer_id
+
+
+def _require_leadership_compare(auth: AuthContext) -> None:
+    if auth.role == "engineer":
+        raise HTTPException(status_code=403, detail="Compare mode requires leadership access")
 
 
 @router.get("/overview", response_model=OverviewStats)
@@ -186,6 +193,56 @@ def recommendations(
     return get_recommendations(
         db, team_id=tid, engineer_id=eid, start_date=start_date, end_date=end_date
     )
+
+
+@router.get("/compare", response_model=CompareResponse)
+def compare(
+    mode: str,
+    left_key: str | None = None,
+    right_key: str | None = None,
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    _require_leadership_compare(auth)
+
+    effective_team_id = team_id
+    if auth.role == "team_lead":
+        effective_team_id = auth.team_id
+        if mode == "team":
+            if left_key != auth.team_id or right_key != auth.team_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Team leads can only compare within their own team scope",
+                )
+        elif mode == "engineer":
+            engineer_ids = [value for value in (left_key, right_key) if value]
+            if engineer_ids:
+                engineers = (
+                    db.query(Engineer.id, Engineer.team_id)
+                    .filter(Engineer.id.in_(engineer_ids))
+                    .all()
+                )
+                if any(team != auth.team_id for _id, team in engineers):
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Team leads can only compare engineers on their team",
+                    )
+
+    try:
+        return get_compare_response(
+            db,
+            mode=mode,
+            left_key=left_key,
+            right_key=right_key,
+            team_id=effective_team_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/engineers", response_model=EngineerAnalytics)

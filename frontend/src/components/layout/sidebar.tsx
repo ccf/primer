@@ -20,6 +20,7 @@ import {
   Sun,
   Moon,
   PanelLeft,
+  Scale,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
@@ -53,6 +54,7 @@ const leadershipLinks: NavItem[] = [
   { to: "/interventions", label: "Interventions", icon: ClipboardList },
   { to: "/projects", label: "Projects", icon: FolderKanban },
   { to: "/growth", label: "Growth", icon: GraduationCap },
+  { to: "/compare", label: "Compare", icon: Scale },
   { to: "/explorer", label: "Explorer", icon: MessageSquare },
   { to: "/sessions", label: "Sessions", icon: MonitorDot },
   { to: "/teams", label: "Teams", icon: Users2 },

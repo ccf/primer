@@ -10,6 +10,7 @@ import type {
   BudgetStatus,
   CacheAnalyticsResponse,
   ClaudePRComparisonResponse,
+  CompareResponse,
   ConfigOptimizationResponse,
   CostAnalytics,
   CrossProjectComparisonResponse,
@@ -194,6 +195,32 @@ export function useInterventionEffectiveness(params: {
           project_name: params.projectName,
         })}`,
       ),
+  })
+}
+
+export function useCompareAnalytics(params: {
+  mode: string
+  leftKey?: string
+  rightKey?: string
+  teamId?: string | null
+  startDate?: string
+  endDate?: string
+  enabled?: boolean
+}) {
+  return useQuery({
+    queryKey: ["compare-analytics", params],
+    queryFn: () =>
+      apiFetch<CompareResponse>(
+        `/api/v1/analytics/compare${buildParams({
+          mode: params.mode,
+          left_key: params.leftKey,
+          right_key: params.rightKey,
+          team_id: params.teamId,
+          start_date: params.startDate,
+          end_date: params.endDate,
+        })}`,
+      ),
+    enabled: params.enabled ?? true,
   })
 }
 
