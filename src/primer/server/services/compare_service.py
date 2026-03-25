@@ -159,7 +159,7 @@ def _build_engineer_snapshot(
                 session_count=workflow.session_count,
                 share_of_sessions=workflow.share_of_sessions,
             )
-            for workflow in profile.impact_review.top_workflows
+            for workflow in profile.impact_review.top_workflows[:3]
         ]
 
     return CompareSnapshot(
