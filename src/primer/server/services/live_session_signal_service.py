@@ -6,7 +6,10 @@ from typing import TYPE_CHECKING
 from primer.common.schemas import LiveSessionSignal, LiveSessionSignalsResponse
 from primer.hook.extractor_registry import get_extractor_for
 from primer.mcp.reader import LocalSession, list_local_sessions
-from primer.server.services.execution_evidence_service import extract_execution_evidence
+from primer.server.services.execution_evidence_service import (
+    _classify_status,
+    extract_execution_evidence,
+)
 from primer.server.services.recovery_path_service import extract_recovery_path
 from primer.server.services.session_signal_parsing import message_payload, normalize_tool_name
 
@@ -39,6 +42,14 @@ _POSITIVE_SATISFACTION_PHRASES = (
     "resolved",
 )
 _TOOL_ERROR_KEYWORDS = ("error", "failed", "failure", "traceback", "exception", "timeout")
+_EXECUTION_TOOL_NAMES = {
+    "bash",
+    "exec_command",
+    "run_terminal_command",
+    "run_terminal_command_v2",
+    "shell",
+    "terminal",
+}
 
 
 def get_live_session_signals(
@@ -252,14 +263,22 @@ def _count_tool_errors(messages: list[object]) -> int:
         for tool_result in tool_results:
             if not isinstance(tool_result, dict):
                 continue
+            tool_name = normalize_tool_name(tool_result.get("name"))
+            if tool_name in _EXECUTION_TOOL_NAMES:
+                continue
             output_preview = tool_result.get("output_preview")
             if not isinstance(output_preview, str):
+                continue
+            status = _classify_status(output_preview)
+            if status == "passed":
+                continue
+            if status == "failed":
+                count += 1
                 continue
             normalized = output_preview.lower()
             if any(keyword in normalized for keyword in _TOOL_ERROR_KEYWORDS):
                 count += 1
                 continue
-            tool_name = normalize_tool_name(tool_result.get("name"))
             if tool_name and "error" in tool_name:
                 count += 1
     return count
