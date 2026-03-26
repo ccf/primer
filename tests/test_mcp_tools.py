@@ -5,6 +5,8 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
+from primer.common.schemas import LiveSessionSignal, LiveSessionSignalsResponse
+
 
 @pytest.fixture(autouse=True)
 def _set_api_key(monkeypatch):
@@ -314,4 +316,61 @@ def test_primer_live_session_signals_error(mock_get_signals):
     from primer.mcp.tools import primer_live_session_signals
 
     result = primer_live_session_signals()
+    assert "No local sessions found" in result
+
+
+# --- primer_in_session_nudges ---
+
+
+@patch("primer.mcp.tools.httpx.get")
+@patch("primer.mcp.tools.get_live_session_signals")
+def test_primer_in_session_nudges_success(mock_get_signals, mock_get):
+    mock_get_signals.return_value = LiveSessionSignalsResponse(
+        session_id="session-123",
+        agent_type="claude_code",
+        project_name="api-server",
+        total_messages=12,
+        risk_level="high",
+        satisfaction_signal="negative",
+        signals=[
+            LiveSessionSignal(
+                signal_type="recovery_loop",
+                severity="critical",
+                title="Recovery loop detected",
+                detail="The session is repeating the same recovery pattern.",
+            )
+        ],
+    )
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "brief_type": "session_start",
+        "status_summary": "Session-start brief",
+        "sections": [
+            {
+                "title": "How to start this session",
+                "items": ["**Debugging playbook** — Start with Read, Bash."],
+            }
+        ],
+        "sessions_analyzed": 12,
+        "generated_at": "2026-03-26T12:00:00Z",
+    }
+    mock_get.return_value = mock_resp
+
+    from primer.mcp.tools import primer_in_session_nudges
+
+    result = primer_in_session_nudges(project_name="api-server", workflow_hint="debugging")
+
+    assert "In-Session Workflow Nudges" in result
+    assert "Break the recovery loop" in result
+    assert "Debugging playbook" in result
+
+
+@patch("primer.mcp.tools.get_live_session_signals")
+def test_primer_in_session_nudges_error(mock_get_signals):
+    mock_get_signals.side_effect = ValueError("No local sessions found")
+
+    from primer.mcp.tools import primer_in_session_nudges
+
+    result = primer_in_session_nudges()
     assert "No local sessions found" in result

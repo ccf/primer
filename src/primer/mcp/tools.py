@@ -6,6 +6,7 @@ import os
 
 import httpx
 
+from primer.mcp.nudges import build_in_session_nudges
 from primer.mcp.sync import sync_sessions
 from primer.server.services.live_session_signal_service import get_live_session_signals
 
@@ -203,5 +204,70 @@ def primer_live_session_signals(
     for signal in data.signals:
         lines.append(f"### [{signal.severity}] {signal.title}")
         lines.append(f"- {signal.detail}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def primer_in_session_nudges(
+    project_name: str | None = None,
+    workflow_hint: str | None = None,
+    task_hint: str | None = None,
+    session_id: str | None = None,
+    transcript_path: str | None = None,
+) -> str:
+    """Get evidence-backed nudges during an active local session.
+
+    Combines local live-session signals with the session-start coaching brief so the
+    sidecar can suggest the smallest next corrective action when the session drifts.
+    """
+    try:
+        live_signals = get_live_session_signals(
+            session_id=session_id,
+            transcript_path=transcript_path,
+        )
+    except ValueError as exc:
+        return f"Error: {exc}"
+
+    coaching_brief = None
+    if API_KEY:
+        try:
+            params = {
+                key: value
+                for key, value in {
+                    "project_name": project_name or live_signals.project_name,
+                    "workflow_hint": workflow_hint,
+                    "task_hint": task_hint,
+                    "days": 90,
+                }.items()
+                if value is not None
+            }
+            resp = httpx.get(
+                f"{SERVER_URL}/api/v1/analytics/coaching/session-start",
+                params=params,
+                headers={"x-api-key": API_KEY},
+                timeout=30,
+            )
+            if resp.status_code == 200:
+                from primer.common.schemas import CoachingBrief
+
+                coaching_brief = CoachingBrief.model_validate(resp.json())
+        except httpx.RequestError:
+            coaching_brief = None
+
+    data = build_in_session_nudges(live_signals, coaching_brief)
+    lines = ["## In-Session Workflow Nudges\n"]
+    lines.append(f"**Risk**: {data.risk_level}\n")
+    if data.project_name:
+        lines.append(f"**Project**: {data.project_name}\n")
+    if not data.nudges:
+        lines.append("No nudges right now.\n")
+        return "\n".join(lines)
+    for nudge in data.nudges:
+        lines.append(f"### [{nudge.severity}] {nudge.title}")
+        lines.append(f"- {nudge.message}")
+        if nudge.rationale:
+            lines.append(f"- Why now: {nudge.rationale}")
+        for action in nudge.suggested_actions:
+            lines.append(f"- Try: {action}")
         lines.append("")
     return "\n".join(lines)
