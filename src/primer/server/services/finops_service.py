@@ -603,16 +603,20 @@ def _build_model_choice_opportunities(
                 )
             )
 
-    opportunities.sort(
-        key=lambda opportunity: (
-            -opportunity.monthly_savings_estimate,
-            {"high": 2, "medium": 1, "low": 0}.get(opportunity.confidence, 0),
-            opportunity.workflow_archetype,
-        )
-    )
+    opportunities.sort(key=_model_choice_opportunity_sort_key)
     opportunities = opportunities[:limit]
     total_savings = sum(opportunity.monthly_savings_estimate for opportunity in opportunities)
     return opportunities, total_savings
+
+
+def _model_choice_opportunity_sort_key(
+    opportunity: ModelChoiceOpportunity,
+) -> tuple[float, int, str]:
+    return (
+        -opportunity.monthly_savings_estimate,
+        -{"high": 2, "medium": 1, "low": 0}.get(opportunity.confidence, 0),
+        opportunity.workflow_archetype,
+    )
 
 
 # ---------------------------------------------------------------------------
