@@ -232,3 +232,4 @@ def test_session_start_coaching_matches_hyphenated_workflow_hints(
     assert any(
         "Use Sonnet for feature-delivery work" in item for item in data["sections"][1]["items"]
     )
+    assert "Workflow: feature-delivery" in data["context_summary"]
