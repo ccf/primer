@@ -8,6 +8,7 @@ from mcp.server.fastmcp import FastMCP
 from primer.mcp.tools import (
     primer_coaching,
     primer_friction_report,
+    primer_live_session_signals,
     primer_my_stats,
     primer_recommendations,
     primer_session_start_coaching,
@@ -91,6 +92,19 @@ def session_start_coaching(
         task_hint=task_hint,
         days=days,
     )
+
+
+@mcp.tool()
+def live_session_signals(
+    session_id: str | None = None,
+    transcript_path: str | None = None,
+) -> str:
+    """Get live friction, satisfaction, and risk signals for the current local session.
+
+    Primer inspects the in-progress local transcript and summarizes whether the
+    session looks healthy, stuck, or at risk of abandonment.
+    """
+    return primer_live_session_signals(session_id=session_id, transcript_path=transcript_path)
 
 
 if __name__ == "__main__":

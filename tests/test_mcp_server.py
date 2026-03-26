@@ -75,3 +75,17 @@ def test_session_start_coaching_tool(mock_session_start):
         task_hint="Fix auth regression",
         days=14,
     )
+
+
+@patch("primer.mcp.server.primer_live_session_signals")
+def test_live_session_signals_tool(mock_live_signals):
+    mock_live_signals.return_value = "signals"
+
+    from primer.mcp.server import live_session_signals
+
+    result = live_session_signals(session_id="session-123")
+    assert result == "signals"
+    mock_live_signals.assert_called_once_with(
+        session_id="session-123",
+        transcript_path=None,
+    )

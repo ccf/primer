@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -273,3 +274,44 @@ def test_primer_session_start_coaching_no_api_key(monkeypatch):
 
     result = primer_session_start_coaching(project_name="api-server")
     assert "Error" in result
+
+
+# --- primer_live_session_signals ---
+
+
+@patch("primer.mcp.tools.get_live_session_signals")
+def test_primer_live_session_signals_success(mock_get_signals):
+    mock_get_signals.return_value = SimpleNamespace(
+        risk_level="high",
+        satisfaction_signal="negative",
+        project_name="api-server",
+        session_id="session-123",
+        agent_type="claude_code",
+        signals=[
+            SimpleNamespace(
+                severity="warning",
+                title="Verification is failing",
+                detail="Recent test commands are failing.",
+            )
+        ],
+    )
+
+    from primer.mcp.tools import primer_live_session_signals
+
+    result = primer_live_session_signals(session_id="session-123")
+    assert "Live Session Signals" in result
+    assert "Verification is failing" in result
+    mock_get_signals.assert_called_once_with(
+        session_id="session-123",
+        transcript_path=None,
+    )
+
+
+@patch("primer.mcp.tools.get_live_session_signals")
+def test_primer_live_session_signals_error(mock_get_signals):
+    mock_get_signals.side_effect = ValueError("No local sessions found")
+
+    from primer.mcp.tools import primer_live_session_signals
+
+    result = primer_live_session_signals()
+    assert "No local sessions found" in result

@@ -7,6 +7,7 @@ import os
 import httpx
 
 from primer.mcp.sync import sync_sessions
+from primer.server.services.live_session_signal_service import get_live_session_signals
 
 logger = logging.getLogger(__name__)
 
@@ -178,3 +179,29 @@ def primer_session_start_coaching(
         return f"Error: {resp.status_code} - {resp.text}"
     except httpx.RequestError as e:
         return f"Error connecting to server: {e}"
+
+
+def primer_live_session_signals(
+    session_id: str | None = None,
+    transcript_path: str | None = None,
+) -> str:
+    """Analyze the current in-progress local session for live risk and friction signals.
+
+    This is computed locally from the active transcript so it can be called repeatedly
+    during a session without waiting for end-of-session ingest.
+    """
+    try:
+        data = get_live_session_signals(session_id=session_id, transcript_path=transcript_path)
+    except ValueError as exc:
+        return f"Error: {exc}"
+    lines = ["## Live Session Signals\n"]
+    lines.append(f"**Risk**: {data.risk_level}\n")
+    lines.append(f"**Satisfaction**: {data.satisfaction_signal}\n")
+    if data.project_name:
+        lines.append(f"**Project**: {data.project_name}\n")
+    lines.append(f"**Session**: {data.session_id} ({data.agent_type})\n")
+    for signal in data.signals:
+        lines.append(f"### [{signal.severity}] {signal.title}")
+        lines.append(f"- {signal.detail}")
+        lines.append("")
+    return "\n".join(lines)
