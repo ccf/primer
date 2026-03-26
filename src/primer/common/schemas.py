@@ -2303,6 +2303,22 @@ class PlanAllocationSummary(BaseModel):
     total_monthly_cost: float
 
 
+class ModelChoiceOpportunity(BaseModel):
+    workflow_archetype: str
+    current_model: str
+    recommended_model: str
+    current_session_count: int
+    supporting_session_count: int
+    current_success_rate: float | None = None
+    recommended_success_rate: float | None = None
+    current_avg_cost: float | None = None
+    recommended_avg_cost: float | None = None
+    period_savings_estimate: float
+    monthly_savings_estimate: float
+    confidence: str
+    rationale: str
+
+
 class CostModelingResponse(BaseModel):
     period_days: int
     plan_tiers: list[PlanTier]
@@ -2311,6 +2327,8 @@ class CostModelingResponse(BaseModel):
     total_api_cost_monthly: float
     total_optimal_cost_monthly: float
     total_savings_monthly: float
+    model_choice_opportunities: list[ModelChoiceOpportunity] = []
+    total_model_choice_savings_monthly: float = 0.0
 
 
 # --- FinOps: Forecasting ---
