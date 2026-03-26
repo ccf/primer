@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import UTC, datetime
+from types import SimpleNamespace
 
 from primer.common.models import Session as SessionModel
 from primer.common.models import SessionFacets, ToolUsage
@@ -80,3 +81,103 @@ def test_coaching_days_param(client, engineer_with_key):
         headers={"x-api-key": key},
     )
     assert resp.status_code == 200
+
+
+def test_session_start_coaching_requires_engineer_key(client, admin_headers):
+    resp = client.get("/api/v1/analytics/coaching/session-start", headers=admin_headers)
+    assert resp.status_code == 400
+    assert "engineer context" in resp.json()["detail"]
+
+
+def test_session_start_coaching_with_context(client, engineer_with_key, monkeypatch):
+    _eng, key = engineer_with_key
+
+    monkeypatch.setattr(
+        "primer.server.services.engineer_profile_service.get_engineer_profile",
+        lambda *args, **kwargs: SimpleNamespace(
+            overview=SimpleNamespace(total_sessions=12, success_rate=0.83),
+            workflow_playbooks=[
+                SimpleNamespace(
+                    title="Debugging: Read -> Test -> Fix",
+                    session_type="debugging",
+                    example_projects=["api-server"],
+                    recommended_tools=["Read", "Bash"],
+                    summary="Reproduce the bug quickly and keep the loop tight.",
+                )
+            ],
+            model_recommendations=[
+                SimpleNamespace(
+                    workflow_archetype="debugging",
+                    title="Use Sonnet for debugging work",
+                    description="Peers keep similar success while spending less.",
+                )
+            ],
+            tool_recommendations=[
+                SimpleNamespace(
+                    title="Lean on grep before edits",
+                    description="Use search to narrow the failing path before you patch.",
+                    matching_projects=["api-server"],
+                    project_context_match_count=1,
+                )
+            ],
+            learning_paths=[
+                SimpleNamespace(
+                    recommendations=[
+                        SimpleNamespace(
+                            title="Reuse the failing-test prompt",
+                            description="Start from the prompt that reproduces the auth failure.",
+                        )
+                    ]
+                )
+            ],
+            config_suggestions=[
+                SimpleNamespace(
+                    title="Check GitHub MCP availability",
+                    description="GitHub lookups are more reliable once the MCP is connected.",
+                )
+            ],
+        ),
+    )
+    monkeypatch.setattr(
+        "primer.server.services.project_workspace_service.get_project_workspace",
+        lambda *args, **kwargs: SimpleNamespace(
+            enablement=SimpleNamespace(
+                recommendations=[
+                    SimpleNamespace(
+                        title="Run the fastest verification loop first",
+                        description="Start with the auth regression test before broad edits.",
+                    )
+                ],
+                permission_mode_counts={"default": 4},
+            ),
+            workflow_summary=SimpleNamespace(
+                friction_hotspots=[
+                    SimpleNamespace(
+                        friction_type="tool_error",
+                        session_count=5,
+                    )
+                ]
+            ),
+        ),
+    )
+
+    resp = client.get(
+        "/api/v1/analytics/coaching/session-start",
+        params={
+            "project_name": "api-server",
+            "workflow_hint": "debugging",
+            "task_hint": "Fix auth regression",
+        },
+        headers={"x-api-key": key},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["brief_type"] == "session_start"
+    assert "Project: api-server" in data["context_summary"]
+    assert "Workflow: debugging" in data["context_summary"]
+    assert len(data["sections"]) == 3
+    assert data["sections"][0]["title"] == "How to start this session"
+    assert any("Debugging: Read -> Test -> Fix" in item for item in data["sections"][0]["items"])
+    assert any("Use Sonnet for debugging work" in item for item in data["sections"][1]["items"])
+    assert any("tool_error" in item for item in data["sections"][2]["items"])

@@ -10,6 +10,7 @@ from primer.mcp.tools import (
     primer_friction_report,
     primer_my_stats,
     primer_recommendations,
+    primer_session_start_coaching,
     primer_sync,
     primer_team_overview,
 )
@@ -70,6 +71,26 @@ def coaching(days: int = 30) -> str:
     based on your usage patterns, friction, and team benchmarks.
     """
     return primer_coaching(days=days)
+
+
+@mcp.tool()
+def session_start_coaching(
+    project_name: str | None = None,
+    workflow_hint: str | None = None,
+    task_hint: str | None = None,
+    days: int = 90,
+) -> str:
+    """Get a contextual session-start brief before you begin work.
+
+    Uses project context, workflow hints, and peer-backed evidence to suggest
+    a strong starting pattern, tool/model choices, and likely pitfalls.
+    """
+    return primer_session_start_coaching(
+        project_name=project_name,
+        workflow_hint=workflow_hint,
+        task_hint=task_hint,
+        days=days,
+    )
 
 
 if __name__ == "__main__":

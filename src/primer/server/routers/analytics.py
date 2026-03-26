@@ -687,6 +687,37 @@ def coaching_brief(
     return get_coaching_brief(db, engineer_id=engineer_id, team_id=team_id, days=days)
 
 
+@router.get("/coaching/session-start", response_model=CoachingBrief)
+def coaching_session_start(
+    days: int = Query(default=90, ge=1, le=365),
+    project_name: str | None = None,
+    workflow_hint: str | None = None,
+    task_hint: str | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.coaching_service import get_session_start_brief
+
+    engineer_id = auth.engineer_id
+    team_id = auth.team_id
+    if auth.role == "admin":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Session-start coaching requires an engineer context. Use an engineer API key."
+            ),
+        )
+    return get_session_start_brief(
+        db,
+        engineer_id=engineer_id,
+        team_id=team_id,
+        days=days,
+        project_name=project_name,
+        workflow_hint=workflow_hint,
+        task_hint=task_hint,
+    )
+
+
 @router.get("/narrative/status", response_model=NarrativeStatusResponse)
 def narrative_status(
     auth: AuthContext = Depends(get_auth_context),
