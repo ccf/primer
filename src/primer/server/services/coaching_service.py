@@ -161,11 +161,15 @@ def _normalize_hint(value: str | None) -> str | None:
     return normalized or None
 
 
+def _normalize_workflow_value(value: str | None) -> str | None:
+    return _normalize_hint(value)
+
+
 def _matches_workflow_hint(playbook_like, workflow_hint: str | None) -> bool:
     if not workflow_hint:
         return True
-    title = getattr(playbook_like, "title", "").lower().replace(" ", "_")
-    session_type = (getattr(playbook_like, "session_type", None) or "").lower()
+    title = _normalize_workflow_value(getattr(playbook_like, "title", "")) or ""
+    session_type = _normalize_workflow_value(getattr(playbook_like, "session_type", None))
     return workflow_hint in title or workflow_hint == session_type
 
 
@@ -244,7 +248,7 @@ def _build_session_start_recommendations_section(
         for recommendation in model_recommendations
         if not workflow_hint
         or not recommendation.workflow_archetype
-        or recommendation.workflow_archetype == workflow_hint
+        or _normalize_workflow_value(recommendation.workflow_archetype) == workflow_hint
     ]
     if matching_models:
         recommendation = matching_models[0]

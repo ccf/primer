@@ -181,3 +181,54 @@ def test_session_start_coaching_with_context(client, engineer_with_key, monkeypa
     assert any("Debugging: Read -> Test -> Fix" in item for item in data["sections"][0]["items"])
     assert any("Use Sonnet for debugging work" in item for item in data["sections"][1]["items"])
     assert any("tool_error" in item for item in data["sections"][2]["items"])
+
+
+def test_session_start_coaching_matches_hyphenated_workflow_hints(
+    client, engineer_with_key, monkeypatch
+):
+    _eng, key = engineer_with_key
+
+    monkeypatch.setattr(
+        "primer.server.services.engineer_profile_service.get_engineer_profile",
+        lambda *args, **kwargs: SimpleNamespace(
+            overview=SimpleNamespace(total_sessions=8, success_rate=0.75),
+            workflow_playbooks=[
+                SimpleNamespace(
+                    title="Feature-delivery: Read -> Edit -> Ship",
+                    session_type="feature-delivery",
+                    example_projects=[],
+                    recommended_tools=["Edit"],
+                    summary="Ship the smallest viable change first.",
+                )
+            ],
+            model_recommendations=[
+                SimpleNamespace(
+                    workflow_archetype="feature-delivery",
+                    title="Use Sonnet for feature-delivery work",
+                    description="Peers keep quality while spending less.",
+                )
+            ],
+            tool_recommendations=[],
+            learning_paths=[],
+            config_suggestions=[],
+        ),
+    )
+    monkeypatch.setattr(
+        "primer.server.services.project_workspace_service.get_project_workspace",
+        lambda *args, **kwargs: None,
+    )
+
+    resp = client.get(
+        "/api/v1/analytics/coaching/session-start",
+        params={"workflow_hint": "feature-delivery"},
+        headers={"x-api-key": key},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert any(
+        "Feature-delivery: Read -> Edit -> Ship" in item for item in data["sections"][0]["items"]
+    )
+    assert any(
+        "Use Sonnet for feature-delivery work" in item for item in data["sections"][1]["items"]
+    )
