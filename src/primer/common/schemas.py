@@ -2203,6 +2203,28 @@ class MaturityAnalyticsResponse(BaseModel):
     model_diversity_avg: float = 0.0
 
 
+# --- Live Session Signals ---
+
+
+class LiveSessionSignal(BaseModel):
+    signal_type: str
+    severity: Literal["info", "warning", "critical"]
+    title: str
+    detail: str
+    evidence: dict[str, Any] = Field(default_factory=dict)
+
+
+class LiveSessionSignalsResponse(BaseModel):
+    session_id: str
+    agent_type: str
+    project_name: str | None = None
+    started_at: datetime | None = None
+    total_messages: int = 0
+    risk_level: Literal["low", "medium", "high"]
+    satisfaction_signal: Literal["positive", "neutral", "negative", "unknown"] = "unknown"
+    signals: list[LiveSessionSignal] = Field(default_factory=list)
+
+
 # --- Coaching Brief ---
 
 
