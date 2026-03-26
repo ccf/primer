@@ -272,3 +272,43 @@ def primer_in_session_nudges(
             lines.append(f"- Try: {action}")
         lines.append("")
     return "\n".join(lines)
+
+
+def primer_personal_recaps(period: str = "both") -> str:
+    """Get your daily and weekly personal recap inside the sidecar."""
+    if not API_KEY:
+        return "Error: PRIMER_API_KEY not set"
+    if period not in {"daily", "weekly", "both"}:
+        return "Error: period must be one of daily, weekly, both"
+    try:
+        resp = httpx.get(
+            f"{SERVER_URL}/api/v1/analytics/personal-recaps",
+            headers={"x-api-key": API_KEY},
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            return f"Error: {resp.status_code} - {resp.text}"
+        data = resp.json()
+        lines = ["## Personal Recaps\n"]
+        periods = ["daily", "weekly"] if period == "both" else [period]
+        for selected in periods:
+            recap = data[selected]
+            lines.append(f"### {selected.title()}")
+            lines.append(f"**{recap['headline']}**")
+            lines.append(recap["summary"])
+            if recap.get("wins"):
+                lines.append("Wins:")
+                for item in recap["wins"]:
+                    lines.append(f"- {item}")
+            if recap.get("watchouts"):
+                lines.append("Watchouts:")
+                for item in recap["watchouts"]:
+                    lines.append(f"- {item}")
+            if recap.get("next_steps"):
+                lines.append("Next steps:")
+                for item in recap["next_steps"]:
+                    lines.append(f"- {item}")
+            lines.append("")
+        return "\n".join(lines)
+    except httpx.RequestError as e:
+        return f"Error connecting to server: {e}"

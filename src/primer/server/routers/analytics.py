@@ -32,6 +32,7 @@ from primer.common.schemas import (
     PaginatedResponse,
     PatternSharingResponse,
     PersonalizedTipsResponse,
+    PersonalRecapsResponse,
     ProductivityMetrics,
     ProjectAnalytics,
     ProjectWorkspaceResponse,
@@ -716,6 +717,21 @@ def coaching_session_start(
         workflow_hint=workflow_hint,
         task_hint=task_hint,
     )
+
+
+@router.get("/personal-recaps", response_model=PersonalRecapsResponse)
+def personal_recaps(
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.recap_service import get_personal_recaps
+
+    if auth.role == "admin":
+        raise HTTPException(
+            status_code=400,
+            detail="Personal recaps require an engineer context. Use an engineer API key.",
+        )
+    return get_personal_recaps(db, engineer_id=auth.engineer_id)
 
 
 @router.get("/narrative/status", response_model=NarrativeStatusResponse)

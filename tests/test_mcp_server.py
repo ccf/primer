@@ -111,3 +111,14 @@ def test_in_session_nudges_tool(mock_nudges):
         session_id="session-123",
         transcript_path=None,
     )
+
+
+@patch("primer.mcp.server.primer_personal_recaps")
+def test_personal_recaps_tool(mock_recaps):
+    mock_recaps.return_value = "recaps"
+
+    from primer.mcp.server import personal_recaps
+
+    result = personal_recaps(period="daily")
+    assert result == "recaps"
+    mock_recaps.assert_called_once_with(period="daily")

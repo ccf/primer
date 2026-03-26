@@ -408,3 +408,57 @@ def test_primer_in_session_nudges_error(mock_get_signals):
 
     result = primer_in_session_nudges()
     assert "No local sessions found" in result
+
+
+# --- primer_personal_recaps ---
+
+
+@patch("primer.mcp.tools.httpx.get")
+def test_primer_personal_recaps_success(mock_get):
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "daily": {
+            "headline": "You logged 2 sessions today",
+            "summary": "2 sessions · 50% success · $1.20 estimated spend",
+            "wins": ["Closed a tough auth bug quickly."],
+            "watchouts": ["tool_error showed up 2 times."],
+            "next_steps": [
+                "Reuse the debugging playbook — Start with the narrowest regression command first."
+            ],
+        },
+        "weekly": {
+            "headline": "Your weekly momentum is improving",
+            "summary": "7 sessions · 86% success · $5.40 estimated spend",
+            "wins": ["Success rate is climbing week over week."],
+            "watchouts": ["No major recurring drag signals stood out in this window."],
+            "next_steps": [
+                "Keep the delivery loop tight — "
+                "Stick with the highest-confidence workflow this week."
+            ],
+        },
+    }
+    mock_get.return_value = mock_resp
+
+    from primer.mcp.tools import primer_personal_recaps
+
+    result = primer_personal_recaps()
+    assert "## Personal Recaps" in result
+    assert "### Daily" in result
+    assert "### Weekly" in result
+    assert "Your weekly momentum is improving" in result
+
+
+def test_primer_personal_recaps_invalid_period():
+    from primer.mcp.tools import primer_personal_recaps
+
+    result = primer_personal_recaps(period="monthly")
+    assert "period must be one of daily, weekly, both" in result
+
+
+def test_primer_personal_recaps_no_api_key(monkeypatch):
+    monkeypatch.setattr("primer.mcp.tools.API_KEY", "")
+    from primer.mcp.tools import primer_personal_recaps
+
+    result = primer_personal_recaps()
+    assert "Error" in result
