@@ -8,6 +8,7 @@ from mcp.server.fastmcp import FastMCP
 from primer.mcp.tools import (
     primer_coaching,
     primer_friction_report,
+    primer_in_session_nudges,
     primer_live_session_signals,
     primer_my_stats,
     primer_recommendations,
@@ -105,6 +106,28 @@ def live_session_signals(
     session looks healthy, stuck, or at risk of abandonment.
     """
     return primer_live_session_signals(session_id=session_id, transcript_path=transcript_path)
+
+
+@mcp.tool()
+def in_session_nudges(
+    project_name: str | None = None,
+    workflow_hint: str | None = None,
+    task_hint: str | None = None,
+    session_id: str | None = None,
+    transcript_path: str | None = None,
+) -> str:
+    """Get evidence-backed nudges for what to try next during an active session.
+
+    Primer combines live local session signals with project playbooks and prior
+    team evidence to suggest the smallest next corrective action.
+    """
+    return primer_in_session_nudges(
+        project_name=project_name,
+        workflow_hint=workflow_hint,
+        task_hint=task_hint,
+        session_id=session_id,
+        transcript_path=transcript_path,
+    )
 
 
 if __name__ == "__main__":

@@ -2225,6 +2225,22 @@ class LiveSessionSignalsResponse(BaseModel):
     signals: list[LiveSessionSignal] = Field(default_factory=list)
 
 
+class InSessionNudge(BaseModel):
+    nudge_type: str
+    severity: Literal["info", "warning", "critical"]
+    title: str
+    message: str
+    rationale: str | None = None
+    suggested_actions: list[str] = Field(default_factory=list)
+
+
+class InSessionNudgesResponse(BaseModel):
+    session_id: str | None = None
+    project_name: str | None = None
+    risk_level: Literal["low", "medium", "high"]
+    nudges: list[InSessionNudge] = Field(default_factory=list)
+
+
 # --- Coaching Brief ---
 
 

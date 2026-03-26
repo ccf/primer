@@ -89,3 +89,25 @@ def test_live_session_signals_tool(mock_live_signals):
         session_id="session-123",
         transcript_path=None,
     )
+
+
+@patch("primer.mcp.server.primer_in_session_nudges")
+def test_in_session_nudges_tool(mock_nudges):
+    mock_nudges.return_value = "nudges"
+
+    from primer.mcp.server import in_session_nudges
+
+    result = in_session_nudges(
+        project_name="api-server",
+        workflow_hint="debugging",
+        task_hint="Fix auth regression",
+        session_id="session-123",
+    )
+    assert result == "nudges"
+    mock_nudges.assert_called_once_with(
+        project_name="api-server",
+        workflow_hint="debugging",
+        task_hint="Fix auth regression",
+        session_id="session-123",
+        transcript_path=None,
+    )
