@@ -7,6 +7,7 @@ from primer.common.schemas import LiveSessionSignal, LiveSessionSignalsResponse
 from primer.hook.extractor_registry import get_extractor_for
 from primer.mcp.reader import LocalSession, list_local_sessions
 from primer.server.services.execution_evidence_service import (
+    _EXECUTION_TOOL_NAMES,
     _classify_status,
     extract_execution_evidence,
 )
@@ -42,14 +43,6 @@ _POSITIVE_SATISFACTION_PHRASES = (
     "resolved",
 )
 _TOOL_ERROR_KEYWORDS = ("error", "failed", "failure", "traceback", "exception", "timeout")
-_EXECUTION_TOOL_NAMES = {
-    "bash",
-    "exec_command",
-    "run_terminal_command",
-    "run_terminal_command_v2",
-    "shell",
-    "terminal",
-}
 
 
 def get_live_session_signals(
