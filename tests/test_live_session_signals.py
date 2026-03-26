@@ -83,6 +83,36 @@ def test_live_session_signals_selects_latest_session(monkeypatch, tmp_path):
                         "role": "tool_result",
                         "tool_results": [{"name": "Bash", "output_preview": "1 failed"}],
                     },
+                    {
+                        "ordinal": 8,
+                        "role": "assistant",
+                        "tool_calls": [{"name": "github_search", "input_preview": "{}"}],
+                    },
+                    {
+                        "ordinal": 9,
+                        "role": "tool_result",
+                        "tool_results": [
+                            {
+                                "name": "github_search",
+                                "output_preview": "Tool error: timeout",
+                            }
+                        ],
+                    },
+                    {
+                        "ordinal": 10,
+                        "role": "assistant",
+                        "tool_calls": [{"name": "jira_lookup", "input_preview": "{}"}],
+                    },
+                    {
+                        "ordinal": 11,
+                        "role": "tool_result",
+                        "tool_results": [
+                            {
+                                "name": "jira_lookup",
+                                "output_preview": "Request failed with exception",
+                            }
+                        ],
+                    },
                 ],
             )
         return SessionMetadata(
@@ -108,6 +138,7 @@ def test_live_session_signals_selects_latest_session(monkeypatch, tmp_path):
     assert response.satisfaction_signal == "negative"
     signal_titles = {signal.title for signal in response.signals}
     assert "Verification is failing" in signal_titles
+    assert "Tool errors are stacking up" in signal_titles
     assert "Recovery loop detected" in signal_titles
     assert "User sentiment looks frustrated" in signal_titles
 
@@ -149,7 +180,9 @@ def test_live_session_signals_support_explicit_session_lookup(monkeypatch, tmp_p
                     {
                         "ordinal": 2,
                         "role": "tool_result",
-                        "tool_results": [{"name": "Bash", "output_preview": "All checks passed"}],
+                        "tool_results": [
+                            {"name": "Bash", "output_preview": "5 passed, 0 failed, 0 errors"}
+                        ],
                     },
                     {
                         "ordinal": 3,
