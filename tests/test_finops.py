@@ -10,6 +10,7 @@ import pytest
 from primer.common.config import settings
 from primer.common.models import Engineer, SessionFacets, SessionWorkflowProfile, Team
 from primer.common.pricing import get_pricing
+from primer.common.schemas import ModelChoiceOpportunity
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -765,6 +766,44 @@ class TestCostModeling:
 
         r = client.get("/api/v1/finops/cost-modeling", headers={"x-api-key": key})
         assert r.status_code == 200
+
+    def test_model_choice_opportunities_sort_high_confidence_first(self):
+        from primer.server.services.finops_service import _model_choice_opportunity_sort_key
+
+        high = ModelChoiceOpportunity(
+            workflow_archetype="debugging",
+            current_model="claude-opus-4-20250514",
+            recommended_model="claude-sonnet-4-5-20250929",
+            current_session_count=6,
+            supporting_session_count=8,
+            current_success_rate=0.82,
+            recommended_success_rate=0.83,
+            current_avg_cost=2.4,
+            recommended_avg_cost=1.2,
+            period_savings_estimate=3.5,
+            monthly_savings_estimate=7.0,
+            confidence="high",
+            rationale="High-confidence opportunity.",
+        )
+        low = ModelChoiceOpportunity(
+            workflow_archetype="feature_development",
+            current_model="claude-opus-4-20250514",
+            recommended_model="claude-sonnet-4-5-20250929",
+            current_session_count=2,
+            supporting_session_count=2,
+            current_success_rate=0.82,
+            recommended_success_rate=0.82,
+            current_avg_cost=2.4,
+            recommended_avg_cost=1.2,
+            period_savings_estimate=3.5,
+            monthly_savings_estimate=7.0,
+            confidence="low",
+            rationale="Low-confidence opportunity.",
+        )
+
+        ordered = sorted([low, high], key=_model_choice_opportunity_sort_key)
+
+        assert ordered[0].confidence == "high"
 
 
 # ---------------------------------------------------------------------------
