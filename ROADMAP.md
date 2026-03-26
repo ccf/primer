@@ -215,7 +215,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [ ] [P1] Break-even analysis for API vs seat-based pricing with per-engineer recommendations
 - [x] [P1] Cost per workflow archetype and cost per engineering outcome
 - [x] [P1] Workflow compare mode for archetype and fingerprint performance
-- [ ] [P1] Model-choice opportunity scoring for overspend reduction
+- [x] [P1] Model-choice opportunity scoring for overspend reduction
 - [ ] [P2] Budget policy simulation by team, project, and billing model
 
 ## AI Synthesis & Explorer

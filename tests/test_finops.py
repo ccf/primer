@@ -8,7 +8,7 @@ import bcrypt
 import pytest
 
 from primer.common.config import settings
-from primer.common.models import Engineer, Team
+from primer.common.models import Engineer, SessionFacets, SessionWorkflowProfile, Team
 from primer.common.pricing import get_pricing
 
 # ---------------------------------------------------------------------------
@@ -51,6 +51,26 @@ def _make_engineer(db_session, team, *, name="Test Eng", email=None, role="engin
     db_session.add(eng)
     db_session.flush()
     return eng, raw_key
+
+
+def _annotate_session(db_session, session_id, *, archetype, outcome):
+    workflow = (
+        db_session.query(SessionWorkflowProfile)
+        .filter(SessionWorkflowProfile.session_id == session_id)
+        .first()
+    )
+    if workflow is None:
+        workflow = SessionWorkflowProfile(session_id=session_id)
+        db_session.add(workflow)
+    workflow.archetype = archetype
+    workflow.label = f"{archetype}: optimized path"
+
+    facets = db_session.query(SessionFacets).filter(SessionFacets.session_id == session_id).first()
+    if facets is None:
+        facets = SessionFacets(session_id=session_id)
+        db_session.add(facets)
+    facets.outcome = outcome
+    db_session.flush()
 
 
 def _admin_headers():
@@ -579,6 +599,152 @@ class TestCostModeling:
         assert r.status_code == 200
         data = r.json()
         assert data["period_days"] == 14
+
+    def test_model_choice_opportunities_identify_downshift_candidates(
+        self, client, db_session, admin_headers
+    ):
+        team = Team(name="Opportunity Team")
+        db_session.add(team)
+        db_session.flush()
+
+        _expensive_eng, expensive_key = _make_engineer(db_session, team, name="Opus Eng")
+        _cheaper_eng, cheaper_key = _make_engineer(db_session, team, name="Sonnet Eng")
+        now = datetime.utcnow()
+
+        for i in range(3):
+            session_id = _ingest_session(
+                client,
+                expensive_key,
+                started_at=(now - timedelta(days=i + 1)).isoformat(),
+                first_prompt="debug auth regression",
+                model_usages=[
+                    {
+                        "model_name": "claude-opus-4-20250514",
+                        "input_tokens": 40000,
+                        "output_tokens": 18000,
+                        "cache_read_tokens": 0,
+                        "cache_creation_tokens": 0,
+                    }
+                ],
+            )
+            _annotate_session(
+                db_session,
+                session_id,
+                archetype="debugging",
+                outcome="success",
+            )
+
+        for i in range(3):
+            session_id = _ingest_session(
+                client,
+                cheaper_key,
+                started_at=(now - timedelta(days=i + 1)).isoformat(),
+                first_prompt="debug auth regression",
+                model_usages=[
+                    {
+                        "model_name": "claude-sonnet-4-5-20250929",
+                        "input_tokens": 18000,
+                        "output_tokens": 9000,
+                        "cache_read_tokens": 0,
+                        "cache_creation_tokens": 0,
+                    }
+                ],
+            )
+            _annotate_session(
+                db_session,
+                session_id,
+                archetype="debugging",
+                outcome="success",
+            )
+
+        db_session.commit()
+
+        r = client.get(
+            "/api/v1/finops/cost-modeling",
+            headers=admin_headers,
+            params={"team_id": team.id},
+        )
+        assert r.status_code == 200
+        data = r.json()
+
+        assert data["model_choice_opportunities"]
+        opportunity = data["model_choice_opportunities"][0]
+        assert opportunity["workflow_archetype"] == "debugging"
+        assert opportunity["current_model"] == "claude-opus-4-20250514"
+        assert opportunity["recommended_model"] == "claude-sonnet-4-5-20250929"
+        assert opportunity["monthly_savings_estimate"] > 0
+        assert data["total_model_choice_savings_monthly"] == pytest.approx(
+            opportunity["monthly_savings_estimate"], abs=0.01
+        )
+
+    def test_model_choice_opportunities_skip_worse_success_candidates(
+        self, client, db_session, admin_headers
+    ):
+        team = Team(name="Opportunity Guard Team")
+        db_session.add(team)
+        db_session.flush()
+
+        _expensive_eng, expensive_key = _make_engineer(db_session, team, name="Expensive Eng")
+        _cheaper_eng, cheaper_key = _make_engineer(db_session, team, name="Cheap Eng")
+        now = datetime.utcnow()
+
+        for i in range(2):
+            session_id = _ingest_session(
+                client,
+                expensive_key,
+                started_at=(now - timedelta(days=i + 1)).isoformat(),
+                first_prompt="debug flaky test",
+                model_usages=[
+                    {
+                        "model_name": "claude-opus-4-20250514",
+                        "input_tokens": 30000,
+                        "output_tokens": 15000,
+                        "cache_read_tokens": 0,
+                        "cache_creation_tokens": 0,
+                    }
+                ],
+            )
+            _annotate_session(
+                db_session,
+                session_id,
+                archetype="debugging",
+                outcome="success",
+            )
+
+        for i in range(2):
+            session_id = _ingest_session(
+                client,
+                cheaper_key,
+                started_at=(now - timedelta(days=i + 1)).isoformat(),
+                first_prompt="debug flaky test",
+                model_usages=[
+                    {
+                        "model_name": "claude-haiku-3.5-20241022",
+                        "input_tokens": 12000,
+                        "output_tokens": 4000,
+                        "cache_read_tokens": 0,
+                        "cache_creation_tokens": 0,
+                    }
+                ],
+            )
+            _annotate_session(
+                db_session,
+                session_id,
+                archetype="debugging",
+                outcome="failure",
+            )
+
+        db_session.commit()
+
+        r = client.get(
+            "/api/v1/finops/cost-modeling",
+            headers=admin_headers,
+            params={"team_id": team.id},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data["model_choice_opportunities"] == []
+        assert data["total_model_choice_savings_monthly"] == 0
 
     def test_requires_admin_or_team_lead(self, client, db_session):
         """Regular engineers should get 403 on cost-modeling."""

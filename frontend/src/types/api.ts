@@ -1908,6 +1908,22 @@ export interface PlanAllocationSummary {
   total_monthly_cost: number
 }
 
+export interface ModelChoiceOpportunity {
+  workflow_archetype: string
+  current_model: string
+  recommended_model: string
+  current_session_count: number
+  supporting_session_count: number
+  current_success_rate: number | null
+  recommended_success_rate: number | null
+  current_avg_cost: number | null
+  recommended_avg_cost: number | null
+  period_savings_estimate: number
+  monthly_savings_estimate: number
+  confidence: string
+  rationale: string
+}
+
 export interface CostModelingResponse {
   period_days: number
   plan_tiers: PlanTier[]
@@ -1916,6 +1932,8 @@ export interface CostModelingResponse {
   total_api_cost_monthly: number
   total_optimal_cost_monthly: number
   total_savings_monthly: number
+  model_choice_opportunities: ModelChoiceOpportunity[]
+  total_model_choice_savings_monthly: number
 }
 
 export interface ForecastPoint {

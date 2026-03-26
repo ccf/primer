@@ -5,7 +5,15 @@ from datetime import datetime, timedelta
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from primer.common.models import Budget, Engineer, ModelUsage, Team
+from primer.common.facet_taxonomy import canonical_outcome, is_success_outcome
+from primer.common.models import (
+    Budget,
+    Engineer,
+    ModelUsage,
+    SessionFacets,
+    SessionWorkflowProfile,
+    Team,
+)
 from primer.common.models import Session as SessionModel
 from primer.common.pricing import PLAN_TIERS, estimate_cost, get_pricing
 from primer.common.schemas import (
@@ -21,6 +29,7 @@ from primer.common.schemas import (
     EngineerCostComparison,
     ForecastPoint,
     ModelCacheBreakdown,
+    ModelChoiceOpportunity,
     PlanAllocationSummary,
     PlanTier,
 )
@@ -246,6 +255,13 @@ def get_cost_modeling(
     period_days = max((eff_end - eff_start).days, 1)
 
     plan_tiers = [PlanTier(**t) for t in PLAN_TIERS]
+    opportunities, opportunity_savings = _build_model_choice_opportunities(
+        db,
+        team_id=team_id,
+        start_date=eff_start,
+        end_date=eff_end,
+        period_days=period_days,
+    )
 
     # Per-engineer API costs
     q = (
@@ -294,6 +310,8 @@ def get_cost_modeling(
             total_api_cost_monthly=0,
             total_optimal_cost_monthly=0,
             total_savings_monthly=0,
+            model_choice_opportunities=opportunities,
+            total_model_choice_savings_monthly=round(opportunity_savings, 2),
         )
 
     engineers_db = db.query(Engineer).filter(Engineer.id.in_(eids)).all()
@@ -386,7 +404,215 @@ def get_cost_modeling(
         total_api_cost_monthly=round(total_api_monthly, 2),
         total_optimal_cost_monthly=round(total_optimal_monthly, 2),
         total_savings_monthly=round(total_api_monthly - total_optimal_monthly, 2),
+        model_choice_opportunities=opportunities,
+        total_model_choice_savings_monthly=round(opportunity_savings, 2),
     )
+
+
+def _build_model_choice_opportunities(
+    db: Session,
+    team_id: str | None,
+    start_date: datetime,
+    end_date: datetime,
+    period_days: int,
+    limit: int = 6,
+) -> tuple[list[ModelChoiceOpportunity], float]:
+    session_rows = (
+        db.query(
+            SessionModel.id,
+            SessionModel.engineer_id,
+            SessionModel.primary_model,
+            SessionModel.input_tokens,
+            SessionModel.output_tokens,
+            SessionModel.cache_read_tokens,
+            SessionModel.cache_creation_tokens,
+            SessionWorkflowProfile.archetype,
+            SessionFacets.outcome,
+        )
+        .join(SessionWorkflowProfile, SessionWorkflowProfile.session_id == SessionModel.id)
+        .outerjoin(SessionFacets, SessionFacets.session_id == SessionModel.id)
+        .filter(
+            SessionModel.started_at >= start_date,
+            SessionModel.started_at <= end_date,
+            SessionWorkflowProfile.archetype.isnot(None),
+        )
+    )
+    if team_id:
+        session_rows = session_rows.join(Engineer, Engineer.id == SessionModel.engineer_id).filter(
+            Engineer.team_id == team_id
+        )
+
+    rows = session_rows.all()
+    if not rows:
+        return [], 0.0
+
+    session_ids = [row.id for row in rows]
+    session_costs: dict[str, float] = {}
+    fallback_models: dict[str, tuple[str, float]] = {}
+    for usage in (
+        db.query(
+            ModelUsage.session_id,
+            ModelUsage.model_name,
+            ModelUsage.input_tokens,
+            ModelUsage.output_tokens,
+            ModelUsage.cache_read_tokens,
+            ModelUsage.cache_creation_tokens,
+        )
+        .filter(ModelUsage.session_id.in_(session_ids))
+        .all()
+    ):
+        usage_cost = estimate_cost(
+            usage.model_name,
+            usage.input_tokens or 0,
+            usage.output_tokens or 0,
+            usage.cache_read_tokens or 0,
+            usage.cache_creation_tokens or 0,
+        )
+        session_costs[usage.session_id] = session_costs.get(usage.session_id, 0.0) + usage_cost
+        current_fallback = fallback_models.get(usage.session_id)
+        if current_fallback is None or usage_cost > current_fallback[1]:
+            fallback_models[usage.session_id] = (usage.model_name, usage_cost)
+
+    buckets: dict[tuple[str, str], dict[str, object]] = {}
+    for row in rows:
+        workflow = row.archetype
+        model = row.primary_model or fallback_models.get(row.id, (None, 0.0))[0]
+        if not workflow or not model:
+            continue
+        bucket = buckets.setdefault(
+            (workflow, model),
+            {
+                "sessions": set(),
+                "engineers": set(),
+                "successes": 0,
+                "costs": [],
+            },
+        )
+        sessions = bucket["sessions"]
+        engineers = bucket["engineers"]
+        costs = bucket["costs"]
+        assert isinstance(sessions, set)
+        assert isinstance(engineers, set)
+        assert isinstance(costs, list)
+        sessions.add(row.id)
+        engineers.add(row.engineer_id)
+        normalized_outcome = canonical_outcome(row.outcome)
+        if normalized_outcome and is_success_outcome(normalized_outcome):
+            bucket["successes"] = int(bucket["successes"]) + 1
+        cost = session_costs.get(row.id)
+        if cost is None:
+            cost = estimate_cost(
+                model,
+                row.input_tokens or 0,
+                row.output_tokens or 0,
+                row.cache_read_tokens or 0,
+                row.cache_creation_tokens or 0,
+            )
+        costs.append(cost)
+
+    workflow_models: dict[str, list[dict[str, object]]] = {}
+    for (workflow, model), bucket in buckets.items():
+        sessions = bucket["sessions"]
+        engineers = bucket["engineers"]
+        costs = bucket["costs"]
+        assert isinstance(sessions, set)
+        assert isinstance(engineers, set)
+        assert isinstance(costs, list)
+        session_count = len(sessions)
+        if session_count < 2 or not costs:
+            continue
+        successes = int(bucket["successes"])
+        workflow_models.setdefault(workflow, []).append(
+            {
+                "workflow": workflow,
+                "model": model,
+                "session_count": session_count,
+                "engineer_count": len(engineers),
+                "success_rate": successes / session_count if session_count > 0 else None,
+                "avg_cost": sum(costs) / len(costs),
+            }
+        )
+
+    opportunities: list[ModelChoiceOpportunity] = []
+    for workflow, model_stats in workflow_models.items():
+        if len(model_stats) < 2:
+            continue
+
+        for current in model_stats:
+            cheaper_candidates = [
+                candidate
+                for candidate in model_stats
+                if candidate["model"] != current["model"]
+                and candidate["avg_cost"] < current["avg_cost"] * 0.85
+                and candidate["session_count"] >= 2
+                and candidate["success_rate"] is not None
+                and current["success_rate"] is not None
+                and candidate["success_rate"] >= max(current["success_rate"] - 0.05, 0.65)
+            ]
+            if not cheaper_candidates:
+                continue
+
+            cheaper_candidates.sort(
+                key=lambda candidate: (
+                    candidate["avg_cost"],
+                    -(candidate["success_rate"] or 0.0),
+                    -candidate["session_count"],
+                )
+            )
+            best = cheaper_candidates[0]
+            avg_cost_gap = float(current["avg_cost"]) - float(best["avg_cost"])
+            period_savings = avg_cost_gap * int(current["session_count"])
+            if period_savings <= 0:
+                continue
+            monthly_savings = period_savings * 30 / max(period_days, 1)
+            if monthly_savings < 0.1:
+                continue
+
+            support = min(int(current["session_count"]), int(best["session_count"]))
+            success_delta = (best["success_rate"] or 0.0) - (current["success_rate"] or 0.0)
+            if support >= 6 and success_delta >= -0.02:
+                confidence = "high"
+            elif support >= 3 and success_delta >= -0.05:
+                confidence = "medium"
+            else:
+                confidence = "low"
+
+            opportunities.append(
+                ModelChoiceOpportunity(
+                    workflow_archetype=workflow,
+                    current_model=str(current["model"]),
+                    recommended_model=str(best["model"]),
+                    current_session_count=int(current["session_count"]),
+                    supporting_session_count=int(best["session_count"]),
+                    current_success_rate=round(float(current["success_rate"]), 3)
+                    if current["success_rate"] is not None
+                    else None,
+                    recommended_success_rate=round(float(best["success_rate"]), 3)
+                    if best["success_rate"] is not None
+                    else None,
+                    current_avg_cost=round(float(current["avg_cost"]), 4),
+                    recommended_avg_cost=round(float(best["avg_cost"]), 4),
+                    period_savings_estimate=round(period_savings, 4),
+                    monthly_savings_estimate=round(monthly_savings, 4),
+                    confidence=confidence,
+                    rationale=(
+                        f"{best['model']} delivers similar outcomes for "
+                        f"{workflow.replace('_', ' ')} "
+                        f"work at materially lower average cost."
+                    ),
+                )
+            )
+
+    opportunities.sort(
+        key=lambda opportunity: (
+            -opportunity.monthly_savings_estimate,
+            {"high": 2, "medium": 1, "low": 0}.get(opportunity.confidence, 0),
+            opportunity.workflow_archetype,
+        )
+    )
+    opportunities = opportunities[:limit]
+    total_savings = sum(opportunity.monthly_savings_estimate for opportunity in opportunities)
+    return opportunities, total_savings
 
 
 # ---------------------------------------------------------------------------

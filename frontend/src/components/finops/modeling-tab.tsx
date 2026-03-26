@@ -15,6 +15,7 @@ import { ChartTooltip } from "@/components/charts/chart-tooltip"
 import { CHART_COLORS, AXIS_TICK_STYLE } from "@/lib/chart-colors"
 import { useCostModeling } from "@/hooks/use-api-queries"
 import { CardSkeleton, ChartSkeleton, TableSkeleton } from "@/components/shared/loading-skeleton"
+import { ModelChoiceOpportunityTable } from "@/components/finops/model-choice-opportunity-table"
 import { formatCost, cn } from "@/lib/utils"
 
 const TIER_COLORS: Record<string, string> = {
@@ -135,6 +136,11 @@ export function ModelingTab({ teamId, startDate, endDate }: ModelingTabProps) {
           ))}
         </div>
       )}
+
+      <ModelChoiceOpportunityTable
+        opportunities={data.model_choice_opportunities}
+        totalSavingsMonthly={data.total_model_choice_savings_monthly}
+      />
 
       {/* Efficient Frontier Chart */}
       {chartData.length > 0 && (
