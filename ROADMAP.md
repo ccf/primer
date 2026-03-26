@@ -249,7 +249,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] [P0] Proactive coaching skill that activates at session start with contextual suggestions
 - [x] [P0] Live session signals that stream friction, satisfaction, and risk as work happens
 - [x] [P1] In-session workflow nudges based on project playbooks and prior failures
-- [ ] [P1] Daily and weekly personal recaps inside the sidecar
+- [x] [P1] Daily and weekly personal recaps inside the sidecar
 - [ ] [P2] Lightweight session planning prompts before complex work begins
 
 ## Organization & Administration

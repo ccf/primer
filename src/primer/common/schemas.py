@@ -2241,6 +2241,28 @@ class InSessionNudgesResponse(BaseModel):
     nudges: list[InSessionNudge] = Field(default_factory=list)
 
 
+# --- Personal Recaps ---
+
+
+class PersonalRecap(BaseModel):
+    period: Literal["daily", "weekly"]
+    headline: str
+    summary: str
+    sessions_analyzed: int
+    success_rate: float | None = None
+    estimated_cost: float | None = None
+    top_workflow: str | None = None
+    wins: list[str] = Field(default_factory=list)
+    watchouts: list[str] = Field(default_factory=list)
+    next_steps: list[str] = Field(default_factory=list)
+
+
+class PersonalRecapsResponse(BaseModel):
+    daily: PersonalRecap
+    weekly: PersonalRecap
+    generated_at: str
+
+
 # --- Coaching Brief ---
 
 

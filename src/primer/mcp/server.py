@@ -11,6 +11,7 @@ from primer.mcp.tools import (
     primer_in_session_nudges,
     primer_live_session_signals,
     primer_my_stats,
+    primer_personal_recaps,
     primer_recommendations,
     primer_session_start_coaching,
     primer_sync,
@@ -128,6 +129,12 @@ def in_session_nudges(
         session_id=session_id,
         transcript_path=transcript_path,
     )
+
+
+@mcp.tool()
+def personal_recaps(period: str = "both") -> str:
+    """Get your daily and weekly personal recaps in the sidecar."""
+    return primer_personal_recaps(period=period)
 
 
 if __name__ == "__main__":
