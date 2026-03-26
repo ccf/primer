@@ -2216,6 +2216,8 @@ class CoachingBrief(BaseModel):
     sections: list[CoachingSection]
     sessions_analyzed: int = 0
     generated_at: str
+    brief_type: Literal["retrospective", "session_start"] = "retrospective"
+    context_summary: str | None = None
 
 
 # --- Narrative Insights ---

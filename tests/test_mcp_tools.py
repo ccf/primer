@@ -206,3 +206,70 @@ def test_primer_recommendations_no_api_key(monkeypatch):
 
     result = primer_recommendations()
     assert "Error" in result
+
+
+# --- primer_coaching ---
+
+
+@patch("primer.mcp.tools.httpx.get")
+def test_primer_coaching_success(mock_get):
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "brief_type": "retrospective",
+        "status_summary": "12 sessions · 80% success rate",
+        "sections": [{"title": "Top recommendations", "items": ["Try the workflow playbook"]}],
+    }
+    mock_get.return_value = mock_resp
+
+    from primer.mcp.tools import primer_coaching
+
+    result = primer_coaching(days=14)
+    assert "Your Primer Coaching Brief" in result
+    assert "Try the workflow playbook" in result
+
+
+# --- primer_session_start_coaching ---
+
+
+@patch("primer.mcp.tools.httpx.get")
+def test_primer_session_start_coaching_success(mock_get):
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "brief_type": "session_start",
+        "status_summary": "Session-start brief · 12 sessions in view",
+        "context_summary": "Project: api-server · Workflow: debugging · Task: Fix auth regression",
+        "sections": [
+            {"title": "How to start this session", "items": ["Start with the debugging playbook"]},
+        ],
+    }
+    mock_get.return_value = mock_resp
+
+    from primer.mcp.tools import primer_session_start_coaching
+
+    result = primer_session_start_coaching(
+        project_name="api-server",
+        workflow_hint="debugging",
+        task_hint="Fix auth regression",
+        days=7,
+    )
+
+    assert "Your Primer Session-Start Brief" in result
+    assert "Project: api-server" in result
+    assert "Start with the debugging playbook" in result
+    params = mock_get.call_args.kwargs["params"]
+    assert params == {
+        "project_name": "api-server",
+        "workflow_hint": "debugging",
+        "task_hint": "Fix auth regression",
+        "days": 7,
+    }
+
+
+def test_primer_session_start_coaching_no_api_key(monkeypatch):
+    monkeypatch.setattr("primer.mcp.tools.API_KEY", "")
+    from primer.mcp.tools import primer_session_start_coaching
+
+    result = primer_session_start_coaching(project_name="api-server")
+    assert "Error" in result

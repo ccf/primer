@@ -54,3 +54,24 @@ def test_recommendations_tool(mock_recs):
     result = recommendations(team_id="team-2")
     assert result == "[]"
     mock_recs.assert_called_once_with(team_id="team-2")
+
+
+@patch("primer.mcp.server.primer_session_start_coaching")
+def test_session_start_coaching_tool(mock_session_start):
+    mock_session_start.return_value = "brief"
+
+    from primer.mcp.server import session_start_coaching
+
+    result = session_start_coaching(
+        project_name="api-server",
+        workflow_hint="debugging",
+        task_hint="Fix auth regression",
+        days=14,
+    )
+    assert result == "brief"
+    mock_session_start.assert_called_once_with(
+        project_name="api-server",
+        workflow_hint="debugging",
+        task_hint="Fix auth regression",
+        days=14,
+    )

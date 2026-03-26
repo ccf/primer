@@ -20,6 +20,25 @@ def _admin_headers() -> dict:
     return {"x-admin-key": admin_key, "x-api-key": API_KEY}
 
 
+def _render_coaching_brief(data: dict) -> str:
+    brief_type = data.get("brief_type", "retrospective")
+    heading = (
+        "## Your Primer Session-Start Brief\n"
+        if brief_type == "session_start"
+        else "## Your Primer Coaching Brief\n"
+    )
+    lines = [heading]
+    lines.append(f"**Status**: {data['status_summary']}\n")
+    if data.get("context_summary"):
+        lines.append(f"**Context**: {data['context_summary']}\n")
+    for section in data.get("sections", []):
+        lines.append(f"### {section['title']}")
+        for item in section.get("items", []):
+            lines.append(f"- {item}")
+        lines.append("")
+    return "\n".join(lines)
+
+
 def primer_sync() -> str:
     """Sync local session history to the Primer server (backfill missing sessions)."""
     if not API_KEY:
@@ -118,15 +137,44 @@ def primer_coaching(days: int = 30) -> str:
             timeout=30,
         )
         if resp.status_code == 200:
-            data = resp.json()
-            lines = ["## Your Primer Coaching Brief\n"]
-            lines.append(f"**Status**: {data['status_summary']}\n")
-            for section in data.get("sections", []):
-                lines.append(f"### {section['title']}")
-                for item in section.get("items", []):
-                    lines.append(f"- {item}")
-                lines.append("")
-            return "\n".join(lines)
+            return _render_coaching_brief(resp.json())
+        return f"Error: {resp.status_code} - {resp.text}"
+    except httpx.RequestError as e:
+        return f"Error connecting to server: {e}"
+
+
+def primer_session_start_coaching(
+    project_name: str | None = None,
+    workflow_hint: str | None = None,
+    task_hint: str | None = None,
+    days: int = 90,
+) -> str:
+    """Get a contextual coaching brief right before starting a session.
+
+    Uses project context, workflow hints, and prior team evidence
+    to suggest a strong opening pattern, tool/model choices, and pitfalls.
+    """
+    if not API_KEY:
+        return "Error: PRIMER_API_KEY not set"
+    try:
+        params = {
+            key: value
+            for key, value in {
+                "project_name": project_name,
+                "workflow_hint": workflow_hint,
+                "task_hint": task_hint,
+                "days": days,
+            }.items()
+            if value is not None
+        }
+        resp = httpx.get(
+            f"{SERVER_URL}/api/v1/analytics/coaching/session-start",
+            params=params,
+            headers={"x-api-key": API_KEY},
+            timeout=30,
+        )
+        if resp.status_code == 200:
+            return _render_coaching_brief(resp.json())
         return f"Error: {resp.status_code} - {resp.text}"
     except httpx.RequestError as e:
         return f"Error connecting to server: {e}"

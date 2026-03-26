@@ -1,6 +1,7 @@
 """Coaching brief service — synthesizes multiple analytics into actionable guidance."""
 
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 from sqlalchemy.orm import Session
 
@@ -150,4 +151,234 @@ def get_coaching_brief(
         ],
         sessions_analyzed=overview.total_sessions,
         generated_at=now.isoformat(),
+    )
+
+
+def _normalize_hint(value: str | None) -> str | None:
+    if not value:
+        return None
+    normalized = value.strip().lower().replace("-", "_").replace(" ", "_")
+    return normalized or None
+
+
+def _matches_workflow_hint(playbook_like, workflow_hint: str | None) -> bool:
+    if not workflow_hint:
+        return True
+    title = getattr(playbook_like, "title", "").lower().replace(" ", "_")
+    session_type = (getattr(playbook_like, "session_type", None) or "").lower()
+    return workflow_hint in title or workflow_hint == session_type
+
+
+def _context_summary(
+    *,
+    project_name: str | None,
+    workflow_hint: str | None,
+    task_hint: str | None,
+) -> str | None:
+    parts: list[str] = []
+    if project_name:
+        parts.append(f"Project: {project_name}")
+    if workflow_hint:
+        parts.append(f"Workflow: {workflow_hint.replace('_', ' ')}")
+    if task_hint:
+        parts.append(f"Task: {task_hint}")
+    if not parts:
+        return None
+    return " · ".join(parts)
+
+
+def _build_starting_pattern_section(
+    profile,
+    project_workspace,
+    workflow_hint: str | None,
+    project_name: str | None,
+) -> CoachingSection:
+    items: list[str] = []
+
+    playbooks = list(getattr(profile, "workflow_playbooks", []) or [])
+    matching_playbooks = [
+        playbook
+        for playbook in playbooks
+        if _matches_workflow_hint(playbook, workflow_hint)
+        and (
+            not project_name
+            or not playbook.example_projects
+            or project_name in playbook.example_projects
+        )
+    ]
+    fallback_playbooks = [
+        playbook for playbook in playbooks if _matches_workflow_hint(playbook, workflow_hint)
+    ]
+    selected_playbook = (matching_playbooks or fallback_playbooks or playbooks[:1])[:1]
+    if selected_playbook:
+        playbook = selected_playbook[0]
+        tools = ", ".join(playbook.recommended_tools[:3]) if playbook.recommended_tools else None
+        summary = playbook.summary.rstrip(".")
+        if tools:
+            summary = f"{summary}. Start with {tools}."
+        items.append(f"**{playbook.title}** — {summary}")
+
+    if project_workspace and project_workspace.enablement.recommendations:
+        recommendation = project_workspace.enablement.recommendations[0]
+        items.append(f"**Project guidance** — {recommendation.title}: {recommendation.description}")
+
+    if not items:
+        items.append(
+            "Start with a short discovery pass: inspect the relevant files, run the quickest "
+            "verification command you trust, and only then widen scope."
+        )
+
+    return CoachingSection(title="How to start this session", items=items[:3])
+
+
+def _build_session_start_recommendations_section(
+    profile,
+    workflow_hint: str | None,
+    project_name: str | None,
+) -> CoachingSection:
+    items: list[str] = []
+
+    model_recommendations = list(getattr(profile, "model_recommendations", []) or [])
+    matching_models = [
+        recommendation
+        for recommendation in model_recommendations
+        if not workflow_hint
+        or not recommendation.workflow_archetype
+        or recommendation.workflow_archetype == workflow_hint
+    ]
+    if matching_models:
+        recommendation = matching_models[0]
+        items.append(f"**Model choice** — {recommendation.title}: {recommendation.description}")
+
+    tool_recommendations = list(getattr(profile, "tool_recommendations", []) or [])
+    matching_tools = [
+        recommendation
+        for recommendation in tool_recommendations
+        if not project_name
+        or project_name in recommendation.matching_projects
+        or recommendation.project_context_match_count > 0
+    ]
+    if matching_tools or tool_recommendations:
+        recommendation = (matching_tools or tool_recommendations)[0]
+        items.append(f"**Tooling** — {recommendation.title}: {recommendation.description}")
+
+    learning_paths = list(getattr(profile, "learning_paths", []) or [])
+    if learning_paths and learning_paths[0].recommendations:
+        recommendation = learning_paths[0].recommendations[0]
+        items.append(f"**Reusable pattern** — {recommendation.title}: {recommendation.description}")
+
+    if not items:
+        items.append(
+            "No strong model or tool recommendation yet. Keep the first pass light and gather "
+            "evidence before escalating complexity."
+        )
+
+    return CoachingSection(title="What to reach for", items=items[:3])
+
+
+def _build_watchouts_section(profile, project_workspace) -> CoachingSection:
+    items: list[str] = []
+
+    if project_workspace and project_workspace.workflow_summary.friction_hotspots:
+        hotspot = project_workspace.workflow_summary.friction_hotspots[0]
+        items.append(
+            f"**Watch for {hotspot.friction_type}** — it shows up in "
+            f"{hotspot.session_count} sessions on this project."
+        )
+
+    config_suggestions = list(getattr(profile, "config_suggestions", []) or [])
+    if config_suggestions:
+        suggestion = config_suggestions[0]
+        items.append(f"**Setup check** — {suggestion.title}: {suggestion.description}")
+
+    if project_workspace and project_workspace.enablement.permission_mode_counts:
+        default_count = project_workspace.enablement.permission_mode_counts.get("default", 0)
+        if default_count > 0:
+            items.append(
+                "Permission prompts are common on this project. Start with read-safe inspection "
+                "before reaching for broader edits or shell commands."
+            )
+
+    if not items:
+        items.append("No major watch-outs are standing out for this project right now.")
+
+    return CoachingSection(title="What to watch for", items=items[:3])
+
+
+def get_session_start_brief(
+    db: Session,
+    engineer_id: str,
+    team_id: str | None = None,
+    *,
+    days: int = 90,
+    project_name: str | None = None,
+    workflow_hint: str | None = None,
+    task_hint: str | None = None,
+) -> CoachingBrief:
+    from primer.server.services.engineer_profile_service import get_engineer_profile
+    from primer.server.services.project_workspace_service import get_project_workspace
+
+    now = datetime.now(tz=UTC)
+    start_date = now - timedelta(days=days)
+    normalized_workflow_hint = _normalize_hint(workflow_hint)
+
+    profile = get_engineer_profile(
+        db,
+        engineer_id,
+        start_date=start_date,
+        end_date=now,
+    )
+    if profile is None:
+        profile = SimpleNamespace(
+            overview=SimpleNamespace(total_sessions=0, success_rate=None),
+            workflow_playbooks=[],
+            model_recommendations=[],
+            tool_recommendations=[],
+            learning_paths=[],
+            config_suggestions=[],
+        )
+
+    project_workspace = None
+    if project_name:
+        project_workspace = get_project_workspace(
+            db,
+            project_name,
+            team_id=team_id,
+            engineer_id=None if team_id else engineer_id,
+            start_date=start_date,
+            end_date=now,
+        )
+
+    status_parts = ["Session-start brief"]
+    total_sessions = getattr(profile.overview, "total_sessions", 0)
+    if total_sessions:
+        status_parts.append(f"{total_sessions} sessions in view")
+    success_rate = getattr(profile.overview, "success_rate", None)
+    if success_rate is not None:
+        status_parts.append(f"{_fmt_pct(success_rate)} success rate")
+
+    return CoachingBrief(
+        status_summary=" · ".join(status_parts),
+        sections=[
+            _build_starting_pattern_section(
+                profile,
+                project_workspace,
+                normalized_workflow_hint,
+                project_name,
+            ),
+            _build_session_start_recommendations_section(
+                profile,
+                normalized_workflow_hint,
+                project_name,
+            ),
+            _build_watchouts_section(profile, project_workspace),
+        ],
+        sessions_analyzed=total_sessions,
+        generated_at=now.isoformat(),
+        brief_type="session_start",
+        context_summary=_context_summary(
+            project_name=project_name,
+            workflow_hint=normalized_workflow_hint,
+            task_hint=task_hint,
+        ),
     )
