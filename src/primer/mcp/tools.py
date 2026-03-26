@@ -5,6 +5,7 @@ import logging
 import os
 
 import httpx
+from pydantic import ValidationError
 
 from primer.mcp.nudges import build_in_session_nudges
 from primer.mcp.sync import sync_sessions
@@ -251,7 +252,7 @@ def primer_in_session_nudges(
                 from primer.common.schemas import CoachingBrief
 
                 coaching_brief = CoachingBrief.model_validate(resp.json())
-        except httpx.RequestError:
+        except (ValidationError, ValueError, httpx.RequestError, json.JSONDecodeError):
             coaching_brief = None
 
     data = build_in_session_nudges(live_signals, coaching_brief)

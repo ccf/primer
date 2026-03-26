@@ -366,6 +366,40 @@ def test_primer_in_session_nudges_success(mock_get_signals, mock_get):
     assert "Debugging playbook" in result
 
 
+@patch("primer.mcp.tools.httpx.get")
+@patch("primer.mcp.tools.get_live_session_signals")
+def test_primer_in_session_nudges_falls_back_when_coaching_payload_is_invalid(
+    mock_get_signals, mock_get
+):
+    mock_get_signals.return_value = LiveSessionSignalsResponse(
+        session_id="session-123",
+        agent_type="claude_code",
+        project_name="api-server",
+        total_messages=12,
+        risk_level="high",
+        satisfaction_signal="negative",
+        signals=[
+            LiveSessionSignal(
+                signal_type="verification_failure",
+                severity="warning",
+                title="Verification is failing",
+                detail="Recent test runs are failing repeatedly.",
+            )
+        ],
+    )
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"brief_type": "session_start", "sections": "invalid"}
+    mock_get.return_value = mock_resp
+
+    from primer.mcp.tools import primer_in_session_nudges
+
+    result = primer_in_session_nudges(project_name="api-server")
+
+    assert "In-Session Workflow Nudges" in result
+    assert "Tighten the verification loop" in result
+
+
 @patch("primer.mcp.tools.get_live_session_signals")
 def test_primer_in_session_nudges_error(mock_get_signals):
     mock_get_signals.side_effect = ValueError("No local sessions found")
