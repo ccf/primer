@@ -1,3 +1,4 @@
+import os
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
@@ -11,8 +12,8 @@ def test_live_session_signals_selects_latest_session(monkeypatch, tmp_path):
     newer_path = tmp_path / "newer.jsonl"
     older_path.write_text("{}\n")
     newer_path.write_text("{}\n")
-    older_path.touch()
-    newer_path.touch()
+    os.utime(older_path, (1, 1))
+    os.utime(newer_path, (2, 2))
 
     sessions = [
         LocalSession(
