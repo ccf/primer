@@ -10,6 +10,7 @@ from primer.mcp.tools import (
     primer_friction_report,
     primer_in_session_nudges,
     primer_live_session_signals,
+    primer_manager_review_pack,
     primer_my_stats,
     primer_personal_recaps,
     primer_recommendations,
@@ -135,6 +136,12 @@ def in_session_nudges(
 def personal_recaps(period: str = "both") -> str:
     """Get your daily and weekly personal recaps in the sidecar."""
     return primer_personal_recaps(period=period)
+
+
+@mcp.tool()
+def manager_review_pack(team_id: str | None = None, days: int = 7) -> str:
+    """Get a weekly manager review pack for a team or the whole org."""
+    return primer_manager_review_pack(team_id=team_id, days=days)
 
 
 if __name__ == "__main__":
