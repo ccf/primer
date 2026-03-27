@@ -8,6 +8,7 @@ from primer.common.schemas import (
     InterventionEffectivenessResponse,
     InterventionResponse,
     InterventionUpdate,
+    NextStepPlanResponse,
 )
 from primer.server.deps import AuthContext, get_auth_context
 from primer.server.services.intervention_service import (
@@ -127,6 +128,35 @@ def interventions_effectiveness(
         auth.engineer_id or "",
         project_name=project_name,
     )
+
+
+@router.get("/next-step-plan", response_model=NextStepPlanResponse)
+def interventions_next_step_plan(
+    team_id: str | None = None,
+    project_name: str | None = None,
+    days: int = 14,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.next_step_plan_service import get_next_step_plan
+
+    if auth.role == "admin":
+        return get_next_step_plan(
+            db,
+            team_id=team_id,
+            project_name=project_name,
+            days=days,
+        )
+
+    if auth.role == "team_lead":
+        return get_next_step_plan(
+            db,
+            team_id=auth.team_id,
+            project_name=project_name,
+            days=days,
+        )
+
+    raise HTTPException(status_code=403, detail="Leadership access required")
 
 
 @router.patch("/{intervention_id}", response_model=InterventionResponse)

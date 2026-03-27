@@ -377,6 +377,26 @@ export interface InterventionEffectivenessResponse {
   coaching_programs: CoachingProgramMeasurement[]
 }
 
+export interface NextStepPlanAction {
+  action_id: string
+  title: string
+  description: string
+  priority: string
+  source_type: string
+  source_title: string | null
+  category: string | null
+  severity: string | null
+  project_name: string | null
+  evidence: Record<string, unknown>
+}
+
+export interface NextStepPlanResponse {
+  scope_label: string
+  summary: string
+  generated_at: string
+  actions: NextStepPlanAction[]
+}
+
 export interface DailyStatsResponse {
   date: string
   message_count: number
