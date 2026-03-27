@@ -25,6 +25,7 @@ import type {
   IngestEventResponse,
   InterventionResponse,
   InterventionEffectivenessResponse,
+  NextStepPlanResponse,
   LearningPathsResponse,
   MeasurementIntegrityStats,
   MaturityAnalyticsResponse,
@@ -195,6 +196,27 @@ export function useInterventionEffectiveness(params: {
           project_name: params.projectName,
         })}`,
       ),
+  })
+}
+
+export function useNextStepPlan(params: {
+  teamId: string | null
+  projectName?: string
+  days?: number
+  enabled?: boolean
+}) {
+  const { enabled = true, ...queryParams } = params
+  return useQuery({
+    queryKey: ["next-step-plan", queryParams],
+    queryFn: () =>
+      apiFetch<NextStepPlanResponse>(
+        `/api/v1/interventions/next-step-plan${buildParams({
+          team_id: params.teamId,
+          project_name: params.projectName,
+          days: params.days ?? 14,
+        })}`,
+      ),
+    enabled,
   })
 }
 

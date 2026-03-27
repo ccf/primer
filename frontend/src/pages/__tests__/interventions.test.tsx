@@ -19,6 +19,7 @@ vi.mock("@/lib/auth-context", () => ({
 vi.mock("@/hooks/use-api-queries", () => ({
   useInterventions: vi.fn(),
   useInterventionEffectiveness: vi.fn(),
+  useNextStepPlan: vi.fn(),
   useEngineers: vi.fn(),
 }))
 
@@ -30,12 +31,14 @@ vi.mock("@/hooks/use-api-mutations", () => ({
 import {
   useInterventionEffectiveness,
   useInterventions,
+  useNextStepPlan,
   useEngineers,
 } from "@/hooks/use-api-queries"
 import { InterventionsPage } from "../interventions"
 
 const mockUseInterventions = vi.mocked(useInterventions)
 const mockUseInterventionEffectiveness = vi.mocked(useInterventionEffectiveness)
+const mockUseNextStepPlan = vi.mocked(useNextStepPlan)
 const mockUseEngineers = vi.mocked(useEngineers)
 
 describe("InterventionsPage", () => {
@@ -125,6 +128,28 @@ describe("InterventionsPage", () => {
       },
       isLoading: false,
     } as unknown as ReturnType<typeof useInterventionEffectiveness>)
+    mockUseNextStepPlan.mockReturnValue({
+      data: {
+        scope_label: "Team One",
+        summary: "3 next-step actions synthesized from recent alerts, narratives, and project findings.",
+        generated_at: "2026-03-27T00:00:00Z",
+        actions: [
+          {
+            action_id: "alert:1",
+            title: "Reduce tool retries",
+            description: "Adopt the debugging playbook before escalating.",
+            priority: "high",
+            source_type: "alert",
+            source_title: "friction_spike",
+            category: "alert_response",
+            severity: "warning",
+            project_name: "primer",
+            evidence: {},
+          },
+        ],
+      },
+      isLoading: false,
+    } as unknown as ReturnType<typeof useNextStepPlan>)
   })
 
   it("renders intervention counts and cards", () => {
@@ -200,6 +225,8 @@ describe("InterventionsPage", () => {
     expect(screen.getByText("By Team")).toBeInTheDocument()
     expect(screen.getByText("By Experiment Type")).toBeInTheDocument()
     expect(screen.getByText("Coaching Program Measurement")).toBeInTheDocument()
+    expect(screen.getByText("Auto-generated next steps")).toBeInTheDocument()
+    expect(screen.getByText("Reduce tool retries")).toBeInTheDocument()
     expect(screen.getByText("Roll out the debugging checklist")).toBeInTheDocument()
     expect(screen.getByText("Team One")).toBeInTheDocument()
     expect(screen.getAllByText("-$0.30").length).toBeGreaterThan(0)

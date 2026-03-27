@@ -666,6 +666,26 @@ class InterventionEffectivenessResponse(BaseModel):
     coaching_programs: list[CoachingProgramMeasurement] = []
 
 
+class NextStepPlanAction(BaseModel):
+    action_id: str
+    title: str
+    description: str
+    priority: str
+    source_type: str
+    source_title: str | None = None
+    category: str | None = None
+    severity: str | None = None
+    project_name: str | None = None
+    evidence: dict[str, Any] = Field(default_factory=dict)
+
+
+class NextStepPlanResponse(BaseModel):
+    scope_label: str
+    summary: str
+    generated_at: str
+    actions: list[NextStepPlanAction] = Field(default_factory=list)
+
+
 # --- Daily Stats ---
 
 

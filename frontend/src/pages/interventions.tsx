@@ -7,12 +7,14 @@ import { InterventionCard } from "@/components/interventions/intervention-card"
 import { CoachingProgramMeasurementSection } from "@/components/interventions/coaching-program-measurement"
 import { InterventionEffectivenessSection } from "@/components/interventions/intervention-effectiveness-section"
 import { InterventionFormModal } from "@/components/interventions/intervention-form-modal"
+import { NextStepPlanSection } from "@/components/interventions/next-step-plan-section"
 import { InlineStat } from "@/components/ui/inline-stat"
 import { Button } from "@/components/ui/button"
 import {
   useEngineers,
   useInterventionEffectiveness,
   useInterventions,
+  useNextStepPlan,
 } from "@/hooks/use-api-queries"
 import { useAuth } from "@/lib/auth-context"
 import { getEffectiveRole } from "@/lib/role-utils"
@@ -35,6 +37,10 @@ export function InterventionsPage({ teamId }: InterventionsPageProps) {
     teamId,
     engineerId: !isLeadership ? user?.engineer_id : undefined,
   })
+  const { data: nextStepPlan, isLoading: loadingNextStepPlan } = useNextStepPlan({
+    teamId,
+    enabled: isLeadership,
+  })
   const { data: engineers } = useEngineers()
 
   const ownerOptions = useMemo(
@@ -42,7 +48,7 @@ export function InterventionsPage({ teamId }: InterventionsPageProps) {
     [engineers, teamId],
   )
 
-  if (isLoading || loadingEffectiveness) {
+  if (isLoading || loadingEffectiveness || (isLeadership && loadingNextStepPlan)) {
     return (
       <div className="space-y-6">
         <CardSkeleton />
@@ -85,6 +91,7 @@ export function InterventionsPage({ teamId }: InterventionsPageProps) {
         <InlineStat label="Experiments" value={String(experimentCount)} icon={Gauge} />
       </div>
 
+      {isLeadership && nextStepPlan && <NextStepPlanSection plan={nextStepPlan} />}
       {effectiveness && <InterventionEffectivenessSection data={effectiveness} />}
       {effectiveness && (
         <CoachingProgramMeasurementSection programs={effectiveness.coaching_programs} />
