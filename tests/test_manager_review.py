@@ -124,6 +124,7 @@ def test_weekly_manager_review_pack_builds_sections(monkeypatch, db_session):
         "Growth",
         "Cost",
     ]
+    assert "Merge rate: 80% (up 20% vs prior week)" in pack.sections[0].bullets
     assert "Reduce tool retries" in pack.recommended_actions[0]
     assert "Platform logged 12 sessions" in pack.headline
 
