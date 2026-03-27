@@ -162,7 +162,11 @@ def _build_quality_section(current, previous) -> ManagerReviewSection:
     bullets: list[str] = [
         f"{overview.total_prs} PRs tracked this week.",
         f"Merge rate: {_format_pct(overview.pr_merge_rate)}"
-        + _delta_text(overview.pr_merge_rate, previous_overview.pr_merge_rate),
+        + _delta_text(
+            overview.pr_merge_rate,
+            previous_overview.pr_merge_rate,
+            value_formatter=_format_pct,
+        ),
     ]
     if current.findings_overview:
         bullets.append(f"Findings fix rate: {_format_pct(current.findings_overview.fix_rate)}.")
