@@ -29,6 +29,8 @@ def get_weekly_manager_review_pack(
     now = datetime.now(tz=UTC)
     period_end = _ensure_utc(end_date) if end_date else now
     period_start = _ensure_utc(start_date) if start_date else period_end - timedelta(days=days)
+    period_days = max((period_end - period_start).days, 1)
+    comparison_label = _comparison_label(period_days)
     previous_start = period_start - (period_end - period_start)
     previous_end = period_start
 
@@ -101,12 +103,22 @@ def get_weekly_manager_review_pack(
 
     scope = "team" if team_id else "org"
     scope_label = _resolve_scope_label(db, team_id)
-    headline = _build_headline(scope_label, current_overview, previous_overview)
+    headline = _build_headline(
+        scope_label,
+        current_overview,
+        previous_overview,
+        comparison_label=comparison_label,
+    )
     sections = [
-        _build_quality_section(quality, previous_quality),
-        _build_friction_section(friction, previous_friction),
+        _build_quality_section(quality, previous_quality, comparison_label=comparison_label),
+        _build_friction_section(friction, previous_friction, comparison_label=comparison_label),
         _build_growth_section(skills),
-        _build_cost_section(costs, productivity, previous_productivity),
+        _build_cost_section(
+            costs,
+            productivity,
+            previous_productivity,
+            comparison_label=comparison_label,
+        ),
     ]
     recommended_actions = [
         f"{recommendation.title} — {recommendation.description}"
@@ -143,20 +155,26 @@ def _resolve_scope_label(db: Session, team_id: str | None) -> str:
     return team[0] if team else "Team"
 
 
-def _build_headline(scope_label: str, current_overview, previous_overview) -> str:
+def _build_headline(
+    scope_label: str,
+    current_overview,
+    previous_overview,
+    *,
+    comparison_label: str,
+) -> str:
     session_delta = current_overview.total_sessions - previous_overview.total_sessions
     success_rate = current_overview.success_rate
     parts = [f"{scope_label} logged {current_overview.total_sessions} sessions"]
     if success_rate is not None:
         parts.append(f"{round(success_rate * 100)}% succeeded")
     if session_delta > 0:
-        parts.append(f"{session_delta} more than the prior week")
+        parts.append(f"{session_delta} more than the {comparison_label}")
     elif session_delta < 0:
-        parts.append(f"{abs(session_delta)} fewer than the prior week")
+        parts.append(f"{abs(session_delta)} fewer than the {comparison_label}")
     return " · ".join(parts)
 
 
-def _build_quality_section(current, previous) -> ManagerReviewSection:
+def _build_quality_section(current, previous, *, comparison_label: str) -> ManagerReviewSection:
     overview = current.overview
     previous_overview = previous.overview
     bullets: list[str] = [
@@ -166,6 +184,7 @@ def _build_quality_section(current, previous) -> ManagerReviewSection:
             overview.pr_merge_rate,
             previous_overview.pr_merge_rate,
             value_formatter=_format_pct,
+            comparison_label=comparison_label,
         ),
     ]
     if current.findings_overview:
@@ -177,7 +196,7 @@ def _build_quality_section(current, previous) -> ManagerReviewSection:
     return ManagerReviewSection(title="Quality", summary=summary, bullets=bullets)
 
 
-def _build_friction_section(current, previous) -> ManagerReviewSection:
+def _build_friction_section(current, previous, *, comparison_label: str) -> ManagerReviewSection:
     current_total = sum(item.count for item in current)
     previous_total = sum(item.count for item in previous)
     top = current[0] if current else None
@@ -191,7 +210,12 @@ def _build_friction_section(current, previous) -> ManagerReviewSection:
         bullets.append("No meaningful friction spikes were captured this week.")
     summary = (
         f"{current_total} total friction events"
-        + _delta_text(current_total, previous_total, value_formatter=str)
+        + _delta_text(
+            current_total,
+            previous_total,
+            value_formatter=str,
+            comparison_label=comparison_label,
+        )
         + "."
     )
     return ManagerReviewSection(title="Friction", summary=summary, bullets=bullets)
@@ -213,7 +237,13 @@ def _build_growth_section(skills) -> ManagerReviewSection:
     return ManagerReviewSection(title="Growth", summary=summary, bullets=bullets)
 
 
-def _build_cost_section(costs, current_productivity, previous_productivity) -> ManagerReviewSection:
+def _build_cost_section(
+    costs,
+    current_productivity,
+    previous_productivity,
+    *,
+    comparison_label: str,
+) -> ManagerReviewSection:
     top_workflow = costs.workflow_breakdown[0] if costs.workflow_breakdown else None
     bullets: list[str] = [
         f"Total spend: ${costs.total_estimated_cost:.2f}.",
@@ -223,6 +253,7 @@ def _build_cost_section(costs, current_productivity, previous_productivity) -> M
             current_productivity.cost_per_successful_outcome,
             previous_productivity.cost_per_successful_outcome,
             value_formatter=_format_cost,
+            comparison_label=comparison_label,
         ),
     ]
     if top_workflow:
@@ -249,12 +280,25 @@ def _format_cost(value: float | None) -> str:
     return f"${value:.2f}"
 
 
-def _delta_text(current, previous, value_formatter=None) -> str:
+def _comparison_label(period_days: int) -> str:
+    if period_days == 1:
+        return "prior day"
+    if period_days == 7:
+        return "prior week"
+    return f"prior {period_days}-day window"
+
+
+def _delta_text(
+    current,
+    previous,
+    value_formatter=None,
+    comparison_label: str = "prior week",
+) -> str:
     if current is None or previous is None:
         return ""
     delta = current - previous
     if abs(delta) < 1e-9:
-        return " (flat vs prior week)"
+        return f" (flat vs {comparison_label})"
     formatter = value_formatter or (lambda value: f"{value:.2f}")
     direction = "up" if delta > 0 else "down"
-    return f" ({direction} {formatter(abs(delta))} vs prior week)"
+    return f" ({direction} {formatter(abs(delta))} vs {comparison_label})"

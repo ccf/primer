@@ -113,7 +113,7 @@ def test_weekly_manager_review_pack_builds_sections(monkeypatch, db_session):
         ],
     )
 
-    pack = get_weekly_manager_review_pack(db_session, team_id=team.id)
+    pack = get_weekly_manager_review_pack(db_session, team_id=team.id, days=14)
 
     assert pack.scope == "team"
     assert pack.scope_label == "Platform"
@@ -124,9 +124,10 @@ def test_weekly_manager_review_pack_builds_sections(monkeypatch, db_session):
         "Growth",
         "Cost",
     ]
-    assert "Merge rate: 80% (up 20% vs prior week)" in pack.sections[0].bullets
+    assert "Merge rate: 80% (up 20% vs prior 14-day window)" in pack.sections[0].bullets
     assert "Reduce tool retries" in pack.recommended_actions[0]
     assert "Platform logged 12 sessions" in pack.headline
+    assert "prior 14-day window" in pack.headline
 
 
 def test_manager_review_pack_route_requires_leadership(client, engineer_with_key):
