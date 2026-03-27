@@ -2263,6 +2263,27 @@ class PersonalRecapsResponse(BaseModel):
     generated_at: str
 
 
+# --- Manager Review Packs ---
+
+
+class ManagerReviewSection(BaseModel):
+    title: str
+    summary: str
+    bullets: list[str] = Field(default_factory=list)
+
+
+class ManagerReviewPack(BaseModel):
+    scope: Literal["team", "org"]
+    scope_label: str
+    period_start: str
+    period_end: str
+    sessions_analyzed: int
+    headline: str
+    sections: list[ManagerReviewSection] = Field(default_factory=list)
+    recommended_actions: list[str] = Field(default_factory=list)
+    generated_at: str
+
+
 # --- Coaching Brief ---
 
 

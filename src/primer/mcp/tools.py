@@ -312,3 +312,40 @@ def primer_personal_recaps(period: str = "both") -> str:
         return "\n".join(lines)
     except httpx.RequestError as e:
         return f"Error connecting to server: {e}"
+
+
+def primer_manager_review_pack(team_id: str | None = None, days: int = 7) -> str:
+    """Get a weekly manager review pack combining quality, friction, growth, and cost."""
+    if not API_KEY and not ADMIN_API_KEY:
+        return "Error: PRIMER_API_KEY or PRIMER_ADMIN_API_KEY not set"
+    try:
+        params = {"days": days}
+        if team_id:
+            params["team_id"] = team_id
+        resp = httpx.get(
+            f"{SERVER_URL}/api/v1/analytics/manager-review-pack",
+            headers=_admin_headers(),
+            params=params,
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            return f"Error: {resp.status_code} - {resp.text}"
+        data = resp.json()
+        lines = ["## Weekly Manager Review Pack\n"]
+        lines.append(f"**Scope**: {data['scope_label']}\n")
+        lines.append(f"**Window**: {data['period_start']} to {data['period_end']}\n")
+        lines.append(f"**Headline**: {data['headline']}\n")
+        for section in data.get("sections", []):
+            lines.append(f"### {section['title']}")
+            lines.append(section["summary"])
+            for bullet in section.get("bullets", []):
+                lines.append(f"- {bullet}")
+            lines.append("")
+        if data.get("recommended_actions"):
+            lines.append("### Recommended Actions")
+            for action in data["recommended_actions"]:
+                lines.append(f"- {action}")
+            lines.append("")
+        return "\n".join(lines)
+    except httpx.RequestError as e:
+        return f"Error connecting to server: {e}"

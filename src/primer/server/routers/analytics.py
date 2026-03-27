@@ -23,6 +23,7 @@ from primer.common.schemas import (
     GitHubStatusResponse,
     GitHubSyncResponse,
     LearningPathsResponse,
+    ManagerReviewPack,
     MaturityAnalyticsResponse,
     ModelRanking,
     NarrativeResponse,
@@ -732,6 +733,27 @@ def personal_recaps(
             detail="Personal recaps require an engineer context. Use an engineer API key.",
         )
     return get_personal_recaps(db, engineer_id=auth.engineer_id)
+
+
+@router.get("/manager-review-pack", response_model=ManagerReviewPack)
+def manager_review_pack(
+    team_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    days: int = Query(default=7, ge=1, le=30),
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_role("admin", "team_lead")),
+):
+    from primer.server.services.manager_review_service import get_weekly_manager_review_pack
+
+    effective_team_id = team_id if auth.role == "admin" else auth.team_id
+    return get_weekly_manager_review_pack(
+        db,
+        team_id=effective_team_id,
+        start_date=start_date,
+        end_date=end_date,
+        days=days,
+    )
 
 
 @router.get("/narrative/status", response_model=NarrativeStatusResponse)

@@ -122,3 +122,14 @@ def test_personal_recaps_tool(mock_recaps):
     result = personal_recaps(period="daily")
     assert result == "recaps"
     mock_recaps.assert_called_once_with(period="daily")
+
+
+@patch("primer.mcp.server.primer_manager_review_pack")
+def test_manager_review_pack_tool(mock_pack):
+    mock_pack.return_value = "pack"
+
+    from primer.mcp.server import manager_review_pack
+
+    result = manager_review_pack(team_id="team-123", days=7)
+    assert result == "pack"
+    mock_pack.assert_called_once_with(team_id="team-123", days=7)

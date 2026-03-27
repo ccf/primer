@@ -462,3 +462,46 @@ def test_primer_personal_recaps_no_api_key(monkeypatch):
 
     result = primer_personal_recaps()
     assert "Error" in result
+
+
+# --- primer_manager_review_pack ---
+
+
+@patch("primer.mcp.tools.httpx.get")
+def test_primer_manager_review_pack_success(mock_get):
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "scope_label": "Platform",
+        "period_start": "2026-03-20",
+        "period_end": "2026-03-27",
+        "headline": "Platform logged 12 sessions · 75% succeeded",
+        "sections": [
+            {
+                "title": "Quality",
+                "summary": "Review and merge quality centered on 5 PRs.",
+                "bullets": ["Merge rate: 80%"],
+            }
+        ],
+        "recommended_actions": ["Reduce tool retries — Adopt the debugging playbook."],
+    }
+    mock_get.return_value = mock_resp
+
+    from primer.mcp.tools import primer_manager_review_pack
+
+    result = primer_manager_review_pack(team_id="team-123", days=7)
+    assert "## Weekly Manager Review Pack" in result
+    assert "### Quality" in result
+    assert "Reduce tool retries" in result
+    params = mock_get.call_args.kwargs["params"]
+    assert params == {"days": 7, "team_id": "team-123"}
+
+
+def test_primer_manager_review_pack_requires_auth(monkeypatch):
+    monkeypatch.setattr("primer.mcp.tools.API_KEY", "")
+    monkeypatch.setattr("primer.mcp.tools.ADMIN_API_KEY", "")
+
+    from primer.mcp.tools import primer_manager_review_pack
+
+    result = primer_manager_review_pack()
+    assert "Error" in result
