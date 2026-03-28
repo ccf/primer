@@ -3,8 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
-from primer.common.config import settings
-from primer.common.models import Alert, Team
+from primer.common.models import Alert, NarrativeCache, Team
 from primer.common.schemas import NextStepPlanAction, NextStepPlanResponse
 from primer.server.services.project_workspace_service import get_project_workspace
 from primer.server.services.synthesis_service import get_recommendations
@@ -28,7 +27,14 @@ def get_next_step_plan(
     period_start = _ensure_utc(start_date) if start_date else period_end - timedelta(days=days)
 
     actions: list[NextStepPlanAction] = []
-    actions.extend(_alert_actions(db, team_id=team_id, period_start=period_start))
+    actions.extend(
+        _alert_actions(
+            db,
+            team_id=team_id,
+            period_start=period_start,
+            period_end=period_end,
+        )
+    )
     actions.extend(
         _project_actions(
             db,
@@ -95,10 +101,12 @@ def _alert_actions(
     *,
     team_id: str | None,
     period_start: datetime,
+    period_end: datetime,
 ) -> list[NextStepPlanAction]:
     query = db.query(Alert).filter(
         Alert.dismissed.is_(False),
         Alert.detected_at >= period_start,
+        Alert.detected_at <= period_end,
     )
     if team_id:
         query = query.filter(Alert.team_id == team_id)
@@ -172,34 +180,41 @@ def _narrative_actions(
     period_start: datetime,
     period_end: datetime,
 ) -> list[NextStepPlanAction]:
-    if not settings.anthropic_api_key:
-        return []
+    from primer.server.services.narrative_service import _date_range_key
 
-    from primer.server.services.narrative_service import generate_narrative
-
-    try:
-        narrative = generate_narrative(
-            db,
-            scope="team" if team_id else "org",
-            team_id=team_id,
-            start_date=period_start,
-            end_date=period_end,
+    scope = "team" if team_id else "org"
+    scope_id = team_id if team_id else None
+    cached = (
+        db.query(NarrativeCache)
+        .filter(
+            NarrativeCache.scope == scope,
+            NarrativeCache.scope_id == scope_id if scope_id else NarrativeCache.scope_id.is_(None),
+            NarrativeCache.date_range_key == _date_range_key(period_start, period_end),
+            NarrativeCache.expires_at > datetime.now(UTC),
         )
-    except Exception:
+        .first()
+    )
+    if cached is None:
         return []
 
     actions: list[NextStepPlanAction] = []
-    for section in narrative.sections:
-        if "recommend" not in section.title.lower():
+    for section in cached.sections or []:
+        if not isinstance(section, dict):
+            continue
+        title = section.get("title")
+        content = section.get("content")
+        if not isinstance(title, str) or not isinstance(content, str):
+            continue
+        if "recommend" not in title.lower():
             continue
         actions.append(
             NextStepPlanAction(
-                action_id=f"narrative:{section.title}",
-                title=section.title,
-                description=section.content,
+                action_id=f"narrative:{title}",
+                title=title,
+                description=content,
                 priority="medium",
                 source_type="narrative",
-                source_title=narrative.scope_label,
+                source_title=scope,
                 category="narrative",
                 severity="info",
                 evidence={},
