@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { apiFetch } from "@/lib/api"
 import type {
   ActivityHeatmap,
+  ActivationHubResponse,
   AlertConfigResponse,
   AlertResponse,
   AlertThresholds,
@@ -427,6 +428,13 @@ export function useMeasurementIntegrity() {
   return useQuery({
     queryKey: ["measurement-integrity"],
     queryFn: () => apiFetch<MeasurementIntegrityStats>("/api/v1/admin/measurement-integrity"),
+  })
+}
+
+export function useActivationHub() {
+  return useQuery({
+    queryKey: ["activation-hub"],
+    queryFn: () => apiFetch<ActivationHubResponse>("/api/v1/admin/activation-hub"),
   })
 }
 

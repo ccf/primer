@@ -620,6 +620,23 @@ export interface SystemStats {
   database_type: string
 }
 
+export type ActivationHubStatus = "ready" | "attention" | "action_needed"
+
+export interface ActivationHubItem {
+  key: string
+  title: string
+  status: ActivationHubStatus
+  summary: string
+  next_action: string | null
+}
+
+export interface ActivationHubResponse {
+  ready_count: number
+  total_items: number
+  progress_pct: number
+  items: ActivationHubItem[]
+}
+
 export interface AgentSourceQuality {
   agent_type: AgentType
   session_count: number

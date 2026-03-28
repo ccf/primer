@@ -6,6 +6,7 @@ from primer.common.database import get_db
 from primer.common.models import Engineer, IngestEvent, Team
 from primer.common.models import Session as SessionModel
 from primer.common.schemas import (
+    ActivationHubResponse,
     AuditLogResponse,
     FacetNormalizationSummary,
     IngestEventResponse,
@@ -57,6 +58,16 @@ def measurement_integrity(
     auth: AuthContext = Depends(require_role("admin")),
 ):
     return get_measurement_integrity_stats(db)
+
+
+@router.get("/activation-hub", response_model=ActivationHubResponse)
+def activation_hub(
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_role("admin")),
+):
+    from primer.server.services.admin_activation_service import get_activation_hub
+
+    return get_activation_hub(db)
 
 
 @router.get("/ingest-events", response_model=PaginatedResponse[IngestEventResponse])
