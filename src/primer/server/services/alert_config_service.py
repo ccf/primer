@@ -118,7 +118,9 @@ def delete_alert_config(db: Session, config_id: str) -> None:
 def resolve_thresholds(db: Session, team_id: str | None = None) -> AlertThresholds:
     """Resolve effective thresholds: team override > global override > settings defaults."""
     defaults = {
-        policy.alert_type: policy.effective_threshold
+        policy.alert_type: (
+            policy.effective_threshold if policy.effective_enabled else policy.default_threshold
+        )
         for policy in resolve_alert_policies(db, team_id=team_id).policies
     }
 
