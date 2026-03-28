@@ -1,11 +1,12 @@
 import secrets
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
+from uuid import uuid4
 
 import bcrypt
 
-from primer.common.models import Alert, Engineer, Team
-from primer.common.schemas import NarrativeResponse, NarrativeSection, NextStepPlanResponse
+from primer.common.models import Alert, Engineer, NarrativeCache, Team
+from primer.common.schemas import NextStepPlanResponse
 from primer.server.services.next_step_plan_service import get_next_step_plan
 
 
@@ -48,27 +49,29 @@ def test_get_next_step_plan_combines_alerts_narratives_and_project_findings(
     )
     db_session.commit()
 
-    monkeypatch.setattr(
-        "primer.server.services.next_step_plan_service.settings.anthropic_api_key",
-        "test-key",
-    )
-    monkeypatch.setattr(
-        "primer.server.services.narrative_service.generate_narrative",
-        lambda *args, **kwargs: NarrativeResponse(
+    end_date = datetime.now(UTC)
+    start_date = end_date - timedelta(days=14)
+    db_session.add(
+        NarrativeCache(
+            id=str(uuid4()),
             scope="team",
-            scope_label="Platform",
+            scope_id=team.id,
+            date_range_key=f"{start_date.strftime('%Y-%m-%d')}_{end_date.strftime('%Y-%m-%d')}",
             sections=[
-                NarrativeSection(
-                    title="Recommendations",
-                    content="Standardize the debugging playbook and reduce tool retries.",
-                )
+                {
+                    "title": "Recommendations",
+                    "content": "Standardize the debugging playbook and reduce tool retries.",
+                }
             ],
-            generated_at=datetime.now(UTC),
-            cached=True,
             model_used="claude-sonnet-4-6",
             data_summary={},
-        ),
+            prompt_tokens=0,
+            completion_tokens=0,
+            created_at=end_date,
+            expires_at=end_date + timedelta(hours=24),
+        )
     )
+    db_session.commit()
     monkeypatch.setattr(
         "primer.server.services.next_step_plan_service.get_project_workspace",
         lambda *args, **kwargs: SimpleNamespace(
@@ -98,7 +101,14 @@ def test_get_next_step_plan_combines_alerts_narratives_and_project_findings(
         ],
     )
 
-    plan = get_next_step_plan(db_session, team_id=team.id, project_name="primer", days=14)
+    plan = get_next_step_plan(
+        db_session,
+        team_id=team.id,
+        project_name="primer",
+        start_date=start_date,
+        end_date=end_date,
+        days=14,
+    )
 
     assert plan.scope_label == "primer"
     assert len(plan.actions) >= 3
