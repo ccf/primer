@@ -265,7 +265,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] API rate limiting
 - [x] Dark mode with system preference detection
 - [x] [P1] Activation and setup hub for GitHub, budgets, alerts, narrative readiness, and data freshness
-- [ ] [P1] Performance measurement views for leadership across productivity, quality, cost, and adoption
+- [x] [P1] Performance measurement views for leadership across productivity, quality, cost, and adoption
 - [ ] [P1] Threshold resolution and policy management that matches actual alerting behavior
 - [ ] [P2] Multi-tenant workspace isolation for multiple organizations on a shared Primer instance
 - [ ] [P2] Enterprise IdP support with SAML and OIDC for provisioning and SSO
