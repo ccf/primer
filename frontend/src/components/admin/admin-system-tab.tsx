@@ -11,7 +11,7 @@ import {
   RefreshCcw,
   Users,
 } from "lucide-react"
-import { useMeasurementIntegrity, useSystemStats } from "@/hooks/use-api-queries"
+import { useActivationHub, useMeasurementIntegrity, useSystemStats } from "@/hooks/use-api-queries"
 import { useBackfillWorkflowProfiles } from "@/hooks/use-api-mutations"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { formatNumber } from "@/lib/utils"
@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type {
+  ActivationHubItem,
   AgentSourceQuality,
   MeasurementIntegrityStats,
   RepositoryQuality,
@@ -305,8 +306,73 @@ function backfillSummaryLabel(result: {
   ].join(" · ")
 }
 
+function activationVariant(status: ActivationHubItem["status"]): "success" | "warning" | "outline" {
+  if (status === "ready") return "success"
+  if (status === "attention") return "warning"
+  return "outline"
+}
+
+function ActivationHubSection({
+  data,
+}: {
+  data: {
+    ready_count: number
+    total_items: number
+    progress_pct: number
+    items: ActivationHubItem[]
+  }
+}) {
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold">Activation Hub</h3>
+          <p className="text-sm text-muted-foreground">
+            Setup checks for GitHub, budgets, alerts, narratives, freshness, and coverage.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-border/70 bg-card px-4 py-3 text-right shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Setup Progress
+          </p>
+          <p className="mt-1 font-display text-2xl tracking-tight">{data.progress_pct.toFixed(1)}%</p>
+          <p className="text-xs text-muted-foreground">
+            {formatNumber(data.ready_count)} of {formatNumber(data.total_items)} ready
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {data.items.map((item) => (
+          <Card key={item.key}>
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle className="text-base">{item.title}</CardTitle>
+                  <p className="text-sm text-muted-foreground">{item.summary}</p>
+                </div>
+                <Badge variant={activationVariant(item.status)}>
+                  {item.status.replace("_", " ")}
+                </Badge>
+              </div>
+            </CardHeader>
+            {item.next_action && (
+              <CardContent>
+                <div className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2 text-sm">
+                  <span className="font-medium">Next action:</span> {item.next_action}
+                </div>
+              </CardContent>
+            )}
+          </Card>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 export function AdminSystemTab() {
   const { data: stats, isLoading: isSystemLoading } = useSystemStats()
+  const { data: activationHub, isLoading: isActivationLoading } = useActivationHub()
   const { data: integrity, isLoading: isIntegrityLoading } = useMeasurementIntegrity()
   const workflowBackfill = useBackfillWorkflowProfiles()
 
@@ -353,6 +419,14 @@ export function AdminSystemTab() {
           />
         </div>
       </section>
+
+      {isActivationLoading ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => <CardSkeleton key={`activation-${i}`} />)}
+        </div>
+      ) : activationHub ? (
+        <ActivationHubSection data={activationHub} />
+      ) : null}
 
       <section className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">

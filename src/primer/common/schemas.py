@@ -1046,6 +1046,24 @@ class WorkflowProfileBackfillSummary(BaseModel):
     sessions_skipped: int
 
 
+ActivationHubStatus = Literal["ready", "attention", "action_needed"]
+
+
+class ActivationHubItem(BaseModel):
+    key: str
+    title: str
+    status: ActivationHubStatus
+    summary: str
+    next_action: str | None = None
+
+
+class ActivationHubResponse(BaseModel):
+    ready_count: int
+    total_items: int
+    progress_pct: float
+    items: list[ActivationHubItem] = Field(default_factory=list)
+
+
 class IngestEventResponse(BaseModel):
     id: int
     engineer_id: str

@@ -1,12 +1,16 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from primer.common.models import (
+    AlertConfig,
     AuditLog,
+    Budget,
     GitRepository,
+    IngestEvent,
     ModelUsage,
+    NarrativeCache,
     PullRequest,
     SessionCommit,
     SessionFacets,
@@ -399,6 +403,82 @@ def test_measurement_integrity_stats_count_missing_supported_tool_and_model_tele
     assert source_quality["cursor"]["tool_call_coverage_pct"] == 0.0
     assert source_quality["cursor"]["model_usage_parity"] == "optional"
     assert source_quality["cursor"]["model_usage_coverage_pct"] == 0.0
+
+
+def test_activation_hub(client, admin_headers, engineer_with_key, db_session, monkeypatch):
+    eng, _api_key = engineer_with_key
+    repo = _create_repository(
+        db_session,
+        full_name="acme/primer",
+        github_id=101,
+        default_branch="main",
+        readiness_checked=True,
+    )
+    db_session.add(
+        PullRequest(
+            repository_id=repo.id,
+            engineer_id=eng.id,
+            github_pr_number=42,
+            title="Improve setup flow",
+            state="merged",
+        )
+    )
+    db_session.add(Budget(team_id=eng.team_id, name="Engineering", amount=500, period="monthly"))
+    db_session.add(AlertConfig(alert_type="friction_spike", threshold=2.0, enabled=True))
+    db_session.add(
+        NarrativeCache(
+            id=str(uuid.uuid4()),
+            scope="team",
+            scope_id=eng.team_id,
+            date_range_key="all",
+            sections=[{"title": "Recommendations", "content": "Do the thing."}],
+            model_used="claude-sonnet-4-6",
+            data_summary={},
+            prompt_tokens=0,
+            completion_tokens=0,
+            created_at=datetime.now(UTC),
+            expires_at=datetime.now(UTC) + timedelta(hours=24),
+        )
+    )
+    db_session.add(
+        IngestEvent(
+            engineer_id=eng.id,
+            event_type="session_ingest",
+            session_id=str(uuid.uuid4()),
+            status="ok",
+        )
+    )
+    db_session.commit()
+
+    monkeypatch.setattr(
+        "primer.server.services.admin_activation_service.settings.slack_alerts_enabled",
+        True,
+    )
+    monkeypatch.setattr(
+        "primer.server.services.admin_activation_service.is_configured",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "primer.server.services.admin_activation_service.settings.slack_webhook_url",
+        "https://hooks.slack.com/services/test",
+    )
+    monkeypatch.setattr(
+        "primer.server.services.admin_activation_service.settings.anthropic_api_key",
+        "test-key",
+    )
+
+    response = client.get("/api/v1/admin/activation-hub", headers=admin_headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total_items"] == 6
+    assert data["ready_count"] >= 4
+    items = {item["key"]: item for item in data["items"]}
+    assert items["github"]["status"] == "ready"
+    assert items["budgets"]["status"] == "ready"
+    assert items["alerts"]["status"] == "ready"
+    assert items["narratives"]["status"] == "ready"
+    assert items["freshness"]["status"] == "ready"
 
 
 def test_measurement_integrity_stats_include_github_sync_and_repository_metadata_coverage(

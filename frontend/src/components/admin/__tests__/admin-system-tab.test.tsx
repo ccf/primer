@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AdminSystemTab } from "../admin-system-tab"
 
 const mockUseSystemStats = vi.fn()
+const mockUseActivationHub = vi.fn()
 const mockUseMeasurementIntegrity = vi.fn()
 const mockUseBackfillWorkflowProfiles = vi.fn()
 
 vi.mock("@/hooks/use-api-queries", () => ({
   useSystemStats: () => mockUseSystemStats(),
+  useActivationHub: () => mockUseActivationHub(),
   useMeasurementIntegrity: () => mockUseMeasurementIntegrity(),
 }))
 
@@ -32,6 +34,30 @@ describe("AdminSystemTab", () => {
         total_sessions: 48,
         total_ingest_events: 120,
         database_type: "SQLite",
+      },
+      isLoading: false,
+    })
+    mockUseActivationHub.mockReturnValue({
+      data: {
+        ready_count: 2,
+        total_items: 6,
+        progress_pct: 33.3,
+        items: [
+          {
+            key: "github",
+            title: "GitHub",
+            status: "ready",
+            summary: "4 repositories linked and 12 pull requests synced.",
+            next_action: null,
+          },
+          {
+            key: "budgets",
+            title: "Budgets",
+            status: "action_needed",
+            summary: "No budgets are configured yet.",
+            next_action: "Create a budget in FinOps so burn-rate alerts and projections can work.",
+          },
+        ],
       },
       isLoading: false,
     })
@@ -135,6 +161,11 @@ describe("AdminSystemTab", () => {
     render(<AdminSystemTab />)
 
     expect(screen.getAllByText("GitHub Sync").length).toBeGreaterThan(0)
+    expect(screen.getByText("Activation Hub")).toBeInTheDocument()
+    expect(screen.getByText("Setup Progress")).toBeInTheDocument()
+    expect(screen.getByText("GitHub")).toBeInTheDocument()
+    expect(screen.getByText("Budgets")).toBeInTheDocument()
+    expect(screen.getByText("Create a budget in FinOps so burn-rate alerts and projections can work.")).toBeInTheDocument()
     expect(screen.getByText("Repository Metadata")).toBeInTheDocument()
     expect(screen.getByText("Schema Parity by Source")).toBeInTheDocument()
     expect(screen.getByText("Workflow Coverage")).toBeInTheDocument()
@@ -190,6 +221,15 @@ describe("AdminSystemTab", () => {
         source_quality: [],
         repository_quality: [],
         workflow_profile_quality: [],
+      },
+      isLoading: false,
+    })
+    mockUseActivationHub.mockReturnValue({
+      data: {
+        ready_count: 1,
+        total_items: 6,
+        progress_pct: 16.7,
+        items: [],
       },
       isLoading: false,
     })
