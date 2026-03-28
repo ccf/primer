@@ -168,6 +168,7 @@ def _project_actions(
                 severity=recommendation.severity,
                 project_name=project_name,
                 evidence=recommendation.evidence or {},
+                narrative=recommendation.narrative,
             )
         )
     return actions
@@ -249,6 +250,7 @@ def _recommendation_actions(
                 category=recommendation.category,
                 severity=recommendation.severity,
                 evidence=recommendation.evidence or {},
+                narrative=recommendation.narrative,
             )
         )
     return actions

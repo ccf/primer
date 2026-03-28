@@ -259,6 +259,13 @@ export interface Recommendation {
   description: string
   severity: string
   evidence: Record<string, unknown>
+  narrative: RecommendationNarrative | null
+}
+
+export interface RecommendationNarrative {
+  why_this_helps: string
+  evidence_summary: string | null
+  expected_impact: string | null
 }
 
 export type InterventionStatus = "planned" | "in_progress" | "completed" | "dismissed"
@@ -388,6 +395,7 @@ export interface NextStepPlanAction {
   severity: string | null
   project_name: string | null
   evidence: Record<string, unknown>
+  narrative: RecommendationNarrative | null
 }
 
 export interface NextStepPlanResponse {

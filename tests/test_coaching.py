@@ -1,11 +1,32 @@
 """Tests for the coaching brief endpoint."""
 
+import secrets
 import uuid
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
+import bcrypt
+
+from primer.common.models import Engineer, SessionFacets, Team, ToolUsage
 from primer.common.models import Session as SessionModel
-from primer.common.models import SessionFacets, ToolUsage
+
+
+def _create_engineer_with_key(db_session) -> str:
+    raw_key = f"primer_{secrets.token_urlsafe(32)}"
+    hashed = bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt()).decode()
+    team = Team(name="Test Team")
+    db_session.add(team)
+    db_session.flush()
+    db_session.add(
+        Engineer(
+            name="Test Engineer",
+            email="test@example.com",
+            team_id=team.id,
+            api_key_hash=hashed,
+        )
+    )
+    db_session.flush()
+    return raw_key
 
 
 def test_coaching_requires_engineer_key(client, admin_headers):
@@ -103,6 +124,9 @@ def test_session_start_coaching_with_context(client, engineer_with_key, monkeypa
                     example_projects=["api-server"],
                     recommended_tools=["Read", "Bash"],
                     summary="Reproduce the bug quickly and keep the loop tight.",
+                    success_rate=0.82,
+                    supporting_session_count=9,
+                    supporting_peer_count=4,
                 )
             ],
             model_recommendations=[
@@ -110,6 +134,12 @@ def test_session_start_coaching_with_context(client, engineer_with_key, monkeypa
                     workflow_archetype="debugging",
                     title="Use Sonnet for debugging work",
                     description="Peers keep similar success while spending less.",
+                    recommendation_type="downshift",
+                    current_success_rate=0.81,
+                    recommended_success_rate=0.8,
+                    current_avg_cost=2.7,
+                    recommended_avg_cost=1.6,
+                    supporting_session_count=7,
                 )
             ],
             tool_recommendations=[
@@ -118,6 +148,7 @@ def test_session_start_coaching_with_context(client, engineer_with_key, monkeypa
                     description="Use search to narrow the failing path before you patch.",
                     matching_projects=["api-server"],
                     project_context_match_count=1,
+                    supporting_exemplar_count=3,
                 )
             ],
             learning_paths=[
@@ -126,6 +157,7 @@ def test_session_start_coaching_with_context(client, engineer_with_key, monkeypa
                         SimpleNamespace(
                             title="Reuse the failing-test prompt",
                             description="Start from the prompt that reproduces the auth failure.",
+                            exemplars=[SimpleNamespace(session_id="sess-1")],
                         )
                     ]
                 )
@@ -146,6 +178,9 @@ def test_session_start_coaching_with_context(client, engineer_with_key, monkeypa
                     SimpleNamespace(
                         title="Run the fastest verification loop first",
                         description="Start with the auth regression test before broad edits.",
+                        narrative=SimpleNamespace(
+                            why_this_helps="It keeps the feedback loop short before scope expands.",
+                        ),
                     )
                 ],
                 permission_mode_counts={"default": 4},
@@ -179,14 +214,20 @@ def test_session_start_coaching_with_context(client, engineer_with_key, monkeypa
     assert len(data["sections"]) == 3
     assert data["sections"][0]["title"] == "How to start this session"
     assert any("Debugging: Read -> Test -> Fix" in item for item in data["sections"][0]["items"])
+    assert any(
+        "Why this helps: Backed by 82% success rate" in item
+        for item in data["sections"][0]["items"]
+    )
     assert any("Use Sonnet for debugging work" in item for item in data["sections"][1]["items"])
+    assert any(
+        "Why this helps: Avg cost shifts from $2.70 to $1.60" in item
+        for item in data["sections"][1]["items"]
+    )
     assert any("tool_error" in item for item in data["sections"][2]["items"])
 
 
-def test_session_start_coaching_matches_hyphenated_workflow_hints(
-    client, engineer_with_key, monkeypatch
-):
-    _eng, key = engineer_with_key
+def test_session_start_coaching_matches_hyphenated_workflow_hints(client, db_session, monkeypatch):
+    key = _create_engineer_with_key(db_session)
 
     monkeypatch.setattr(
         "primer.server.services.engineer_profile_service.get_engineer_profile",

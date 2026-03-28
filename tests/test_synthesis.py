@@ -49,7 +49,9 @@ def test_recommendation_low_facet_coverage(client, engineer_with_key, admin_head
     r = client.get("/api/v1/analytics/recommendations", headers=admin_headers)
     assert r.status_code == 200
     data = r.json()
-    assert any(rec["category"] == "data_quality" for rec in data)
+    rec = next(rec for rec in data if rec["category"] == "data_quality")
+    assert rec["narrative"]["why_this_helps"].startswith("Better measurement integrity")
+    assert "future recommendations" in rec["narrative"]["expected_impact"]
 
 
 def test_recommendation_surfaces_measurement_integrity_evidence(
@@ -223,4 +225,5 @@ def test_recommendation_tool_over_reliance(client, engineer_with_key, admin_head
     r = client.get("/api/v1/analytics/recommendations", headers=admin_headers)
     assert r.status_code == 200
     data = r.json()
-    assert any(rec["category"] == "workflow" for rec in data)
+    rec = next(rec for rec in data if rec["category"] == "workflow")
+    assert rec["narrative"]["evidence_summary"] == "Read accounts for 93% of tracked tool calls."

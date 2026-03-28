@@ -515,12 +515,19 @@ class ModelRanking(BaseModel):
     session_count: int
 
 
+class RecommendationNarrative(BaseModel):
+    why_this_helps: str
+    evidence_summary: str | None = None
+    expected_impact: str | None = None
+
+
 class Recommendation(BaseModel):
     category: str
     title: str
     description: str
     severity: str  # info, warning, critical
     evidence: dict
+    narrative: RecommendationNarrative | None = None
 
 
 class InterventionMetricsSnapshot(BaseModel):
@@ -677,6 +684,7 @@ class NextStepPlanAction(BaseModel):
     severity: str | None = None
     project_name: str | None = None
     evidence: dict[str, Any] = Field(default_factory=dict)
+    narrative: RecommendationNarrative | None = None
 
 
 class NextStepPlanResponse(BaseModel):
