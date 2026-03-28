@@ -1,8 +1,10 @@
 import { useState } from "react"
 import { Trash2 } from "lucide-react"
-import { useAlertConfigs, useResolvedThresholds, useTeams } from "@/hooks/use-api-queries"
+import { useAlertConfigs, useResolvedAlertPolicy, useTeams } from "@/hooks/use-api-queries"
 import { useCreateAlertConfig, useDeleteAlertConfig, useUpdateAlertConfig } from "@/hooks/use-api-mutations"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { TableSkeleton } from "@/components/shared/loading-skeleton"
 
 const ALERT_TYPES = [
@@ -15,8 +17,9 @@ const ALERT_TYPES = [
 
 export function AdminAlertsTab() {
   const { data: configs, isLoading } = useAlertConfigs()
-  const { data: thresholds } = useResolvedThresholds()
   const { data: teams } = useTeams()
+  const [policyTeamId, setPolicyTeamId] = useState("")
+  const { data: policy } = useResolvedAlertPolicy(policyTeamId || null)
   const createMutation = useCreateAlertConfig()
   const updateMutation = useUpdateAlertConfig()
   const deleteMutation = useDeleteAlertConfig()
@@ -38,8 +41,108 @@ export function AdminAlertsTab() {
 
   if (isLoading) return <TableSkeleton />
 
+  const sourceLabel = (source: string) => source.replaceAll("_", " ")
+  const formatThreshold = (threshold: number, unitLabel: string) => {
+    if (unitLabel === "percentage points") return `${threshold}pp`
+    return `${threshold} ${unitLabel}`
+  }
+
   return (
     <div className="space-y-6">
+      {policy && (
+        <Card>
+          <CardHeader className="pb-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <CardTitle>Effective Policy</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Resolved alert behavior for the selected scope, including overrides and disabled states.
+                </p>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">Inspect team</label>
+                <select
+                  className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+                  value={policyTeamId}
+                  onChange={(e) => setPolicyTeamId(e.target.value)}
+                >
+                  <option value="">Global</option>
+                  {teams?.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+              <Badge variant={policy.notifications_enabled ? "success" : "outline"}>
+                {policy.notifications_enabled ? "Slack enabled" : "Slack disabled"}
+              </Badge>
+              <Badge variant={policy.webhook_configured ? "success" : "outline"}>
+                {policy.webhook_configured ? "Webhook configured" : "Webhook missing"}
+              </Badge>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/50 text-left">
+                    <th className="px-4 py-2 font-medium">Alert</th>
+                    <th className="px-4 py-2 font-medium">Effective</th>
+                    <th className="px-4 py-2 font-medium">Source</th>
+                    <th className="px-4 py-2 font-medium">Window</th>
+                    <th className="px-4 py-2 font-medium">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {policy.policies.map((item) => (
+                    <tr key={item.alert_type} className="border-b border-border last:border-0">
+                      <td className="px-4 py-3 align-top">
+                        <div className="space-y-1">
+                          <div className="font-medium">{item.label}</div>
+                          <div className="text-xs text-muted-foreground">{item.description}</div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <div className="space-y-1">
+                          <Badge variant={item.effective_enabled ? "success" : "outline"}>
+                            {item.effective_enabled ? "Enabled" : "Disabled"}
+                          </Badge>
+                          <div className="font-medium">
+                            {formatThreshold(item.effective_threshold, item.unit_label)}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <Badge variant="outline">{sourceLabel(item.source)}</Badge>
+                      </td>
+                      <td className="px-4 py-3 align-top text-muted-foreground">
+                        {item.detector_window}
+                      </td>
+                      <td className="px-4 py-3 align-top text-xs text-muted-foreground">
+                        Default {formatThreshold(item.default_threshold, item.unit_label)}
+                        {item.global_override_threshold != null && (
+                          <div>
+                            Global override: {formatThreshold(item.global_override_threshold, item.unit_label)}
+                            {item.global_override_enabled === false ? " (disabled)" : ""}
+                          </div>
+                        )}
+                        {item.team_override_threshold != null && (
+                          <div>
+                            Team override: {formatThreshold(item.team_override_threshold, item.unit_label)}
+                            {item.team_override_enabled === false ? " (disabled)" : ""}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Add Override */}
       <div className="rounded-lg border border-border p-4">
         <h3 className="mb-3 text-sm font-semibold">Add Override</h3>
@@ -133,34 +236,6 @@ export function AdminAlertsTab() {
         </div>
       )}
 
-      {/* Effective Defaults */}
-      {thresholds && (
-        <div className="rounded-lg border border-border p-4">
-          <h3 className="mb-3 text-sm font-semibold">Effective Defaults</h3>
-          <dl className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-3">
-            <div>
-              <dt className="text-muted-foreground">Friction Spike</dt>
-              <dd className="font-medium">{thresholds.friction_spike_multiplier}x</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Usage Drop</dt>
-              <dd className="font-medium">{thresholds.usage_drop_ratio}x</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Cost Warning</dt>
-              <dd className="font-medium">{thresholds.cost_spike_warning}x</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Cost Critical</dt>
-              <dd className="font-medium">{thresholds.cost_spike_critical}x</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Success Rate Drop</dt>
-              <dd className="font-medium">{thresholds.success_rate_drop_pp}pp</dd>
-            </div>
-          </dl>
-        </div>
-      )}
     </div>
   )
 }

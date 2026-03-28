@@ -9,6 +9,7 @@ from primer.common.facet_taxonomy import canonical_outcome, is_success_outcome
 from primer.common.models import Alert, Engineer, ModelUsage, SessionFacets
 from primer.common.models import Session as SessionModel
 from primer.common.pricing import estimate_cost
+from primer.server.services.alert_config_service import resolve_alert_policy_map
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ def detect_anomalies(
     then call ``send_alert_notifications(snapshots)`` so that Slack messages
     are only sent for alerts that were actually persisted.
     """
+    policies = resolve_alert_policy_map(db, team_id=team_id)
     alerts: list[Alert] = []
     for detector in [
         _detect_friction_spike,
@@ -32,7 +34,7 @@ def detect_anomalies(
         _detect_success_rate_drop,
     ]:
         try:
-            result = detector(db, team_id=team_id, engineer_id=engineer_id)
+            result = detector(db, team_id=team_id, engineer_id=engineer_id, policies=policies)
             if result:
                 alerts.append(result)
         except Exception:
@@ -158,7 +160,12 @@ def _detect_friction_spike(
     db: Session,
     team_id: str | None = None,
     engineer_id: str | None = None,
+    policies=None,
 ) -> Alert | None:
+    policy = (policies or {}).get("friction_spike")
+    if policy and not policy.effective_enabled:
+        return None
+    multiplier = policy.effective_threshold if policy else 2.0
     # Last day friction
     day_q = _recent_window(db, team_id, engineer_id, 1)
     day_sessions = day_q.all()
@@ -176,7 +183,7 @@ def _detect_friction_spike(
             week_friction += sum(s.facets.friction_counts.values())
     avg_daily_friction = week_friction / 7
 
-    if avg_daily_friction > 0 and day_friction > avg_daily_friction * 2:
+    if avg_daily_friction > 0 and day_friction > avg_daily_friction * multiplier:
         return _create_alert_if_new(
             db,
             team_id=team_id,
@@ -186,12 +193,12 @@ def _detect_friction_spike(
             title="Friction spike detected",
             message=(
                 f"Friction count today ({day_friction}) is more than "
-                f"2x the 7-day average ({avg_daily_friction:.1f})"
+                f"{multiplier:.1f}x the 7-day average ({avg_daily_friction:.1f})"
             ),
             metric_name="friction_count",
             expected_value=avg_daily_friction,
             actual_value=float(day_friction),
-            threshold=avg_daily_friction * 2,
+            threshold=avg_daily_friction * multiplier,
         )
     return None
 
@@ -200,13 +207,18 @@ def _detect_usage_drop(
     db: Session,
     team_id: str | None = None,
     engineer_id: str | None = None,
+    policies=None,
 ) -> Alert | None:
+    policy = (policies or {}).get("usage_drop")
+    if policy and not policy.effective_enabled:
+        return None
+    ratio_threshold = policy.effective_threshold if policy else 0.5
     day_count = _recent_window(db, team_id, engineer_id, 1).count()
     week_q = _recent_window(db, team_id, engineer_id, 7)
     week_count = week_q.count()
     avg_daily = week_count / 7
 
-    if avg_daily >= 2 and day_count < avg_daily * 0.5:
+    if avg_daily >= 2 and day_count < avg_daily * ratio_threshold:
         return _create_alert_if_new(
             db,
             team_id=team_id,
@@ -216,12 +228,12 @@ def _detect_usage_drop(
             title="Usage drop detected",
             message=(
                 f"Sessions today ({day_count}) dropped more than "
-                f"50% below 7-day average ({avg_daily:.1f})"
+                f"{(1 - ratio_threshold) * 100:.0f}% below 7-day average ({avg_daily:.1f})"
             ),
             metric_name="daily_sessions",
             expected_value=avg_daily,
             actual_value=float(day_count),
-            threshold=avg_daily * 0.5,
+            threshold=avg_daily * ratio_threshold,
         )
     return None
 
@@ -230,7 +242,17 @@ def _detect_cost_spike(
     db: Session,
     team_id: str | None = None,
     engineer_id: str | None = None,
+    policies=None,
 ) -> Alert | None:
+    warning_policy = (policies or {}).get("cost_spike_warning")
+    critical_policy = (policies or {}).get("cost_spike_critical")
+    warning_enabled = warning_policy.effective_enabled if warning_policy else True
+    critical_enabled = critical_policy.effective_enabled if critical_policy else True
+    warning_multiplier = warning_policy.effective_threshold if warning_policy else 2.0
+    critical_multiplier = critical_policy.effective_threshold if critical_policy else 3.0
+    if not warning_enabled and not critical_enabled:
+        return None
+
     def _daily_cost(days: int) -> float:
         cutoff = datetime.now(UTC) - timedelta(days=days)
         q = (
@@ -260,10 +282,12 @@ def _detect_cost_spike(
 
     if avg_daily_cost > 0:
         ratio = day_cost / avg_daily_cost
-        if ratio > 3:
+        if critical_enabled and ratio > critical_multiplier:
             severity = "critical"
-        elif ratio > 2:
+            threshold_multiplier = critical_multiplier
+        elif warning_enabled and ratio > warning_multiplier:
             severity = "warning"
+            threshold_multiplier = warning_multiplier
         else:
             return None
 
@@ -281,7 +305,7 @@ def _detect_cost_spike(
             metric_name="daily_cost",
             expected_value=avg_daily_cost,
             actual_value=day_cost,
-            threshold=avg_daily_cost * 2,
+            threshold=avg_daily_cost * threshold_multiplier,
         )
     return None
 
@@ -290,7 +314,13 @@ def _detect_success_rate_drop(
     db: Session,
     team_id: str | None = None,
     engineer_id: str | None = None,
+    policies=None,
 ) -> Alert | None:
+    policy = (policies or {}).get("success_rate_drop")
+    if policy and not policy.effective_enabled:
+        return None
+    threshold_pp = policy.effective_threshold if policy else 20.0
+
     def _success_rate(days: int) -> float | None:
         cutoff = datetime.now(UTC) - timedelta(days=days)
         q = (
@@ -322,7 +352,7 @@ def _detect_success_rate_drop(
 
     if day_rate is not None and week_rate is not None:
         drop_pp = (week_rate - day_rate) * 100
-        if drop_pp > 20:
+        if drop_pp > threshold_pp:
             return _create_alert_if_new(
                 db,
                 team_id=team_id,
@@ -337,7 +367,7 @@ def _detect_success_rate_drop(
                 metric_name="success_rate",
                 expected_value=week_rate,
                 actual_value=day_rate,
-                threshold=week_rate - 0.2,
+                threshold=week_rate - (threshold_pp / 100),
             )
     return None
 

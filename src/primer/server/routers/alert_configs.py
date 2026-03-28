@@ -7,6 +7,7 @@ from primer.common.schemas import (
     AlertConfigResponse,
     AlertConfigUpdate,
     AlertThresholds,
+    ResolvedAlertPolicyResponse,
 )
 from primer.server.deps import AuthContext, require_role
 from primer.server.services import alert_config_service, audit_service
@@ -30,6 +31,15 @@ def resolved_thresholds(
     auth: AuthContext = Depends(require_role("admin")),
 ):
     return alert_config_service.resolve_thresholds(db, team_id=team_id)
+
+
+@router.get("/policy", response_model=ResolvedAlertPolicyResponse)
+def resolved_policy(
+    team_id: str | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_role("admin")),
+):
+    return alert_config_service.resolve_alert_policies(db, team_id=team_id)
 
 
 @router.post("", response_model=AlertConfigResponse, status_code=201)

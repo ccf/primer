@@ -102,6 +102,60 @@ def test_resolve_thresholds_with_override(client, admin_headers):
     assert data["friction_spike_multiplier"] == 5.0
 
 
+def test_resolve_policy_defaults(client, admin_headers):
+    resp = client.get("/api/v1/alert-configs/policy", headers=admin_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["notifications_enabled"] is False
+    assert data["webhook_configured"] is False
+    friction = next(item for item in data["policies"] if item["alert_type"] == "friction_spike")
+    assert friction["source"] == "default"
+    assert friction["effective_enabled"] is True
+    assert friction["effective_threshold"] == settings.alert_friction_spike_multiplier
+
+
+def test_resolve_policy_team_override_and_disable(client, admin_headers):
+    create_global = client.post(
+        "/api/v1/alert-configs",
+        json={"alert_type": "friction_spike", "threshold": 4.0, "enabled": False},
+        headers=admin_headers,
+    )
+    assert create_global.status_code == 201
+    create_team = client.post(
+        "/api/v1/alert-configs",
+        json={
+            "team_id": "team-123",
+            "alert_type": "friction_spike",
+            "threshold": 5.0,
+            "enabled": True,
+        },
+        headers=admin_headers,
+    )
+    assert create_team.status_code == 201
+
+    global_policy = client.get("/api/v1/alert-configs/policy", headers=admin_headers)
+    team_policy = client.get(
+        "/api/v1/alert-configs/policy?team_id=team-123",
+        headers=admin_headers,
+    )
+
+    assert global_policy.status_code == 200
+    assert team_policy.status_code == 200
+
+    global_friction = next(
+        item for item in global_policy.json()["policies"] if item["alert_type"] == "friction_spike"
+    )
+    team_friction = next(
+        item for item in team_policy.json()["policies"] if item["alert_type"] == "friction_spike"
+    )
+
+    assert global_friction["source"] == "global_disabled"
+    assert global_friction["effective_enabled"] is False
+    assert team_friction["source"] == "team_override"
+    assert team_friction["effective_enabled"] is True
+    assert team_friction["effective_threshold"] == 5.0
+
+
 def test_admin_only_access(client):
     resp = client.get("/api/v1/alert-configs")
     assert resp.status_code in (401, 403, 422)

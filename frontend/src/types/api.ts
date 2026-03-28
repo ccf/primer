@@ -736,6 +736,36 @@ export interface AlertThresholds {
   success_rate_drop_pp: number
 }
 
+export type AlertPolicySource =
+  | "default"
+  | "global_override"
+  | "team_override"
+  | "global_disabled"
+  | "team_disabled"
+
+export interface ResolvedAlertPolicy {
+  alert_type: string
+  label: string
+  description: string
+  detector_window: string
+  unit_label: string
+  effective_threshold: number
+  effective_enabled: boolean
+  source: AlertPolicySource
+  default_threshold: number
+  global_override_threshold: number | null
+  global_override_enabled: boolean | null
+  team_override_threshold: number | null
+  team_override_enabled: boolean | null
+}
+
+export interface ResolvedAlertPolicyResponse {
+  team_id: string | null
+  notifications_enabled: boolean
+  webhook_configured: boolean
+  policies: ResolvedAlertPolicy[]
+}
+
 export interface FrictionImpact {
   friction_type: string
   occurrence_count: number
