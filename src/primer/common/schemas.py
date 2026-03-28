@@ -958,6 +958,38 @@ class AlertThresholds(BaseModel):
     success_rate_drop_pp: float
 
 
+AlertPolicySource = Literal[
+    "default",
+    "global_override",
+    "team_override",
+    "global_disabled",
+    "team_disabled",
+]
+
+
+class ResolvedAlertPolicy(BaseModel):
+    alert_type: str
+    label: str
+    description: str
+    detector_window: str
+    unit_label: str
+    effective_threshold: float
+    effective_enabled: bool
+    source: AlertPolicySource
+    default_threshold: float
+    global_override_threshold: float | None = None
+    global_override_enabled: bool | None = None
+    team_override_threshold: float | None = None
+    team_override_enabled: bool | None = None
+
+
+class ResolvedAlertPolicyResponse(BaseModel):
+    team_id: str | None = None
+    notifications_enabled: bool
+    webhook_configured: bool
+    policies: list[ResolvedAlertPolicy] = Field(default_factory=list)
+
+
 # --- Admin ---
 
 

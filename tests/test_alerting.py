@@ -1,5 +1,5 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from primer.common.models import Alert
 
@@ -124,3 +124,93 @@ def test_dedup_alerts(db_session, client, admin_headers):
         .all()
     )
     assert len(friction_alerts) == 1
+
+
+def test_friction_spike_detection_honors_team_policy_threshold(
+    client, admin_headers, engineer_with_key
+):
+    eng, api_key = engineer_with_key
+    now = datetime.now(UTC)
+    for days_ago in range(1, 8):
+        _ingest_session(
+            client,
+            api_key,
+            started_at=(now - timedelta(days=days_ago)).isoformat(),
+            facets={
+                "outcome": "success",
+                "friction_counts": {"tool_error": 1},
+            },
+        )
+    _ingest_session(
+        client,
+        api_key,
+        started_at=now.isoformat(),
+        facets={
+            "outcome": "success",
+            "friction_counts": {"tool_error": 3},
+        },
+    )
+
+    resp = client.post(
+        "/api/v1/alert-configs",
+        headers=admin_headers,
+        json={
+            "team_id": eng.team_id,
+            "alert_type": "friction_spike",
+            "threshold": 5.0,
+            "enabled": True,
+        },
+    )
+    assert resp.status_code == 201
+
+    detect = client.post(
+        f"/api/v1/alerts/detect?team_id={eng.team_id}",
+        headers=admin_headers,
+    )
+    assert detect.status_code == 200
+    assert detect.json()["alerts_created"] == 0
+
+
+def test_friction_spike_detection_honors_team_policy_disable(
+    client, admin_headers, engineer_with_key
+):
+    eng, api_key = engineer_with_key
+    now = datetime.now(UTC)
+    for days_ago in range(1, 8):
+        _ingest_session(
+            client,
+            api_key,
+            started_at=(now - timedelta(days=days_ago)).isoformat(),
+            facets={
+                "outcome": "success",
+                "friction_counts": {"tool_error": 1},
+            },
+        )
+    _ingest_session(
+        client,
+        api_key,
+        started_at=now.isoformat(),
+        facets={
+            "outcome": "success",
+            "friction_counts": {"tool_error": 6},
+        },
+    )
+
+    resp = client.post(
+        "/api/v1/alert-configs",
+        headers=admin_headers,
+        json={
+            "team_id": eng.team_id,
+            "alert_type": "friction_spike",
+            "threshold": 2.0,
+            "enabled": False,
+        },
+    )
+    assert resp.status_code == 201
+
+    detect = client.post(
+        f"/api/v1/alerts/detect?team_id={eng.team_id}",
+        headers=admin_headers,
+    )
+    assert detect.status_code == 200
+    assert detect.json()["alerts_created"] == 0

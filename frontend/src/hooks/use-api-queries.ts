@@ -4,6 +4,7 @@ import type {
   ActivityHeatmap,
   ActivationHubResponse,
   AlertConfigResponse,
+  ResolvedAlertPolicyResponse,
   AlertResponse,
   AlertThresholds,
   AuditLogResponse,
@@ -469,6 +470,16 @@ export function useResolvedThresholds(teamId?: string | null) {
     queryFn: () =>
       apiFetch<AlertThresholds>(
         `/api/v1/alert-configs/resolved${buildParams({ team_id: teamId })}`,
+      ),
+  })
+}
+
+export function useResolvedAlertPolicy(teamId?: string | null) {
+  return useQuery({
+    queryKey: ["alert-policy", teamId],
+    queryFn: () =>
+      apiFetch<ResolvedAlertPolicyResponse>(
+        `/api/v1/alert-configs/policy${buildParams({ team_id: teamId })}`,
       ),
   })
 }
