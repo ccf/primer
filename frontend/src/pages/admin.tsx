@@ -11,8 +11,11 @@ import { AdminAlertsTab } from "@/components/admin/admin-alerts-tab"
 import { AdminNotificationsTab } from "@/components/admin/admin-notifications-tab"
 import { AdminAuditTab } from "@/components/admin/admin-audit-tab"
 import { AdminSystemTab } from "@/components/admin/admin-system-tab"
+import { AdminPerformanceTab } from "@/components/admin/admin-performance-tab"
+import type { DateRange } from "@/components/layout/date-range-picker"
 
 const tabs = [
+  { id: "performance", label: "Performance" },
   { id: "engineers", label: "Engineers" },
   { id: "teams", label: "Teams" },
   { id: "alerts", label: "Alert Thresholds" },
@@ -23,11 +26,18 @@ const tabs = [
 
 type TabId = (typeof tabs)[number]["id"]
 
-export function AdminPage() {
+interface AdminPageProps {
+  teamId: string | null
+  dateRange: DateRange | null
+}
+
+export function AdminPage({ teamId, dateRange }: AdminPageProps) {
   const { user } = useAuth()
   const isApiKeyUser = !user && !!getApiKey()
   const role = user?.role ?? (isApiKeyUser ? "admin" : "engineer")
-  const [activeTab, setActiveTab] = useState<TabId>("engineers")
+  const [activeTab, setActiveTab] = useState<TabId>("performance")
+  const startDate = dateRange?.startDate
+  const endDate = dateRange?.endDate
 
   if (role !== "admin") {
     return <EmptyState message="You do not have permission to access this page" />
@@ -43,6 +53,9 @@ export function AdminPage() {
 
       <PageTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
+      {activeTab === "performance" && (
+        <AdminPerformanceTab teamId={teamId} startDate={startDate} endDate={endDate} />
+      )}
       {activeTab === "engineers" && <AdminEngineersTab />}
       {activeTab === "teams" && <AdminTeamsTab />}
       {activeTab === "alerts" && <AdminAlertsTab />}

@@ -99,7 +99,7 @@ function AuthenticatedApp() {
           <Route path="/maturity" element={<MaturityPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/teams" element={<TeamsPage />} />
           <Route path="/teams/:teamId" element={<TeamDetailRoute dateRange={dateRange} />} />
-          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin" element={<AdminPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/explorer" element={<ExplorerPage teamId={teamId} dateRange={dateRange} />} />
 
           <Route path="/synthesis" element={<NarrativePage teamId={teamId} dateRange={dateRange} />} />
