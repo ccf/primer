@@ -187,6 +187,73 @@ def _context_summary(
     return " · ".join(parts)
 
 
+def _append_reason(base: str, reason: str | None) -> str:
+    if not reason:
+        return base
+    return f"{base} Why this helps: {reason}"
+
+
+def _playbook_reason(playbook) -> str | None:
+    parts: list[str] = []
+    if getattr(playbook, "success_rate", None) is not None:
+        parts.append(f"{playbook.success_rate:.0%} success rate")
+    if getattr(playbook, "supporting_session_count", 0):
+        parts.append(f"{playbook.supporting_session_count} supporting sessions")
+    if getattr(playbook, "supporting_peer_count", 0):
+        parts.append(f"{playbook.supporting_peer_count} peers")
+    if not parts:
+        return None
+    return "Backed by " + ", ".join(parts) + "."
+
+
+def _model_reason(recommendation) -> str | None:
+    current_success = getattr(recommendation, "current_success_rate", None)
+    recommended_success = getattr(recommendation, "recommended_success_rate", None)
+    current_cost = getattr(recommendation, "current_avg_cost", None)
+    recommended_cost = getattr(recommendation, "recommended_avg_cost", None)
+    supporting_sessions = getattr(recommendation, "supporting_session_count", 0)
+
+    details: list[str] = []
+    if current_cost is not None and recommended_cost is not None:
+        details.append(f"avg cost shifts from ${current_cost:.2f} to ${recommended_cost:.2f}")
+    if current_success is not None and recommended_success is not None:
+        details.append(
+            f"peer success stays around {recommended_success:.0%}"
+            if recommendation.recommendation_type == "downshift"
+            else f"peer success rises toward {recommended_success:.0%}"
+        )
+    if supporting_sessions:
+        details.append(f"{supporting_sessions} supporting sessions")
+    if not details:
+        return None
+    return ", ".join(details).capitalize() + "."
+
+
+def _tool_reason(recommendation) -> str | None:
+    details: list[str] = []
+    exemplar_count = getattr(recommendation, "supporting_exemplar_count", 0)
+    project_matches = getattr(recommendation, "project_context_match_count", 0)
+    if exemplar_count:
+        details.append(f"{exemplar_count} exemplar session{'s' if exemplar_count != 1 else ''}")
+    if project_matches:
+        details.append(
+            f"{project_matches} matching project context{'s' if project_matches != 1 else ''}"
+        )
+    if not details:
+        return None
+    return "Seen in " + " and ".join(details) + "."
+
+
+def _learning_reason(recommendation) -> str | None:
+    exemplars = list(getattr(recommendation, "exemplars", []) or [])
+    if not exemplars:
+        return None
+    return (
+        f"Grounded in {len(exemplars)} exemplar session"
+        f"{'s' if len(exemplars) != 1 else ''} from similar work."
+    )
+
+
 def _build_starting_pattern_section(
     profile,
     project_workspace,
@@ -216,11 +283,19 @@ def _build_starting_pattern_section(
         summary = playbook.summary.rstrip(".")
         if tools:
             summary = f"{summary}. Start with {tools}."
-        items.append(f"**{playbook.title}** — {summary}")
+        items.append(
+            _append_reason(f"**{playbook.title}** — {summary}", _playbook_reason(playbook))
+        )
 
     if project_workspace and project_workspace.enablement.recommendations:
         recommendation = project_workspace.enablement.recommendations[0]
-        items.append(f"**Project guidance** — {recommendation.title}: {recommendation.description}")
+        narrative = getattr(recommendation, "narrative", None)
+        items.append(
+            _append_reason(
+                f"**Project guidance** — {recommendation.title}: {recommendation.description}",
+                getattr(narrative, "why_this_helps", None),
+            )
+        )
 
     if not items:
         items.append(
@@ -248,7 +323,12 @@ def _build_session_start_recommendations_section(
     ]
     if matching_models:
         recommendation = matching_models[0]
-        items.append(f"**Model choice** — {recommendation.title}: {recommendation.description}")
+        items.append(
+            _append_reason(
+                f"**Model choice** — {recommendation.title}: {recommendation.description}",
+                _model_reason(recommendation),
+            )
+        )
 
     tool_recommendations = list(getattr(profile, "tool_recommendations", []) or [])
     matching_tools = [
@@ -260,12 +340,22 @@ def _build_session_start_recommendations_section(
     ]
     if matching_tools or tool_recommendations:
         recommendation = (matching_tools or tool_recommendations)[0]
-        items.append(f"**Tooling** — {recommendation.title}: {recommendation.description}")
+        items.append(
+            _append_reason(
+                f"**Tooling** — {recommendation.title}: {recommendation.description}",
+                _tool_reason(recommendation),
+            )
+        )
 
     learning_paths = list(getattr(profile, "learning_paths", []) or [])
     if learning_paths and learning_paths[0].recommendations:
         recommendation = learning_paths[0].recommendations[0]
-        items.append(f"**Reusable pattern** — {recommendation.title}: {recommendation.description}")
+        items.append(
+            _append_reason(
+                f"**Reusable pattern** — {recommendation.title}: {recommendation.description}",
+                _learning_reason(recommendation),
+            )
+        )
 
     if not items:
         items.append(

@@ -145,6 +145,7 @@ describe("InterventionsPage", () => {
             severity: "warning",
             project_name: "primer",
             evidence: {},
+            narrative: null,
           },
         ],
       },

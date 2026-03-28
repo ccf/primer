@@ -2,7 +2,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from primer.common.schemas import Recommendation
+from primer.common.schemas import Recommendation, RecommendationNarrative
 from primer.server.services.analytics_service import (
     get_friction_report,
     get_overview,
@@ -14,6 +14,80 @@ from primer.server.services.measurement_integrity_service import (
 )
 
 LOW_COVERAGE_THRESHOLD_PCT = 30.0
+
+
+def _friction_narrative(friction_type: str, count: int) -> RecommendationNarrative:
+    label = friction_type.replace("_", " ")
+    return RecommendationNarrative(
+        why_this_helps=(
+            f"Recurring {label} usually pushes engineers into the same failed recovery loop."
+        ),
+        evidence_summary=f"Observed {count} {label} incidents in the selected window.",
+        expected_impact=(
+            "Removing the repeat failure path should lower friction and improve follow-through."
+        ),
+    )
+
+
+def _measurement_integrity_narrative(
+    *,
+    facet_coverage_pct: float,
+    transcript_coverage_pct: float,
+    low_confidence_sessions: int,
+    remaining_legacy_rows: int,
+) -> RecommendationNarrative:
+    limiting_signals: list[str] = []
+    if facet_coverage_pct < LOW_COVERAGE_THRESHOLD_PCT:
+        limiting_signals.append(f"facet coverage is only {facet_coverage_pct:.1f}%")
+    if transcript_coverage_pct < LOW_COVERAGE_THRESHOLD_PCT:
+        limiting_signals.append(f"transcript coverage is only {transcript_coverage_pct:.1f}%")
+    if low_confidence_sessions > 0:
+        limiting_signals.append(f"{low_confidence_sessions} sessions are low-confidence")
+    if remaining_legacy_rows > 0:
+        limiting_signals.append(f"{remaining_legacy_rows} legacy rows still need normalization")
+    evidence_summary = (
+        "; ".join(limiting_signals)
+        if limiting_signals
+        else "Coverage is present, but confidence gaps are still limiting trust."
+    )
+    return RecommendationNarrative(
+        why_this_helps=(
+            "Better measurement integrity makes every downstream workflow, quality, and cost "
+            "recommendation more trustworthy."
+        ),
+        evidence_summary=evidence_summary + ".",
+        expected_impact=(
+            "Improving transcript and facet quality will sharpen future recommendations and "
+            "reduce false signals."
+        ),
+    )
+
+
+def _cost_narrative(avg_tokens: float) -> RecommendationNarrative:
+    return RecommendationNarrative(
+        why_this_helps=(
+            "Very high token usage usually means prompts are carrying more context than the task "
+            "needs or reloading context inefficiently."
+        ),
+        evidence_summary=f"Average session size is {avg_tokens:,.0f} tokens.",
+        expected_impact=(
+            "Trimming prompt weight or improving cache reuse should reduce spend without lowering "
+            "task quality."
+        ),
+    )
+
+
+def _workflow_narrative(tool_name: str, share: float) -> RecommendationNarrative:
+    return RecommendationNarrative(
+        why_this_helps=(
+            "When one tool dominates a workflow, engineers often miss faster search, edit, or "
+            "verification paths."
+        ),
+        evidence_summary=f"{tool_name} accounts for {share:.0%} of tracked tool calls.",
+        expected_impact=(
+            "Balancing the tool mix should improve recovery options and reduce bottlenecks."
+        ),
+    )
 
 
 def get_recommendations(
@@ -48,6 +122,7 @@ def get_recommendations(
                     ),
                     severity="warning",
                     evidence={"friction_type": fr.friction_type, "count": fr.count},
+                    narrative=_friction_narrative(fr.friction_type, fr.count),
                 )
             )
 
@@ -125,6 +200,12 @@ def get_recommendations(
                         "legacy_goal_category_sessions": legacy_goal_category_sessions,
                         "remaining_legacy_rows": remaining_legacy_rows,
                     },
+                    narrative=_measurement_integrity_narrative(
+                        facet_coverage_pct=facet_coverage_pct,
+                        transcript_coverage_pct=transcript_coverage_pct,
+                        low_confidence_sessions=low_confidence_sessions,
+                        remaining_legacy_rows=remaining_legacy_rows,
+                    ),
                 )
             )
 
@@ -143,6 +224,7 @@ def get_recommendations(
                     ),
                     severity="warning",
                     evidence={"avg_tokens_per_session": avg_tokens},
+                    narrative=_cost_narrative(avg_tokens),
                 )
             )
 
@@ -169,6 +251,7 @@ def get_recommendations(
                     ),
                     severity="info",
                     evidence={"tool": tools[0].tool_name, "share": top_tool_share},
+                    narrative=_workflow_narrative(tools[0].tool_name, top_tool_share),
                 )
             )
 

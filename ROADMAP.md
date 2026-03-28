@@ -228,7 +228,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [ ] [P1] Saved explorer prompts and reusable report cards
 - [x] [P1] Compare mode for engineer, team, project, and time-period analysis
 - [x] [P2] Weekly manager review packs that combine quality, friction, growth, and cost
-- [ ] [P2] Recommendation narratives that explain why a workflow is likely to help
+- [x] [P2] Recommendation narratives that explain why a workflow is likely to help
 
 ## Website & Positioning
 

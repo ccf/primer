@@ -83,6 +83,11 @@ def test_get_next_step_plan_combines_alerts_narratives_and_project_findings(
                         severity="warning",
                         category="workflow",
                         evidence={"fingerprint": "debugging"},
+                        narrative={
+                            "why_this_helps": "It standardizes the best recovery pattern.",
+                            "evidence_summary": "Backed by the highest-success debugging sessions.",
+                            "expected_impact": "More consistent recoveries.",
+                        },
                     )
                 ]
             )
@@ -97,6 +102,13 @@ def test_get_next_step_plan_combines_alerts_narratives_and_project_findings(
                 category="friction",
                 severity="warning",
                 evidence={"friction_type": "tool_error"},
+                narrative={
+                    "why_this_helps": (
+                        "Teams recover faster once they stop repeating the same tool path."
+                    ),
+                    "evidence_summary": "Tool errors are the top repeated failure mode.",
+                    "expected_impact": "Lower friction and faster follow-through.",
+                },
             )
         ],
     )
@@ -116,6 +128,11 @@ def test_get_next_step_plan_combines_alerts_narratives_and_project_findings(
     assert any(action.source_type == "project_finding" for action in plan.actions)
     assert any(action.source_type == "narrative" for action in plan.actions)
     assert any(action.source_type == "recommendation" for action in plan.actions)
+    recommendation_action = next(
+        action for action in plan.actions if action.source_type == "recommendation"
+    )
+    assert recommendation_action.narrative is not None
+    assert recommendation_action.narrative.why_this_helps.startswith("Teams recover faster")
 
 
 def test_next_step_plan_route_scopes_team_lead_to_their_team(client, db_session, monkeypatch):

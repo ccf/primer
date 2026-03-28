@@ -342,6 +342,14 @@ def test_project_workspace_endpoint_returns_composed_views(
     recommendation_titles = {item["title"] for item in data["enablement"]["recommendations"]}
     assert "Codify project context for agents" in recommendation_titles
     assert "Stabilize recurring tooling failures" in recommendation_titles
+    context_recommendation = next(
+        item
+        for item in data["enablement"]["recommendations"]
+        if item["title"] == "Codify project context for agents"
+    )
+    assert context_recommendation["narrative"]["why_this_helps"].startswith(
+        "Explicit repo guidance keeps agents"
+    )
     assert data["friction"]["project_name"] == "workspace-proj"
     assert data["quality"]["overview"]["total_prs"] == 1
     assert data["quality"]["findings_overview"]["total_findings"] == 1

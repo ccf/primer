@@ -109,6 +109,10 @@ def test_weekly_manager_review_pack_builds_sections(monkeypatch, db_session):
             SimpleNamespace(
                 title="Reduce tool retries",
                 description="Adopt the debugging playbook before escalating.",
+                narrative=SimpleNamespace(
+                    why_this_helps="It cuts the most common failure loop earlier.",
+                    expected_impact="Fewer tool-error retries next week.",
+                ),
             )
         ],
     )
@@ -126,6 +130,10 @@ def test_weekly_manager_review_pack_builds_sections(monkeypatch, db_session):
     ]
     assert "Merge rate: 80% (up 20% vs prior 14-day window)" in pack.sections[0].bullets
     assert "Reduce tool retries" in pack.recommended_actions[0]
+    assert (
+        "Why this helps: It cuts the most common failure loop earlier."
+        in pack.recommended_actions[0]
+    )
     assert "Platform logged 12 sessions" in pack.headline
     assert "prior 14-day window" in pack.headline
 

@@ -31,6 +31,7 @@ describe("ProjectEnablementCard", () => {
               description: "Tooling is failing in repeated project sessions.",
               severity: "warning",
               evidence: { friction_type: "tool_error" },
+              narrative: null,
             },
           ],
         }}

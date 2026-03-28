@@ -33,6 +33,7 @@ from primer.common.schemas import (
     ProjectWorkflowSummary,
     ProjectWorkspaceResponse,
     Recommendation,
+    RecommendationNarrative,
 )
 from primer.common.source_capabilities import CAPABILITIES
 from primer.server.services.analytics_service import (
@@ -56,6 +57,99 @@ from primer.server.services.workflow_patterns import (
 
 _PROJECT_CONTEXT_FRICTION = {"context_switching", "edit_conflict"}
 _PROJECT_TOOLING_FRICTION = {"tool_error", "timeout", "exec_error"}
+
+
+def _project_context_narrative(
+    hotspot, repos_missing_guidance: list[str]
+) -> RecommendationNarrative:
+    return RecommendationNarrative(
+        why_this_helps=(
+            "Explicit repo guidance keeps agents from repeatedly rediscovering commands, file "
+            "boundaries, and handoff conventions."
+        ),
+        evidence_summary=(
+            f"{hotspot.friction_type.replace('_', ' ')} touched {hotspot.session_count} sessions, "
+            f"and {len(repos_missing_guidance)} linked repos still lack CLAUDE.md or AGENTS.md."
+        ),
+        expected_impact=(
+            "Capturing project context should reduce early-session drift and lower recurring "
+            "context or edit friction."
+        ),
+    )
+
+
+def _project_tooling_narrative(hotspot) -> RecommendationNarrative:
+    return RecommendationNarrative(
+        why_this_helps=(
+            "Stable happy-path and fallback tooling prevents the same build, test, or MCP failures "
+            "from repeating across sessions."
+        ),
+        evidence_summary=(
+            f"{hotspot.friction_type.replace('_', ' ')} recurred {hotspot.total_occurrences} "
+            f"times across {hotspot.session_count} sessions."
+        ),
+        expected_impact=(
+            "Documenting the recovery path should shorten failed retries and improve recovery "
+            "rates on this project."
+        ),
+    )
+
+
+def _permissions_narrative(
+    hotspot, dominant_permission_mode: str | None
+) -> RecommendationNarrative:
+    dominant = f" Dominant mode: {dominant_permission_mode}." if dominant_permission_mode else ""
+    return RecommendationNarrative(
+        why_this_helps=(
+            "Permission friction is easiest to fix when projects make safe defaults and approval "
+            "boundaries explicit before engineers hit them mid-flow."
+        ),
+        evidence_summary=(
+            f"Permission-denied friction touched {hotspot.session_count} sessions.{dominant}"
+        ),
+        expected_impact=(
+            "Clarifying safe commands and approval boundaries should reduce interruptions in the "
+            "most common workflows."
+        ),
+    )
+
+
+def _workflow_playbook_narrative(
+    best_fingerprint: ProjectWorkflowFingerprint,
+) -> RecommendationNarrative:
+    return RecommendationNarrative(
+        why_this_helps=(
+            "Standardizing a proven workflow lets more engineers start from a pattern that already "
+            "works well in this repo."
+        ),
+        evidence_summary=(
+            f"'{best_fingerprint.label}' succeeded {best_fingerprint.success_rate:.0%} across "
+            f"{best_fingerprint.session_count} sessions."
+        ),
+        expected_impact=(
+            "Turning it into a playbook should improve consistency and shorten ramp time for "
+            "similar work."
+        ),
+    )
+
+
+def _fallback_workflow_narrative(friction) -> RecommendationNarrative:
+    return RecommendationNarrative(
+        why_this_helps=(
+            "Repeated project friction usually means the team has not yet codified the fastest "
+            "recovery path."
+        ),
+        evidence_summary=(
+            f"Captured {friction.total_friction_count} friction events at a "
+            f"{friction.friction_rate:.0%} friction rate."
+            if friction.friction_rate is not None
+            else f"Captured {friction.total_friction_count} friction events."
+        ),
+        expected_impact=(
+            "Reviewing the highest-friction workflows should reveal one or two concrete playbook "
+            "candidates."
+        ),
+    )
 
 
 def get_project_workspace(
@@ -658,6 +752,10 @@ def _build_project_enablement_recommendations(
                     "session_count": context_hotspot.session_count,
                     "repositories_missing_guidance": repos_missing_guidance,
                 },
+                narrative=_project_context_narrative(
+                    context_hotspot,
+                    repos_missing_guidance,
+                ),
             )
         )
 
@@ -681,6 +779,7 @@ def _build_project_enablement_recommendations(
                     "linked_fingerprints": tooling_hotspot.linked_fingerprints,
                     "sample_details": tooling_hotspot.sample_details,
                 },
+                narrative=_project_tooling_narrative(tooling_hotspot),
             )
         )
 
@@ -713,6 +812,10 @@ def _build_project_enablement_recommendations(
                     "total_occurrences": permission_hotspot.total_occurrences,
                     "dominant_permission_mode": dominant_permission_mode,
                 },
+                narrative=_permissions_narrative(
+                    permission_hotspot,
+                    dominant_permission_mode,
+                ),
             )
         )
 
@@ -741,6 +844,7 @@ def _build_project_enablement_recommendations(
                     "session_count": best_fingerprint.session_count,
                     "success_rate": best_fingerprint.success_rate,
                 },
+                narrative=_workflow_playbook_narrative(best_fingerprint),
             )
         )
 
@@ -759,6 +863,7 @@ def _build_project_enablement_recommendations(
                     "friction_rate": friction.friction_rate,
                     "total_friction_count": friction.total_friction_count,
                 },
+                narrative=_fallback_workflow_narrative(friction),
             )
         )
 

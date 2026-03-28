@@ -8,6 +8,11 @@ const sampleRec: Recommendation = {
   description: "Reduce tool errors",
   severity: "warning",
   evidence: {},
+  narrative: {
+    why_this_helps: "It removes the most common failure loop.",
+    evidence_summary: "Tool errors spiked this week.",
+    expected_impact: "Fewer stalled sessions.",
+  },
 }
 
 describe("RecommendationCard", () => {
@@ -16,6 +21,14 @@ describe("RecommendationCard", () => {
 
     expect(screen.getByText("Too many errors")).toBeInTheDocument()
     expect(screen.getByText("Reduce tool errors")).toBeInTheDocument()
+  })
+
+  it("renders recommendation narrative when present", () => {
+    render(<RecommendationCard rec={sampleRec} />)
+
+    expect(screen.getByText("Why this helps")).toBeInTheDocument()
+    expect(screen.getByText("It removes the most common failure loop.")).toBeInTheDocument()
+    expect(screen.getByText(/Likely impact:/)).toBeInTheDocument()
   })
 
   it("renders severity badge", () => {

@@ -18,6 +18,7 @@ const sampleRecs: Recommendation[] = [
     description: "Reduce tool errors",
     severity: "warning",
     evidence: {},
+    narrative: null,
   },
   {
     category: "performance",
@@ -25,6 +26,7 @@ const sampleRecs: Recommendation[] = [
     description: "Optimize long-running sessions",
     severity: "critical",
     evidence: {},
+    narrative: null,
   },
 ]
 

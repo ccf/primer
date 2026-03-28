@@ -121,8 +121,7 @@ def get_weekly_manager_review_pack(
         ),
     ]
     recommended_actions = [
-        f"{recommendation.title} — {recommendation.description}"
-        for recommendation in recommendations[:3]
+        _format_recommended_action(recommendation) for recommendation in recommendations[:3]
     ]
     if not recommended_actions:
         recommended_actions = ["No urgent action is standing out this week."]
@@ -172,6 +171,16 @@ def _build_headline(
     elif session_delta < 0:
         parts.append(f"{abs(session_delta)} fewer than the {comparison_label}")
     return " · ".join(parts)
+
+
+def _format_recommended_action(recommendation) -> str:
+    parts = [f"{recommendation.title} — {recommendation.description}"]
+    narrative = getattr(recommendation, "narrative", None)
+    if narrative is not None and getattr(narrative, "why_this_helps", None):
+        parts.append(f"Why this helps: {narrative.why_this_helps}")
+    if narrative is not None and getattr(narrative, "expected_impact", None):
+        parts.append(f"Expected impact: {narrative.expected_impact}")
+    return " ".join(parts)
 
 
 def _build_quality_section(current, previous, *, comparison_label: str) -> ManagerReviewSection:
