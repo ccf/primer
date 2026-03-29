@@ -207,6 +207,7 @@ def _playbook_reason(playbook) -> str | None:
 
 
 def _model_reason(recommendation) -> str | None:
+    recommendation_type = getattr(recommendation, "recommendation_type", None)
     current_success = getattr(recommendation, "current_success_rate", None)
     recommended_success = getattr(recommendation, "recommended_success_rate", None)
     current_cost = getattr(recommendation, "current_avg_cost", None)
@@ -219,7 +220,7 @@ def _model_reason(recommendation) -> str | None:
     if current_success is not None and recommended_success is not None:
         details.append(
             f"peer success stays around {recommended_success:.0%}"
-            if recommendation.recommendation_type == "downshift"
+            if recommendation_type == "downshift"
             else f"peer success rises toward {recommended_success:.0%}"
         )
     if supporting_sessions:
