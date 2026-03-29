@@ -121,6 +121,8 @@ def test_recommendation_surfaces_missing_confidence_sessions_in_evidence_and_des
     assert rec["evidence"]["facet_coverage_pct"] == 100.0
     assert rec["evidence"]["missing_confidence_sessions"] == 3
     assert "missing confidence" in rec["description"]
+    assert "missing confidence scores" in rec["narrative"]["evidence_summary"]
+    assert ".." not in rec["narrative"]["evidence_summary"]
 
 
 def test_recommendation_scopes_measurement_integrity_evidence_by_team(
