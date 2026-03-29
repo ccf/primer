@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { RecommendationNarrativeBlock } from "@/components/shared/recommendation-narrative-block"
 import type { Recommendation } from "@/types/api"
 
 const severityVariant: Record<string, "default" | "warning" | "destructive" | "secondary"> = {
@@ -28,22 +29,10 @@ export function RecommendationCard({
           <p className="mt-2 text-sm font-medium">{rec.title}</p>
           <p className="mt-1 text-sm text-muted-foreground">{rec.description}</p>
           {rec.narrative && (
-            <div className="mt-3 rounded-md border border-border/70 bg-muted/30 p-3 text-sm">
-              <p className="font-medium text-foreground/90">Why this helps</p>
-              <p className="mt-1 text-muted-foreground">{rec.narrative.why_this_helps}</p>
-              {rec.narrative.evidence_summary && (
-                <p className="mt-2 text-muted-foreground">
-                  <span className="font-medium text-foreground/90">Evidence:</span>{" "}
-                  {rec.narrative.evidence_summary}
-                </p>
-              )}
-              {rec.narrative.expected_impact && (
-                <p className="mt-1 text-muted-foreground">
-                  <span className="font-medium text-foreground/90">Likely impact:</span>{" "}
-                  {rec.narrative.expected_impact}
-                </p>
-              )}
-            </div>
+            <RecommendationNarrativeBlock
+              narrative={rec.narrative}
+              className="rounded-md bg-muted/30"
+            />
           )}
           {onCreateIntervention && (
             <div className="mt-3">

@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { RecommendationNarrativeBlock } from "@/components/shared/recommendation-narrative-block"
 import type { NextStepPlanResponse } from "@/types/api"
 
 interface NextStepPlanSectionProps {
@@ -50,22 +51,10 @@ export function NextStepPlanSection({ plan }: NextStepPlanSectionProps) {
                 <p className="text-base font-semibold">{action.title}</p>
                 <p className="text-sm text-muted-foreground">{action.description}</p>
                 {action.narrative && (
-                  <div className="mt-3 rounded-xl border border-border/70 bg-muted/20 p-3 text-sm">
-                    <p className="font-medium text-foreground/90">Why this helps</p>
-                    <p className="mt-1 text-muted-foreground">{action.narrative.why_this_helps}</p>
-                    {action.narrative.evidence_summary && (
-                      <p className="mt-2 text-muted-foreground">
-                        <span className="font-medium text-foreground/90">Evidence:</span>{" "}
-                        {action.narrative.evidence_summary}
-                      </p>
-                    )}
-                    {action.narrative.expected_impact && (
-                      <p className="mt-1 text-muted-foreground">
-                        <span className="font-medium text-foreground/90">Likely impact:</span>{" "}
-                        {action.narrative.expected_impact}
-                      </p>
-                    )}
-                  </div>
+                  <RecommendationNarrativeBlock
+                    narrative={action.narrative}
+                    className="rounded-xl bg-muted/20"
+                  />
                 )}
               </div>
               {action.source_title && (
