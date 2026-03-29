@@ -34,6 +34,7 @@ def _measurement_integrity_narrative(
     facet_coverage_pct: float,
     transcript_coverage_pct: float,
     low_confidence_sessions: int,
+    missing_confidence_sessions: int,
     remaining_legacy_rows: int,
 ) -> RecommendationNarrative:
     limiting_signals: list[str] = []
@@ -43,10 +44,14 @@ def _measurement_integrity_narrative(
         limiting_signals.append(f"transcript coverage is only {transcript_coverage_pct:.1f}%")
     if low_confidence_sessions > 0:
         limiting_signals.append(f"{low_confidence_sessions} sessions are low-confidence")
+    if missing_confidence_sessions > 0:
+        limiting_signals.append(
+            f"{missing_confidence_sessions} sessions are missing confidence scores"
+        )
     if remaining_legacy_rows > 0:
         limiting_signals.append(f"{remaining_legacy_rows} legacy rows still need normalization")
     evidence_summary = (
-        "; ".join(limiting_signals)
+        "; ".join(limiting_signals) + "."
         if limiting_signals
         else "Coverage is present, but confidence gaps are still limiting trust."
     )
@@ -55,7 +60,7 @@ def _measurement_integrity_narrative(
             "Better measurement integrity makes every downstream workflow, quality, and cost "
             "recommendation more trustworthy."
         ),
-        evidence_summary=evidence_summary + ".",
+        evidence_summary=evidence_summary,
         expected_impact=(
             "Improving transcript and facet quality will sharpen future recommendations and "
             "reduce false signals."
@@ -204,6 +209,7 @@ def get_recommendations(
                         facet_coverage_pct=facet_coverage_pct,
                         transcript_coverage_pct=transcript_coverage_pct,
                         low_confidence_sessions=low_confidence_sessions,
+                        missing_confidence_sessions=missing_confidence_sessions,
                         remaining_legacy_rows=remaining_legacy_rows,
                     ),
                 )
