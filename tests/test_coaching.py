@@ -247,6 +247,11 @@ def test_session_start_coaching_matches_hyphenated_workflow_hints(client, db_ses
                     workflow_archetype="feature-delivery",
                     title="Use Sonnet for feature-delivery work",
                     description="Peers keep quality while spending less.",
+                    current_success_rate=0.72,
+                    recommended_success_rate=0.75,
+                    current_avg_cost=2.1,
+                    recommended_avg_cost=1.4,
+                    supporting_session_count=5,
                 )
             ],
             tool_recommendations=[],
@@ -272,5 +277,9 @@ def test_session_start_coaching_matches_hyphenated_workflow_hints(client, db_ses
     )
     assert any(
         "Use Sonnet for feature-delivery work" in item for item in data["sections"][1]["items"]
+    )
+    assert any(
+        "Why this helps: Avg cost shifts from $2.10 to $1.40" in item
+        for item in data["sections"][1]["items"]
     )
     assert "Workflow: feature-delivery" in data["context_summary"]
