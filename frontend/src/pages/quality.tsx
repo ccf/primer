@@ -9,6 +9,7 @@ import { GitHubStatusBanner } from "@/components/quality/github-status-banner"
 import { EngineerQualityTable } from "@/components/quality/engineer-quality-table"
 import { FindingsOverviewSection } from "@/components/quality/findings-overview"
 import { FindingsTable } from "@/components/quality/findings-table"
+import { PostMergeOutcomesSection } from "@/components/quality/post-merge-outcomes-section"
 import { QualityAttributionTable } from "@/components/quality/quality-attribution-table"
 import { CardSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleton"
 import { SectionHeader } from "@/components/shared/section-header"
@@ -63,6 +64,17 @@ export function QualityPage({ teamId, dateRange }: QualityPageProps) {
       {quality.findings_overview && (
         <FindingsOverviewSection findings={quality.findings_overview} />
       )}
+
+      <section className="space-y-3">
+        <SectionHeader
+          title="Post-merge outcomes"
+          description="Track the stabilization work that shows up after merge, including reverts, hotfixes, and follow-up fixes."
+        />
+        <PostMergeOutcomesSection
+          summary={quality.post_merge_outcomes}
+          prs={quality.recent_post_merge_prs}
+        />
+      </section>
 
       {findingsData && findingsData.items.length > 0 && (
         <section className="space-y-3">

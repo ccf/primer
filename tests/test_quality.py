@@ -508,6 +508,102 @@ class TestQualityMetrics:
         types = data["by_session_type"]
         assert len(types) >= 1
 
+    def test_post_merge_outcomes_tracks_reverts_hotfixes_and_follow_up_fixes(
+        self, client, engineer_with_key, admin_headers, db_session
+    ):
+        eng, key = engineer_with_key
+        now = datetime.utcnow()
+
+        repo = GitRepository(full_name="acme/post-merge-test")
+        db_session.add(repo)
+        db_session.flush()
+
+        session_specs = [
+            (
+                "post-merge-session-1",
+                "pm_commit_1",
+                'Revert "Feature rollout"',
+                "revert/feature-rollout",
+            ),
+            (
+                "post-merge-session-2",
+                "pm_commit_2",
+                "Hotfix: repair auth cache",
+                "hotfix/auth-cache",
+            ),
+            (
+                "post-merge-session-3",
+                "pm_commit_3",
+                "Follow-up: fix auth regression",
+                "follow-up/auth-regression",
+            ),
+            (
+                "post-merge-session-4",
+                "pm_commit_4",
+                "Feature: ship dashboard polish",
+                "feat/dashboard",
+            ),
+        ]
+
+        pr_ids_by_sha: dict[str, str] = {}
+        for idx, (session_id, sha, title, branch) in enumerate(session_specs, start=1):
+            payload = _ingest_payload(
+                key,
+                session_id=session_id,
+                git_remote_url="https://github.com/acme/post-merge-test.git",
+                commits=[
+                    {
+                        "sha": sha,
+                        "message": title,
+                        "committed_at": now.isoformat(),
+                        "files_changed": 1,
+                        "lines_added": 10,
+                        "lines_deleted": 2,
+                    }
+                ],
+            )
+            resp = client.post("/api/v1/ingest/session", json=payload)
+            assert resp.status_code == 200
+
+            pr = PullRequest(
+                repository_id=repo.id,
+                engineer_id=eng.id,
+                github_pr_number=400 + idx,
+                title=title,
+                state="merged",
+                head_branch=branch,
+                review_comments_count=idx,
+                pr_created_at=now - timedelta(days=idx, hours=3),
+                merged_at=now - timedelta(days=idx),
+            )
+            db_session.add(pr)
+            db_session.flush()
+            pr_ids_by_sha[sha] = pr.id
+
+        for sha, pr_id in pr_ids_by_sha.items():
+            commit = db_session.query(SessionCommit).filter(SessionCommit.commit_sha == sha).one()
+            commit.pull_request_id = pr_id
+        db_session.flush()
+
+        resp = client.get("/api/v1/analytics/quality-metrics", headers=admin_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+
+        summary = data["post_merge_outcomes"]
+        assert summary["merged_prs_analyzed"] == 4
+        assert summary["revert_prs"] == 1
+        assert summary["hotfix_prs"] == 1
+        assert summary["follow_up_fix_prs"] == 1
+        assert summary["post_merge_issue_rate"] == 0.75
+
+        outcome_types = {row["outcome_type"] for row in data["recent_post_merge_prs"]}
+        assert outcome_types == {"revert", "hotfix", "follow_up_fix"}
+        revert_row = next(
+            row for row in data["recent_post_merge_prs"] if row["outcome_type"] == "revert"
+        )
+        assert revert_row["detection_signal"] == "linked revert session"
+        assert revert_row["linked_sessions"] == 1
+
     def test_auth_required(self, client):
         resp = client.get("/api/v1/analytics/quality-metrics")
         assert resp.status_code == 401
