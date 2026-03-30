@@ -1265,6 +1265,27 @@ export interface PRSummary {
   merged_at: string | null
 }
 
+export interface PostMergeOutcomeSummary {
+  merged_prs_analyzed: number
+  revert_prs: number
+  hotfix_prs: number
+  follow_up_fix_prs: number
+  affected_repositories: number
+  post_merge_issue_rate: number | null
+}
+
+export interface PostMergeOutcomePRSummary {
+  repository: string
+  pr_number: number
+  title: string | null
+  head_branch: string | null
+  author: string | null
+  outcome_type: string
+  detection_signal: string
+  linked_sessions: number
+  merged_at: string | null
+}
+
 export interface ReviewFindingSummary {
   id: string
   source: string
@@ -1296,6 +1317,8 @@ export interface QualityMetricsResponse {
   engineer_quality: EngineerQuality[]
   attribution: QualityAttributionRow[]
   recent_prs: PRSummary[]
+  post_merge_outcomes: PostMergeOutcomeSummary | null
+  recent_post_merge_prs: PostMergeOutcomePRSummary[]
   findings_overview: FindingsOverview | null
   sessions_analyzed: number
   github_connected: boolean

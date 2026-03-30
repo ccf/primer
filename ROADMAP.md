@@ -198,7 +198,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] `GET /api/v1/analytics/review-findings` endpoint with source/severity/status filters
 - [x] Quality attribution layer linking session behavior to PR outcomes and review findings
 - [ ] [P1] Additional review bot parsers: CodeRabbit, SonarQube, and other automated review tools
-- [ ] [P1] Post-merge outcome tracking: reverts, hotfixes, and follow-up bug volume
+- [x] [P1] Post-merge outcome tracking: reverts, hotfixes, and follow-up bug volume
 - [x] [P1] Change-quality analysis by workflow fingerprint and session archetype
 - [ ] [P2] Review remediation tracking from finding creation to fix completion
 
@@ -266,7 +266,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Dark mode with system preference detection
 - [x] [P1] Activation and setup hub for GitHub, budgets, alerts, narrative readiness, and data freshness
 - [x] [P1] Performance measurement views for leadership across productivity, quality, cost, and adoption
-- [ ] [P1] Threshold resolution and policy management that matches actual alerting behavior
+- [x] [P1] Threshold resolution and policy management that matches actual alerting behavior
 - [ ] [P2] Multi-tenant workspace isolation for multiple organizations on a shared Primer instance
 - [ ] [P2] Enterprise IdP support with SAML and OIDC for provisioning and SSO
 

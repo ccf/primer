@@ -1626,6 +1626,27 @@ class PRSummary(BaseModel):
     merged_at: str | None
 
 
+class PostMergeOutcomeSummary(BaseModel):
+    merged_prs_analyzed: int
+    revert_prs: int = 0
+    hotfix_prs: int = 0
+    follow_up_fix_prs: int = 0
+    affected_repositories: int = 0
+    post_merge_issue_rate: float | None = None
+
+
+class PostMergeOutcomePRSummary(BaseModel):
+    repository: str
+    pr_number: int
+    title: str | None
+    head_branch: str | None
+    author: str | None
+    outcome_type: str
+    detection_signal: str
+    linked_sessions: int
+    merged_at: str | None
+
+
 # --- Review Findings ---
 
 
@@ -1662,6 +1683,8 @@ class QualityMetricsResponse(BaseModel):
     engineer_quality: list[EngineerQuality]
     attribution: list[QualityAttributionRow]
     recent_prs: list[PRSummary]
+    post_merge_outcomes: PostMergeOutcomeSummary | None = None
+    recent_post_merge_prs: list[PostMergeOutcomePRSummary] = []
     findings_overview: FindingsOverview | None = None
     sessions_analyzed: int
     github_connected: bool

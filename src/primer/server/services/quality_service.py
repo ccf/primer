@@ -11,6 +11,7 @@ from primer.common.models import (
     GitRepository,
     PullRequest,
     ReviewFinding,
+    SessionChangeShape,
     SessionCommit,
     SessionFacets,
     SessionWorkflowProfile,
@@ -22,6 +23,8 @@ from primer.common.schemas import (
     DailyCodeVolume,
     EngineerQuality,
     FindingsOverview,
+    PostMergeOutcomePRSummary,
+    PostMergeOutcomeSummary,
     PRGroupMetrics,
     PRSummary,
     QualityAttributionRow,
@@ -33,6 +36,59 @@ from primer.server.services.analytics_service import base_session_query
 from primer.server.services.github_service import is_configured
 
 logger = logging.getLogger(__name__)
+
+_REVERT_KEYWORDS = ("revert", "rollback")
+_HOTFIX_KEYWORDS = ("hotfix", "emergency fix", "emergency-fix", "emergency_fix")
+_FOLLOW_UP_FIX_KEYWORDS = (
+    "follow-up",
+    "follow up",
+    "followup",
+    "regression",
+    "fix-forward",
+    "fix forward",
+    "post-merge",
+    "post merge",
+)
+
+
+def _normalize_text(value: str | None) -> str:
+    return (value or "").strip().lower()
+
+
+def _contains_keyword(text: str, keywords: tuple[str, ...]) -> str | None:
+    for keyword in keywords:
+        if keyword in text:
+            return keyword
+    return None
+
+
+def _classify_post_merge_outcome(pr, *, revert_linked: bool) -> tuple[str | None, str | None]:
+    title = _normalize_text(pr.title)
+    branch = _normalize_text(pr.head_branch)
+    title_match = _contains_keyword(title, _REVERT_KEYWORDS)
+    branch_match = _contains_keyword(branch, _REVERT_KEYWORDS)
+    if revert_linked:
+        return "revert", "linked revert session"
+    if title_match:
+        return "revert", f"title contains '{title_match}'"
+    if branch_match:
+        return "revert", f"branch contains '{branch_match}'"
+
+    title_match = _contains_keyword(title, _HOTFIX_KEYWORDS)
+    branch_match = _contains_keyword(branch, _HOTFIX_KEYWORDS)
+    if title_match:
+        return "hotfix", f"title contains '{title_match}'"
+    if branch_match:
+        return "hotfix", f"branch contains '{branch_match}'"
+
+    title_match = _contains_keyword(title, _FOLLOW_UP_FIX_KEYWORDS)
+    branch_match = _contains_keyword(branch, _FOLLOW_UP_FIX_KEYWORDS)
+    if title_match:
+        return "follow_up_fix", f"title contains '{title_match}'"
+    if branch_match:
+        return "follow_up_fix", f"branch contains '{branch_match}'"
+
+    return None, None
 
 
 def get_quality_metrics(
@@ -61,6 +117,17 @@ def get_quality_metrics(
 
     github_prs = (
         [] if project_name else _compute_github_prs(db, team_id, engineer_id, start_date, end_date)
+    )
+    post_merge_outcomes, recent_post_merge_prs = (
+        _compute_post_merge_outcomes_for_session_scope(db, session_id_subq)
+        if project_name
+        else _compute_post_merge_outcomes_from_github(
+            db,
+            team_id,
+            engineer_id,
+            start_date,
+            end_date,
+        )
     )
     findings_overview = (
         _compute_findings_overview_for_session_scope(db, session_id_subq)
@@ -93,6 +160,8 @@ def get_quality_metrics(
             engineer_quality=[],
             attribution=[],
             recent_prs=github_prs,
+            post_merge_outcomes=post_merge_outcomes,
+            recent_post_merge_prs=recent_post_merge_prs,
             findings_overview=findings_overview,
             sessions_analyzed=0,
             github_connected=is_configured(),
@@ -145,6 +214,8 @@ def get_quality_metrics(
         engineer_quality=engineer_quality,
         attribution=attribution,
         recent_prs=merged_prs[:30],
+        post_merge_outcomes=post_merge_outcomes,
+        recent_post_merge_prs=recent_post_merge_prs,
         findings_overview=findings_overview,
         sessions_analyzed=total_sessions,
         github_connected=is_configured(),
@@ -784,6 +855,168 @@ def _compute_recent_prs_for_session_scope(db: Session, session_scope) -> list[PR
         )
 
     return results
+
+
+def _build_post_merge_outcomes(
+    pr_rows,
+    *,
+    linked_rows,
+    revert_rows,
+) -> tuple[PostMergeOutcomeSummary, list[PostMergeOutcomePRSummary]]:
+    merged_prs = list(pr_rows)
+    if not merged_prs:
+        return (
+            PostMergeOutcomeSummary(
+                merged_prs_analyzed=0,
+                revert_prs=0,
+                hotfix_prs=0,
+                follow_up_fix_prs=0,
+                affected_repositories=0,
+                post_merge_issue_rate=None,
+            ),
+            [],
+        )
+
+    linked_map = {row.pull_request_id: row.linked for row in linked_rows}
+    revert_pr_ids = {row.pull_request_id for row in revert_rows}
+
+    results: list[PostMergeOutcomePRSummary] = []
+    revert_prs = 0
+    hotfix_prs = 0
+    follow_up_fix_prs = 0
+    affected_repositories: set[str] = set()
+
+    for pr, repo_name, author_name in merged_prs:
+        outcome_type, detection_signal = _classify_post_merge_outcome(
+            pr,
+            revert_linked=pr.id in revert_pr_ids,
+        )
+        if outcome_type is None or detection_signal is None:
+            continue
+
+        if outcome_type == "revert":
+            revert_prs += 1
+        elif outcome_type == "hotfix":
+            hotfix_prs += 1
+        else:
+            follow_up_fix_prs += 1
+        affected_repositories.add(repo_name)
+
+        results.append(
+            PostMergeOutcomePRSummary(
+                repository=repo_name,
+                pr_number=pr.github_pr_number,
+                title=pr.title,
+                head_branch=pr.head_branch,
+                author=author_name,
+                outcome_type=outcome_type,
+                detection_signal=detection_signal,
+                linked_sessions=linked_map.get(pr.id, 0),
+                merged_at=pr.merged_at.isoformat() if pr.merged_at else None,
+            )
+        )
+
+    results.sort(key=lambda pr: pr.merged_at or "", reverse=True)
+    total_outcomes = revert_prs + hotfix_prs + follow_up_fix_prs
+    summary = PostMergeOutcomeSummary(
+        merged_prs_analyzed=len(merged_prs),
+        revert_prs=revert_prs,
+        hotfix_prs=hotfix_prs,
+        follow_up_fix_prs=follow_up_fix_prs,
+        affected_repositories=len(affected_repositories),
+        post_merge_issue_rate=(total_outcomes / len(merged_prs) if merged_prs else None),
+    )
+    return summary, results[:20]
+
+
+def _compute_post_merge_outcomes_from_github(
+    db: Session,
+    team_id: str | None,
+    engineer_id: str | None,
+    start_date: datetime | None,
+    end_date: datetime | None,
+) -> tuple[PostMergeOutcomeSummary, list[PostMergeOutcomePRSummary]]:
+    pr_rows = (
+        _build_pr_scope_query(db, team_id, engineer_id, start_date, end_date)
+        .filter(PullRequest.state == "merged", PullRequest.merged_at.isnot(None))
+        .order_by(PullRequest.merged_at.desc())
+        .all()
+    )
+    pr_ids = [pr.id for pr, _, _ in pr_rows]
+    if not pr_ids:
+        return _build_post_merge_outcomes([], linked_rows=[], revert_rows=[])
+
+    linked_rows = (
+        db.query(
+            SessionCommit.pull_request_id,
+            func.count(distinct(SessionCommit.session_id)).label("linked"),
+        )
+        .filter(SessionCommit.pull_request_id.in_(pr_ids))
+        .group_by(SessionCommit.pull_request_id)
+        .all()
+    )
+    revert_rows = (
+        db.query(SessionCommit.pull_request_id)
+        .join(SessionChangeShape, SessionChangeShape.session_id == SessionCommit.session_id)
+        .filter(
+            SessionCommit.pull_request_id.in_(pr_ids),
+            SessionChangeShape.revert_indicator.is_(True),
+        )
+        .distinct()
+        .all()
+    )
+    return _build_post_merge_outcomes(
+        pr_rows,
+        linked_rows=linked_rows,
+        revert_rows=revert_rows,
+    )
+
+
+def _compute_post_merge_outcomes_for_session_scope(
+    db: Session,
+    session_scope,
+) -> tuple[PostMergeOutcomeSummary, list[PostMergeOutcomePRSummary]]:
+    pr_rows = (
+        db.query(PullRequest, GitRepository.full_name, Engineer.name.label("author_name"))
+        .join(GitRepository, GitRepository.id == PullRequest.repository_id)
+        .outerjoin(Engineer, Engineer.id == PullRequest.engineer_id)
+        .join(SessionCommit, SessionCommit.pull_request_id == PullRequest.id)
+        .join(session_scope, SessionCommit.session_id == session_scope.c.id)
+        .filter(PullRequest.state == "merged", PullRequest.merged_at.isnot(None))
+        .distinct()
+        .order_by(PullRequest.merged_at.desc())
+        .all()
+    )
+    pr_ids = [pr.id for pr, _, _ in pr_rows]
+    if not pr_ids:
+        return _build_post_merge_outcomes([], linked_rows=[], revert_rows=[])
+
+    linked_rows = (
+        db.query(
+            SessionCommit.pull_request_id,
+            func.count(distinct(SessionCommit.session_id)).label("linked"),
+        )
+        .join(session_scope, SessionCommit.session_id == session_scope.c.id)
+        .filter(SessionCommit.pull_request_id.in_(pr_ids))
+        .group_by(SessionCommit.pull_request_id)
+        .all()
+    )
+    revert_rows = (
+        db.query(SessionCommit.pull_request_id)
+        .join(session_scope, SessionCommit.session_id == session_scope.c.id)
+        .join(SessionChangeShape, SessionChangeShape.session_id == SessionCommit.session_id)
+        .filter(
+            SessionCommit.pull_request_id.in_(pr_ids),
+            SessionChangeShape.revert_indicator.is_(True),
+        )
+        .distinct()
+        .all()
+    )
+    return _build_post_merge_outcomes(
+        pr_rows,
+        linked_rows=linked_rows,
+        revert_rows=revert_rows,
+    )
 
 
 def _build_pr_scope_query(
