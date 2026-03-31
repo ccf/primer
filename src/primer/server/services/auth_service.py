@@ -217,8 +217,6 @@ def exchange_device_setup_code(
         return None
 
     if setup_code.expires_at.replace(tzinfo=UTC) < now:
-        setup_code.revoked = True
-        db.flush()
         return None
 
     engineer = db.query(Engineer).filter(Engineer.id == setup_code.engineer_id).first()

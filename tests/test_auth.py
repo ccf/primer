@@ -7,7 +7,7 @@ import bcrypt
 import jwt
 
 from primer.common.config import settings
-from primer.common.models import DeviceToken, Engineer, RefreshToken, Team
+from primer.common.models import AuditLog, DeviceToken, Engineer, RefreshToken, Team
 from primer.server.services.auth_service import (
     JWT_ALGORITHM,
     _hash_token,
@@ -237,6 +237,16 @@ def test_device_setup_code_exchange_creates_device_token(client, engineer_with_k
     assert data["engineer"]["id"] == eng.id
     assert data["device_token"]["name"] == "Laptop"
     assert data["raw_token"].startswith("primer_dev_")
+
+    audit_entry = (
+        db_session.query(AuditLog)
+        .filter(
+            AuditLog.action == "exchange",
+            AuditLog.resource_type == "device_setup_code",
+        )
+        .one()
+    )
+    assert audit_entry.actor_id == eng.id
 
     replay_resp = client.post(
         "/api/v1/auth/device-token-setup-codes/exchange",
