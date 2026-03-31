@@ -208,21 +208,29 @@ def exchange_device_setup_code(
     device_name: str | None = None,
 ) -> tuple[Engineer, DeviceToken, str] | None:
     code_hash = _hash_token(raw_code)
-    setup_code = (
-        db.query(DeviceSetupCode)
-        .filter(
-            DeviceSetupCode.code_hash == code_hash,
-            DeviceSetupCode.revoked.is_(False),
-            DeviceSetupCode.used_at.is_(None),
-        )
-        .first()
-    )
+    setup_code = db.query(DeviceSetupCode).filter(DeviceSetupCode.code_hash == code_hash).first()
     if setup_code is None:
         return None
 
-    if setup_code.expires_at.replace(tzinfo=UTC) < datetime.now(UTC):
+    now = datetime.now(UTC)
+    if setup_code.revoked or setup_code.used_at is not None:
+        return None
+
+    if setup_code.expires_at.replace(tzinfo=UTC) < now:
         setup_code.revoked = True
         db.flush()
+        return None
+
+    claimed = (
+        db.query(DeviceSetupCode)
+        .filter(
+            DeviceSetupCode.id == setup_code.id,
+            DeviceSetupCode.revoked.is_(False),
+            DeviceSetupCode.used_at.is_(None),
+        )
+        .update({"used_at": now}, synchronize_session=False)
+    )
+    if claimed != 1:
         return None
 
     engineer = db.query(Engineer).filter(Engineer.id == setup_code.engineer_id).first()
@@ -234,7 +242,6 @@ def exchange_device_setup_code(
         engineer,
         name=device_name or "Local machine",
     )
-    setup_code.used_at = datetime.now(UTC)
     db.flush()
     return engineer, device_token, raw_token
 
