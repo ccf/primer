@@ -51,11 +51,17 @@ def verify_device_token(device_token: str, db: Session) -> Engineer:
     return _require_active_engineer(engineer, missing_detail="Invalid device token")
 
 
+def _header_value(value: object) -> str | None:
+    return value if isinstance(value, str) and value else None
+
+
 def require_engineer(
     x_api_key: str | None = Header(default=None),
     x_device_token: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ) -> Engineer:
+    x_api_key = _header_value(x_api_key)
+    x_device_token = _header_value(x_device_token)
     if x_device_token:
         return verify_device_token(x_device_token, db)
     if x_api_key:
@@ -79,6 +85,9 @@ def get_auth_context(
     x_device_token: str | None = Header(default=None),
 ) -> AuthContext:
     """Unified auth: try JWT cookie → admin key header → API key header."""
+    x_admin_key = _header_value(x_admin_key)
+    x_api_key = _header_value(x_api_key)
+    x_device_token = _header_value(x_device_token)
     # 1. JWT cookie
     if primer_access:
         payload = verify_access_token(primer_access)
