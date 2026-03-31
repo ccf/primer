@@ -71,7 +71,7 @@ class SessionMetadata:
     commits: list[dict] = field(default_factory=list)
     customizations: list[dict] | None = None
 
-    def to_ingest_payload(self, api_key: str, facets: dict | None = None) -> dict:
+    def to_ingest_payload(self, api_key: str | None = None, facets: dict | None = None) -> dict:
         customizations = (
             self.customizations
             if self.customizations is not None
@@ -86,7 +86,6 @@ class SessionMetadata:
         )
         payload: dict = {
             "session_id": self.session_id,
-            "api_key": api_key,
             "project_path": self.project_path or None,
             "project_name": self.project_name or None,
             "git_branch": self.git_branch or None,
@@ -124,6 +123,8 @@ class SessionMetadata:
                 for name, tokens in self.model_tokens.items()
             ],
         }
+        if api_key:
+            payload["api_key"] = api_key
         if self.messages:
             payload["messages"] = self.messages
         if self.git_remote_url:

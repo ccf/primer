@@ -141,6 +141,7 @@ export function ProfilePage({ teamId, dateRange }: ProfilePageProps) {
                 teamId={teamId}
                 startDate={startDate}
                 endDate={endDate}
+                showDeviceTokens={!isApiKeyUser}
               />
             )}
             {activeTab === "sessions" && (

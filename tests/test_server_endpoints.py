@@ -222,6 +222,19 @@ def test_get_team_not_found(client, admin_headers):
     assert r.status_code == 404
 
 
+def test_list_sessions_with_device_token(client, engineer_with_key, db_session):
+    from primer.server.services.auth_service import create_device_token
+
+    eng, api_key = engineer_with_key
+    _ingest_session(client, api_key)
+    _token, raw_token = create_device_token(db_session, eng, name="Laptop")
+    db_session.commit()
+
+    r = client.get("/api/v1/sessions", headers={"x-device-token": raw_token})
+    assert r.status_code == 200
+    assert len(r.json()["items"]) >= 1
+
+
 def test_ingest_with_messages(client, engineer_with_key):
     _eng, api_key = engineer_with_key
     session_id = str(uuid.uuid4())

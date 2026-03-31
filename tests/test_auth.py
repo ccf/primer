@@ -7,7 +7,7 @@ import bcrypt
 import jwt
 
 from primer.common.config import settings
-from primer.common.models import Engineer, RefreshToken, Team
+from primer.common.models import DeviceToken, Engineer, RefreshToken, Team
 from primer.server.services.auth_service import (
     JWT_ALGORITHM,
     _hash_token,
@@ -179,6 +179,42 @@ def test_refresh_without_cookie(client):
     """POST /auth/refresh returns 401 without cookie."""
     r = client.post("/api/v1/auth/refresh")
     assert r.status_code == 401
+
+
+def test_device_token_lifecycle_with_engineer_api_key(client, engineer_with_key, db_session):
+    eng, api_key = engineer_with_key
+
+    create_resp = client.post(
+        "/api/v1/auth/device-tokens",
+        json={"name": "Laptop"},
+        headers={"x-api-key": api_key},
+    )
+    assert create_resp.status_code == 200
+    create_data = create_resp.json()
+    assert create_data["device_token"]["engineer_id"] == eng.id
+    assert create_data["device_token"]["name"] == "Laptop"
+    assert create_data["raw_token"].startswith("primer_dev_")
+
+    stored = (
+        db_session.query(DeviceToken)
+        .filter(DeviceToken.id == create_data["device_token"]["id"])
+        .one()
+    )
+    assert stored.token_last_four == create_data["raw_token"][-4:]
+
+    list_resp = client.get("/api/v1/auth/device-tokens", headers={"x-api-key": api_key})
+    assert list_resp.status_code == 200
+    listed = list_resp.json()
+    assert len(listed) == 1
+    assert listed[0]["token_last_four"] == create_data["raw_token"][-4:]
+
+    revoke_resp = client.delete(
+        f"/api/v1/auth/device-tokens/{create_data['device_token']['id']}",
+        headers={"x-api-key": api_key},
+    )
+    assert revoke_resp.status_code == 200
+    db_session.refresh(stored)
+    assert stored.revoked is True
 
 
 def test_logout_clears_cookies(client):

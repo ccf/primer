@@ -56,6 +56,7 @@ class Engineer(Base):
     daily_stats: Mapped[list["DailyStats"]] = relationship(back_populates="engineer")
     ingest_events: Mapped[list["IngestEvent"]] = relationship(back_populates="engineer")
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="engineer")
+    device_tokens: Mapped[list["DeviceToken"]] = relationship(back_populates="engineer")
 
 
 class GitRepository(Base):
@@ -280,6 +281,20 @@ class RefreshToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     engineer: Mapped[Engineer] = relationship(back_populates="refresh_tokens")
+
+
+class DeviceToken(Base):
+    __tablename__ = "device_tokens"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    engineer_id: Mapped[str] = mapped_column(ForeignKey("engineers.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    token_last_four: Mapped[str] = mapped_column(String(8), nullable=False)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    engineer: Mapped[Engineer] = relationship(back_populates="device_tokens")
 
 
 class AlertConfig(Base):

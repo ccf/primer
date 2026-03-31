@@ -2,7 +2,7 @@
 
 import click
 
-SENSITIVE_KEYS = {"auth.admin_api_key", "auth.api_key"}
+SENSITIVE_KEYS = {"auth.admin_api_key", "auth.api_key", "auth.device_token"}
 
 
 @click.group("configure")

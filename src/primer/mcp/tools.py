@@ -14,13 +14,29 @@ from primer.server.services.live_session_signal_service import get_live_session_
 logger = logging.getLogger(__name__)
 
 SERVER_URL = os.environ.get("PRIMER_SERVER_URL", "http://localhost:8000")
+DEVICE_TOKEN = os.environ.get("PRIMER_DEVICE_TOKEN", "")
 API_KEY = os.environ.get("PRIMER_API_KEY", "")
 ADMIN_API_KEY = os.environ.get("PRIMER_ADMIN_API_KEY", "")
 
 
+def _has_engineer_auth() -> bool:
+    return bool(DEVICE_TOKEN or API_KEY)
+
+
+def _engineer_headers() -> dict:
+    if DEVICE_TOKEN:
+        return {"x-device-token": DEVICE_TOKEN}
+    if API_KEY:
+        return {"x-api-key": API_KEY}
+    return {}
+
+
 def _admin_headers() -> dict:
+    headers = _engineer_headers()
     admin_key = ADMIN_API_KEY or API_KEY
-    return {"x-admin-key": admin_key, "x-api-key": API_KEY}
+    if admin_key:
+        headers["x-admin-key"] = admin_key
+    return headers
 
 
 def _render_coaching_brief(data: dict) -> str:
@@ -44,16 +60,20 @@ def _render_coaching_brief(data: dict) -> str:
 
 def primer_sync() -> str:
     """Sync local session history to the Primer server (backfill missing sessions)."""
-    if not API_KEY:
-        return "Error: PRIMER_API_KEY not set"
-    result = sync_sessions(SERVER_URL, API_KEY)
+    if not _has_engineer_auth():
+        return "Error: PRIMER_DEVICE_TOKEN or PRIMER_API_KEY not set"
+    result = sync_sessions(
+        SERVER_URL,
+        api_key=API_KEY or None,
+        device_token=DEVICE_TOKEN or None,
+    )
     return json.dumps(result, indent=2)
 
 
 def primer_my_stats(days: int = 30) -> str:
     """Get personal usage stats (sessions, tokens, tools, outcomes) for the last N days."""
-    if not API_KEY:
-        return "Error: PRIMER_API_KEY not set"
+    if not _has_engineer_auth():
+        return "Error: PRIMER_DEVICE_TOKEN or PRIMER_API_KEY not set"
     try:
         resp = httpx.get(
             f"{SERVER_URL}/api/v1/analytics/overview",
@@ -69,8 +89,8 @@ def primer_my_stats(days: int = 30) -> str:
 
 def primer_team_overview(team_id: str | None = None) -> str:
     """Get team-level analytics overview."""
-    if not API_KEY:
-        return "Error: PRIMER_API_KEY not set"
+    if not _has_engineer_auth():
+        return "Error: PRIMER_DEVICE_TOKEN or PRIMER_API_KEY not set"
     try:
         params = {"team_id": team_id} if team_id else {}
         resp = httpx.get(
@@ -88,8 +108,8 @@ def primer_team_overview(team_id: str | None = None) -> str:
 
 def primer_friction_report(team_id: str | None = None) -> str:
     """Get team friction points and details."""
-    if not API_KEY:
-        return "Error: PRIMER_API_KEY not set"
+    if not _has_engineer_auth():
+        return "Error: PRIMER_DEVICE_TOKEN or PRIMER_API_KEY not set"
     try:
         params = {"team_id": team_id} if team_id else {}
         resp = httpx.get(
@@ -107,8 +127,8 @@ def primer_friction_report(team_id: str | None = None) -> str:
 
 def primer_recommendations(team_id: str | None = None) -> str:
     """Get org/team recommendations from the synthesis engine."""
-    if not API_KEY:
-        return "Error: PRIMER_API_KEY not set"
+    if not _has_engineer_auth():
+        return "Error: PRIMER_DEVICE_TOKEN or PRIMER_API_KEY not set"
     try:
         params = {"team_id": team_id} if team_id else {}
         resp = httpx.get(
@@ -130,13 +150,13 @@ def primer_coaching(days: int = 30) -> str:
     Synthesizes your usage patterns, friction hotspots, skill gaps,
     and config optimization into actionable guidance.
     """
-    if not API_KEY:
-        return "Error: PRIMER_API_KEY not set"
+    if not _has_engineer_auth():
+        return "Error: PRIMER_DEVICE_TOKEN or PRIMER_API_KEY not set"
     try:
         resp = httpx.get(
             f"{SERVER_URL}/api/v1/analytics/coaching",
             params={"days": days},
-            headers={"x-api-key": API_KEY},
+            headers=_engineer_headers(),
             timeout=30,
         )
         if resp.status_code == 200:
@@ -157,8 +177,8 @@ def primer_session_start_coaching(
     Uses project context, workflow hints, and prior team evidence
     to suggest a strong opening pattern, tool/model choices, and pitfalls.
     """
-    if not API_KEY:
-        return "Error: PRIMER_API_KEY not set"
+    if not _has_engineer_auth():
+        return "Error: PRIMER_DEVICE_TOKEN or PRIMER_API_KEY not set"
     try:
         params = {
             key: value
@@ -173,7 +193,7 @@ def primer_session_start_coaching(
         resp = httpx.get(
             f"{SERVER_URL}/api/v1/analytics/coaching/session-start",
             params=params,
-            headers={"x-api-key": API_KEY},
+            headers=_engineer_headers(),
             timeout=30,
         )
         if resp.status_code == 200:
@@ -230,7 +250,7 @@ def primer_in_session_nudges(
         return f"Error: {exc}"
 
     coaching_brief = None
-    if API_KEY:
+    if _has_engineer_auth():
         try:
             params = {
                 key: value
@@ -245,7 +265,7 @@ def primer_in_session_nudges(
             resp = httpx.get(
                 f"{SERVER_URL}/api/v1/analytics/coaching/session-start",
                 params=params,
-                headers={"x-api-key": API_KEY},
+                headers=_engineer_headers(),
                 timeout=30,
             )
             if resp.status_code == 200:
@@ -276,14 +296,14 @@ def primer_in_session_nudges(
 
 def primer_personal_recaps(period: str = "both") -> str:
     """Get your daily and weekly personal recap inside the sidecar."""
-    if not API_KEY:
-        return "Error: PRIMER_API_KEY not set"
+    if not _has_engineer_auth():
+        return "Error: PRIMER_DEVICE_TOKEN or PRIMER_API_KEY not set"
     if period not in {"daily", "weekly", "both"}:
         return "Error: period must be one of daily, weekly, both"
     try:
         resp = httpx.get(
             f"{SERVER_URL}/api/v1/analytics/personal-recaps",
-            headers={"x-api-key": API_KEY},
+            headers=_engineer_headers(),
             timeout=30,
         )
         if resp.status_code != 200:
@@ -316,8 +336,8 @@ def primer_personal_recaps(period: str = "both") -> str:
 
 def primer_manager_review_pack(team_id: str | None = None, days: int = 7) -> str:
     """Get a weekly manager review pack combining quality, friction, growth, and cost."""
-    if not API_KEY and not ADMIN_API_KEY:
-        return "Error: PRIMER_API_KEY or PRIMER_ADMIN_API_KEY not set"
+    if not _has_engineer_auth() and not ADMIN_API_KEY:
+        return "Error: PRIMER_DEVICE_TOKEN, PRIMER_API_KEY, or PRIMER_ADMIN_API_KEY not set"
     try:
         params = {"days": days}
         if team_id:

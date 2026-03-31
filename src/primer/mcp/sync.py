@@ -20,7 +20,24 @@ class SyncPreflightError(RuntimeError):
     """Raised when sync cannot safely determine server-side session state."""
 
 
-def get_server_session_ids(server_url: str, api_key: str) -> set[str]:
+def _engineer_auth_headers(
+    *,
+    api_key: str | None = None,
+    device_token: str | None = None,
+) -> dict[str, str]:
+    if device_token:
+        return {"x-device-token": device_token}
+    if api_key:
+        return {"x-api-key": api_key}
+    return {}
+
+
+def get_server_session_ids(
+    server_url: str,
+    api_key: str | None = None,
+    *,
+    device_token: str | None = None,
+) -> set[str]:
     """Fetch the set of session IDs already on the server for this engineer."""
     session_ids: set[str] = set()
     limit = 1000
@@ -30,7 +47,7 @@ def get_server_session_ids(server_url: str, api_key: str) -> set[str]:
         try:
             resp = httpx.get(
                 f"{server_url}/api/v1/sessions",
-                headers={"x-api-key": api_key},
+                headers=_engineer_auth_headers(api_key=api_key, device_token=device_token),
                 params={"limit": limit, "offset": offset},
                 timeout=30.0,
             )
@@ -61,7 +78,12 @@ def get_server_session_ids(server_url: str, api_key: str) -> set[str]:
     raise SyncPreflightError(message)
 
 
-def sync_sessions(server_url: str, api_key: str) -> dict:
+def sync_sessions(
+    server_url: str,
+    api_key: str | None = None,
+    *,
+    device_token: str | None = None,
+) -> dict:
     """Compare local sessions vs server, upload missing ones.
 
     Returns a summary dict with counts.
@@ -79,7 +101,11 @@ def sync_sessions(server_url: str, api_key: str) -> dict:
         }
 
     try:
-        server_ids = get_server_session_ids(server_url, api_key)
+        server_ids = get_server_session_ids(
+            server_url,
+            api_key=api_key,
+            device_token=device_token,
+        )
     except SyncPreflightError as exc:
         return {
             "local_count": len(local_sessions),
@@ -142,6 +168,7 @@ def sync_sessions(server_url: str, api_key: str) -> dict:
             resp = httpx.post(
                 f"{server_url}/api/v1/ingest/session",
                 json=payload,
+                headers=_engineer_auth_headers(api_key=api_key, device_token=device_token),
                 timeout=10.0,
             )
             if resp.status_code == 200:

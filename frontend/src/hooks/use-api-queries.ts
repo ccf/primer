@@ -19,6 +19,7 @@ import type {
   CostForecastResponse,
   CostModelingResponse,
   DailyStatsResponse,
+  DeviceTokenResponse,
   EngineerAnalytics,
   EngineerBenchmarkResponse,
   EngineerProfileResponse,
@@ -89,6 +90,14 @@ export function useEngineers(includeInactive = false, enabled = true) {
       apiFetch<EngineerResponse[]>(
         `/api/v1/engineers${includeInactive ? "?include_inactive=true" : ""}`,
       ),
+    enabled,
+  })
+}
+
+export function useDeviceTokens(enabled = true) {
+  return useQuery({
+    queryKey: ["device-tokens"],
+    queryFn: () => apiFetch<DeviceTokenResponse[]>("/api/v1/auth/device-tokens"),
     enabled,
   })
 }

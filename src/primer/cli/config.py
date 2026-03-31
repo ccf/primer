@@ -18,6 +18,7 @@ _CONFIG_MAP: list[tuple[str, str, str]] = [
     ("database", "url", "PRIMER_DATABASE_URL"),
     ("auth", "admin_api_key", "PRIMER_ADMIN_API_KEY"),
     ("auth", "api_key", "PRIMER_API_KEY"),
+    ("auth", "device_token", "PRIMER_DEVICE_TOKEN"),
     ("log", "level", "PRIMER_LOG_LEVEL"),
 ]
 
@@ -37,6 +38,7 @@ url = "http://localhost:8000"
 [auth]
 # admin_api_key = "generated-on-init"
 # api_key = "set-after-primer-setup"
+# device_token = "preferred-for-hooks-and-sidecar"
 
 [log]
 level = "info"

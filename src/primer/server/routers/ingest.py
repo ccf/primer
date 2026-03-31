@@ -13,7 +13,7 @@ from primer.common.schemas import (
     SessionFacetsPayload,
     SessionIngestPayload,
 )
-from primer.server.deps import verify_api_key
+from primer.server.deps import verify_api_key, verify_device_token
 from primer.server.middleware import limiter
 from primer.server.services.ingest_service import (
     log_ingest_event,
@@ -26,15 +26,33 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/ingest", tags=["ingest"])
 
 
+def _authenticate_ingest_engineer(
+    db: Session,
+    *,
+    api_key: str | None = None,
+    device_token: str | None = None,
+):
+    if device_token:
+        return verify_device_token(device_token, db)
+    if api_key:
+        return verify_api_key(api_key, db)
+    raise HTTPException(status_code=401, detail="Authentication required")
+
+
 @router.post("/session", response_model=IngestResponse)
 @limiter.limit(settings.rate_limit_ingest)
 def ingest_session(
     request: Request,
     payload: SessionIngestPayload,
     background_tasks: BackgroundTasks,
+    x_device_token: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ):
-    engineer = verify_api_key(payload.api_key, db)
+    engineer = _authenticate_ingest_engineer(
+        db,
+        api_key=payload.api_key,
+        device_token=x_device_token,
+    )
     try:
         created = upsert_session(db, engineer.id, payload)
         log_ingest_event(db, engineer.id, "session", payload.session_id, None, "ok")
@@ -84,9 +102,14 @@ def ingest_session(
 def ingest_bulk(
     request: Request,
     payload: BulkIngestPayload,
+    x_device_token: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ):
-    engineer = verify_api_key(payload.api_key, db)
+    engineer = _authenticate_ingest_engineer(
+        db,
+        api_key=payload.api_key,
+        device_token=x_device_token,
+    )
     results = []
     for session_payload in payload.sessions:
         try:
@@ -113,10 +136,11 @@ def ingest_facets(
     request: Request,
     session_id: str,
     payload: SessionFacetsPayload,
-    x_api_key: str = Header(),
+    x_api_key: str | None = Header(default=None),
+    x_device_token: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ):
-    engineer = verify_api_key(x_api_key, db)
+    engineer = _authenticate_ingest_engineer(db, api_key=x_api_key, device_token=x_device_token)
     session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")

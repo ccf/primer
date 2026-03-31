@@ -8,7 +8,7 @@ import jwt
 from sqlalchemy.orm import Session
 
 from primer.common.config import settings
-from primer.common.models import Engineer, RefreshToken
+from primer.common.models import DeviceToken, Engineer, RefreshToken
 
 GITHUB_AUTHORIZE_URL = "https://github.com/login/oauth/authorize"
 GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token"  # noqa: S105  # nosec B105
@@ -138,6 +138,64 @@ def create_refresh_token(db: Session, engineer: Engineer) -> str:
     db.add(token)
     db.flush()
     return raw
+
+
+def create_device_token(
+    db: Session,
+    engineer: Engineer,
+    *,
+    name: str | None = None,
+) -> tuple[DeviceToken, str]:
+    raw = f"primer_dev_{secrets.token_urlsafe(32)}"
+    token = DeviceToken(
+        engineer_id=engineer.id,
+        name=name or "Local machine",
+        token_hash=_hash_token(raw),
+        token_last_four=raw[-4:],
+    )
+    db.add(token)
+    db.flush()
+    return token, raw
+
+
+def revoke_device_token(db: Session, engineer: Engineer, token_id: str) -> DeviceToken | None:
+    token = (
+        db.query(DeviceToken)
+        .filter(
+            DeviceToken.id == token_id,
+            DeviceToken.engineer_id == engineer.id,
+        )
+        .first()
+    )
+    if token is None:
+        return None
+    token.revoked = True
+    db.flush()
+    return token
+
+
+def list_device_tokens(db: Session, engineer: Engineer) -> list[DeviceToken]:
+    return (
+        db.query(DeviceToken)
+        .filter(DeviceToken.engineer_id == engineer.id)
+        .order_by(DeviceToken.created_at.desc())
+        .all()
+    )
+
+
+def find_engineer_by_device_token(db: Session, raw_token: str) -> Engineer | None:
+    token_hash = _hash_token(raw_token)
+    device_token = (
+        db.query(DeviceToken)
+        .filter(
+            DeviceToken.token_hash == token_hash,
+            DeviceToken.revoked.is_(False),
+        )
+        .first()
+    )
+    if device_token is None:
+        return None
+    return db.query(Engineer).filter(Engineer.id == device_token.engineer_id).first()
 
 
 def verify_access_token(token: str) -> dict | None:

@@ -195,11 +195,12 @@ def test_sync_no_api_key(tmp_path, monkeypatch):
     config_file.write_text("[server]\nport = 8000\n")
     monkeypatch.setattr("primer.cli.config.CONFIG_FILE", config_file)
     monkeypatch.delenv("PRIMER_API_KEY", raising=False)
+    monkeypatch.delenv("PRIMER_DEVICE_TOKEN", raising=False)
 
     runner = CliRunner()
     result = runner.invoke(cli, ["sync"])
     assert result.exit_code == 0
-    assert "no api key" in result.output.lower()
+    assert "no device token or api key" in result.output.lower()
 
 
 def test_doctor_missing_home(tmp_path, monkeypatch):
@@ -267,20 +268,43 @@ def test_setup_success(tmp_path, monkeypatch):
 
     monkeypatch.setattr("primer.cli.commands.setup.subprocess.run", fake_git_run)
 
-    # Mock httpx.post to return 200 with api_key
-    class FakeResp:
+    class SetupResp:
         status_code = 200
 
         def json(self):
             return {"id": "eng-123", "api_key": "key-abc"}
 
-    monkeypatch.setattr("httpx.post", lambda *a, **kw: FakeResp())
+    class DeviceTokenResp:
+        status_code = 200
+
+        def json(self):
+            return {
+                "device_token": {
+                    "id": "dt-1",
+                    "engineer_id": "eng-123",
+                    "name": "Local machine",
+                    "token_last_four": "c123",
+                    "revoked": False,
+                    "created_at": "2026-03-31T00:00:00Z",
+                },
+                "raw_token": "primer_dev_abc123",
+            }
+
+    def fake_post(url, *args, **kwargs):
+        if url.endswith("/api/v1/engineers"):
+            return SetupResp()
+        if url.endswith("/api/v1/auth/device-tokens"):
+            return DeviceTokenResp()
+        raise AssertionError(url)
+
+    monkeypatch.setattr("httpx.post", fake_post)
 
     runner = CliRunner()
     result = runner.invoke(cli, ["setup"])
     assert result.exit_code == 0
     assert "registered" in result.output.lower()
     assert "eng-123" in result.output
+    assert "device token saved" in result.output.lower()
 
 
 def test_setup_with_flags(tmp_path, monkeypatch):
@@ -290,13 +314,36 @@ def test_setup_with_flags(tmp_path, monkeypatch):
     monkeypatch.delenv("PRIMER_SERVER_URL", raising=False)
     monkeypatch.delenv("PRIMER_ADMIN_API_KEY", raising=False)
 
-    class FakeResp:
+    class SetupResp:
         status_code = 200
 
         def json(self):
             return {"id": "eng-456", "api_key": "key-def"}
 
-    monkeypatch.setattr("httpx.post", lambda *a, **kw: FakeResp())
+    class DeviceTokenResp:
+        status_code = 200
+
+        def json(self):
+            return {
+                "device_token": {
+                    "id": "dt-2",
+                    "engineer_id": "eng-456",
+                    "name": "Local machine",
+                    "token_last_four": "f456",
+                    "revoked": False,
+                    "created_at": "2026-03-31T00:00:00Z",
+                },
+                "raw_token": "primer_dev_def456",
+            }
+
+    def fake_post(url, *args, **kwargs):
+        if url.endswith("/api/v1/engineers"):
+            return SetupResp()
+        if url.endswith("/api/v1/auth/device-tokens"):
+            return DeviceTokenResp()
+        raise AssertionError(url)
+
+    monkeypatch.setattr("httpx.post", fake_post)
 
     runner = CliRunner()
     result = runner.invoke(cli, ["setup", "--name", "Bob", "--email", "bob@test.com"])
@@ -451,7 +498,12 @@ def test_sync_success_with_counts(tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         "primer.mcp.sync.sync_sessions",
-        lambda url, key: {"local_count": 10, "already_synced": 7, "synced": 3, "errors": 0},
+        lambda url, api_key=None, device_token=None: {
+            "local_count": 10,
+            "already_synced": 7,
+            "synced": 3,
+            "errors": 0,
+        },
     )
 
     runner = CliRunner()
@@ -471,7 +523,12 @@ def test_sync_with_errors(tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         "primer.mcp.sync.sync_sessions",
-        lambda url, key: {"local_count": 5, "already_synced": 2, "synced": 1, "errors": 2},
+        lambda url, api_key=None, device_token=None: {
+            "local_count": 5,
+            "already_synced": 2,
+            "synced": 1,
+            "errors": 2,
+        },
     )
 
     runner = CliRunner()
@@ -490,7 +547,7 @@ def test_sync_fails_closed_on_preflight_error(tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         "primer.mcp.sync.sync_sessions",
-        lambda url, key: {
+        lambda url, api_key=None, device_token=None: {
             "local_count": 5,
             "already_synced": 0,
             "synced": 0,
