@@ -181,6 +181,25 @@ def test_refresh_without_cookie(client):
     assert r.status_code == 401
 
 
+def test_refresh_rejects_expired_naive_refresh_token(client, db_session):
+    eng = Engineer(
+        name="Expired Refresh Eng",
+        email="expired-refresh@example.com",
+        api_key_hash="",
+        role="engineer",
+    )
+    db_session.add(eng)
+    db_session.flush()
+
+    raw_refresh = create_refresh_token(db_session, eng)
+    stored = db_session.query(RefreshToken).filter(RefreshToken.engineer_id == eng.id).one()
+    stored.expires_at = datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=1)
+    db_session.flush()
+
+    r = client.post("/api/v1/auth/refresh", cookies={"primer_refresh": raw_refresh})
+    assert r.status_code == 401
+
+
 def test_device_token_lifecycle_with_engineer_api_key(client, engineer_with_key, db_session):
     eng, api_key = engineer_with_key
 
