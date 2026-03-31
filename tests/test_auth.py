@@ -245,6 +245,29 @@ def test_device_setup_code_exchange_creates_device_token(client, engineer_with_k
     assert replay_resp.status_code == 401
 
 
+def test_device_setup_code_exchange_rejects_inactive_engineer(
+    client, engineer_with_key, db_session
+):
+    eng, api_key = engineer_with_key
+
+    create_resp = client.post(
+        "/api/v1/auth/device-token-setup-codes",
+        json={"expires_in_minutes": 15},
+        headers={"x-api-key": api_key},
+    )
+    assert create_resp.status_code == 200
+    setup_code = create_resp.json()["setup_code"]
+
+    eng.is_active = False
+    db_session.flush()
+
+    exchange_resp = client.post(
+        "/api/v1/auth/device-token-setup-codes/exchange",
+        json={"setup_code": setup_code, "device_name": "Laptop"},
+    )
+    assert exchange_resp.status_code == 401
+
+
 def test_logout_clears_cookies(client):
     """POST /auth/logout clears both cookies."""
     r = client.post("/api/v1/auth/logout")
