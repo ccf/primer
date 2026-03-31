@@ -7,6 +7,7 @@ import os
 import httpx
 from pydantic import ValidationError
 
+from primer.common.auth_headers import build_engineer_auth_headers
 from primer.mcp.nudges import build_in_session_nudges
 from primer.mcp.sync import sync_sessions
 from primer.server.services.live_session_signal_service import get_live_session_signals
@@ -24,11 +25,10 @@ def _has_engineer_auth() -> bool:
 
 
 def _engineer_headers() -> dict:
-    if DEVICE_TOKEN:
-        return {"x-device-token": DEVICE_TOKEN}
-    if API_KEY:
-        return {"x-api-key": API_KEY}
-    return {}
+    return build_engineer_auth_headers(
+        api_key=API_KEY or None,
+        device_token=DEVICE_TOKEN or None,
+    )
 
 
 def _admin_headers() -> dict:
