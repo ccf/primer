@@ -221,6 +221,10 @@ def exchange_device_setup_code(
         db.flush()
         return None
 
+    engineer = db.query(Engineer).filter(Engineer.id == setup_code.engineer_id).first()
+    if engineer is None or not engineer.is_active:
+        return None
+
     claimed = (
         db.query(DeviceSetupCode)
         .filter(
@@ -231,10 +235,6 @@ def exchange_device_setup_code(
         .update({"used_at": now}, synchronize_session=False)
     )
     if claimed != 1:
-        return None
-
-    engineer = db.query(Engineer).filter(Engineer.id == setup_code.engineer_id).first()
-    if engineer is None:
         return None
 
     device_token, raw_token = create_device_token(
