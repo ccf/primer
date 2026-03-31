@@ -1379,6 +1379,17 @@ export interface ProjectEnablementSummary {
   top_tools: string[]
   top_models: string[]
   recommendations: Recommendation[]
+  playbook_templates: ProjectPlaybookTemplate[]
+}
+
+export interface ProjectPlaybookTemplate {
+  template_type: string
+  title: string
+  summary: string
+  recommended_workflow: string | null
+  initial_steps: string[]
+  guardrails: string[]
+  evidence: Record<string, unknown>
 }
 
 export interface ProjectRepositoryContextSummary {
