@@ -18,6 +18,16 @@ GITHUB_EMAILS_URL = "https://api.github.com/user/emails"
 JWT_ALGORITHM = "HS256"
 
 
+def _utcnow_naive() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+def _normalize_stored_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(UTC).replace(tzinfo=None)
+
+
 def get_github_authorize_url(state: str) -> str:
     params = {
         "client_id": settings.github_client_id,
@@ -129,7 +139,7 @@ def _hash_token(raw: str) -> str:
 def create_refresh_token(db: Session, engineer: Engineer) -> str:
     """Create a refresh token, store its hash, return the raw token."""
     raw = secrets.token_urlsafe(48)
-    expires_at = datetime.now(UTC) + timedelta(days=settings.jwt_refresh_token_expire_days)
+    expires_at = _utcnow_naive() + timedelta(days=settings.jwt_refresh_token_expire_days)
     token = RefreshToken(
         engineer_id=engineer.id,
         token_hash=_hash_token(raw),
@@ -169,7 +179,7 @@ def create_device_setup_code(
         engineer_id=engineer.id,
         code_hash=_hash_token(raw),
         code_last_four=raw[-4:],
-        expires_at=datetime.now(UTC) + timedelta(minutes=expires_in_minutes),
+        expires_at=_utcnow_naive() + timedelta(minutes=expires_in_minutes),
     )
     db.add(code)
     db.flush()
@@ -212,11 +222,11 @@ def exchange_device_setup_code(
     if setup_code is None:
         return None
 
-    now = datetime.now(UTC)
+    now = _utcnow_naive()
     if setup_code.revoked or setup_code.used_at is not None:
         return None
 
-    if setup_code.expires_at.replace(tzinfo=UTC) <= now:
+    if _normalize_stored_utc(setup_code.expires_at) <= now:
         return None
 
     engineer = db.query(Engineer).filter(Engineer.id == setup_code.engineer_id).first()
@@ -285,7 +295,7 @@ def rotate_refresh_token(db: Session, raw_token: str) -> tuple[Engineer, str, st
     if not stored:
         return None
 
-    if stored.expires_at.replace(tzinfo=UTC) < datetime.now(UTC):
+    if _normalize_stored_utc(stored.expires_at) < _utcnow_naive():
         stored.revoked = True
         db.flush()
         return None
