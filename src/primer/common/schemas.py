@@ -153,6 +153,38 @@ class DeviceTokenCreateResponse(BaseModel):
     raw_token: str = Field(description="Copy this device token now; it cannot be retrieved again.")
 
 
+class DeviceSetupCodeCreate(BaseModel):
+    expires_in_minutes: int | None = Field(default=15, ge=1, le=60)
+
+
+class DeviceSetupCodeResponse(BaseModel):
+    id: str
+    engineer_id: str
+    code_last_four: str
+    expires_at: datetime
+    used_at: datetime | None
+    revoked: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class DeviceSetupCodeCreateResponse(BaseModel):
+    setup_code: str = Field(description="Copy this setup code now; it cannot be retrieved again.")
+    expires_at: datetime
+
+
+class DeviceSetupCodeExchangeRequest(BaseModel):
+    setup_code: str
+    device_name: str | None = None
+
+
+class DeviceSetupCodeExchangeResponse(BaseModel):
+    engineer: EngineerResponse
+    device_token: DeviceTokenResponse
+    raw_token: str = Field(description="Copy this device token now; it cannot be retrieved again.")
+
+
 # --- Session Facets ---
 
 

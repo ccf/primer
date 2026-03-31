@@ -8,6 +8,10 @@ from primer.common.config import settings
 from primer.common.database import get_db
 from primer.common.models import Engineer
 from primer.common.schemas import (
+    DeviceSetupCodeCreate,
+    DeviceSetupCodeCreateResponse,
+    DeviceSetupCodeExchangeRequest,
+    DeviceSetupCodeExchangeResponse,
     DeviceTokenCreate,
     DeviceTokenCreateResponse,
     DeviceTokenResponse,
@@ -18,8 +22,10 @@ from primer.server.middleware import limiter
 from primer.server.services import audit_service
 from primer.server.services.auth_service import (
     create_access_token,
+    create_device_setup_code,
     create_device_token,
     create_refresh_token,
+    exchange_device_setup_code,
     exchange_github_code,
     find_or_create_engineer,
     get_github_authorize_url,
@@ -196,6 +202,58 @@ def create_device_access_token(
     db.commit()
     db.refresh(token)
     return DeviceTokenCreateResponse(
+        device_token=DeviceTokenResponse.model_validate(token),
+        raw_token=raw_token,
+    )
+
+
+@router.post("/device-token-setup-codes", response_model=DeviceSetupCodeCreateResponse)
+@limiter.limit(settings.rate_limit_auth)
+def create_device_token_setup_code(
+    request: Request,
+    payload: DeviceSetupCodeCreate,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    engineer = _require_authenticated_engineer(auth, db)
+    code, raw_code = create_device_setup_code(
+        db,
+        engineer,
+        expires_in_minutes=payload.expires_in_minutes or 15,
+    )
+    ip = request.client.host if request.client else None
+    audit_service.log_action(
+        db,
+        auth,
+        "create",
+        "device_setup_code",
+        code.id,
+        details={"expires_at": code.expires_at.isoformat()},
+        ip_address=ip,
+    )
+    db.commit()
+    return DeviceSetupCodeCreateResponse(setup_code=raw_code, expires_at=code.expires_at)
+
+
+@router.post("/device-token-setup-codes/exchange", response_model=DeviceSetupCodeExchangeResponse)
+@limiter.limit(settings.rate_limit_auth)
+def exchange_device_token_setup_code(
+    request: Request,
+    payload: DeviceSetupCodeExchangeRequest,
+    db: Session = Depends(get_db),
+):
+    result = exchange_device_setup_code(
+        db,
+        payload.setup_code,
+        device_name=payload.device_name,
+    )
+    if result is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired setup code")
+    engineer, token, raw_token = result
+    db.commit()
+    db.refresh(token)
+    return DeviceSetupCodeExchangeResponse(
+        engineer=EngineerResponse.model_validate(engineer),
         device_token=DeviceTokenResponse.model_validate(token),
         raw_token=raw_token,
     )

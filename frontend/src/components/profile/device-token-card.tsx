@@ -2,14 +2,21 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { useCreateDeviceToken, useRevokeDeviceToken } from "@/hooks/use-api-mutations"
+import {
+  useCreateDeviceToken,
+  useCreateDeviceTokenSetupCode,
+  useRevokeDeviceToken,
+} from "@/hooks/use-api-mutations"
 import { useDeviceTokens } from "@/hooks/use-api-queries"
 
 export function DeviceTokenCard() {
   const { data: tokens, isLoading } = useDeviceTokens()
   const createToken = useCreateDeviceToken()
+  const createSetupCode = useCreateDeviceTokenSetupCode()
   const revokeToken = useRevokeDeviceToken()
   const [latestRawToken, setLatestRawToken] = useState<string | null>(null)
+  const [latestSetupCode, setLatestSetupCode] = useState<string | null>(null)
+  const [setupCodeExpiresAt, setSetupCodeExpiresAt] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
   const handleCreate = () => {
@@ -18,6 +25,19 @@ export function DeviceTokenCard() {
       {
         onSuccess: (data) => {
           setLatestRawToken(data.raw_token)
+          setCopied(false)
+        },
+      },
+    )
+  }
+
+  const handleCreateSetupCode = () => {
+    createSetupCode.mutate(
+      { expires_in_minutes: 15 },
+      {
+        onSuccess: (data) => {
+          setLatestSetupCode(data.setup_code)
+          setSetupCodeExpiresAt(data.expires_at)
           setCopied(false)
         },
       },
@@ -42,13 +62,31 @@ export function DeviceTokenCard() {
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={handleCreate} disabled={createToken.isPending}>
+          <Button onClick={handleCreateSetupCode} disabled={createSetupCode.isPending}>
+            Create setup code
+          </Button>
+          <Button onClick={handleCreate} disabled={createToken.isPending} variant="outline">
             Create device token
           </Button>
-          {createToken.isPending && (
-            <span className="text-sm text-muted-foreground">Creating token…</span>
+          {(createSetupCode.isPending || createToken.isPending) && (
+            <span className="text-sm text-muted-foreground">Creating…</span>
           )}
         </div>
+
+        {latestSetupCode && (
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Preferred setup path
+            </p>
+            <p className="mt-2 break-all font-mono text-sm">{latestSetupCode}</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Run <span className="font-mono">primer setup --setup-code {latestSetupCode}</span>
+              {setupCodeExpiresAt
+                ? ` before ${new Date(setupCodeExpiresAt).toLocaleTimeString()}.`
+                : "."}
+            </p>
+          </div>
+        )}
 
         {latestRawToken && (
           <div className="rounded-xl border border-border/60 bg-muted/20 p-4">

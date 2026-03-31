@@ -252,7 +252,7 @@ def test_setup_success(tmp_path, monkeypatch):
     config_file.write_text('[server]\nurl = "http://localhost:8000"\n')
     monkeypatch.setattr("primer.cli.config.CONFIG_FILE", config_file)
     monkeypatch.delenv("PRIMER_SERVER_URL", raising=False)
-    monkeypatch.delenv("PRIMER_ADMIN_API_KEY", raising=False)
+    monkeypatch.setenv("PRIMER_ADMIN_API_KEY", "admin-key")
 
     # Mock git config returning name/email
     import subprocess as _sp
@@ -312,7 +312,7 @@ def test_setup_with_flags(tmp_path, monkeypatch):
     config_file.write_text("[server]\n")
     monkeypatch.setattr("primer.cli.config.CONFIG_FILE", config_file)
     monkeypatch.delenv("PRIMER_SERVER_URL", raising=False)
-    monkeypatch.delenv("PRIMER_ADMIN_API_KEY", raising=False)
+    monkeypatch.setenv("PRIMER_ADMIN_API_KEY", "admin-key")
 
     class SetupResp:
         status_code = 200
@@ -351,12 +351,64 @@ def test_setup_with_flags(tmp_path, monkeypatch):
     assert "eng-456" in result.output
 
 
+def test_setup_with_setup_code(tmp_path, monkeypatch):
+    config_file = tmp_path / "config.toml"
+    config_file.write_text('[server]\nurl = "http://localhost:8000"\n')
+    monkeypatch.setattr("primer.cli.config.CONFIG_FILE", config_file)
+    monkeypatch.delenv("PRIMER_SERVER_URL", raising=False)
+    monkeypatch.delenv("PRIMER_ADMIN_API_KEY", raising=False)
+
+    class ExchangeResp:
+        status_code = 200
+
+        def json(self):
+            return {
+                "engineer": {
+                    "id": "eng-789",
+                    "name": "Test User",
+                    "email": "test@example.com",
+                    "team_id": None,
+                    "role": "engineer",
+                    "avatar_url": None,
+                    "github_username": "testuser",
+                    "display_name": "Test User",
+                    "is_active": True,
+                    "created_at": "2026-03-31T00:00:00Z",
+                },
+                "device_token": {
+                    "id": "dt-setup",
+                    "engineer_id": "eng-789",
+                    "name": "Laptop",
+                    "token_last_four": "6789",
+                    "revoked": False,
+                    "created_at": "2026-03-31T00:00:00Z",
+                },
+                "raw_token": "primer_dev_from_setup_code",
+            }
+
+    def fake_post(url, *args, **kwargs):
+        if url.endswith("/api/v1/auth/device-token-setup-codes/exchange"):
+            return ExchangeResp()
+        raise AssertionError(url)
+
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        ["setup", "--setup-code", "primer_setup_abc123", "--device-name", "Laptop"],
+    )
+    assert result.exit_code == 0
+    assert "device token saved" in result.output.lower()
+    assert "test user" in result.output.lower()
+
+
 def test_setup_server_error(tmp_path, monkeypatch):
     config_file = tmp_path / "config.toml"
     config_file.write_text("[server]\n")
     monkeypatch.setattr("primer.cli.config.CONFIG_FILE", config_file)
     monkeypatch.delenv("PRIMER_SERVER_URL", raising=False)
-    monkeypatch.delenv("PRIMER_ADMIN_API_KEY", raising=False)
+    monkeypatch.setenv("PRIMER_ADMIN_API_KEY", "admin-key")
 
     class FakeResp:
         status_code = 400
@@ -375,7 +427,7 @@ def test_setup_network_error(tmp_path, monkeypatch):
     config_file.write_text("[server]\n")
     monkeypatch.setattr("primer.cli.config.CONFIG_FILE", config_file)
     monkeypatch.delenv("PRIMER_SERVER_URL", raising=False)
-    monkeypatch.delenv("PRIMER_ADMIN_API_KEY", raising=False)
+    monkeypatch.setenv("PRIMER_ADMIN_API_KEY", "admin-key")
 
     import httpx
 

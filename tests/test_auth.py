@@ -217,6 +217,34 @@ def test_device_token_lifecycle_with_engineer_api_key(client, engineer_with_key,
     assert stored.revoked is True
 
 
+def test_device_setup_code_exchange_creates_device_token(client, engineer_with_key, db_session):
+    eng, api_key = engineer_with_key
+
+    create_resp = client.post(
+        "/api/v1/auth/device-token-setup-codes",
+        json={"expires_in_minutes": 15},
+        headers={"x-api-key": api_key},
+    )
+    assert create_resp.status_code == 200
+    setup_code = create_resp.json()["setup_code"]
+
+    exchange_resp = client.post(
+        "/api/v1/auth/device-token-setup-codes/exchange",
+        json={"setup_code": setup_code, "device_name": "Laptop"},
+    )
+    assert exchange_resp.status_code == 200
+    data = exchange_resp.json()
+    assert data["engineer"]["id"] == eng.id
+    assert data["device_token"]["name"] == "Laptop"
+    assert data["raw_token"].startswith("primer_dev_")
+
+    replay_resp = client.post(
+        "/api/v1/auth/device-token-setup-codes/exchange",
+        json={"setup_code": setup_code},
+    )
+    assert replay_resp.status_code == 401
+
+
 def test_logout_clears_cookies(client):
     """POST /auth/logout clears both cookies."""
     r = client.post("/api/v1/auth/logout")
