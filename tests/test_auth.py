@@ -278,6 +278,48 @@ def test_device_setup_code_exchange_rejects_inactive_engineer(
     assert exchange_resp.status_code == 401
 
 
+def test_device_setup_code_exchange_rejects_expiry_boundary(client, engineer_with_key, db_session):
+    _eng, api_key = engineer_with_key
+
+    create_resp = client.post(
+        "/api/v1/auth/device-token-setup-codes",
+        json={"expires_in_minutes": 1},
+        headers={"x-api-key": api_key},
+    )
+    assert create_resp.status_code == 200
+    setup_code = create_resp.json()["setup_code"]
+
+    from primer.common.models import DeviceSetupCode
+
+    stored_code = db_session.query(DeviceSetupCode).one()
+    stored_code.expires_at = datetime.now(UTC)
+    db_session.flush()
+
+    exchange_resp = client.post(
+        "/api/v1/auth/device-token-setup-codes/exchange",
+        json={"setup_code": setup_code},
+    )
+    assert exchange_resp.status_code == 401
+
+
+def test_device_setup_code_exchange_rejects_oversized_device_name(client, engineer_with_key):
+    _eng, api_key = engineer_with_key
+
+    create_resp = client.post(
+        "/api/v1/auth/device-token-setup-codes",
+        json={"expires_in_minutes": 15},
+        headers={"x-api-key": api_key},
+    )
+    assert create_resp.status_code == 200
+    setup_code = create_resp.json()["setup_code"]
+
+    exchange_resp = client.post(
+        "/api/v1/auth/device-token-setup-codes/exchange",
+        json={"setup_code": setup_code, "device_name": "x" * 256},
+    )
+    assert exchange_resp.status_code == 422
+
+
 def test_logout_clears_cookies(client):
     """POST /auth/logout clears both cookies."""
     r = client.post("/api/v1/auth/logout")

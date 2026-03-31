@@ -216,7 +216,7 @@ def exchange_device_setup_code(
     if setup_code.revoked or setup_code.used_at is not None:
         return None
 
-    if setup_code.expires_at.replace(tzinfo=UTC) < now:
+    if setup_code.expires_at.replace(tzinfo=UTC) <= now:
         return None
 
     engineer = db.query(Engineer).filter(Engineer.id == setup_code.engineer_id).first()
@@ -229,6 +229,7 @@ def exchange_device_setup_code(
             DeviceSetupCode.id == setup_code.id,
             DeviceSetupCode.revoked.is_(False),
             DeviceSetupCode.used_at.is_(None),
+            DeviceSetupCode.expires_at > now,
         )
         .update({"used_at": now}, synchronize_session=False)
     )

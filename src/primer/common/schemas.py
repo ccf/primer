@@ -134,7 +134,7 @@ class EngineerCreateResponse(BaseModel):
 
 
 class DeviceTokenCreate(BaseModel):
-    name: str | None = None
+    name: str | None = Field(default=None, max_length=255)
 
 
 class DeviceTokenResponse(BaseModel):
@@ -164,7 +164,7 @@ class DeviceSetupCodeCreateResponse(BaseModel):
 
 class DeviceSetupCodeExchangeRequest(BaseModel):
     setup_code: str
-    device_name: str | None = None
+    device_name: str | None = Field(default=None, max_length=255)
 
 
 class DeviceSetupCodeExchangeResponse(BaseModel):
