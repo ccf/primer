@@ -3,6 +3,7 @@ import { apiFetch } from "@/lib/api"
 import type {
   AlertConfigResponse,
   BudgetStatus,
+  DeviceTokenSetupCodeCreateResponse,
   DeviceTokenCreateResponse,
   NarrativeResponse,
   WorkflowProfileBackfillSummary,
@@ -67,6 +68,16 @@ export function useRevokeDeviceToken() {
         method: "DELETE",
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["device-tokens"] }),
+  })
+}
+
+export function useCreateDeviceTokenSetupCode() {
+  return useMutation({
+    mutationFn: (payload?: { expires_in_minutes?: number | null }) =>
+      apiFetch<DeviceTokenSetupCodeCreateResponse>("/api/v1/auth/device-token-setup-codes", {
+        method: "POST",
+        body: JSON.stringify(payload ?? {}),
+      }),
   })
 }
 

@@ -9,8 +9,16 @@ import click
 @click.option("--name", help="Your display name (default: git config user.name)")
 @click.option("--email", help="Your email (default: git config user.email)")
 @click.option("--server-url", default=None, help="Primer server URL")
-def setup(name: str | None, email: str | None, server_url: str | None) -> None:
-    """Register yourself as an engineer and save your API key."""
+@click.option("--setup-code", default=None, help="One-time setup code from the Primer UI")
+@click.option("--device-name", default="Local machine", help="Label for this local device")
+def setup(
+    name: str | None,
+    email: str | None,
+    server_url: str | None,
+    setup_code: str | None,
+    device_name: str,
+) -> None:
+    """Register yourself as an engineer or exchange a setup code for a device token."""
     import os
 
     import httpx
@@ -19,6 +27,37 @@ def setup(name: str | None, email: str | None, server_url: str | None) -> None:
     from primer.cli.config import get_value, set_value
 
     console.header("Engineer Setup")
+
+    url = (
+        server_url
+        or os.environ.get("PRIMER_SERVER_URL")
+        or get_value("server.url")
+        or "http://localhost:8000"
+    )
+    admin_key = os.environ.get("PRIMER_ADMIN_API_KEY") or get_value("auth.admin_api_key") or ""
+
+    if setup_code:
+        console.info("Exchanging setup code for a device token")
+        try:
+            resp = httpx.post(
+                f"{url}/api/v1/auth/device-token-setup-codes/exchange",
+                json={"setup_code": setup_code, "device_name": device_name},
+                timeout=10.0,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                set_value("auth.device_token", data["raw_token"])
+                console.success("Device token saved to config.toml")
+                console.info(
+                    f"Connected as {data['engineer']['display_name'] or data['engineer']['name']}"
+                )
+                console.info("You can now run: primer hook install")
+            else:
+                console.error(f"Setup code exchange failed ({resp.status_code}): {resp.text}")
+        except httpx.RequestError as e:
+            console.error(f"Could not reach server: {e}")
+            console.info("Is the server running? Try: primer server start")
+        return
 
     # Resolve name/email from git config if not provided
     if not name:
@@ -35,13 +74,14 @@ def setup(name: str | None, email: str | None, server_url: str | None) -> None:
 
     console.info(f"Registering {name} <{email}>")
 
-    url = (
-        server_url
-        or os.environ.get("PRIMER_SERVER_URL")
-        or get_value("server.url")
-        or "http://localhost:8000"
-    )
-    admin_key = os.environ.get("PRIMER_ADMIN_API_KEY") or get_value("auth.admin_api_key") or ""
+    if not admin_key:
+        console.error("No admin key configured for legacy bootstrap.")
+        console.info(
+            "Sign into Primer in the browser, generate a setup code from "
+            "Profile > Local Device Tokens, and rerun: "
+            "primer setup --setup-code <code>"
+        )
+        return
 
     try:
         resp = httpx.post(

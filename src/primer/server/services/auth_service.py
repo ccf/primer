@@ -8,7 +8,7 @@ import jwt
 from sqlalchemy.orm import Session
 
 from primer.common.config import settings
-from primer.common.models import DeviceToken, Engineer, RefreshToken
+from primer.common.models import DeviceSetupCode, DeviceToken, Engineer, RefreshToken
 
 GITHUB_AUTHORIZE_URL = "https://github.com/login/oauth/authorize"
 GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token"  # noqa: S105  # nosec B105
@@ -158,6 +158,24 @@ def create_device_token(
     return token, raw
 
 
+def create_device_setup_code(
+    db: Session,
+    engineer: Engineer,
+    *,
+    expires_in_minutes: int = 15,
+) -> tuple[DeviceSetupCode, str]:
+    raw = f"primer_setup_{secrets.token_urlsafe(16)}"
+    code = DeviceSetupCode(
+        engineer_id=engineer.id,
+        code_hash=_hash_token(raw),
+        code_last_four=raw[-4:],
+        expires_at=datetime.now(UTC) + timedelta(minutes=expires_in_minutes),
+    )
+    db.add(code)
+    db.flush()
+    return code, raw
+
+
 def revoke_device_token(db: Session, engineer: Engineer, token_id: str) -> DeviceToken | None:
     token = (
         db.query(DeviceToken)
@@ -181,6 +199,44 @@ def list_device_tokens(db: Session, engineer: Engineer) -> list[DeviceToken]:
         .order_by(DeviceToken.created_at.desc())
         .all()
     )
+
+
+def exchange_device_setup_code(
+    db: Session,
+    raw_code: str,
+    *,
+    device_name: str | None = None,
+) -> tuple[Engineer, DeviceToken, str] | None:
+    code_hash = _hash_token(raw_code)
+    setup_code = (
+        db.query(DeviceSetupCode)
+        .filter(
+            DeviceSetupCode.code_hash == code_hash,
+            DeviceSetupCode.revoked.is_(False),
+            DeviceSetupCode.used_at.is_(None),
+        )
+        .first()
+    )
+    if setup_code is None:
+        return None
+
+    if setup_code.expires_at.replace(tzinfo=UTC) < datetime.now(UTC):
+        setup_code.revoked = True
+        db.flush()
+        return None
+
+    engineer = db.query(Engineer).filter(Engineer.id == setup_code.engineer_id).first()
+    if engineer is None:
+        return None
+
+    device_token, raw_token = create_device_token(
+        db,
+        engineer,
+        name=device_name or "Local machine",
+    )
+    setup_code.used_at = datetime.now(UTC)
+    db.flush()
+    return engineer, device_token, raw_token
 
 
 def find_engineer_by_device_token(db: Session, raw_token: str) -> Engineer | None:

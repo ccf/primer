@@ -39,6 +39,11 @@ export interface DeviceTokenCreateResponse {
   raw_token: string
 }
 
+export interface DeviceTokenSetupCodeCreateResponse {
+  setup_code: string
+  expires_at: string
+}
+
 export type AgentType = 'claude_code' | 'codex_cli' | 'gemini_cli' | 'cursor'
 export type TelemetryParity = 'required' | 'optional' | 'unavailable'
 export type RecoveryStrategy =

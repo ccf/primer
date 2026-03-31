@@ -7,15 +7,21 @@ vi.mock("@/hooks/use-api-queries", () => ({
 
 vi.mock("@/hooks/use-api-mutations", () => ({
   useCreateDeviceToken: vi.fn(),
+  useCreateDeviceTokenSetupCode: vi.fn(),
   useRevokeDeviceToken: vi.fn(),
 }))
 
-import { useCreateDeviceToken, useRevokeDeviceToken } from "@/hooks/use-api-mutations"
+import {
+  useCreateDeviceToken,
+  useCreateDeviceTokenSetupCode,
+  useRevokeDeviceToken,
+} from "@/hooks/use-api-mutations"
 import { useDeviceTokens } from "@/hooks/use-api-queries"
 import { DeviceTokenCard } from "@/components/profile/device-token-card"
 
 const mockUseDeviceTokens = vi.mocked(useDeviceTokens)
 const mockUseCreateDeviceToken = vi.mocked(useCreateDeviceToken)
+const mockUseCreateDeviceTokenSetupCode = vi.mocked(useCreateDeviceTokenSetupCode)
 const mockUseRevokeDeviceToken = vi.mocked(useRevokeDeviceToken)
 
 describe("DeviceTokenCard", () => {
@@ -38,6 +44,10 @@ describe("DeviceTokenCard", () => {
       mutate: vi.fn(),
       isPending: false,
     } as unknown as ReturnType<typeof useCreateDeviceToken>)
+    mockUseCreateDeviceTokenSetupCode.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useCreateDeviceTokenSetupCode>)
     mockUseRevokeDeviceToken.mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
@@ -61,6 +71,19 @@ describe("DeviceTokenCard", () => {
 
     render(<DeviceTokenCard />)
     fireEvent.click(screen.getByText("Create device token"))
+
+    expect(mutate).toHaveBeenCalled()
+  })
+
+  it("creates a setup code when requested", () => {
+    const mutate = vi.fn()
+    mockUseCreateDeviceTokenSetupCode.mockReturnValue({
+      mutate,
+      isPending: false,
+    } as unknown as ReturnType<typeof useCreateDeviceTokenSetupCode>)
+
+    render(<DeviceTokenCard />)
+    fireEvent.click(screen.getByText("Create setup code"))
 
     expect(mutate).toHaveBeenCalled()
   })
