@@ -42,8 +42,9 @@ Primer is an open-source workflow intelligence platform for agentic engineering.
 session data from [Claude Code](https://docs.anthropic.com/en/docs/claude-code),
 [Codex CLI](https://github.com/openai/codex),
 [Gemini CLI](https://github.com/google-gemini/gemini-cli), and Cursor, then turns that telemetry
-into workflow fingerprints, quality attribution, cost proof, exemplar sessions, coaching, and
-experiments. Self-hosted. Privacy-first. Your data never leaves your network.
+into workflow fingerprints, quality attribution, cost proof, exemplar sessions, project playbook
+templates, post-merge outcomes, coaching, and experiments. Self-hosted. Privacy-first. Your data
+never leaves your network.
 
 ## Questions Primer Answers
 
@@ -88,8 +89,9 @@ differentiate high performers and which ones create friction.
 
 **Individual intelligence, not just org dashboards.** Every engineer gets a trajectory view,
 strengths profile, friction breakdown, AI-generated narrative, model coach, and learning paths.
-The MCP sidecar brings stats, friction reports, recommendations, and coaching into the session
-without forcing context switching.
+The MCP sidecar now brings session-start coaching, live signals, in-session nudges, stats,
+friction reports, recaps, and manager review packs into the session without forcing context
+switching.
 
 **Cost optimization, not just cost tracking.** Primer models whether each engineer should be on API billing, Pro ($20/mo), or Max ($100/mo) based on actual usage. It measures cache hit rates per engineer and surfaces how much money is being left on the table. Budget burn-rate alerts catch overruns before they happen.
 
@@ -110,11 +112,11 @@ actually improved outcomes.
 | **Engineer Profiles** | Weekly trajectory sparklines, strengths/friction breakdown, peer benchmarking, AI-generated narrative insights |
 | **AI Maturity** | Leverage scores (tool mastery, orchestration depth, efficiency), Effectiveness scores (success rate, cost efficiency), model diversity, agent team detection, project AI-readiness |
 | **Friction Intelligence** | Categorized friction types with impact scoring, bottleneck detection, root cause patterns, cluster analysis |
-| **Quality & Code Impact** | PR merge rates, workflow-based quality attribution, Claude-assisted vs. non-Claude comparison, code volume per session, review comment analysis |
+| **Quality & Code Impact** | PR merge rates, workflow-based quality attribution, post-merge outcomes, Claude-assisted vs. non-Claude comparison, code volume per session, review comment analysis |
 | **AI Synthesis** | LLM-generated narrative reports at org, team, and engineer scope — turns metrics into stories |
 | **Conversational Explorer** | Natural language queries over your data via SSE-streamed tool-use chat |
 | **Session Browser** | Full-text search, outcome/model/type filters, transcript viewer, message-level detail |
-| **MCP Sidecar** | Engineers query their own stats mid-session: trends, friction reports, recommendations, coaching |
+| **MCP Sidecar** | Session-start coaching, live signals, in-session nudges, personal recaps, manager review packs, and mid-session stats |
 | **Multi-Agent Support** | Claude Code, Codex CLI, Gemini CLI, and Cursor sessions in one platform |
 | **GitHub Integration** | OAuth SSO, PR sync, commit correlation, repository AI-readiness scoring |
 

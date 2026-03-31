@@ -6,10 +6,16 @@ Run the test suite and analyze results.
 
 ### Instructions
 
-1. Run `pytest -v --tb=short` and capture output
+1. Run `pytest --import-mode=importlib -v --tb=short` and capture output
 2. If any tests fail, read the failing test file and the source it tests to diagnose the issue
-3. Run `pytest -v --cov=primer --cov-report=term-missing` to check coverage
+3. Run `pytest --import-mode=importlib -v --cov=primer --cov-report=term-missing` to check coverage
 4. Report: total passed/failed, coverage percentage, and any uncovered lines worth testing
+
+### Repo note
+
+- In this workspace, prefer `pytest --import-mode=importlib ...` so pytest uses this repo's
+  `tests/conftest.py` instead of a sibling checkout's shared `tests` package when both exist on
+  the same machine.
 
 ### Key files
 

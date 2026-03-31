@@ -20,7 +20,7 @@ AI engineering intelligence platform for agentic teams.
 | `src/primer/server/routers/` | API endpoint definitions (see Routers table below) |
 | `src/primer/server/services/` | Business logic (see Services table below) |
 | `src/primer/hook/` | Session capture layer: multi-agent extractor registry (Claude Code, Codex CLI, Gemini CLI, Cursor) |
-| `src/primer/mcp/` | MCP sidecar server (6 tools: sync, my_stats, team_overview, friction_report, recommendations, coaching) |
+| `src/primer/mcp/` | MCP sidecar server (11 tools: sync, my_stats, team_overview, friction_report, recommendations, coaching, session_start_coaching, live_session_signals, in_session_nudges, personal_recaps, manager_review_pack) |
 | `alembic/` | Database migrations |
 | `tests/` | Large pytest suite covering ingest, analytics, quality, auth, CLI, extractors, and UI-adjacent backend behavior |
 | `scripts/` | Dev utilities: seed_data.py, install_hook.py, verify_github.py, provision_user.py |
@@ -29,7 +29,7 @@ AI engineering intelligence platform for agentic teams.
 
 | Path | Purpose |
 |------|---------|
-| `frontend/src/pages/` | Route pages (dashboard, sessions, engineers, engineer-profile, teams, team-detail, maturity, explorer, narrative, finops, admin, login, profile) |
+| `frontend/src/pages/` | Route pages (dashboard, sessions, session-detail, engineers, engineer-profile, teams, team-detail, projects, project-workspace, growth, maturity, quality, compare, friction, explorer, narrative, finops, interventions, admin, login, profile) |
 | `frontend/src/components/dashboard/` | Organization dashboard sections (activity, attention, deep-dive cards, recommendations, charts) |
 | `frontend/src/components/finops/` | FinOps tabs (overview, cache, modeling, forecast, budgets) |
 | `frontend/src/components/engineer-profile/` | Engineer profile views (trajectory, strengths, friction, quality, narrative) |
@@ -41,7 +41,7 @@ AI engineering intelligence platform for agentic teams.
 | `frontend/src/components/quality/` | Code quality metrics, Claude PR comparison, review findings, GitHub integration |
 | `frontend/src/components/explorer/` | Conversational data explorer (floating chat, SSE streaming) |
 | `frontend/src/components/narrative/` | AI-generated narrative insights |
-| `frontend/src/components/admin/` | Admin UI tabs (alerts, audit log, engineers, teams, notifications, system) |
+| `frontend/src/components/admin/` | Admin UI tabs (alerts, audit log, engineers, teams, notifications, system, activation, performance) |
 | `frontend/src/components/layout/` | App shell, sidebar, header, date-range-picker, alert bell |
 | `frontend/src/components/shared/` | Reusable: empty-state, loading-skeleton, login-gate, page-header |
 | `frontend/src/components/ui/` | Primitives: button, card, badge, skeleton, separator, page-tabs |
@@ -60,7 +60,7 @@ AI engineering intelligence platform for agentic teams.
 | `engineers.py` | Engineer CRUD, API key generation/rotation, profile |
 | `sessions.py` | Session list/detail with filters (engineer, team, project, outcome, model, date range) |
 | `ingest.py` | Session ingestion from hooks (single + bulk) |
-| `analytics.py` | Overview stats, friction, benchmarks, cost analysis, tool adoption, daily stats, insights, maturity, quality, review findings, explorer, narrative |
+| `analytics.py` | Overview stats, friction, compare mode, coaching, manager review packs, benchmarks, cost analysis, tool adoption, daily stats, insights, maturity, quality, review findings, explorer, narrative |
 | `alerts.py` | Alert list/detail, acknowledge/dismiss, anomaly detection trigger |
 | `alert_configs.py` | Alert threshold CRUD per team |
 | `notifications.py` | Slack webhook config and test |
@@ -85,10 +85,10 @@ AI engineering intelligence platform for agentic teams.
 | `workflow_playbook_service.py` | Build workflow playbooks from successful peer patterns |
 | `narrative_service.py` | Claude API-powered narrative insights with caching and auto-refresh |
 | `synthesis_service.py` | AI synthesis of recommendations |
-| `coaching_service.py` | Personalized in-workflow coaching brief from analytics, tips, and maturity data |
+| `coaching_service.py` | Personalized coaching plus session-start guidance from analytics, tips, maturity data, and recommendation narratives |
 | `facet_extraction_service.py` | LLM-powered session facet extraction (goal, friction, satisfaction) |
 | `explorer_service.py` | Conversational data explorer (tool-use chat with Anthropic API) |
-| `quality_service.py` | Code quality metrics, Claude PR comparison, review findings aggregation, GitHub integration |
+| `quality_service.py` | Code quality metrics, Claude PR comparison, review findings aggregation, post-merge outcomes, GitHub integration |
 | `maturity_service.py` | Tool leverage scoring, AI readiness per project |
 | `github_service.py` | GitHub PR/commit fetching, PR comment fetching, AI readiness detection |
 | `review_finding_service.py` | Extensible parser registry for automated review findings (BugBot, etc.) |

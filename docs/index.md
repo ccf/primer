@@ -111,7 +111,7 @@ Primer has four major runtime surfaces:
 - **Capture layer** discovers and extracts local sessions across supported agents
 - **FastAPI platform** ingests data and computes workflow, quality, cost, growth, maturity, and experiment analytics
 - **React dashboard** exposes organization, project, growth, quality, FinOps, and intervention workflows
-- **MCP sidecar** brings stats, friction, recommendations, and coaching into the engineer workflow
+- **MCP sidecar** brings session-start coaching, live signals, nudges, stats, recaps, and manager packs into the engineer workflow
 
 Read the full [Architecture guide](architecture.md) for details.
 
