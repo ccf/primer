@@ -25,6 +25,7 @@ from primer.common.schemas import (
     ProjectAgentMixSummary,
     ProjectEnablementSummary,
     ProjectFrictionHotspot,
+    ProjectPlaybookTemplate,
     ProjectRepositoryContextSummary,
     ProjectRepositorySummary,
     ProjectScorecard,
@@ -234,7 +235,12 @@ def get_project_workspace(
                 repositories,
                 workflow_summary,
                 friction,
-            )
+            ),
+            "playbook_templates": _build_project_playbook_templates(
+                enablement,
+                repositories,
+                workflow_summary,
+            ),
         }
     )
     project = ProjectStats(
@@ -868,6 +874,173 @@ def _build_project_enablement_recommendations(
         )
 
     return recommendations[:3]
+
+
+def _build_project_playbook_templates(
+    enablement: ProjectEnablementSummary,
+    repositories: list[ProjectRepositorySummary],
+    workflow_summary: ProjectWorkflowSummary,
+) -> list[ProjectPlaybookTemplate]:
+    templates: list[ProjectPlaybookTemplate] = []
+    best_fingerprint = _select_best_fingerprint(workflow_summary.fingerprints)
+    recommended_workflow = (
+        best_fingerprint.label
+        if best_fingerprint is not None
+        else "Read -> Verify -> Edit -> Verify -> Ship"
+    )
+
+    ready_small_repos = [
+        repo.repository
+        for repo in repositories
+        if repo.repo_size_bucket == "small" and repo.has_test_harness and repo.has_ci_pipeline
+    ]
+    if ready_small_repos:
+        templates.append(
+            ProjectPlaybookTemplate(
+                template_type="greenfield",
+                title="Greenfield default playbook",
+                summary=(
+                    "This project has the signals of a lighter-weight codebase with fast feedback "
+                    "loops. Bias toward shipping the smallest vertical slice with tight, frequent "
+                    "verification."
+                ),
+                recommended_workflow=recommended_workflow,
+                initial_steps=[
+                    "Start from the narrowest user-visible change or failing check.",
+                    "Verify immediately after the first edit before widening scope.",
+                    (
+                        "Capture any repo-specific conventions in CLAUDE.md or AGENTS.md "
+                        "as you learn them."
+                    ),
+                ],
+                guardrails=[
+                    "Avoid oversized prompts when the repo is still easy to inspect directly.",
+                    "Keep the first pass small enough that rollback is trivial.",
+                ],
+                evidence={"repositories": ready_small_repos},
+            )
+        )
+
+    legacy_repos = [repo.repository for repo in repositories if repo.repo_size_bucket == "large"]
+    context_hotspot = next(
+        (
+            hotspot
+            for hotspot in workflow_summary.friction_hotspots
+            if hotspot.friction_type in _PROJECT_CONTEXT_FRICTION
+        ),
+        None,
+    )
+    if legacy_repos or context_hotspot:
+        templates.append(
+            ProjectPlaybookTemplate(
+                template_type="legacy",
+                title="Legacy-system stabilization playbook",
+                summary=(
+                    "This project shows signs of broader system surface area or context drag. "
+                    "Front-load discovery, map blast radius, and commit to incremental "
+                    "verification before each wider edit."
+                ),
+                recommended_workflow=recommended_workflow,
+                initial_steps=[
+                    "Trace the narrowest path through the affected code before editing.",
+                    "List the files, commands, and checks that define the safe change boundary.",
+                    "Verify after each small change instead of batching multiple uncertain edits.",
+                ],
+                guardrails=[
+                    "Prefer reversible edits over broad refactors on the first pass.",
+                    "Record recovery steps when you hit context or edit-conflict friction.",
+                ],
+                evidence={
+                    "repositories": legacy_repos,
+                    "context_hotspot": context_hotspot.friction_type if context_hotspot else None,
+                },
+            )
+        )
+
+    dominant_permission_mode = None
+    if enablement.permission_mode_counts:
+        dominant_permission_mode = max(
+            enablement.permission_mode_counts.items(),
+            key=lambda item: item[1],
+        )[0]
+    permission_hotspot = next(
+        (
+            hotspot
+            for hotspot in workflow_summary.friction_hotspots
+            if hotspot.friction_type == "permission_denied"
+        ),
+        None,
+    )
+    if permission_hotspot or dominant_permission_mode in {"default", "never"}:
+        templates.append(
+            ProjectPlaybookTemplate(
+                template_type="high_compliance",
+                title="High-compliance approval playbook",
+                summary=(
+                    "This project shows stronger approval or permission boundaries. Start with "
+                    "read-safe discovery, make the approval path explicit, and line up "
+                    "verification before any privileged step."
+                ),
+                recommended_workflow="Inspect -> Propose -> Approve -> Verify -> Ship",
+                initial_steps=[
+                    "Identify which commands and directories are safe before editing.",
+                    (
+                        "Write out the exact privileged step you expect to need before "
+                        "requesting approval."
+                    ),
+                    (
+                        "Prepare the verification command so the approval window stays short "
+                        "and purposeful."
+                    ),
+                ],
+                guardrails=[
+                    "Do not batch multiple approval-requiring steps into a single request.",
+                    (
+                        "Keep an audit trail of the commands and files that crossed "
+                        "approval boundaries."
+                    ),
+                ],
+                evidence={
+                    "dominant_permission_mode": dominant_permission_mode,
+                    "permission_hotspot_sessions": (
+                        permission_hotspot.session_count if permission_hotspot else 0
+                    ),
+                },
+            )
+        )
+
+    test_poor_repos = [
+        repo.repository
+        for repo in repositories
+        if repo.has_test_harness is False
+        or repo.has_ci_pipeline is False
+        or (repo.test_maturity_score is not None and repo.test_maturity_score < 50)
+    ]
+    if test_poor_repos:
+        templates.append(
+            ProjectPlaybookTemplate(
+                template_type="test_poor",
+                title="Test-poor safety-first playbook",
+                summary=(
+                    "This project lacks strong automated verification, so the playbook should lean "
+                    "on explicit manual checks, smallest-possible deltas, and recovery plans "
+                    "before shipping."
+                ),
+                recommended_workflow="Inspect -> Edit -> Manual verify -> Add safety rails -> Ship",
+                initial_steps=[
+                    "Define the manual verification checklist before the first code change.",
+                    "Prefer the smallest patch that proves the fix or behavior change.",
+                    "Capture the next-best automated check to add while the context is fresh.",
+                ],
+                guardrails=[
+                    "Avoid wide refactors without first creating a repeatable verification path.",
+                    "Document the fallback or rollback plan before shipping risky edits.",
+                ],
+                evidence={"repositories": test_poor_repos},
+            )
+        )
+
+    return templates[:4]
 
 
 def _build_repository_summary(db: Session, session_q) -> list[ProjectRepositorySummary]:

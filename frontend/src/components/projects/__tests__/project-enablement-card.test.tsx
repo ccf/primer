@@ -24,6 +24,17 @@ describe("ProjectEnablementCard", () => {
           permission_mode_counts: { "on-request": 2 },
           top_tools: ["Edit", "Bash"],
           top_models: ["claude-sonnet-4"],
+          playbook_templates: [
+            {
+              template_type: "legacy",
+              title: "Legacy-system stabilization playbook",
+              summary: "Front-load discovery and verify after each small edit.",
+              recommended_workflow: "Debugging -> Verify -> Edit -> Verify",
+              initial_steps: ["Trace the narrowest path first."],
+              guardrails: ["Prefer reversible edits."],
+              evidence: {},
+            },
+          ],
           recommendations: [
             {
               category: "tooling",
@@ -41,6 +52,8 @@ describe("ProjectEnablementCard", () => {
     )
 
     expect(screen.getByText("Enablement Recommendations")).toBeInTheDocument()
+    expect(screen.getByText("Playbook Templates")).toBeInTheDocument()
+    expect(screen.getByText("Legacy-system stabilization playbook")).toBeInTheDocument()
     expect(screen.getByText("Stabilize recurring tooling failures")).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole("button", { name: "Create intervention" }))

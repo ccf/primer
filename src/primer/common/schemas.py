@@ -1745,6 +1745,17 @@ class ProjectEnablementSummary(BaseModel):
     top_tools: list[str] = []
     top_models: list[str] = []
     recommendations: list[Recommendation] = Field(default_factory=list)
+    playbook_templates: list["ProjectPlaybookTemplate"] = Field(default_factory=list)
+
+
+class ProjectPlaybookTemplate(BaseModel):
+    template_type: str
+    title: str
+    summary: str
+    recommended_workflow: str | None = None
+    initial_steps: list[str] = Field(default_factory=list)
+    guardrails: list[str] = Field(default_factory=list)
+    evidence: dict[str, Any] = Field(default_factory=dict)
 
 
 class ProjectRepositoryContextSummary(BaseModel):

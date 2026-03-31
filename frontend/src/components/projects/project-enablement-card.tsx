@@ -46,6 +46,60 @@ function renderTopList(items: string[], emptyLabel: string) {
   )
 }
 
+function renderPlaybookTemplates(
+  templates: ProjectEnablementSummary["playbook_templates"],
+) {
+  if (templates.length === 0) {
+    return <p className="text-sm text-muted-foreground">No project playbook templates yet.</p>
+  }
+
+  return (
+    <div className="space-y-3">
+      {templates.map((template) => (
+        <div
+          key={`${template.template_type}-${template.title}`}
+          className="rounded-xl border border-border/60 bg-muted/20 p-4"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline">{template.template_type.replaceAll("_", " ")}</Badge>
+            {template.recommended_workflow && (
+              <Badge variant="secondary">{template.recommended_workflow}</Badge>
+            )}
+          </div>
+          <p className="mt-3 text-sm font-semibold">{template.title}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{template.summary}</p>
+
+          {template.initial_steps.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                First Steps
+              </p>
+              <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                {template.initial_steps.map((step) => (
+                  <li key={step}>- {step}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {template.guardrails.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Guardrails
+              </p>
+              <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                {template.guardrails.map((guardrail) => (
+                  <li key={guardrail}>- {guardrail}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function ProjectEnablementCard({
   enablement,
   teamId,
@@ -106,6 +160,13 @@ export function ProjectEnablementCard({
               Top Models
             </h3>
             {renderTopList(enablement.top_models, "No model usage telemetry yet.")}
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Playbook Templates
+            </h3>
+            {renderPlaybookTemplates(enablement.playbook_templates)}
           </section>
 
           <section className="space-y-3">
