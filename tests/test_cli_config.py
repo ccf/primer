@@ -27,9 +27,13 @@ def test_write_and_read_config(tmp_path):
 
 def test_get_value(tmp_path):
     path = tmp_path / "config.toml"
-    write_config('[server]\nport = 9000\n[auth]\napi_key = "abc123"\n', path)
+    write_config(
+        '[server]\nport = 9000\n[auth]\napi_key = "abc123"\ndevice_token = "dev-xyz"\n',
+        path,
+    )
     assert get_value("server.port", path) == "9000"
     assert get_value("auth.api_key", path) == "abc123"
+    assert get_value("auth.device_token", path) == "dev-xyz"
     assert get_value("missing.key", path) is None
 
 
@@ -51,13 +55,23 @@ def test_set_value_overwrites(tmp_path):
 
 def test_load_config_into_env(tmp_path, monkeypatch):
     path = tmp_path / "config.toml"
+    device_token = "device-abc"  # noqa: S105 - test fixture token
     write_config(
-        '[server]\nhost = "10.0.0.1"\nport = 3000\n[auth]\nadmin_api_key = "secret"\n',
+        (
+            '[server]\nhost = "10.0.0.1"\nport = 3000\n'
+            '[auth]\nadmin_api_key = "secret"\n'
+            f'device_token = "{device_token}"\n'
+        ),
         path,
     )
 
     # Clear relevant env vars
-    for var in ("PRIMER_SERVER_HOST", "PRIMER_SERVER_PORT", "PRIMER_ADMIN_API_KEY"):
+    for var in (
+        "PRIMER_SERVER_HOST",
+        "PRIMER_SERVER_PORT",
+        "PRIMER_ADMIN_API_KEY",
+        "PRIMER_DEVICE_TOKEN",
+    ):
         monkeypatch.delenv(var, raising=False)
 
     load_config_into_env(path)
@@ -65,6 +79,7 @@ def test_load_config_into_env(tmp_path, monkeypatch):
     assert os.environ["PRIMER_SERVER_HOST"] == "10.0.0.1"
     assert os.environ["PRIMER_SERVER_PORT"] == "3000"
     assert os.environ["PRIMER_ADMIN_API_KEY"] == "secret"
+    assert os.environ["PRIMER_DEVICE_TOKEN"] == device_token
 
 
 def test_load_config_env_precedence(tmp_path, monkeypatch):

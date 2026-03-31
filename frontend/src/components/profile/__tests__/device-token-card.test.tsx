@@ -1,0 +1,67 @@
+import { fireEvent, render, screen } from "@testing-library/react"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+
+vi.mock("@/hooks/use-api-queries", () => ({
+  useDeviceTokens: vi.fn(),
+}))
+
+vi.mock("@/hooks/use-api-mutations", () => ({
+  useCreateDeviceToken: vi.fn(),
+  useRevokeDeviceToken: vi.fn(),
+}))
+
+import { useCreateDeviceToken, useRevokeDeviceToken } from "@/hooks/use-api-mutations"
+import { useDeviceTokens } from "@/hooks/use-api-queries"
+import { DeviceTokenCard } from "@/components/profile/device-token-card"
+
+const mockUseDeviceTokens = vi.mocked(useDeviceTokens)
+const mockUseCreateDeviceToken = vi.mocked(useCreateDeviceToken)
+const mockUseRevokeDeviceToken = vi.mocked(useRevokeDeviceToken)
+
+describe("DeviceTokenCard", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockUseDeviceTokens.mockReturnValue({
+      data: [
+        {
+          id: "dt-1",
+          engineer_id: "eng-1",
+          name: "Laptop",
+          token_last_four: "1234",
+          revoked: false,
+          created_at: "2026-03-31T00:00:00Z",
+        },
+      ],
+      isLoading: false,
+    } as ReturnType<typeof useDeviceTokens>)
+    mockUseCreateDeviceToken.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useCreateDeviceToken>)
+    mockUseRevokeDeviceToken.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useRevokeDeviceToken>)
+  })
+
+  it("renders existing tokens", () => {
+    render(<DeviceTokenCard />)
+
+    expect(screen.getByText("Local Device Tokens")).toBeInTheDocument()
+    expect(screen.getByText("Laptop")).toBeInTheDocument()
+    expect(screen.getByText(/Ends with 1234/)).toBeInTheDocument()
+  })
+
+  it("creates a token when requested", () => {
+    const mutate = vi.fn()
+    mockUseCreateDeviceToken.mockReturnValue({
+      mutate,
+      isPending: false,
+    } as unknown as ReturnType<typeof useCreateDeviceToken>)
+
+    render(<DeviceTokenCard />)
+    fireEvent.click(screen.getByText("Create device token"))
+
+    expect(mutate).toHaveBeenCalled()
+  })
+})

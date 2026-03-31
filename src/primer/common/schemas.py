@@ -133,6 +133,26 @@ class EngineerCreateResponse(BaseModel):
     api_key: str = Field(description="Store this key securely; it cannot be retrieved again.")
 
 
+class DeviceTokenCreate(BaseModel):
+    name: str | None = None
+
+
+class DeviceTokenResponse(BaseModel):
+    id: str
+    engineer_id: str
+    name: str
+    token_last_four: str
+    revoked: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class DeviceTokenCreateResponse(BaseModel):
+    device_token: DeviceTokenResponse
+    raw_token: str = Field(description="Copy this device token now; it cannot be retrieved again.")
+
+
 # --- Session Facets ---
 
 
@@ -372,7 +392,7 @@ class SessionCustomizationPayload(BaseModel):
 
 class SessionIngestPayload(BaseModel):
     session_id: str
-    api_key: str
+    api_key: str | None = None
     agent_type: AgentType = "claude_code"
     project_path: str | None = None
     project_name: str | None = None
@@ -412,7 +432,7 @@ class SessionIngestPayload(BaseModel):
 
 
 class BulkIngestPayload(BaseModel):
-    api_key: str
+    api_key: str | None = None
     sessions: list[SessionIngestPayload]
 
 

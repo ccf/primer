@@ -10,6 +10,7 @@ from primer.common.schemas import LiveSessionSignal, LiveSessionSignalsResponse
 
 @pytest.fixture(autouse=True)
 def _set_api_key(monkeypatch):
+    monkeypatch.setattr("primer.mcp.tools.DEVICE_TOKEN", "")
     monkeypatch.setattr("primer.mcp.tools.API_KEY", "test-key")
     monkeypatch.setattr("primer.mcp.tools.ADMIN_API_KEY", "")
     monkeypatch.setattr("primer.mcp.tools.SERVER_URL", "http://test:8000")
@@ -27,6 +28,7 @@ def test_admin_headers():
 
 def test_primer_sync_no_api_key(monkeypatch):
     monkeypatch.setattr("primer.mcp.tools.API_KEY", "")
+    monkeypatch.setattr("primer.mcp.tools.DEVICE_TOKEN", "")
     from primer.mcp.tools import primer_sync
 
     result = primer_sync()
@@ -41,7 +43,29 @@ def test_primer_sync_success(mock_sync):
     result = primer_sync()
     data = json.loads(result)
     assert data["synced"] == 2
-    mock_sync.assert_called_once_with("http://test:8000", "test-key")
+    mock_sync.assert_called_once_with(
+        "http://test:8000",
+        api_key="test-key",
+        device_token=None,
+    )
+
+
+@patch("primer.mcp.tools.sync_sessions")
+def test_primer_sync_prefers_device_token(mock_sync, monkeypatch):
+    monkeypatch.setattr("primer.mcp.tools.API_KEY", "")
+    monkeypatch.setattr("primer.mcp.tools.DEVICE_TOKEN", "device-123")
+    mock_sync.return_value = {"synced": 1, "errors": 0}
+
+    from primer.mcp.tools import primer_sync
+
+    result = primer_sync()
+    data = json.loads(result)
+    assert data["synced"] == 1
+    mock_sync.assert_called_once_with(
+        "http://test:8000",
+        api_key=None,
+        device_token="device-123",
+    )
 
 
 # --- primer_my_stats ---

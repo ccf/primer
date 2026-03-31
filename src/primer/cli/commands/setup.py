@@ -57,7 +57,23 @@ def setup(name: str | None, email: str | None, server_url: str | None) -> None:
             console.success(f"Registered! Engineer ID: {eng_id}")
             if api_key:
                 set_value("auth.api_key", api_key)
-                console.success("API key saved to config.toml")
+                console.success("Legacy API key saved to config.toml")
+                try:
+                    token_resp = httpx.post(
+                        f"{url}/api/v1/auth/device-tokens",
+                        json={"name": "Local machine"},
+                        headers={"x-api-key": api_key},
+                        timeout=10.0,
+                    )
+                    if token_resp.status_code == 200:
+                        raw_token = token_resp.json().get("raw_token")
+                        if raw_token:
+                            set_value("auth.device_token", raw_token)
+                            console.success("Device token saved to config.toml")
+                    else:
+                        console.warn("Device token minting failed; falling back to legacy API key")
+                except httpx.RequestError:
+                    console.warn("Could not mint a device token; falling back to legacy API key")
                 console.info("You can now run: primer hook install")
         else:
             console.error(f"Registration failed ({resp.status_code}): {resp.text}")

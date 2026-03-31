@@ -6,14 +6,25 @@ from sqlalchemy.orm import Session
 
 from primer.common.config import settings
 from primer.common.database import get_db
-from primer.common.schemas import EngineerResponse
+from primer.common.models import Engineer
+from primer.common.schemas import (
+    DeviceTokenCreate,
+    DeviceTokenCreateResponse,
+    DeviceTokenResponse,
+    EngineerResponse,
+)
+from primer.server.deps import AuthContext, get_auth_context
 from primer.server.middleware import limiter
+from primer.server.services import audit_service
 from primer.server.services.auth_service import (
     create_access_token,
+    create_device_token,
     create_refresh_token,
     exchange_github_code,
     find_or_create_engineer,
     get_github_authorize_url,
+    list_device_tokens,
+    revoke_device_token,
     rotate_refresh_token,
     verify_access_token,
 )
@@ -29,6 +40,15 @@ class GithubLoginResponse(BaseModel):
 class GithubCallbackRequest(BaseModel):
     code: str
     state: str
+
+
+def _require_authenticated_engineer(auth: AuthContext, db: Session) -> Engineer:
+    if auth.engineer_id is None:
+        raise HTTPException(status_code=400, detail="Engineer context required")
+    engineer = db.query(Engineer).filter(Engineer.id == auth.engineer_id).first()
+    if engineer is None:
+        raise HTTPException(status_code=404, detail="Engineer not found")
+    return engineer
 
 
 def _is_secure() -> bool:
@@ -142,3 +162,65 @@ def me(
         raise HTTPException(status_code=401, detail="Engineer not found")
 
     return EngineerResponse.model_validate(engineer)
+
+
+@router.get("/device-tokens", response_model=list[DeviceTokenResponse])
+def device_tokens(
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    engineer = _require_authenticated_engineer(auth, db)
+    return [DeviceTokenResponse.model_validate(token) for token in list_device_tokens(db, engineer)]
+
+
+@router.post("/device-tokens", response_model=DeviceTokenCreateResponse)
+@limiter.limit(settings.rate_limit_auth)
+def create_device_access_token(
+    request: Request,
+    payload: DeviceTokenCreate,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    engineer = _require_authenticated_engineer(auth, db)
+    token, raw_token = create_device_token(db, engineer, name=payload.name)
+    ip = request.client.host if request.client else None
+    audit_service.log_action(
+        db,
+        auth,
+        "create",
+        "device_token",
+        token.id,
+        details={"name": token.name},
+        ip_address=ip,
+    )
+    db.commit()
+    db.refresh(token)
+    return DeviceTokenCreateResponse(
+        device_token=DeviceTokenResponse.model_validate(token),
+        raw_token=raw_token,
+    )
+
+
+@router.delete("/device-tokens/{token_id}")
+def delete_device_access_token(
+    token_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    engineer = _require_authenticated_engineer(auth, db)
+    token = revoke_device_token(db, engineer, token_id)
+    if token is None:
+        raise HTTPException(status_code=404, detail="Device token not found")
+    ip = request.client.host if request.client else None
+    audit_service.log_action(
+        db,
+        auth,
+        "revoke",
+        "device_token",
+        token.id,
+        details={"name": token.name},
+        ip_address=ip,
+    )
+    db.commit()
+    return {"status": "ok"}

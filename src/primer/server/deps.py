@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from primer.common.config import settings
 from primer.common.database import get_db
 from primer.common.models import Engineer
-from primer.server.services.auth_service import verify_access_token
+from primer.server.services.auth_service import find_engineer_by_device_token, verify_access_token
 
 
 def require_admin(x_admin_key: str = Header()) -> str:
@@ -46,8 +46,21 @@ def verify_api_key(api_key: str, db: Session) -> Engineer:
     return _require_active_engineer(engineer, missing_detail="Invalid API key")
 
 
-def require_engineer(x_api_key: str = Header(), db: Session = Depends(get_db)) -> Engineer:
-    return verify_api_key(x_api_key, db)
+def verify_device_token(device_token: str, db: Session) -> Engineer:
+    engineer = find_engineer_by_device_token(db, device_token)
+    return _require_active_engineer(engineer, missing_detail="Invalid device token")
+
+
+def require_engineer(
+    x_api_key: str | None = Header(default=None),
+    x_device_token: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> Engineer:
+    if x_device_token:
+        return verify_device_token(x_device_token, db)
+    if x_api_key:
+        return verify_api_key(x_api_key, db)
+    raise HTTPException(status_code=401, detail="Authentication required")
 
 
 @dataclass
@@ -63,6 +76,7 @@ def get_auth_context(
     primer_access: str | None = Cookie(default=None),
     x_admin_key: str | None = Header(default=None),
     x_api_key: str | None = Header(default=None),
+    x_device_token: str | None = Header(default=None),
 ) -> AuthContext:
     """Unified auth: try JWT cookie → admin key header → API key header."""
     # 1. JWT cookie
@@ -83,7 +97,16 @@ def get_auth_context(
     if x_admin_key and x_admin_key == settings.admin_api_key:
         return AuthContext(engineer_id=None, role="admin", team_id=None)
 
-    # 3. API key header
+    # 3. Device token header
+    if x_device_token:
+        eng = verify_device_token(x_device_token, db)
+        return AuthContext(
+            engineer_id=eng.id,
+            role=eng.role,
+            team_id=eng.team_id,
+        )
+
+    # 4. API key header
     if x_api_key:
         eng = verify_api_key(x_api_key, db)
         return AuthContext(

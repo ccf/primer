@@ -46,6 +46,14 @@ def _detect_billing_mode(agent: str) -> str:
     return "subscription"
 
 
+def _auth_headers(*, api_key: str | None = None, device_token: str | None = None) -> dict[str, str]:
+    if device_token:
+        return {"x-device-token": device_token}
+    if api_key:
+        return {"x-api-key": api_key}
+    return {}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Primer SessionEnd hook")
     parser.add_argument(
@@ -60,10 +68,11 @@ def main() -> None:
     agent_type = AGENT_MAP[agent]
 
     server_url = os.environ.get("PRIMER_SERVER_URL", "http://localhost:8000")
+    device_token = os.environ.get("PRIMER_DEVICE_TOKEN", "")
     api_key = os.environ.get("PRIMER_API_KEY", "")
 
-    if not api_key:
-        logger.error("PRIMER_API_KEY not set")
+    if not device_token and not api_key:
+        logger.error("PRIMER_DEVICE_TOKEN or PRIMER_API_KEY must be set")
         sys.exit(1)
 
     # Read hook input from stdin
@@ -124,12 +133,13 @@ def main() -> None:
         facets = load_facets(session_id)
 
     # Build and send payload
-    payload = meta.to_ingest_payload(api_key=api_key, facets=facets)
+    payload = meta.to_ingest_payload(api_key=api_key or None, facets=facets)
 
     try:
         resp = httpx.post(
             f"{server_url}/api/v1/ingest/session",
             json=payload,
+            headers=_auth_headers(api_key=api_key or None, device_token=device_token or None),
             timeout=10.0,
         )
         if resp.status_code == 200:

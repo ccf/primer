@@ -751,3 +751,24 @@ def test_ingest_facets_wrong_engineer(client, engineer_with_key, db_session):
         headers={"x-api-key": raw_key2},
     )
     assert r2.status_code == 403
+
+
+def test_ingest_session_with_device_token(client, engineer_with_key, db_session):
+    from primer.server.services.auth_service import create_device_token
+
+    eng, _api_key = engineer_with_key
+    _token, raw_token = create_device_token(db_session, eng, name="Laptop")
+    db_session.commit()
+
+    payload = {
+        "session_id": str(uuid.uuid4()),
+        "message_count": 5,
+    }
+    response = client.post(
+        "/api/v1/ingest/session",
+        json=payload,
+        headers={"x-device-token": raw_token},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"

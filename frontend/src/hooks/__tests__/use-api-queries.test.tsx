@@ -11,6 +11,7 @@ import { apiFetch } from "@/lib/api"
 import {
   useTeams,
   useEngineers,
+  useDeviceTokens,
   useOverview,
   useDailyStats,
   useFriction,
@@ -64,6 +65,16 @@ describe("useEngineers", () => {
 
     await waitFor(() => expect(result.current.fetchStatus).toBe("idle"))
     expect(mockApiFetch).not.toHaveBeenCalled()
+  })
+})
+
+describe("useDeviceTokens", () => {
+  it("calls apiFetch with /api/v1/auth/device-tokens", async () => {
+    mockApiFetch.mockResolvedValue([])
+    const { result } = renderHook(() => useDeviceTokens(), { wrapper: createWrapper() })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(mockApiFetch).toHaveBeenCalledWith("/api/v1/auth/device-tokens")
   })
 })
 

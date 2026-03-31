@@ -3,6 +3,7 @@ import { apiFetch } from "@/lib/api"
 import type {
   AlertConfigResponse,
   BudgetStatus,
+  DeviceTokenCreateResponse,
   NarrativeResponse,
   WorkflowProfileBackfillSummary,
 } from "@/types/api"
@@ -43,6 +44,29 @@ export function useRotateApiKey() {
         { method: "POST" },
       ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["engineers"] }),
+  })
+}
+
+export function useCreateDeviceToken() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (payload?: { name?: string | null }) =>
+      apiFetch<DeviceTokenCreateResponse>("/api/v1/auth/device-tokens", {
+        method: "POST",
+        body: JSON.stringify(payload ?? {}),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["device-tokens"] }),
+  })
+}
+
+export function useRevokeDeviceToken() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (tokenId: string) =>
+      apiFetch<{ status: string }>(`/api/v1/auth/device-tokens/${tokenId}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["device-tokens"] }),
   })
 }
 

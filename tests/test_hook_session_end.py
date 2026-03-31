@@ -17,6 +17,7 @@ def _make_stdin(data: dict) -> io.StringIO:
 
 def test_main_no_api_key(monkeypatch):
     monkeypatch.delenv("PRIMER_API_KEY", raising=False)
+    monkeypatch.delenv("PRIMER_DEVICE_TOKEN", raising=False)
     monkeypatch.setenv("PRIMER_API_KEY", "")
     monkeypatch.setattr("sys.argv", ["session_end"])
 
@@ -25,6 +26,37 @@ def test_main_no_api_key(monkeypatch):
     with pytest.raises(SystemExit) as exc_info:
         main()
     assert exc_info.value.code == 1
+
+
+@patch("primer.hook.session_end.httpx.post")
+@patch("primer.hook.session_end.load_facets")
+@patch("primer.hook.session_end.get_extractor_for")
+def test_main_prefers_device_token(mock_get_extractor, mock_facets, mock_post, monkeypatch):
+    monkeypatch.delenv("PRIMER_API_KEY", raising=False)
+    monkeypatch.setenv("PRIMER_DEVICE_TOKEN", "device-123")
+    monkeypatch.setattr(
+        "sys.stdin",
+        _make_stdin({"session_id": "sess-device", "transcript_path": "/test/transcript.jsonl"}),
+    )
+    monkeypatch.setattr("sys.argv", ["session_end"])
+
+    meta = SessionMetadata(session_id="", message_count=1)
+    mock_extractor = MagicMock()
+    mock_extractor.extract.return_value = meta
+    mock_get_extractor.return_value = mock_extractor
+    mock_facets.return_value = None
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_post.return_value = mock_resp
+
+    from primer.hook.session_end import main
+
+    main()
+
+    kwargs = mock_post.call_args.kwargs
+    assert kwargs["headers"] == {"x-device-token": "device-123"}
+    assert "api_key" not in kwargs["json"]
 
 
 def test_main_invalid_stdin(monkeypatch):

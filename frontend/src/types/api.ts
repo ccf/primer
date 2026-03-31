@@ -25,6 +25,20 @@ export interface EngineerResponse {
   created_at: string
 }
 
+export interface DeviceTokenResponse {
+  id: string
+  engineer_id: string
+  name: string
+  token_last_four: string
+  revoked: boolean
+  created_at: string
+}
+
+export interface DeviceTokenCreateResponse {
+  device_token: DeviceTokenResponse
+  raw_token: string
+}
+
 export type AgentType = 'claude_code' | 'codex_cli' | 'gemini_cli' | 'cursor'
 export type TelemetryParity = 'required' | 'optional' | 'unavailable'
 export type RecoveryStrategy =
