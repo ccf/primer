@@ -18,6 +18,7 @@ import sys
 
 import httpx
 
+from primer.common.auth_headers import build_engineer_auth_headers
 from primer.hook.extractor import SessionMetadata, capture_git_info, load_facets
 from primer.hook.extractor_registry import get_extractor_for
 
@@ -44,14 +45,6 @@ def _detect_billing_mode(agent: str) -> str:
         if os.environ.get(key):
             return "api_key"
     return "subscription"
-
-
-def _auth_headers(*, api_key: str | None = None, device_token: str | None = None) -> dict[str, str]:
-    if device_token:
-        return {"x-device-token": device_token}
-    if api_key:
-        return {"x-api-key": api_key}
-    return {}
 
 
 def main() -> None:
@@ -139,7 +132,10 @@ def main() -> None:
         resp = httpx.post(
             f"{server_url}/api/v1/ingest/session",
             json=payload,
-            headers=_auth_headers(api_key=api_key or None, device_token=device_token or None),
+            headers=build_engineer_auth_headers(
+                api_key=api_key or None,
+                device_token=device_token or None,
+            ),
             timeout=10.0,
         )
         if resp.status_code == 200:

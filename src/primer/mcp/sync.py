@@ -6,6 +6,7 @@ from pathlib import Path
 
 import httpx
 
+from primer.common.auth_headers import build_engineer_auth_headers
 from primer.common.source_capabilities import get_capability_for
 from primer.hook.extractor import capture_git_info, load_facets
 from primer.hook.extractor_registry import get_extractor_for
@@ -18,18 +19,6 @@ _MAX_PAGES = 200
 
 class SyncPreflightError(RuntimeError):
     """Raised when sync cannot safely determine server-side session state."""
-
-
-def _engineer_auth_headers(
-    *,
-    api_key: str | None = None,
-    device_token: str | None = None,
-) -> dict[str, str]:
-    if device_token:
-        return {"x-device-token": device_token}
-    if api_key:
-        return {"x-api-key": api_key}
-    return {}
 
 
 def get_server_session_ids(
@@ -47,7 +36,10 @@ def get_server_session_ids(
         try:
             resp = httpx.get(
                 f"{server_url}/api/v1/sessions",
-                headers=_engineer_auth_headers(api_key=api_key, device_token=device_token),
+                headers=build_engineer_auth_headers(
+                    api_key=api_key,
+                    device_token=device_token,
+                ),
                 params={"limit": limit, "offset": offset},
                 timeout=30.0,
             )
@@ -168,7 +160,10 @@ def sync_sessions(
             resp = httpx.post(
                 f"{server_url}/api/v1/ingest/session",
                 json=payload,
-                headers=_engineer_auth_headers(api_key=api_key, device_token=device_token),
+                headers=build_engineer_auth_headers(
+                    api_key=api_key,
+                    device_token=device_token,
+                ),
                 timeout=10.0,
             )
             if resp.status_code == 200:
