@@ -101,19 +101,20 @@ def ensure_recurring_jobs(db) -> None:
     if active_count > 0:
         return
 
-    latest_completed = (
+    latest_terminal = (
         db.query(BackgroundJob)
         .filter(
             BackgroundJob.job_type == JOB_TYPE_NARRATIVE_REFRESH_ALL,
-            BackgroundJob.status == JOB_STATUS_SUCCEEDED,
+            BackgroundJob.status.in_([JOB_STATUS_SUCCEEDED, JOB_STATUS_FAILED]),
+            BackgroundJob.finished_at.is_not(None),
         )
         .order_by(BackgroundJob.finished_at.desc())
         .first()
     )
     now = _utcnow_naive()
-    if latest_completed and latest_completed.finished_at:
+    if latest_terminal and latest_terminal.finished_at:
         ttl = timedelta(hours=settings.narrative_cache_ttl_hours)
-        if latest_completed.finished_at > now - ttl:
+        if latest_terminal.finished_at > now - ttl:
             return
 
     enqueue_background_job(db, job_type=JOB_TYPE_NARRATIVE_REFRESH_ALL)
