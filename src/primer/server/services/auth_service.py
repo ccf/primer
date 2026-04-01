@@ -216,7 +216,7 @@ def exchange_device_setup_code(
     raw_code: str,
     *,
     device_name: str | None = None,
-) -> tuple[Engineer, DeviceToken, str] | None:
+) -> tuple[Engineer, DeviceToken, str, str] | None:
     code_hash = _hash_token(raw_code)
     setup_code = db.query(DeviceSetupCode).filter(DeviceSetupCode.code_hash == code_hash).first()
     if setup_code is None:
@@ -252,7 +252,7 @@ def exchange_device_setup_code(
         name=device_name or "Local machine",
     )
     db.flush()
-    return engineer, device_token, raw_token
+    return engineer, device_token, raw_token, setup_code.id
 
 
 def find_engineer_by_device_token(db: Session, raw_token: str) -> Engineer | None:

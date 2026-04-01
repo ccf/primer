@@ -266,6 +266,7 @@ def test_device_setup_code_exchange_creates_device_token(client, engineer_with_k
         .one()
     )
     assert audit_entry.actor_id == eng.id
+    assert audit_entry.resource_id is not None
 
     replay_resp = client.post(
         "/api/v1/auth/device-token-setup-codes/exchange",
