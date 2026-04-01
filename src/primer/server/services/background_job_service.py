@@ -198,12 +198,13 @@ def _claim_next_job(
         if updated != 1:
             job_db.rollback()
             return None
+        new_attempts = candidate.attempts + 1
         job_db.commit()
         return (
             candidate.id,
             candidate.job_type,
             candidate.payload,
-            candidate.attempts + 1,
+            new_attempts,
             candidate.max_attempts,
         )
     finally:
