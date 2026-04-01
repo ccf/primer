@@ -249,7 +249,7 @@ def exchange_device_token_setup_code(
     )
     if result is None:
         raise HTTPException(status_code=401, detail="Invalid or expired setup code")
-    engineer, token, raw_token = result
+    engineer, token, raw_token, setup_code_id = result
     ip = request.client.host if request.client else None
     audit_service.log_action(
         db,
@@ -260,6 +260,7 @@ def exchange_device_token_setup_code(
         ),
         "exchange",
         "device_setup_code",
+        setup_code_id,
         details={"device_name": token.name, "device_token_id": token.id},
         ip_address=ip,
     )
