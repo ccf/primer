@@ -77,6 +77,7 @@ async def _background_job_worker_loop() -> None:
                 try:
                     ensure_recurring_jobs(db)
                     return run_background_job_cycle(
+                        db,
                         limit=settings.background_job_batch_size,
                         lease_seconds=settings.background_job_lease_seconds,
                     )
