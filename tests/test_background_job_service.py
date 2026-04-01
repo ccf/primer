@@ -196,3 +196,22 @@ def test_ensure_recurring_jobs_skips_recent_success(db_session, monkeypatch):
         .count()
         == 1
     )
+
+
+def test_run_background_job_cycle_does_not_reclaim_expired_job_at_max_attempts(
+    db_session,
+):
+    expired_job = BackgroundJob(
+        job_type=JOB_TYPE_FACET_EXTRACTION,
+        status="running",
+        attempts=3,
+        max_attempts=3,
+        lease_expires_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=5),
+        payload={"session_id": str(uuid4())},
+    )
+    db_session.add(expired_job)
+    db_session.commit()
+
+    result = run_background_job_cycle(db_session, limit=1, lease_seconds=60)
+
+    assert result == {"processed": 0, "succeeded": 0, "failed": 0}

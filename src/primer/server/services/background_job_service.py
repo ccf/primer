@@ -26,6 +26,20 @@ def _utcnow_naive() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
+def _claimable_job_filter(now: datetime):
+    return and_(
+        BackgroundJob.attempts < BackgroundJob.max_attempts,
+        or_(
+            BackgroundJob.status == JOB_STATUS_PENDING,
+            and_(
+                BackgroundJob.status == JOB_STATUS_RUNNING,
+                BackgroundJob.lease_expires_at.is_not(None),
+                BackgroundJob.lease_expires_at < now,
+            ),
+        ),
+    )
+
+
 def enqueue_background_job(
     db,
     *,
@@ -155,16 +169,7 @@ def _claim_next_job(
     try:
         candidate = (
             job_db.query(BackgroundJob)
-            .filter(
-                or_(
-                    BackgroundJob.status == JOB_STATUS_PENDING,
-                    and_(
-                        BackgroundJob.status == JOB_STATUS_RUNNING,
-                        BackgroundJob.lease_expires_at.is_not(None),
-                        BackgroundJob.lease_expires_at < now,
-                    ),
-                )
-            )
+            .filter(_claimable_job_filter(now))
             .order_by(BackgroundJob.enqueued_at.asc())
             .first()
         )
@@ -175,14 +180,7 @@ def _claim_next_job(
             job_db.query(BackgroundJob)
             .filter(
                 BackgroundJob.id == candidate.id,
-                or_(
-                    BackgroundJob.status == JOB_STATUS_PENDING,
-                    and_(
-                        BackgroundJob.status == JOB_STATUS_RUNNING,
-                        BackgroundJob.lease_expires_at.is_not(None),
-                        BackgroundJob.lease_expires_at < now,
-                    ),
-                ),
+                _claimable_job_filter(now),
             )
             .update(
                 {
