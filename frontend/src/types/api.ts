@@ -644,7 +644,24 @@ export interface SystemStats {
   total_teams: number
   total_sessions: number
   total_ingest_events: number
+  pending_background_jobs: number
+  running_background_jobs: number
+  failed_background_jobs: number
   database_type: string
+}
+
+export interface BackgroundJobResponse {
+  id: string
+  job_type: string
+  status: string
+  attempts: number
+  max_attempts: number
+  lease_expires_at: string | null
+  last_error: string | null
+  created_by_engineer_id: string | null
+  enqueued_at: string
+  started_at: string | null
+  finished_at: string | null
 }
 
 export type ActivationHubStatus = "ready" | "attention" | "action_needed"

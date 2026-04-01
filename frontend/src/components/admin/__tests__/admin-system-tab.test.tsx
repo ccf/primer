@@ -5,12 +5,14 @@ import { AdminSystemTab } from "../admin-system-tab"
 const mockUseSystemStats = vi.fn()
 const mockUseActivationHub = vi.fn()
 const mockUseMeasurementIntegrity = vi.fn()
+const mockUseBackgroundJobs = vi.fn()
 const mockUseBackfillWorkflowProfiles = vi.fn()
 
 vi.mock("@/hooks/use-api-queries", () => ({
   useSystemStats: () => mockUseSystemStats(),
   useActivationHub: () => mockUseActivationHub(),
   useMeasurementIntegrity: () => mockUseMeasurementIntegrity(),
+  useBackgroundJobs: () => mockUseBackgroundJobs(),
 }))
 
 vi.mock("@/hooks/use-api-mutations", () => ({
@@ -33,8 +35,29 @@ describe("AdminSystemTab", () => {
         total_teams: 3,
         total_sessions: 48,
         total_ingest_events: 120,
+        pending_background_jobs: 2,
+        running_background_jobs: 1,
+        failed_background_jobs: 1,
         database_type: "SQLite",
       },
+      isLoading: false,
+    })
+    mockUseBackgroundJobs.mockReturnValue({
+      data: [
+        {
+          id: "job-1",
+          job_type: "facet_extract_session",
+          status: "pending",
+          attempts: 0,
+          max_attempts: 3,
+          lease_expires_at: null,
+          last_error: null,
+          created_by_engineer_id: null,
+          enqueued_at: "2026-04-01T00:00:00Z",
+          started_at: null,
+          finished_at: null,
+        },
+      ],
       isLoading: false,
     })
     mockUseActivationHub.mockReturnValue({
@@ -170,6 +193,8 @@ describe("AdminSystemTab", () => {
     expect(screen.getByText("Schema Parity by Source")).toBeInTheDocument()
     expect(screen.getByText("Workflow Coverage")).toBeInTheDocument()
     expect(screen.getByText("Repository Coverage")).toBeInTheDocument()
+    expect(screen.getByText("Recent Background Jobs")).toBeInTheDocument()
+    expect(screen.getByText("facet extract session")).toBeInTheDocument()
     expect(screen.getAllByText("claude_code").length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText("cursor").length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText("acme/complete-repo")).toBeInTheDocument()
@@ -222,6 +247,10 @@ describe("AdminSystemTab", () => {
         repository_quality: [],
         workflow_profile_quality: [],
       },
+      isLoading: false,
+    })
+    mockUseBackgroundJobs.mockReturnValue({
+      data: [],
       isLoading: false,
     })
     mockUseActivationHub.mockReturnValue({

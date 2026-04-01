@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from primer.common.config import settings
@@ -15,6 +15,10 @@ from primer.common.schemas import (
 )
 from primer.server.deps import verify_api_key, verify_device_token
 from primer.server.middleware import limiter
+from primer.server.services.background_job_service import (
+    JOB_TYPE_FACET_EXTRACTION,
+    enqueue_background_job,
+)
 from primer.server.services.ingest_service import (
     log_ingest_event,
     upsert_facets,
@@ -44,7 +48,6 @@ def _authenticate_ingest_engineer(
 def ingest_session(
     request: Request,
     payload: SessionIngestPayload,
-    background_tasks: BackgroundTasks,
     x_device_token: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ):
@@ -71,23 +74,25 @@ def ingest_session(
         except Exception:
             logger.exception("Anomaly detection failed during ingest")
 
-        db.commit()
-
-        # Send Slack notifications only after a successful commit
-        if alert_snapshots:
-            send_alert_notifications(alert_snapshots)
-
-        # Auto-extract facets if enabled and not already provided
+        # Auto-extract facets durably if enabled and not already provided
         if (
             settings.facet_extraction_enabled
             and settings.anthropic_api_key
             and payload.messages
             and not payload.facets
         ):
-            from primer.server.services.facet_extraction_service import extract_and_store_facets
+            enqueue_background_job(
+                db,
+                job_type=JOB_TYPE_FACET_EXTRACTION,
+                payload={"session_id": payload.session_id},
+                created_by_engineer_id=engineer.id,
+            )
 
-            messages = [m.model_dump() for m in payload.messages]
-            background_tasks.add_task(extract_and_store_facets, payload.session_id, messages)
+        db.commit()
+
+        # Send Slack notifications only after a successful commit
+        if alert_snapshots:
+            send_alert_notifications(alert_snapshots)
 
         return IngestResponse(status="ok", session_id=payload.session_id, created=created)
     except Exception as e:

@@ -1047,7 +1047,26 @@ class SystemStats(BaseModel):
     total_teams: int
     total_sessions: int
     total_ingest_events: int
+    pending_background_jobs: int = 0
+    running_background_jobs: int = 0
+    failed_background_jobs: int = 0
     database_type: str
+
+
+class BackgroundJobResponse(BaseModel):
+    id: str
+    job_type: str
+    status: str
+    attempts: int
+    max_attempts: int
+    lease_expires_at: datetime | None = None
+    last_error: str | None = None
+    created_by_engineer_id: str | None = None
+    enqueued_at: datetime
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
 
 
 class AgentSourceQuality(BaseModel):

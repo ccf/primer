@@ -62,10 +62,45 @@ async def _narrative_refresh_loop() -> None:
         await asyncio.sleep(settings.narrative_cache_ttl_hours * 3600)
 
 
+async def _background_job_worker_loop() -> None:
+    from primer.common.database import SessionLocal
+    from primer.server.services.background_job_service import (
+        ensure_recurring_jobs,
+        run_background_job_cycle,
+    )
+
+    while True:
+        try:
+
+            def _run_cycle() -> dict[str, int]:
+                db = SessionLocal()
+                try:
+                    ensure_recurring_jobs(db)
+                    return run_background_job_cycle(
+                        limit=settings.background_job_batch_size,
+                        lease_seconds=settings.background_job_lease_seconds,
+                    )
+                finally:
+                    db.close()
+
+            result = await asyncio.to_thread(_run_cycle)
+            if result["processed"] > 0:
+                logger.info(
+                    "Background jobs processed: %d succeeded, %d failed",
+                    result["succeeded"],
+                    result["failed"],
+                )
+        except Exception:
+            logger.exception("Background job worker loop failed")
+        await asyncio.sleep(settings.background_job_poll_seconds)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     task = None
-    if settings.narrative_auto_refresh and settings.anthropic_api_key:
+    if settings.background_jobs_enabled:
+        task = asyncio.create_task(_background_job_worker_loop())
+    elif settings.narrative_auto_refresh and settings.anthropic_api_key:
         task = asyncio.create_task(_narrative_refresh_loop())
     yield
     if task:

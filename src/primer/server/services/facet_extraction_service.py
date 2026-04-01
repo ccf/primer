@@ -308,6 +308,38 @@ def extract_and_store_facets(session_id: str, messages: list[dict]) -> bool:
         db.close()
 
 
+def extract_and_store_facets_for_session(session_id: str) -> bool:
+    """Load stored session messages and extract facets for that session."""
+    db = SessionLocal()
+    try:
+        session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+        if not session or session.has_facets:
+            return False
+
+        msg_rows = (
+            db.query(SessionMessage)
+            .filter(SessionMessage.session_id == session_id)
+            .order_by(SessionMessage.ordinal)
+            .all()
+        )
+        if not msg_rows:
+            return False
+
+        messages = [
+            {
+                "role": m.role,
+                "content_text": m.content_text,
+                "tool_calls": m.tool_calls,
+                "tool_results": m.tool_results,
+            }
+            for m in msg_rows
+        ]
+    finally:
+        db.close()
+
+    return extract_and_store_facets(session_id, messages)
+
+
 def backfill_facets(limit: int = 50) -> dict:
     """Extract facets for sessions that have messages but no facets.
 

@@ -6,6 +6,7 @@ import pytest
 from primer.common.models import (
     AlertConfig,
     AuditLog,
+    BackgroundJob,
     Budget,
     GitRepository,
     IngestEvent,
@@ -163,7 +164,27 @@ def test_system_stats(client, admin_headers, engineer_with_key):
     assert data["total_teams"] >= 1
     assert data["total_sessions"] >= 1
     assert data["total_ingest_events"] >= 1
+    assert "pending_background_jobs" in data
+    assert "running_background_jobs" in data
+    assert "failed_background_jobs" in data
     assert "database_type" in data
+
+
+def test_background_jobs_endpoint(client, admin_headers, db_session):
+    db_session.add(
+        BackgroundJob(
+            job_type="facet_extract_session",
+            status="pending",
+            payload={"session_id": "sess-1"},
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/api/v1/admin/background-jobs", headers=admin_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data[0]["job_type"] == "facet_extract_session"
+    assert data[0]["status"] == "pending"
 
 
 def test_system_stats_requires_admin(client, engineer_with_key):

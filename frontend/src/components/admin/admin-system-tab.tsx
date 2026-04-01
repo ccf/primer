@@ -9,9 +9,15 @@ import {
   GitPullRequest,
   MonitorDot,
   RefreshCcw,
+  Rows3,
   Users,
 } from "lucide-react"
-import { useActivationHub, useMeasurementIntegrity, useSystemStats } from "@/hooks/use-api-queries"
+import {
+  useActivationHub,
+  useBackgroundJobs,
+  useMeasurementIntegrity,
+  useSystemStats,
+} from "@/hooks/use-api-queries"
 import { useBackfillWorkflowProfiles } from "@/hooks/use-api-mutations"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { formatNumber } from "@/lib/utils"
@@ -26,6 +32,7 @@ import type {
   RepositoryQuality,
   TelemetryParity,
   WorkflowProfileCoverageRow,
+  BackgroundJobResponse,
 } from "@/types/api"
 
 function formatCoverage(value: number): string {
@@ -268,6 +275,59 @@ function WorkflowProfileCoverageTable({ rows }: { rows: WorkflowProfileCoverageR
   )
 }
 
+function BackgroundJobsTable({ rows }: { rows: BackgroundJobResponse[] }) {
+  if (rows.length === 0) {
+    return <p className="text-sm text-muted-foreground">No background jobs yet.</p>
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-4">
+        <CardTitle>Recent Background Jobs</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Durable jobs cover narrative refresh, facet extraction, and queued admin backfills.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="text-left text-muted-foreground">
+              <tr className="border-b border-border/60">
+                <th className="pb-3 pr-4 font-medium">Type</th>
+                <th className="pb-3 pr-4 font-medium">Status</th>
+                <th className="pb-3 pr-4 font-medium">Attempts</th>
+                <th className="pb-3 pr-4 font-medium">Queued</th>
+                <th className="pb-3 font-medium">Last Error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id} className="border-b border-border/40 last:border-b-0">
+                  <td className="py-3 pr-4 font-medium">{row.job_type.replaceAll("_", " ")}</td>
+                  <td className="py-3 pr-4">
+                    <Badge variant={row.status === "failed" ? "destructive" : "outline"}>
+                      {row.status}
+                    </Badge>
+                  </td>
+                  <td className="py-3 pr-4 text-muted-foreground">
+                    {row.attempts}/{row.max_attempts}
+                  </td>
+                  <td className="py-3 pr-4 text-muted-foreground">
+                    {new Date(row.enqueued_at).toLocaleString()}
+                  </td>
+                  <td className="py-3 text-xs text-muted-foreground">
+                    {row.last_error ? row.last_error : "-"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 function githubSyncSubtitle(integrity: MeasurementIntegrityStats): string {
   if (integrity.sessions_with_commit_sync_target === 0) {
     return "No repo-linked commit sessions yet"
@@ -374,12 +434,13 @@ export function AdminSystemTab() {
   const { data: stats, isLoading: isSystemLoading } = useSystemStats()
   const { data: activationHub, isLoading: isActivationLoading } = useActivationHub()
   const { data: integrity, isLoading: isIntegrityLoading } = useMeasurementIntegrity()
+  const { data: backgroundJobs, isLoading: isBackgroundJobsLoading } = useBackgroundJobs()
   const workflowBackfill = useBackfillWorkflowProfiles()
 
   if (isSystemLoading) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 5 }).map((_, i) => <CardSkeleton key={i} />)}
+        {Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)}
       </div>
     )
   }
@@ -417,8 +478,16 @@ export function AdminSystemTab() {
             value={stats.database_type}
             icon={Database}
           />
+          <StatCard
+            label="Job Queue"
+            value={formatNumber(stats.pending_background_jobs + stats.running_background_jobs)}
+            subtitle={`${formatNumber(stats.failed_background_jobs)} failed`}
+            icon={Rows3}
+          />
         </div>
       </section>
+
+      {isBackgroundJobsLoading ? <CardSkeleton /> : <BackgroundJobsTable rows={backgroundJobs ?? []} />}
 
       {isActivationLoading ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from primer.common.config import settings
@@ -8,6 +8,7 @@ from primer.common.models import Session as SessionModel
 from primer.common.schemas import (
     ActivationHubResponse,
     AuditLogResponse,
+    BackgroundJobResponse,
     FacetNormalizationSummary,
     IngestEventResponse,
     MeasurementIntegrityStats,
@@ -17,6 +18,12 @@ from primer.common.schemas import (
 )
 from primer.server.deps import AuthContext, require_role
 from primer.server.services import audit_service
+from primer.server.services.background_job_service import (
+    JOB_TYPE_FACET_BACKFILL,
+    enqueue_background_job,
+    get_background_job_counts,
+    list_background_jobs,
+)
 from primer.server.services.measurement_integrity_service import (
     get_measurement_integrity_stats,
     normalize_existing_facets,
@@ -35,6 +42,7 @@ def system_stats(
     total_teams = db.query(Team).count()
     total_sessions = db.query(SessionModel).count()
     total_ingest_events = db.query(IngestEvent).count()
+    job_counts = get_background_job_counts(db)
 
     # Determine database type from the engine URL
     engine = db.get_bind()
@@ -48,6 +56,9 @@ def system_stats(
         total_teams=total_teams,
         total_sessions=total_sessions,
         total_ingest_events=total_ingest_events,
+        pending_background_jobs=job_counts["pending"],
+        running_background_jobs=job_counts["running"],
+        failed_background_jobs=job_counts["failed"],
         database_type=db_type,
     )
 
@@ -90,10 +101,22 @@ def list_ingest_events(
     return PaginatedResponse(items=items, total_count=total_count, limit=limit, offset=offset)
 
 
-@router.post("/backfill-facets")
+@router.get("/background-jobs", response_model=list[BackgroundJobResponse])
+def background_jobs(
+    status: str | None = None,
+    limit: int = Query(default=20, le=100),
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_role("admin")),
+):
+    jobs = list_background_jobs(db, status=status, limit=limit)
+    return [BackgroundJobResponse.model_validate(job) for job in jobs]
+
+
+@router.post("/backfill-facets", response_model=BackgroundJobResponse)
 def backfill_facets(
-    background_tasks: BackgroundTasks,
+    request: Request,
     limit: int = Query(default=50, le=500),
+    db: Session = Depends(get_db),
     auth: AuthContext = Depends(require_role("admin")),
 ):
     """Trigger LLM facet extraction for sessions that are missing facets."""
@@ -105,10 +128,25 @@ def backfill_facets(
             detail="Facet extraction is disabled (set PRIMER_FACET_EXTRACTION_ENABLED=true)",
         )
 
-    from primer.server.services.facet_extraction_service import backfill_facets as _backfill
-
-    background_tasks.add_task(_backfill, limit)
-    return {"status": "started", "limit": limit}
+    job = enqueue_background_job(
+        db,
+        job_type=JOB_TYPE_FACET_BACKFILL,
+        payload={"limit": limit},
+        created_by_engineer_id=auth.engineer_id,
+    )
+    ip = request.client.host if request.client else None
+    audit_service.log_action(
+        db,
+        auth,
+        "enqueue",
+        "background_job",
+        job.id,
+        details={"job_type": job.job_type, "limit": limit},
+        ip_address=ip,
+    )
+    db.commit()
+    db.refresh(job)
+    return BackgroundJobResponse.model_validate(job)
 
 
 @router.post("/normalize-facets", response_model=FacetNormalizationSummary)
