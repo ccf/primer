@@ -792,12 +792,8 @@ class TestBackfillEndpoint:
         resp = client.post("/api/v1/admin/backfill-facets")
         assert resp.status_code in (401, 403)
 
-    def test_returns_started(self, client, admin_headers):
-        svc = "primer.server.services.facet_extraction_service"
-        with (
-            patch("primer.server.routers.admin.settings") as mock_settings,
-            patch(f"{svc}.SessionLocal"),  # prevent background task hitting real DB
-        ):
+    def test_returns_background_job(self, client, admin_headers):
+        with patch("primer.server.routers.admin.settings") as mock_settings:
             mock_settings.anthropic_api_key = "test-key"
             mock_settings.facet_extraction_enabled = True
             resp = client.post(
@@ -806,7 +802,10 @@ class TestBackfillEndpoint:
             )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["status"] == "started"
+        assert data["job_type"] == "facet_backfill"
+        assert data["status"] == "pending"
+        assert data["attempts"] == 0
+        assert data["max_attempts"] == 3
 
     def test_no_api_key_error(self, client, admin_headers):
         with patch("primer.server.routers.admin.settings") as mock_settings:
