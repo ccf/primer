@@ -18,6 +18,7 @@ import {
 } from "@/hooks/use-api-mutations"
 import { useDeviceTokens } from "@/hooks/use-api-queries"
 import { DeviceTokenCard } from "@/components/profile/device-token-card"
+import { parseApiUtcDate } from "@/lib/datetime"
 
 const mockUseDeviceTokens = vi.mocked(useDeviceTokens)
 const mockUseCreateDeviceToken = vi.mocked(useCreateDeviceToken)
@@ -86,5 +87,10 @@ describe("DeviceTokenCard", () => {
     fireEvent.click(screen.getByText("Create setup code"))
 
     expect(mutate).toHaveBeenCalled()
+  })
+
+  it("treats naive API timestamps as UTC", () => {
+    expect(parseApiUtcDate("2026-03-31T12:15:00").toISOString()).toBe("2026-03-31T12:15:00.000Z")
+    expect(parseApiUtcDate("2026-03-31T12:15:00Z").toISOString()).toBe("2026-03-31T12:15:00.000Z")
   })
 })
