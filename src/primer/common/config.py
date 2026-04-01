@@ -83,5 +83,11 @@ class PrimerSettings(BaseSettings):
     facet_extraction_enabled: bool = False
     facet_extraction_model: str = "claude-haiku-4-5-20251001"
 
+    # Durable background jobs
+    background_jobs_enabled: bool = True
+    background_job_poll_seconds: int = 15
+    background_job_batch_size: int = 5
+    background_job_lease_seconds: int = 300
+
 
 settings = PrimerSettings()

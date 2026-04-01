@@ -196,27 +196,17 @@ def test_ingest_session_accepts_cursor_agent_type_and_persists(
 
 
 def test_ingest_session_auto_extracts_facets_for_codex_transcripts(
-    client, engineer_with_key, monkeypatch
+    client, engineer_with_key, monkeypatch, db_session
 ):
+    from primer.common.models import BackgroundJob
     from primer.server.routers import ingest as ingest_router
-    from primer.server.services import facet_extraction_service
+    from primer.server.services.background_job_service import JOB_TYPE_FACET_EXTRACTION
 
     _eng, api_key = engineer_with_key
     session_id = str(uuid.uuid4())
-    observed: list[tuple[str, list[dict]]] = []
 
     monkeypatch.setattr(ingest_router.settings, "facet_extraction_enabled", True)
     monkeypatch.setattr(ingest_router.settings, "anthropic_api_key", "test-key")
-
-    def fake_extract_and_store_facets(target_session_id: str, messages: list[dict]) -> bool:
-        observed.append((target_session_id, messages))
-        return True
-
-    monkeypatch.setattr(
-        facet_extraction_service,
-        "extract_and_store_facets",
-        fake_extract_and_store_facets,
-    )
 
     payload = {
         "session_id": session_id,
@@ -235,14 +225,13 @@ def test_ingest_session_auto_extracts_facets_for_codex_transcripts(
     response = client.post("/api/v1/ingest/session", json=payload)
 
     assert response.status_code == 200
-    assert len(observed) == 1
-    observed_session_id, observed_messages = observed[0]
-    assert observed_session_id == session_id
-    assert [msg["content_text"] for msg in observed_messages] == [
-        "Fix the sync bug",
-        "I found the API limit issue",
-    ]
-    assert [msg["role"] for msg in observed_messages] == ["human", "assistant"]
+    job = (
+        db_session.query(BackgroundJob)
+        .filter(BackgroundJob.job_type == JOB_TYPE_FACET_EXTRACTION)
+        .one()
+    )
+    assert job.payload == {"session_id": session_id}
+    assert job.status == "pending"
 
 
 def test_ingest_session_derives_execution_evidence_from_terminal_messages(

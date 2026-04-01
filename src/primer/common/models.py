@@ -313,6 +313,29 @@ class DeviceSetupCode(Base):
     engineer: Mapped[Engineer] = relationship(back_populates="device_setup_codes")
 
 
+class BackgroundJob(Base):
+    __tablename__ = "background_jobs"
+    __table_args__ = (
+        Index("ix_background_jobs_status_enqueued", "status", "enqueued_at"),
+        Index("ix_background_jobs_type_status", "job_type", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    job_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="pending")
+    payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by_engineer_id: Mapped[str | None] = mapped_column(
+        ForeignKey("engineers.id"), nullable=True
+    )
+    enqueued_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class AlertConfig(Base):
     __tablename__ = "alert_configs"
     __table_args__ = (

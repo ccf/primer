@@ -4,6 +4,7 @@ import type {
   ActivityHeatmap,
   ActivationHubResponse,
   AlertConfigResponse,
+  BackgroundJobResponse,
   ResolvedAlertPolicyResponse,
   AlertResponse,
   AlertThresholds,
@@ -445,6 +446,16 @@ export function useActivationHub() {
   return useQuery({
     queryKey: ["activation-hub"],
     queryFn: () => apiFetch<ActivationHubResponse>("/api/v1/admin/activation-hub"),
+  })
+}
+
+export function useBackgroundJobs(status?: string, limit = 20) {
+  return useQuery({
+    queryKey: ["background-jobs", status, limit],
+    queryFn: () =>
+      apiFetch<BackgroundJobResponse[]>(
+        `/api/v1/admin/background-jobs${buildParams({ status, limit })}`,
+      ),
   })
 }
 
