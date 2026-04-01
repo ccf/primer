@@ -50,9 +50,9 @@ def test_run_background_job_cycle_processes_facet_extraction_job(
 
     observed: list[str] = []
 
-    def fake_extract_and_store_facets_for_session(session_id: str) -> bool:
+    def fake_extract_and_store_facets_for_session(session_id: str) -> str:
         observed.append(session_id)
-        return True
+        return "succeeded"
 
     monkeypatch.setattr(
         "primer.server.services.facet_extraction_service.extract_and_store_facets_for_session",
@@ -65,6 +65,73 @@ def test_run_background_job_cycle_processes_facet_extraction_job(
     assert observed == [session.id]
     db_session.refresh(job)
     assert job.status == JOB_STATUS_SUCCEEDED
+
+
+def test_run_background_job_cycle_retries_failed_facet_extraction(
+    monkeypatch, db_session, engineer_with_key
+):
+    engineer, _api_key = engineer_with_key
+    session = SessionModel(
+        id=str(uuid4()),
+        engineer_id=engineer.id,
+        started_at=datetime.now(UTC),
+        message_count=2,
+        user_message_count=1,
+        assistant_message_count=1,
+        duration_seconds=120.0,
+        has_facets=False,
+    )
+    db_session.add(session)
+    db_session.flush()
+    job = enqueue_background_job(
+        db_session,
+        job_type=JOB_TYPE_FACET_EXTRACTION,
+        payload={"session_id": session.id},
+        created_by_engineer_id=engineer.id,
+        max_attempts=1,
+    )
+    job_id = job.id
+    db_session.commit()
+
+    monkeypatch.setattr(
+        "primer.server.services.facet_extraction_service.extract_and_store_facets_for_session",
+        lambda _session_id: "failed",
+    )
+    marked_succeeded: list[str] = []
+    marked_failed: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "primer.server.services.background_job_service._mark_job_succeeded",
+        lambda _db, marked_job_id: marked_succeeded.append(marked_job_id),
+    )
+
+    def fake_mark_job_failed(
+        _db, marked_job_id: str, error: str, *, attempts: int, max_attempts: int
+    ) -> None:
+        marked_failed.update(
+            {
+                "job_id": marked_job_id,
+                "error": error,
+                "attempts": attempts,
+                "max_attempts": max_attempts,
+            }
+        )
+
+    monkeypatch.setattr(
+        "primer.server.services.background_job_service._mark_job_failed",
+        fake_mark_job_failed,
+    )
+
+    result = run_background_job_cycle(db_session, limit=1, lease_seconds=60)
+
+    assert result == {"processed": 1, "succeeded": 0, "failed": 1}
+    assert marked_succeeded == []
+    assert marked_failed == {
+        "job_id": job_id,
+        "error": f"Facet extraction failed for session {session.id}",
+        "attempts": 1,
+        "max_attempts": 1,
+    }
 
 
 def test_ensure_recurring_jobs_enqueues_narrative_refresh(db_session, monkeypatch):

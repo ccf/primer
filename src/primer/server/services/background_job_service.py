@@ -267,7 +267,9 @@ def _run_job(db: Session | None, job_type: str, payload: dict[str, Any]) -> None
             extract_and_store_facets_for_session,
         )
 
-        extract_and_store_facets_for_session(payload["session_id"])
+        result = extract_and_store_facets_for_session(payload["session_id"])
+        if result == "failed":
+            raise RuntimeError(f"Facet extraction failed for session {payload['session_id']}")
         return
 
     if job_type == JOB_TYPE_FACET_BACKFILL:

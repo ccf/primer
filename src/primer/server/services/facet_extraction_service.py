@@ -308,13 +308,20 @@ def extract_and_store_facets(session_id: str, messages: list[dict]) -> bool:
         db.close()
 
 
-def extract_and_store_facets_for_session(session_id: str) -> bool:
-    """Load stored session messages and extract facets for that session."""
+def extract_and_store_facets_for_session(session_id: str) -> str:
+    """Load stored session messages and extract facets for that session.
+
+    Returns:
+        "succeeded" when facets were extracted and stored,
+        "skipped" for harmless no-op cases like missing sessions/messages or
+        already-extracted facets,
+        "failed" when extraction/storage was attempted but did not succeed.
+    """
     db = SessionLocal()
     try:
         session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
         if not session or session.has_facets:
-            return False
+            return "skipped"
 
         msg_rows = (
             db.query(SessionMessage)
@@ -323,7 +330,7 @@ def extract_and_store_facets_for_session(session_id: str) -> bool:
             .all()
         )
         if not msg_rows:
-            return False
+            return "skipped"
 
         messages = [
             {
@@ -337,7 +344,7 @@ def extract_and_store_facets_for_session(session_id: str) -> bool:
     finally:
         db.close()
 
-    return extract_and_store_facets(session_id, messages)
+    return "succeeded" if extract_and_store_facets(session_id, messages) else "failed"
 
 
 def backfill_facets(limit: int = 50) -> dict:
