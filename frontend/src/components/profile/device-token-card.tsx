@@ -8,6 +8,7 @@ import {
   useRevokeDeviceToken,
 } from "@/hooks/use-api-mutations"
 import { useDeviceTokens } from "@/hooks/use-api-queries"
+import { parseApiUtcDate } from "@/lib/datetime"
 
 export function DeviceTokenCard() {
   const { data: tokens, isLoading } = useDeviceTokens()
@@ -82,7 +83,7 @@ export function DeviceTokenCard() {
             <p className="mt-2 text-xs text-muted-foreground">
               Run <span className="font-mono">primer setup --setup-code {latestSetupCode}</span>
               {setupCodeExpiresAt
-                ? ` before ${new Date(setupCodeExpiresAt).toLocaleTimeString()}.`
+                ? ` before ${parseApiUtcDate(setupCodeExpiresAt).toLocaleTimeString()}.`
                 : "."}
             </p>
           </div>
@@ -123,7 +124,7 @@ export function DeviceTokenCard() {
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Ends with {token.token_last_four} • Created{" "}
-                    {new Date(token.created_at).toLocaleDateString()}
+                    {parseApiUtcDate(token.created_at).toLocaleDateString()}
                   </p>
                 </div>
                 {!token.revoked && (
