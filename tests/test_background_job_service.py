@@ -198,6 +198,70 @@ def test_ensure_recurring_jobs_skips_recent_success(db_session, monkeypatch):
     )
 
 
+def test_ensure_recurring_jobs_skips_recent_failure(db_session, monkeypatch):
+    monkeypatch.setattr(
+        "primer.server.services.background_job_service.settings.narrative_auto_refresh",
+        True,
+    )
+    monkeypatch.setattr(
+        "primer.server.services.background_job_service.settings.anthropic_api_key",
+        "test-key",
+    )
+    monkeypatch.setattr(
+        "primer.server.services.background_job_service.settings.narrative_cache_ttl_hours",
+        24,
+    )
+
+    job = BackgroundJob(
+        job_type=JOB_TYPE_NARRATIVE_REFRESH_ALL,
+        status="failed",
+        finished_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=1),
+    )
+    db_session.add(job)
+    db_session.commit()
+
+    ensure_recurring_jobs(db_session)
+
+    assert (
+        db_session.query(BackgroundJob)
+        .filter(BackgroundJob.job_type == JOB_TYPE_NARRATIVE_REFRESH_ALL)
+        .count()
+        == 1
+    )
+
+
+def test_ensure_recurring_jobs_reenqueues_after_failed_ttl_expires(db_session, monkeypatch):
+    monkeypatch.setattr(
+        "primer.server.services.background_job_service.settings.narrative_auto_refresh",
+        True,
+    )
+    monkeypatch.setattr(
+        "primer.server.services.background_job_service.settings.anthropic_api_key",
+        "test-key",
+    )
+    monkeypatch.setattr(
+        "primer.server.services.background_job_service.settings.narrative_cache_ttl_hours",
+        24,
+    )
+
+    job = BackgroundJob(
+        job_type=JOB_TYPE_NARRATIVE_REFRESH_ALL,
+        status="failed",
+        finished_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=25),
+    )
+    db_session.add(job)
+    db_session.commit()
+
+    ensure_recurring_jobs(db_session)
+
+    assert (
+        db_session.query(BackgroundJob)
+        .filter(BackgroundJob.job_type == JOB_TYPE_NARRATIVE_REFRESH_ALL)
+        .count()
+        == 2
+    )
+
+
 def test_run_background_job_cycle_does_not_reclaim_expired_job_at_max_attempts(
     db_session,
 ):
