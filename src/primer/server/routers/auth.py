@@ -219,7 +219,7 @@ def create_device_token_setup_code(
     code, raw_code = create_device_setup_code(
         db,
         engineer,
-        expires_in_minutes=payload.expires_in_minutes or 15,
+        expires_in_minutes=payload.expires_in_minutes,
     )
     ip = request.client.host if request.client else None
     audit_service.log_action(

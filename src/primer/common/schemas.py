@@ -154,7 +154,7 @@ class DeviceTokenCreateResponse(BaseModel):
 
 
 class DeviceSetupCodeCreate(BaseModel):
-    expires_in_minutes: int | None = Field(default=15, ge=1, le=60)
+    expires_in_minutes: int = Field(default=15, ge=1, le=60)
 
 
 class DeviceSetupCodeCreateResponse(BaseModel):
