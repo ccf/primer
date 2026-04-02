@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
 ROLLUP_SCOPE_ORG = "org"
-JOB_TYPE_DAILY_ANALYTICS_ROLLUP_REFRESH = "daily_analytics_rollup_refresh"
 
 
 def _agent_types_with_capability(capability_name: str) -> list[str]:
@@ -40,6 +39,23 @@ def _scope_key(team_id: str | None) -> str:
 
 def _rollup_key(rollup_date: date, team_id: str | None) -> tuple[date, str | None]:
     return rollup_date, team_id
+
+
+def _is_day_start(value: datetime) -> bool:
+    return value.hour == 0 and value.minute == 0 and value.second == 0 and value.microsecond == 0
+
+
+def _is_day_end(value: datetime) -> bool:
+    return value.hour == 23 and value.minute == 59 and value.second == 59
+
+
+def _supports_rollup_bounds(
+    start_date: datetime | None,
+    end_date: datetime | None,
+) -> bool:
+    if start_date and not _is_day_start(start_date):
+        return False
+    return not (end_date and not _is_day_end(end_date))
 
 
 def refresh_recent_daily_analytics_rollups(
@@ -213,6 +229,9 @@ def get_daily_stats_from_rollups(
     start_date: datetime | None = None,
     end_date: datetime | None = None,
 ) -> list[DailyStatsResponse] | None:
+    if not _supports_rollup_bounds(start_date, end_date):
+        return None
+
     base_q = db.query(func.date(SessionModel.started_at).label("date")).filter(
         SessionModel.started_at.isnot(None)
     )
