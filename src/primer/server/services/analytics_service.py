@@ -52,7 +52,7 @@ from primer.common.schemas import (
     ToolTrendEntry,
     WorkflowCostBreakdown,
 )
-from primer.common.source_capabilities import CAPABILITIES
+from primer.common.source_capabilities import get_agent_types_with_capability
 from primer.common.tool_classification import classify_tool
 from primer.server.services.analytics_rollup_service import get_daily_stats_from_rollups
 
@@ -195,11 +195,7 @@ def base_session_query(
 
 
 def _agent_types_with_capability(capability_name: str) -> list[str]:
-    return [
-        agent_type
-        for agent_type, capability in CAPABILITIES.items()
-        if getattr(capability, capability_name)
-    ]
+    return get_agent_types_with_capability(capability_name)
 
 
 def _filter_sessions_by_capability(query, capability_name: str):

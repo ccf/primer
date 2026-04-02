@@ -89,3 +89,11 @@ CAPABILITIES: dict[AgentType, AgentCapability] = {
 
 def get_capability_for(agent_type: str) -> AgentCapability | None:
     return CAPABILITIES.get(agent_type)
+
+
+def get_agent_types_with_capability(capability_name: str) -> list[AgentType]:
+    return [
+        agent_type
+        for agent_type, capability in CAPABILITIES.items()
+        if getattr(capability, capability_name)
+    ]
