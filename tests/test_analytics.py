@@ -3,6 +3,8 @@ from datetime import UTC, datetime
 
 from primer.common.models import DailyAnalyticsRollup, GitRepository, SessionFacets
 from primer.common.models import Session as SessionModel
+from primer.common.schemas import DailyStatsResponse, OverviewStats
+from primer.server.services.analytics_service import get_daily_stats, get_overview
 
 
 def _messages(count: int) -> list[dict[str, str | int]]:
@@ -40,6 +42,69 @@ def test_overview_empty(client, admin_headers):
     assert r.status_code == 200
     data = r.json()
     assert data["total_sessions"] == 0
+
+
+def test_get_overview_uses_cached_payload(monkeypatch, db_session):
+    monkeypatch.setattr(
+        "primer.server.services.analytics_service.get_cached_json",
+        lambda namespace, params: {
+            "total_sessions": 7,
+            "total_engineers": 2,
+            "total_messages": 14,
+            "total_tool_calls": 5,
+            "total_input_tokens": 100,
+            "total_output_tokens": 50,
+            "estimated_cost": 1.25,
+            "avg_session_duration": 120.0,
+            "avg_messages_per_session": 2.0,
+            "outcome_counts": {"success": 7},
+            "session_type_counts": {"feature": 7},
+            "success_rate": 1.0,
+            "end_reason_counts": {},
+            "cache_hit_rate": None,
+            "avg_health_score": None,
+            "agent_type_counts": {"claude_code": 7},
+            "previous_period": None,
+        }
+        if namespace == "overview"
+        else None,
+    )
+    monkeypatch.setattr(
+        "primer.server.services.analytics_service._build_overview",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("live overview should not run")
+        ),
+    )
+
+    result = get_overview(db_session)
+
+    assert isinstance(result, OverviewStats)
+    assert result.total_sessions == 7
+    assert result.success_rate == 1.0
+
+
+def test_get_overview_populates_cache_on_miss(monkeypatch, db_session):
+    observed: dict[str, object] = {}
+    monkeypatch.setattr(
+        "primer.server.services.analytics_service.get_cached_json",
+        lambda *_args, **_kwargs: None,
+    )
+
+    def fake_set_cached_json(namespace, params, payload):
+        observed["namespace"] = namespace
+        observed["params"] = params
+        observed["payload"] = payload
+
+    monkeypatch.setattr(
+        "primer.server.services.analytics_service.set_cached_json",
+        fake_set_cached_json,
+    )
+
+    result = get_overview(db_session)
+
+    assert result.total_sessions == 0
+    assert observed["namespace"] == "overview"
+    assert observed["payload"]["total_sessions"] == 0
 
 
 def test_overview_with_data(client, engineer_with_key, admin_headers):
@@ -535,6 +600,83 @@ def test_daily_stats_endpoint(client, engineer_with_key, admin_headers):
     assert day_15["session_count"] == 2
     assert day_15["message_count"] == 18
     assert day_15["tool_call_count"] == 8
+
+
+def test_get_daily_stats_uses_cached_payload(monkeypatch, db_session):
+    monkeypatch.setattr(
+        "primer.server.services.analytics_service.get_cached_json",
+        lambda namespace, params: [
+            {
+                "date": "2025-02-02",
+                "session_count": 5,
+                "message_count": 17,
+                "tool_call_count": 11,
+                "success_rate": 0.8,
+            }
+        ]
+        if namespace == "daily_stats"
+        else None,
+    )
+    monkeypatch.setattr(
+        "primer.server.services.analytics_service.get_daily_stats_from_rollups",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("rollup path should not run")),
+    )
+    monkeypatch.setattr(
+        "primer.server.services.analytics_service._get_daily_stats_live",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("live path should not run")),
+    )
+
+    result = get_daily_stats(db_session)
+
+    assert result == [
+        DailyStatsResponse(
+            date="2025-02-02",
+            session_count=5,
+            message_count=17,
+            tool_call_count=11,
+            success_rate=0.8,
+        )
+    ]
+
+
+def test_get_daily_stats_populates_cache_from_live_rows(monkeypatch, db_session):
+    observed: dict[str, object] = {}
+    monkeypatch.setattr(
+        "primer.server.services.analytics_service.get_cached_json",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "primer.server.services.analytics_service.get_daily_stats_from_rollups",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "primer.server.services.analytics_service._get_daily_stats_live",
+        lambda *args, **kwargs: [
+            DailyStatsResponse(
+                date="2025-02-02",
+                session_count=5,
+                message_count=17,
+                tool_call_count=11,
+                success_rate=0.8,
+            )
+        ],
+    )
+
+    def fake_set_cached_json(namespace, params, payload):
+        observed["namespace"] = namespace
+        observed["params"] = params
+        observed["payload"] = payload
+
+    monkeypatch.setattr(
+        "primer.server.services.analytics_service.set_cached_json",
+        fake_set_cached_json,
+    )
+
+    result = get_daily_stats(db_session)
+
+    assert result[0].session_count == 5
+    assert observed["namespace"] == "daily_stats"
+    assert observed["payload"][0]["session_count"] == 5
 
 
 def test_daily_stats_uses_rollups_when_available(
