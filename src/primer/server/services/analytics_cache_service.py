@@ -59,6 +59,11 @@ def _build_cache_key(namespace: str, params: dict[str, Any]) -> str:
     return f"primer:analytics:{namespace}:{digest}"
 
 
+def _disable_cache_client() -> None:
+    global _redis_client
+    _redis_client = False
+
+
 def get_cached_json(namespace: str, params: dict[str, Any]) -> Any | None:
     client = _get_redis_client()
     if client is None:
@@ -66,6 +71,7 @@ def get_cached_json(namespace: str, params: dict[str, Any]) -> Any | None:
     try:
         payload = client.get(_build_cache_key(namespace, params))
     except (RedisError, OSError):
+        _disable_cache_client()
         return None
     if not payload:
         return None
@@ -91,5 +97,8 @@ def set_cached_json(
             ttl_seconds or settings.analytics_cache_ttl_seconds,
             json.dumps(payload, separators=(",", ":")),
         )
-    except (RedisError, OSError, TypeError, ValueError):
+    except (RedisError, OSError):
+        _disable_cache_client()
+        return
+    except (TypeError, ValueError):
         return
