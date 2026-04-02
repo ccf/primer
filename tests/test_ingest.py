@@ -234,6 +234,45 @@ def test_ingest_session_auto_extracts_facets_for_codex_transcripts(
     assert job.status == "pending"
 
 
+def test_ingest_session_falls_back_to_background_task_when_jobs_disabled(
+    client, engineer_with_key, monkeypatch, db_session
+):
+    from primer.common.models import BackgroundJob
+    from primer.server.routers import ingest as ingest_router
+
+    _eng, api_key = engineer_with_key
+    session_id = str(uuid.uuid4())
+    observed: list[str] = []
+
+    monkeypatch.setattr(ingest_router.settings, "facet_extraction_enabled", True)
+    monkeypatch.setattr(ingest_router.settings, "anthropic_api_key", "test-key")
+    monkeypatch.setattr(ingest_router.settings, "background_jobs_enabled", False)
+    monkeypatch.setattr(
+        "primer.server.services.facet_extraction_service.extract_and_store_facets_for_session",
+        lambda incoming_session_id: observed.append(incoming_session_id) or "skipped",
+    )
+
+    payload = {
+        "session_id": session_id,
+        "api_key": api_key,
+        "agent_type": "codex_cli",
+        "project_name": "codex-project",
+        "message_count": 2,
+        "user_message_count": 1,
+        "assistant_message_count": 1,
+        "messages": [
+            {"ordinal": 0, "role": "human", "content_text": "Fix the sync bug"},
+            {"ordinal": 1, "role": "assistant", "content_text": "I found the API limit issue"},
+        ],
+    }
+
+    response = client.post("/api/v1/ingest/session", json=payload)
+
+    assert response.status_code == 200
+    assert observed == [session_id]
+    assert db_session.query(BackgroundJob).count() == 0
+
+
 def test_ingest_session_derives_execution_evidence_from_terminal_messages(
     client, engineer_with_key, db_session
 ):
