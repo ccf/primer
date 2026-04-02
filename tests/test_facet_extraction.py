@@ -796,6 +796,7 @@ class TestBackfillEndpoint:
         with patch("primer.server.routers.admin.settings") as mock_settings:
             mock_settings.anthropic_api_key = "test-key"
             mock_settings.facet_extraction_enabled = True
+            mock_settings.background_jobs_enabled = True
             resp = client.post(
                 "/api/v1/admin/backfill-facets?limit=10",
                 headers=admin_headers,
@@ -806,6 +807,25 @@ class TestBackfillEndpoint:
         assert data["status"] == "pending"
         assert data["attempts"] == 0
         assert data["max_attempts"] == 3
+
+    def test_falls_back_to_background_task_when_jobs_disabled(self, client, admin_headers):
+        with (
+            patch("primer.server.routers.admin.settings") as mock_settings,
+            patch(
+                "primer.server.services.facet_extraction_service.backfill_facets"
+            ) as mock_backfill,
+        ):
+            mock_settings.anthropic_api_key = "test-key"
+            mock_settings.facet_extraction_enabled = True
+            mock_settings.background_jobs_enabled = False
+            resp = client.post(
+                "/api/v1/admin/backfill-facets?limit=10",
+                headers=admin_headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json() == {"status": "started", "limit": 10, "mode": "background_task"}
+        mock_backfill.assert_called_once_with(10)
 
     def test_no_api_key_error(self, client, admin_headers):
         with patch("primer.server.routers.admin.settings") as mock_settings:

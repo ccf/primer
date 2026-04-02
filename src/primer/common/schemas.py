@@ -1069,6 +1069,12 @@ class BackgroundJobResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class BackgroundTaskStartResponse(BaseModel):
+    status: str
+    limit: int
+    mode: str
+
+
 class AgentSourceQuality(BaseModel):
     agent_type: AgentType
     session_count: int

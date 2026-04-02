@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from primer.common.config import settings
@@ -48,6 +48,7 @@ def _authenticate_ingest_engineer(
 def ingest_session(
     request: Request,
     payload: SessionIngestPayload,
+    background_tasks: BackgroundTasks,
     x_device_token: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ):
@@ -81,12 +82,19 @@ def ingest_session(
             and payload.messages
             and not payload.facets
         ):
-            enqueue_background_job(
-                db,
-                job_type=JOB_TYPE_FACET_EXTRACTION,
-                payload={"session_id": payload.session_id},
-                created_by_engineer_id=engineer.id,
-            )
+            if settings.background_jobs_enabled:
+                enqueue_background_job(
+                    db,
+                    job_type=JOB_TYPE_FACET_EXTRACTION,
+                    payload={"session_id": payload.session_id},
+                    created_by_engineer_id=engineer.id,
+                )
+            else:
+                from primer.server.services.facet_extraction_service import (
+                    extract_and_store_facets_for_session,
+                )
+
+                background_tasks.add_task(extract_and_store_facets_for_session, payload.session_id)
 
         db.commit()
 

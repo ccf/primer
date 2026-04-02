@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from primer.common.config import settings
@@ -9,6 +9,7 @@ from primer.common.schemas import (
     ActivationHubResponse,
     AuditLogResponse,
     BackgroundJobResponse,
+    BackgroundTaskStartResponse,
     FacetNormalizationSummary,
     IngestEventResponse,
     MeasurementIntegrityStats,
@@ -112,8 +113,9 @@ def background_jobs(
     return [BackgroundJobResponse.model_validate(job) for job in jobs]
 
 
-@router.post("/backfill-facets", response_model=BackgroundJobResponse)
+@router.post("/backfill-facets", response_model=BackgroundJobResponse | BackgroundTaskStartResponse)
 def backfill_facets(
+    background_tasks: BackgroundTasks,
     request: Request,
     limit: int = Query(default=50, le=500),
     db: Session = Depends(get_db),
@@ -127,6 +129,24 @@ def backfill_facets(
             status_code=422,
             detail="Facet extraction is disabled (set PRIMER_FACET_EXTRACTION_ENABLED=true)",
         )
+
+    if not settings.background_jobs_enabled:
+        from primer.server.services.facet_extraction_service import (
+            backfill_facets as _backfill,
+        )
+
+        background_tasks.add_task(_backfill, limit)
+        ip = request.client.host if request.client else None
+        audit_service.log_action(
+            db,
+            auth,
+            "start",
+            "facet_backfill",
+            details={"limit": limit, "mode": "background_task"},
+            ip_address=ip,
+        )
+        db.commit()
+        return BackgroundTaskStartResponse(status="started", limit=limit, mode="background_task")
 
     job = enqueue_background_job(
         db,
