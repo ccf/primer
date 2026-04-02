@@ -600,6 +600,58 @@ def test_daily_stats_uses_rollups_when_available(
     assert day_01["message_count"] == 9
 
 
+def test_daily_stats_falls_back_to_live_query_for_partial_day_filters(
+    client, engineer_with_key, admin_headers, db_session
+):
+    engineer, _api_key = engineer_with_key
+    day = datetime(2025, 2, 2, 0, 0, tzinfo=UTC)
+    db_session.add_all(
+        [
+            SessionModel(
+                id=str(uuid.uuid4()),
+                engineer_id=engineer.id,
+                started_at=day.replace(hour=10),
+                message_count=1,
+                user_message_count=1,
+                assistant_message_count=0,
+                tool_call_count=0,
+            ),
+            SessionModel(
+                id=str(uuid.uuid4()),
+                engineer_id=engineer.id,
+                started_at=day.replace(hour=14),
+                message_count=1,
+                user_message_count=1,
+                assistant_message_count=0,
+                tool_call_count=0,
+            ),
+            DailyAnalyticsRollup(
+                date=day.date(),
+                scope_key="org",
+                session_count=9,
+                message_count=99,
+                tool_call_count=44,
+                success_session_count=7,
+                outcome_session_count=9,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(
+        "/api/v1/analytics/daily?start_date=2025-02-02T12:00:00&end_date=2025-02-02T23:59:59",
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["date"] == "2025-02-02"
+    assert data[0]["session_count"] == 1
+    assert data[0]["message_count"] == 0
+    assert data[0]["tool_call_count"] == 0
+
+
 def test_daily_stats_excludes_sessions_without_supported_tool_telemetry(
     client, engineer_with_key, admin_headers
 ):
