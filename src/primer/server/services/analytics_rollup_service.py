@@ -17,20 +17,12 @@ from primer.common.models import (
 )
 from primer.common.models import Session as SessionModel
 from primer.common.schemas import DailyStatsResponse
-from primer.common.source_capabilities import CAPABILITIES
+from primer.common.source_capabilities import get_agent_types_with_capability
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
 ROLLUP_SCOPE_ORG = "org"
-
-
-def _agent_types_with_capability(capability_name: str) -> list[str]:
-    return [
-        agent_type
-        for agent_type, capability in CAPABILITIES.items()
-        if getattr(capability, capability_name)
-    ]
 
 
 def _scope_key(team_id: str | None) -> str:
@@ -101,7 +93,7 @@ def refresh_recent_daily_analytics_rollups(
             int(session_count or 0),
         )
 
-    transcript_agent_types = _agent_types_with_capability("supports_transcript")
+    transcript_agent_types = get_agent_types_with_capability("supports_transcript")
     if transcript_agent_types:
         message_rows = (
             db.query(
@@ -125,7 +117,7 @@ def refresh_recent_daily_analytics_rollups(
                 int(message_count or 0),
             )
 
-    tool_agent_types = _agent_types_with_capability("supports_tool_calls")
+    tool_agent_types = get_agent_types_with_capability("supports_tool_calls")
     if tool_agent_types:
         tool_rows = (
             db.query(
@@ -149,7 +141,7 @@ def refresh_recent_daily_analytics_rollups(
                 int(tool_call_count or 0),
             )
 
-    facet_agent_types = _agent_types_with_capability("supports_facets")
+    facet_agent_types = get_agent_types_with_capability("supports_facets")
     if facet_agent_types:
         outcome_rows = (
             db.query(
