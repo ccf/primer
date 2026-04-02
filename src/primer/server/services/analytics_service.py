@@ -54,6 +54,7 @@ from primer.common.schemas import (
 )
 from primer.common.source_capabilities import get_agent_types_with_capability
 from primer.common.tool_classification import classify_tool
+from primer.server.services.analytics_cache_service import get_cached_json, set_cached_json
 from primer.server.services.analytics_rollup_service import get_daily_stats_from_rollups
 
 _ROOT_CAUSE_FRICTION_MAP: dict[str, str] = {
@@ -635,6 +636,17 @@ def get_overview(
     end_date: datetime | None = None,
     project_name: str | None = None,
 ) -> OverviewStats:
+    cache_params = {
+        "team_id": team_id,
+        "engineer_id": engineer_id,
+        "start_date": start_date,
+        "end_date": end_date,
+        "project_name": project_name,
+    }
+    cached = get_cached_json("overview", cache_params)
+    if cached is not None:
+        return OverviewStats.model_validate(cached)
+
     result = _build_overview(
         db,
         team_id,
@@ -683,6 +695,7 @@ def get_overview(
     # No date range ("All") → skip deltas since comparing all-time vs an
     # arbitrary prior window produces misleading percentage changes.
 
+    set_cached_json("overview", cache_params, result.model_dump(mode="json"))
     return result
 
 
@@ -810,6 +823,17 @@ def get_daily_stats(
     start_date: datetime | None = None,
     end_date: datetime | None = None,
 ) -> list[DailyStatsResponse]:
+    cache_params = {
+        "team_id": team_id,
+        "days": days,
+        "engineer_id": engineer_id,
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+    cached = get_cached_json("daily_stats", cache_params)
+    if cached is not None:
+        return [DailyStatsResponse.model_validate(row) for row in cached]
+
     if engineer_id is None:
         rollup_rows = get_daily_stats_from_rollups(
             db,
@@ -819,9 +843,14 @@ def get_daily_stats(
             end_date=end_date,
         )
         if rollup_rows is not None:
+            set_cached_json(
+                "daily_stats",
+                cache_params,
+                [row.model_dump(mode="json") for row in rollup_rows],
+            )
             return rollup_rows
 
-    return _get_daily_stats_live(
+    live_rows = _get_daily_stats_live(
         db,
         team_id=team_id,
         days=days,
@@ -829,6 +858,12 @@ def get_daily_stats(
         start_date=start_date,
         end_date=end_date,
     )
+    set_cached_json(
+        "daily_stats",
+        cache_params,
+        [row.model_dump(mode="json") for row in live_rows],
+    )
+    return live_rows
 
 
 def get_friction_report(

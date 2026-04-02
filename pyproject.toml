@@ -23,6 +23,7 @@ dependencies = [
     "slowapi>=0.1.9",
     "python-dotenv>=1.0.0",
     "click>=8.1.0",
+    "redis>=5.2.0",
 ]
 
 [project.scripts]

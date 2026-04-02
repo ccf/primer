@@ -27,6 +27,9 @@ class PrimerSettings(BaseSettings):
     log_level: str = "info"
     cors_origins: list[str] = ["http://localhost:5173"]
 
+    # Redis / cache
+    redis_url: str = ""
+
     # GitHub OAuth
     github_client_id: str = ""
     github_client_secret: str = ""
@@ -94,6 +97,10 @@ class PrimerSettings(BaseSettings):
     analytics_rollup_refresh_enabled: bool = True
     analytics_rollup_refresh_interval_minutes: int = 15
     analytics_rollup_lookback_days: int = 35
+
+    # Analytics cache
+    analytics_cache_enabled: bool = True
+    analytics_cache_ttl_seconds: int = 60
 
 
 settings = PrimerSettings()
