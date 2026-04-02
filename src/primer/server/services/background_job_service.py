@@ -20,6 +20,7 @@ JOB_STATUS_FAILED = "failed"
 JOB_TYPE_FACET_EXTRACTION = "facet_extract_session"
 JOB_TYPE_FACET_BACKFILL = "facet_backfill"
 JOB_TYPE_NARRATIVE_REFRESH_ALL = "narrative_refresh_all"
+JOB_TYPE_DAILY_ANALYTICS_ROLLUP_REFRESH = "daily_analytics_rollup_refresh"
 
 
 def _utcnow_naive() -> datetime:
@@ -92,13 +93,31 @@ def get_background_job_counts(db) -> dict[str, int]:
 
 
 def ensure_recurring_jobs(db) -> None:
-    if not settings.narrative_auto_refresh or not settings.anthropic_api_key:
-        return
+    if settings.analytics_rollup_refresh_enabled:
+        _ensure_recurring_job(
+            db,
+            job_type=JOB_TYPE_DAILY_ANALYTICS_ROLLUP_REFRESH,
+            interval=timedelta(minutes=settings.analytics_rollup_refresh_interval_minutes),
+        )
 
+    if settings.narrative_auto_refresh and settings.anthropic_api_key:
+        _ensure_recurring_job(
+            db,
+            job_type=JOB_TYPE_NARRATIVE_REFRESH_ALL,
+            interval=timedelta(hours=settings.narrative_cache_ttl_hours),
+        )
+
+
+def _ensure_recurring_job(
+    db,
+    *,
+    job_type: str,
+    interval: timedelta,
+) -> None:
     active_count = (
         db.query(func.count(BackgroundJob.id))
         .filter(
-            BackgroundJob.job_type == JOB_TYPE_NARRATIVE_REFRESH_ALL,
+            BackgroundJob.job_type == job_type,
             BackgroundJob.status.in_([JOB_STATUS_PENDING, JOB_STATUS_RUNNING]),
         )
         .scalar()
@@ -110,7 +129,7 @@ def ensure_recurring_jobs(db) -> None:
     latest_terminal = (
         db.query(BackgroundJob)
         .filter(
-            BackgroundJob.job_type == JOB_TYPE_NARRATIVE_REFRESH_ALL,
+            BackgroundJob.job_type == job_type,
             BackgroundJob.status.in_([JOB_STATUS_SUCCEEDED, JOB_STATUS_FAILED]),
             BackgroundJob.finished_at.is_not(None),
         )
@@ -118,12 +137,14 @@ def ensure_recurring_jobs(db) -> None:
         .first()
     )
     now = _utcnow_naive()
-    if latest_terminal and latest_terminal.finished_at:
-        ttl = timedelta(hours=settings.narrative_cache_ttl_hours)
-        if latest_terminal.finished_at > now - ttl:
-            return
+    if (
+        latest_terminal
+        and latest_terminal.finished_at
+        and latest_terminal.finished_at > now - interval
+    ):
+        return
 
-    enqueue_background_job(db, job_type=JOB_TYPE_NARRATIVE_REFRESH_ALL)
+    enqueue_background_job(db, job_type=job_type)
     db.commit()
 
 
@@ -299,6 +320,20 @@ def _run_job(db: Session | None, job_type: str, payload: dict[str, Any]) -> None
         finally:
             if owns_session:
                 narrative_db.close()
+        return
+
+    if job_type == JOB_TYPE_DAILY_ANALYTICS_ROLLUP_REFRESH:
+        from primer.server.services.analytics_rollup_service import (
+            refresh_recent_daily_analytics_rollups,
+        )
+
+        owns_session = db is None
+        rollup_db = db or SessionLocal()
+        try:
+            refresh_recent_daily_analytics_rollups(rollup_db)
+        finally:
+            if owns_session:
+                rollup_db.close()
         return
 
     raise ValueError(f"Unsupported background job type: {job_type}")

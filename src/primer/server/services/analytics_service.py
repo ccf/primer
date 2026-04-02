@@ -54,6 +54,7 @@ from primer.common.schemas import (
 )
 from primer.common.source_capabilities import CAPABILITIES
 from primer.common.tool_classification import classify_tool
+from primer.server.services.analytics_rollup_service import get_daily_stats_from_rollups
 
 _ROOT_CAUSE_FRICTION_MAP: dict[str, str] = {
     "permission_denied": "permission_boundary",
@@ -689,7 +690,7 @@ def get_overview(
     return result
 
 
-def get_daily_stats(
+def _get_daily_stats_live(
     db: Session,
     team_id: str | None = None,
     days: int = 30,
@@ -803,6 +804,35 @@ def get_daily_stats(
         )
         for row in rows
     ]
+
+
+def get_daily_stats(
+    db: Session,
+    team_id: str | None = None,
+    days: int = 30,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> list[DailyStatsResponse]:
+    if engineer_id is None:
+        rollup_rows = get_daily_stats_from_rollups(
+            db,
+            team_id=team_id,
+            days=days,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        if rollup_rows is not None:
+            return rollup_rows
+
+    return _get_daily_stats_live(
+        db,
+        team_id=team_id,
+        days=days,
+        engineer_id=engineer_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
 
 
 def get_friction_report(

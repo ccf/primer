@@ -79,7 +79,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] [P1] Execution evidence capture: lint, test, build, and verification signals per session
 - [x] [P1] Change-shape capture: files touched, diff size, churn, and rewrite/revert indicators
 - [x] [P1] Recovery-path tracking: detect whether engineers recover after friction or abandon the attempt
-- [ ] [P1] Derived analytics tables and materialized rollups for heavy longitudinal queries
+- [x] [P1] Derived analytics tables and materialized rollups for heavy longitudinal queries
 - [x] Source-quality dashboard by agent type, including capture coverage and telemetry completeness for Cursor
 - [ ] [P2] Data-quality anomaly detection for broken ingestion, sparse transcripts, or stale integrations
 
@@ -281,7 +281,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] PostgreSQL and SQLite support
 - [x] Alembic migration bundling in pip package
 - [x] [P0] Cursor `agent_type` support across capture, sync, ingest, and analytics filters
-- [ ] [P0] Durable background job system for sync, facet extraction, narratives, and alerts
+- [x] [P0] Durable background job system for sync, facet extraction, narratives, and alerts
 - [ ] [P0] Scalable API key lookup and verification strategy
 - [x] [P1] Source-capability registry so Primer can safely gate analytics by what each agent source actually provides
 - [ ] [P1] OpenTelemetry integration for metrics, traces, and logs
