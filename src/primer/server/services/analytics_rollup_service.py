@@ -55,7 +55,9 @@ def refresh_recent_daily_analytics_rollups(
     *,
     lookback_days: int | None = None,
 ) -> dict[str, int]:
-    effective_lookback = lookback_days or settings.analytics_rollup_lookback_days
+    effective_lookback = (
+        settings.analytics_rollup_lookback_days if lookback_days is None else lookback_days
+    )
     since_date = datetime.now(UTC).date() - timedelta(days=max(effective_lookback - 1, 0))
 
     stats: dict[tuple[date, str | None], dict[str, int]] = defaultdict(
