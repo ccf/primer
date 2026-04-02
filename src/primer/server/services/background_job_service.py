@@ -30,7 +30,13 @@ def _claimable_job_filter(now: datetime):
     return and_(
         BackgroundJob.attempts < BackgroundJob.max_attempts,
         or_(
-            BackgroundJob.status == JOB_STATUS_PENDING,
+            and_(
+                BackgroundJob.status == JOB_STATUS_PENDING,
+                or_(
+                    BackgroundJob.lease_expires_at.is_(None),
+                    BackgroundJob.lease_expires_at <= now,
+                ),
+            ),
             and_(
                 BackgroundJob.status == JOB_STATUS_RUNNING,
                 BackgroundJob.lease_expires_at.is_not(None),
@@ -242,13 +248,19 @@ def _mark_job_failed(
     owns_session = db is None
     job_db = db or SessionLocal()
     try:
+        now = _utcnow_naive()
         status = JOB_STATUS_FAILED if attempts >= max_attempts else JOB_STATUS_PENDING
-        finished_at = _utcnow_naive() if status == JOB_STATUS_FAILED else None
+        finished_at = now if status == JOB_STATUS_FAILED else None
+        retry_after = (
+            None
+            if status == JOB_STATUS_FAILED
+            else now + timedelta(seconds=settings.background_job_retry_backoff_seconds)
+        )
         job_db.rollback()
         job_db.query(BackgroundJob).filter(BackgroundJob.id == job_id).update(
             {
                 "status": status,
-                "lease_expires_at": None,
+                "lease_expires_at": retry_after,
                 "finished_at": finished_at,
                 "last_error": error[:2000],
             },
