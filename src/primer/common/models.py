@@ -256,6 +256,25 @@ class DailyStats(Base):
     engineer: Mapped[Engineer] = relationship(back_populates="daily_stats")
 
 
+class DailyAnalyticsRollup(Base):
+    __tablename__ = "daily_analytics_rollups"
+    __table_args__ = (
+        UniqueConstraint("date", "scope_key", name="uq_daily_analytics_rollups_date_scope"),
+        Index("ix_daily_analytics_rollups_team_date", "team_id", "date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    scope_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    team_id: Mapped[str | None] = mapped_column(ForeignKey("teams.id"), nullable=True)
+    session_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    message_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    tool_call_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    success_session_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    outcome_session_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    refreshed_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class IngestEvent(Base):
     __tablename__ = "ingest_events"
 

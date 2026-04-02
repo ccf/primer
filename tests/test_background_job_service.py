@@ -6,6 +6,7 @@ from primer.common.models import Session as SessionModel
 from primer.server.services.background_job_service import (
     JOB_STATUS_PENDING,
     JOB_STATUS_SUCCEEDED,
+    JOB_TYPE_DAILY_ANALYTICS_ROLLUP_REFRESH,
     JOB_TYPE_FACET_EXTRACTION,
     JOB_TYPE_NARRATIVE_REFRESH_ALL,
     enqueue_background_job,
@@ -217,6 +218,30 @@ def test_ensure_recurring_jobs_enqueues_narrative_refresh(db_session, monkeypatc
         .count()
         == 1
     )
+
+
+def test_ensure_recurring_jobs_enqueues_daily_rollup_refresh(db_session, monkeypatch):
+    monkeypatch.setattr(
+        "primer.server.services.background_job_service.settings.analytics_rollup_refresh_enabled",
+        True,
+    )
+    monkeypatch.setattr(
+        "primer.server.services.background_job_service.settings.analytics_rollup_refresh_interval_minutes",
+        15,
+    )
+    monkeypatch.setattr(
+        "primer.server.services.background_job_service.settings.narrative_auto_refresh",
+        False,
+    )
+
+    ensure_recurring_jobs(db_session)
+
+    job = (
+        db_session.query(BackgroundJob)
+        .filter(BackgroundJob.job_type == JOB_TYPE_DAILY_ANALYTICS_ROLLUP_REFRESH)
+        .one()
+    )
+    assert job.status == JOB_STATUS_PENDING
 
 
 def test_ensure_recurring_jobs_skips_recent_success(db_session, monkeypatch):

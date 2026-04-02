@@ -90,5 +90,10 @@ class PrimerSettings(BaseSettings):
     background_job_lease_seconds: int = 300
     background_job_retry_backoff_seconds: int = 60
 
+    # Derived analytics rollups
+    analytics_rollup_refresh_enabled: bool = True
+    analytics_rollup_refresh_interval_minutes: int = 15
+    analytics_rollup_lookback_days: int = 35
+
 
 settings = PrimerSettings()
