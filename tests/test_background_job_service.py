@@ -134,6 +134,59 @@ def test_run_background_job_cycle_retries_failed_facet_extraction(
     }
 
 
+def test_run_background_job_cycle_backs_off_retryable_failures(
+    monkeypatch, db_session, engineer_with_key
+):
+    engineer, _api_key = engineer_with_key
+    session = SessionModel(
+        id=str(uuid4()),
+        engineer_id=engineer.id,
+        started_at=datetime.now(UTC),
+        message_count=2,
+        user_message_count=1,
+        assistant_message_count=1,
+        duration_seconds=120.0,
+        has_facets=False,
+    )
+    db_session.add(session)
+    db_session.flush()
+    job = enqueue_background_job(
+        db_session,
+        job_type=JOB_TYPE_FACET_EXTRACTION,
+        payload={"session_id": session.id},
+        created_by_engineer_id=engineer.id,
+        max_attempts=3,
+    )
+    db_session.commit()
+    observed: list[str] = []
+    marked_failed: list[tuple[str, int, int]] = []
+
+    monkeypatch.setattr(
+        "primer.server.services.background_job_service.settings.background_job_retry_backoff_seconds",
+        60,
+    )
+    monkeypatch.setattr(
+        "primer.server.services.facet_extraction_service.extract_and_store_facets_for_session",
+        lambda incoming_session_id: observed.append(incoming_session_id) or "failed",
+    )
+
+    def fake_mark_job_failed(
+        _db, marked_job_id: str, _error: str, *, attempts: int, max_attempts: int
+    ) -> None:
+        marked_failed.append((marked_job_id, attempts, max_attempts))
+
+    monkeypatch.setattr(
+        "primer.server.services.background_job_service._mark_job_failed",
+        fake_mark_job_failed,
+    )
+
+    result = run_background_job_cycle(db_session, limit=3, lease_seconds=60)
+
+    assert result == {"processed": 1, "succeeded": 0, "failed": 1}
+    assert observed == [session.id]
+    assert marked_failed == [(job.id, 1, 3)]
+
+
 def test_ensure_recurring_jobs_enqueues_narrative_refresh(db_session, monkeypatch):
     monkeypatch.setattr(
         "primer.server.services.background_job_service.settings.narrative_auto_refresh",

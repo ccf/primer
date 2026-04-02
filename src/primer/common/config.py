@@ -88,6 +88,7 @@ class PrimerSettings(BaseSettings):
     background_job_poll_seconds: int = 15
     background_job_batch_size: int = 5
     background_job_lease_seconds: int = 300
+    background_job_retry_backoff_seconds: int = 60
 
 
 settings = PrimerSettings()
