@@ -101,6 +101,7 @@ class PrimerSettings(BaseSettings):
     # Analytics cache
     analytics_cache_enabled: bool = True
     analytics_cache_ttl_seconds: int = 60
+    analytics_cache_error_backoff_seconds: int = 30
 
 
 settings = PrimerSettings()
