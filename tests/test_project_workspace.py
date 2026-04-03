@@ -13,6 +13,7 @@ from primer.common.schemas import LanguageShare, ProjectRepositorySummary
 from primer.server.services.project_workspace_service import (
     _build_repository_context_summary,
     _language_mix_from_breakdown,
+    get_project_workspace,
 )
 
 
@@ -401,6 +402,40 @@ def test_project_workspace_missing_project_returns_404(client, admin_headers):
         headers=admin_headers,
     )
     assert response.status_code == 404
+
+
+def test_project_workspace_uses_cached_payload(client, engineer_with_key, db_session, monkeypatch):
+    _engineer, api_key = engineer_with_key
+    session_id = _ingest_project_session(
+        client,
+        api_key,
+        project_name="cached-workspace-proj",
+        git_remote_url="https://github.com/acme/cached-workspace.git",
+        session_type="implementation",
+    )
+    _ensure_project_facets(db_session, session_id, session_type="implementation")
+    db_session.commit()
+
+    cached_workspace = get_project_workspace(db_session, "cached-workspace-proj")
+    assert cached_workspace is not None
+
+    monkeypatch.setattr(
+        "primer.server.services.project_workspace_service.get_cached_json",
+        lambda namespace, params: cached_workspace.model_dump(mode="json")
+        if namespace == "project_workspace"
+        else None,
+    )
+    monkeypatch.setattr(
+        "primer.server.services.project_workspace_service.base_session_query",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("project workspace query should not run")
+        ),
+    )
+
+    result = get_project_workspace(object(), "cached-workspace-proj")
+
+    assert result is not None
+    assert result.project.project_name == "cached-workspace-proj"
 
 
 def test_repository_context_language_mix_ignores_repos_without_language_data():

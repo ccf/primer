@@ -10,6 +10,7 @@ from primer.common.schemas import (
     CompareSnapshot,
     CompareWorkflowEntry,
 )
+from primer.server.services.analytics_cache_service import get_cached_json, set_cached_json
 from primer.server.services.analytics_service import (
     base_session_query,
     get_overview,
@@ -31,6 +32,18 @@ def get_compare_response(
     start_date: datetime | None = None,
     end_date: datetime | None = None,
 ) -> CompareResponse:
+    cache_params = {
+        "mode": mode,
+        "left_key": left_key,
+        "right_key": right_key,
+        "team_id": team_id,
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+    cached = get_cached_json("compare_response", cache_params)
+    if cached is not None:
+        return CompareResponse.model_validate(cached)
+
     if mode == "team":
         if not left_key or not right_key:
             raise ValueError("team compare requires left_key and right_key")
@@ -68,7 +81,9 @@ def get_compare_response(
     else:
         raise ValueError(f"Unsupported compare mode: {mode}")
 
-    return CompareResponse(mode=mode, left=left, right=right, delta=_build_delta(left, right))
+    response = CompareResponse(mode=mode, left=left, right=right, delta=_build_delta(left, right))
+    set_cached_json("compare_response", cache_params, response.model_dump(mode="json"))
+    return response
 
 
 def _build_team_snapshot(

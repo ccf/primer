@@ -37,6 +37,7 @@ from primer.common.schemas import (
     RecommendationNarrative,
 )
 from primer.common.source_capabilities import CAPABILITIES
+from primer.server.services.analytics_cache_service import get_cached_json, set_cached_json
 from primer.server.services.analytics_service import (
     _filter_sessions_by_capability,
     base_session_query,
@@ -162,6 +163,17 @@ def get_project_workspace(
     start_date: datetime | None = None,
     end_date: datetime | None = None,
 ) -> ProjectWorkspaceResponse | None:
+    cache_params = {
+        "project_name": project_name,
+        "team_id": team_id,
+        "engineer_id": engineer_id,
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+    cached = get_cached_json("project_workspace", cache_params)
+    if cached is not None:
+        return ProjectWorkspaceResponse.model_validate(cached)
+
     session_q = base_session_query(
         db,
         team_id=team_id,
@@ -285,7 +297,7 @@ def get_project_workspace(
         measurement_confidence=_compute_measurement_confidence(db, session_q),
     )
 
-    return ProjectWorkspaceResponse(
+    response = ProjectWorkspaceResponse(
         project=project,
         scorecard=scorecard,
         overview=overview,
@@ -300,6 +312,8 @@ def get_project_workspace(
         repository_context=repository_context,
         workflow_summary=workflow_summary,
     )
+    set_cached_json("project_workspace", cache_params, response.model_dump(mode="json"))
+    return response
 
 
 def get_cross_project_comparison(

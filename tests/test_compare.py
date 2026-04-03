@@ -6,6 +6,7 @@ import bcrypt
 
 from primer.common.models import Engineer, ModelUsage, SessionFacets, SessionWorkflowProfile, Team
 from primer.common.models import Session as SessionModel
+from primer.server.services.compare_service import get_compare_response
 
 
 def _make_engineer(db_session, team, *, name, role="engineer"):
@@ -113,6 +114,64 @@ def test_compare_mode_team(client, db_session, admin_headers):
     assert data["left"]["total_sessions"] == 2
     assert data["right"]["total_sessions"] == 1
     assert data["left"]["top_workflows"][0]["label"] == "debugging"
+
+
+def test_compare_mode_uses_cached_payload(monkeypatch, db_session):
+    team_a = Team(name="Alpha Cache")
+    team_b = Team(name="Beta Cache")
+    db_session.add_all([team_a, team_b])
+    db_session.flush()
+    eng_a, _eng_a_key = _make_engineer(db_session, team_a, name="Alice Cache")
+    eng_b, _eng_b_key = _make_engineer(db_session, team_b, name="Bob Cache")
+    now = datetime.now(UTC)
+
+    _create_session(
+        db_session,
+        eng_a,
+        project_name="alpha-app",
+        started_at=now - timedelta(days=1),
+        archetype="debugging",
+        outcome="success",
+    )
+    _create_session(
+        db_session,
+        eng_b,
+        project_name="beta-app",
+        started_at=now - timedelta(days=1),
+        archetype="implementation",
+        outcome="failure",
+    )
+    db_session.commit()
+
+    cached_response = get_compare_response(
+        db_session,
+        mode="team",
+        left_key=team_a.id,
+        right_key=team_b.id,
+    )
+
+    monkeypatch.setattr(
+        "primer.server.services.compare_service.get_cached_json",
+        lambda namespace, params: cached_response.model_dump(mode="json")
+        if namespace == "compare_response"
+        else None,
+    )
+    monkeypatch.setattr(
+        "primer.server.services.compare_service._build_team_snapshot",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("team snapshot should not run")
+        ),
+    )
+
+    result = get_compare_response(
+        object(),
+        mode="team",
+        left_key=team_a.id,
+        right_key=team_b.id,
+    )
+
+    assert result.left.label == "Alpha Cache"
+    assert result.right.label == "Beta Cache"
 
 
 def test_compare_mode_engineer(client, db_session, admin_headers):
