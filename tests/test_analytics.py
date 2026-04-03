@@ -47,27 +47,29 @@ def test_overview_empty(client, admin_headers):
 def test_get_overview_uses_cached_payload(monkeypatch, db_session):
     monkeypatch.setattr(
         "primer.server.services.analytics_service.get_cached_json",
-        lambda namespace, params: {
-            "total_sessions": 7,
-            "total_engineers": 2,
-            "total_messages": 14,
-            "total_tool_calls": 5,
-            "total_input_tokens": 100,
-            "total_output_tokens": 50,
-            "estimated_cost": 1.25,
-            "avg_session_duration": 120.0,
-            "avg_messages_per_session": 2.0,
-            "outcome_counts": {"success": 7},
-            "session_type_counts": {"feature": 7},
-            "success_rate": 1.0,
-            "end_reason_counts": {},
-            "cache_hit_rate": None,
-            "avg_health_score": None,
-            "agent_type_counts": {"claude_code": 7},
-            "previous_period": None,
-        }
-        if namespace == "overview"
-        else None,
+        lambda namespace, params: (
+            {
+                "total_sessions": 7,
+                "total_engineers": 2,
+                "total_messages": 14,
+                "total_tool_calls": 5,
+                "total_input_tokens": 100,
+                "total_output_tokens": 50,
+                "estimated_cost": 1.25,
+                "avg_session_duration": 120.0,
+                "avg_messages_per_session": 2.0,
+                "outcome_counts": {"success": 7},
+                "session_type_counts": {"feature": 7},
+                "success_rate": 1.0,
+                "end_reason_counts": {},
+                "cache_hit_rate": None,
+                "avg_health_score": None,
+                "agent_type_counts": {"claude_code": 7},
+                "previous_period": None,
+            }
+            if namespace == "overview"
+            else None
+        ),
     )
     monkeypatch.setattr(
         "primer.server.services.analytics_service._build_overview",
@@ -605,17 +607,19 @@ def test_daily_stats_endpoint(client, engineer_with_key, admin_headers):
 def test_get_daily_stats_uses_cached_payload(monkeypatch, db_session):
     monkeypatch.setattr(
         "primer.server.services.analytics_service.get_cached_json",
-        lambda namespace, params: [
-            {
-                "date": "2025-02-02",
-                "session_count": 5,
-                "message_count": 17,
-                "tool_call_count": 11,
-                "success_rate": 0.8,
-            }
-        ]
-        if namespace == "daily_stats"
-        else None,
+        lambda namespace, params: (
+            [
+                {
+                    "date": "2025-02-02",
+                    "session_count": 5,
+                    "message_count": 17,
+                    "tool_call_count": 11,
+                    "success_rate": 0.8,
+                }
+            ]
+            if namespace == "daily_stats"
+            else None
+        ),
     )
     monkeypatch.setattr(
         "primer.server.services.analytics_service.get_daily_stats_from_rollups",

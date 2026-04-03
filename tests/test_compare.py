@@ -152,9 +152,9 @@ def test_compare_mode_uses_cached_payload(monkeypatch, db_session):
 
     monkeypatch.setattr(
         "primer.server.services.compare_service.get_cached_json",
-        lambda namespace, params: cached_response.model_dump(mode="json")
-        if namespace == "compare_response"
-        else None,
+        lambda namespace, params: (
+            cached_response.model_dump(mode="json") if namespace == "compare_response" else None
+        ),
     )
     monkeypatch.setattr(
         "primer.server.services.compare_service._build_team_snapshot",

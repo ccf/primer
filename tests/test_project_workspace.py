@@ -421,9 +421,9 @@ def test_project_workspace_uses_cached_payload(client, engineer_with_key, db_ses
 
     monkeypatch.setattr(
         "primer.server.services.project_workspace_service.get_cached_json",
-        lambda namespace, params: cached_workspace.model_dump(mode="json")
-        if namespace == "project_workspace"
-        else None,
+        lambda namespace, params: (
+            cached_workspace.model_dump(mode="json") if namespace == "project_workspace" else None
+        ),
     )
     monkeypatch.setattr(
         "primer.server.services.project_workspace_service.base_session_query",
