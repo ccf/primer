@@ -285,6 +285,6 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [ ] [P0] Scalable API key lookup and verification strategy
 - [x] [P1] Source-capability registry so Primer can safely gate analytics by what each agent source actually provides
 - [ ] [P1] OpenTelemetry integration for metrics, traces, and logs
-- [ ] [P1] Redis-backed caching for analytics query results and high-read metadata
+- [x] [P1] Redis-backed caching for analytics query results and high-read metadata
 - [ ] [P1] Analytics performance work for large orgs and concurrent dashboard usage
 - [ ] [P2] Pluggable warehouse export for long-horizon analysis in external BI tools

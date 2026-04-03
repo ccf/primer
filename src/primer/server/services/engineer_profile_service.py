@@ -22,6 +22,7 @@ from primer.common.schemas import (
     ToolRecommendation,
     WeeklyMetricPoint,
 )
+from primer.server.services.analytics_cache_service import get_cached_json, set_cached_json
 from primer.server.services.analytics_service import (
     _build_overview,
     get_friction_report,
@@ -861,6 +862,15 @@ def get_engineer_profile(
     end_date: datetime | None = None,
 ) -> EngineerProfileResponse | None:
     """Build a comprehensive profile for a single engineer."""
+    cache_params = {
+        "engineer_id": engineer_id,
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+    cached = get_cached_json("engineer_profile", cache_params)
+    if cached is not None:
+        return EngineerProfileResponse.model_validate(cached)
+
     engineer = db.query(Engineer).filter(Engineer.id == engineer_id).first()
     if not engineer:
         return None
@@ -1041,7 +1051,7 @@ def get_engineer_profile(
             workflow_playbooks,
         )
 
-    return EngineerProfileResponse(
+    response = EngineerProfileResponse(
         engineer_id=engineer.id,
         name=engineer.name,
         email=engineer.email,
@@ -1067,3 +1077,5 @@ def get_engineer_profile(
         tool_rankings=tool_rankings,
         workflow_playbooks=workflow_playbooks,
     )
+    set_cached_json("engineer_profile", cache_params, response.model_dump(mode="json"))
+    return response

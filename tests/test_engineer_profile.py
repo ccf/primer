@@ -18,6 +18,7 @@ from primer.common.models import (
     Team,
     ToolUsage,
 )
+from primer.server.services.engineer_profile_service import get_engineer_profile
 
 
 def _make_engineer(db_session, team, *, name="Eng", email=None, role="engineer"):
@@ -72,6 +73,24 @@ class TestEngineerProfileOverview:
 
         assert data["overview"]["total_sessions"] == 0
         assert data["impact_review"] is None
+
+    def test_profile_uses_cached_payload(self, db_session, engineer_with_key, monkeypatch):
+        eng, _key = engineer_with_key
+        cached_profile = get_engineer_profile(db_session, eng.id)
+        assert cached_profile is not None
+
+        monkeypatch.setattr(
+            "primer.server.services.engineer_profile_service.get_cached_json",
+            lambda namespace, params: cached_profile.model_dump(mode="json")
+            if namespace == "engineer_profile"
+            else None,
+        )
+
+        result = get_engineer_profile(object(), eng.id)
+
+        assert result is not None
+        assert result.engineer_id == eng.id
+        assert result.overview.total_sessions == 0
 
     def test_profile_overview(self, client, db_session, engineer_with_key, admin_headers):
         """Create 1 engineer with 2 sessions, verify overview stats."""
