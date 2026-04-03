@@ -81,9 +81,9 @@ class TestEngineerProfileOverview:
 
         monkeypatch.setattr(
             "primer.server.services.engineer_profile_service.get_cached_json",
-            lambda namespace, params: cached_profile.model_dump(mode="json")
-            if namespace == "engineer_profile"
-            else None,
+            lambda namespace, params: (
+                cached_profile.model_dump(mode="json") if namespace == "engineer_profile" else None
+            ),
         )
 
         result = get_engineer_profile(object(), eng.id)
