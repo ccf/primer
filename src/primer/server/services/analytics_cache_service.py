@@ -98,12 +98,7 @@ def get_cached_json(namespace: str, params: dict[str, Any]) -> Any | None:
         )
         return None
     try:
-        record_counter(
-            "primer.analytics_cache.requests",
-            1,
-            {"namespace": namespace, "result": "hit"},
-        )
-        return json.loads(payload)
+        decoded = json.loads(payload)
     except json.JSONDecodeError:
         record_counter(
             "primer.analytics_cache.requests",
@@ -111,6 +106,12 @@ def get_cached_json(namespace: str, params: dict[str, Any]) -> Any | None:
             {"namespace": namespace, "result": "decode_error"},
         )
         return None
+    record_counter(
+        "primer.analytics_cache.requests",
+        1,
+        {"namespace": namespace, "result": "hit"},
+    )
+    return decoded
 
 
 def set_cached_json(

@@ -101,17 +101,17 @@ async def _background_job_worker_loop() -> None:
                 )
                 if result["processed"] > 0:
                     record_counter(
-                        "primer.background_jobs.processed",
+                        "primer.background_jobs.cycle_processed",
                         result["processed"],
-                        {"result": "processed"},
+                        None,
                     )
                     record_counter(
-                        "primer.background_jobs.processed",
+                        "primer.background_jobs.executions_by_result",
                         result["succeeded"],
                         {"result": "succeeded"},
                     )
                     record_counter(
-                        "primer.background_jobs.processed",
+                        "primer.background_jobs.executions_by_result",
                         result["failed"],
                         {"result": "failed"},
                     )
