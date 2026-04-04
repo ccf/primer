@@ -7,6 +7,7 @@ from hashlib import sha256
 from typing import Any
 
 from primer.common.config import settings
+from primer.server.services.observability_service import record_counter
 
 try:
     from redis import Redis
@@ -73,17 +74,42 @@ def _disable_cache_client() -> None:
 def get_cached_json(namespace: str, params: dict[str, Any]) -> Any | None:
     client = _get_redis_client()
     if client is None:
+        record_counter(
+            "primer.analytics_cache.requests",
+            1,
+            {"namespace": namespace, "result": "disabled"},
+        )
         return None
     try:
         payload = client.get(_build_cache_key(namespace, params))
     except (RedisError, OSError):
         _disable_cache_client()
+        record_counter(
+            "primer.analytics_cache.requests",
+            1,
+            {"namespace": namespace, "result": "error"},
+        )
         return None
     if not payload:
+        record_counter(
+            "primer.analytics_cache.requests",
+            1,
+            {"namespace": namespace, "result": "miss"},
+        )
         return None
     try:
+        record_counter(
+            "primer.analytics_cache.requests",
+            1,
+            {"namespace": namespace, "result": "hit"},
+        )
         return json.loads(payload)
     except json.JSONDecodeError:
+        record_counter(
+            "primer.analytics_cache.requests",
+            1,
+            {"namespace": namespace, "result": "decode_error"},
+        )
         return None
 
 
@@ -96,6 +122,11 @@ def set_cached_json(
 ) -> None:
     client = _get_redis_client()
     if client is None:
+        record_counter(
+            "primer.analytics_cache.writes",
+            1,
+            {"namespace": namespace, "result": "disabled"},
+        )
         return
     try:
         client.setex(
@@ -103,8 +134,23 @@ def set_cached_json(
             ttl_seconds or settings.analytics_cache_ttl_seconds,
             json.dumps(payload, separators=(",", ":")),
         )
+        record_counter(
+            "primer.analytics_cache.writes",
+            1,
+            {"namespace": namespace, "result": "success"},
+        )
     except (RedisError, OSError):
         _disable_cache_client()
+        record_counter(
+            "primer.analytics_cache.writes",
+            1,
+            {"namespace": namespace, "result": "error"},
+        )
         return
     except (TypeError, ValueError):
+        record_counter(
+            "primer.analytics_cache.writes",
+            1,
+            {"namespace": namespace, "result": "serialize_error"},
+        )
         return

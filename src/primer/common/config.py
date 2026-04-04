@@ -30,6 +30,13 @@ class PrimerSettings(BaseSettings):
     # Redis / cache
     redis_url: str = ""
 
+    # OpenTelemetry
+    otel_enabled: bool = False
+    otel_service_name: str = "primer"
+    otel_environment: str = "development"
+    otel_console_export: bool = False
+    otel_otlp_endpoint: str = ""
+
     # GitHub OAuth
     github_client_id: str = ""
     github_client_secret: str = ""
