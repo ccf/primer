@@ -1,13 +1,16 @@
 from dataclasses import dataclass
 
-import bcrypt
 from fastapi import Cookie, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from primer.common.config import settings
 from primer.common.database import get_db
 from primer.common.models import Engineer
-from primer.server.services.auth_service import find_engineer_by_device_token, verify_access_token
+from primer.server.services.auth_service import (
+    find_engineer_by_api_key,
+    find_engineer_by_device_token,
+    verify_access_token,
+)
 
 
 def require_admin(x_admin_key: str = Header()) -> str:
@@ -28,21 +31,9 @@ def _require_active_engineer(
     return engineer
 
 
-def _find_engineer_by_api_key(api_key: str, db: Session) -> Engineer | None:
-    encoded_key = api_key.encode()
-    engineers = db.query(Engineer).filter(
-        Engineer.api_key_hash.is_not(None),
-        Engineer.api_key_hash != "",
-    )
-    for eng in engineers:
-        if bcrypt.checkpw(encoded_key, eng.api_key_hash.encode()):
-            return eng
-    return None
-
-
 def verify_api_key(api_key: str, db: Session) -> Engineer:
     """Verify an API key against stored hashes. Returns the engineer or raises."""
-    engineer = _find_engineer_by_api_key(api_key, db)
+    engineer = find_engineer_by_api_key(db, api_key)
     return _require_active_engineer(engineer, missing_detail="Invalid API key")
 
 

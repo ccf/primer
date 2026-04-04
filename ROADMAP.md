@@ -282,7 +282,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Alembic migration bundling in pip package
 - [x] [P0] Cursor `agent_type` support across capture, sync, ingest, and analytics filters
 - [x] [P0] Durable background job system for sync, facet extraction, narratives, and alerts
-- [ ] [P0] Scalable API key lookup and verification strategy
+- [x] [P0] Scalable API key lookup and verification strategy
 - [x] [P1] Source-capability registry so Primer can safely gate analytics by what each agent source actually provides
 - [x] [P1] OpenTelemetry integration for metrics, traces, and logs
 - [x] [P1] Redis-backed caching for analytics query results and high-read metadata

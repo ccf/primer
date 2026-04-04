@@ -1,6 +1,3 @@
-import secrets
-
-import bcrypt
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -10,6 +7,7 @@ from primer.common.config import settings
 from primer.common.database import Base, get_db
 from primer.common.models import Engineer, Team
 from primer.server.app import create_app
+from primer.server.services.auth_service import create_engineer_api_key
 
 TEST_DB_URL = "sqlite:///./test_primer.db"
 
@@ -64,13 +62,16 @@ def admin_headers():
 @pytest.fixture
 def engineer_with_key(db_session):
     """Create an engineer and return (engineer, raw_api_key)."""
-    raw_key = f"primer_{secrets.token_urlsafe(32)}"
-    hashed = bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt()).decode()
+    raw_key, hashed, lookup_hash = create_engineer_api_key()
     team = Team(name="Test Team")
     db_session.add(team)
     db_session.flush()
     eng = Engineer(
-        name="Test Engineer", email="test@example.com", team_id=team.id, api_key_hash=hashed
+        name="Test Engineer",
+        email="test@example.com",
+        team_id=team.id,
+        api_key_hash=hashed,
+        api_key_lookup_hash=lookup_hash,
     )
     db_session.add(eng)
     db_session.flush()
