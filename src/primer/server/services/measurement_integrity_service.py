@@ -165,12 +165,11 @@ def _grouped_related_counts(
 def _grouped_source_signal_counts(
     db: Session,
     *,
-    signal_key: str,
     team_id: str | None = None,
     engineer_id: str | None = None,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
-) -> dict[str, int]:
+) -> dict[str, dict[str, int]]:
     rows = _apply_session_scope(
         db.query(SessionModel.agent_type, SessionModel.source_metadata).filter(
             SessionModel.source_metadata.isnot(None)
@@ -180,16 +179,17 @@ def _grouped_source_signal_counts(
         start_date=start_date,
         end_date=end_date,
     ).all()
-    counts: dict[str, int] = {}
+    counts: dict[str, dict[str, int]] = {}
     for agent_type, source_metadata in rows:
         native_telemetry = (
             source_metadata.get("native_telemetry") if isinstance(source_metadata, dict) else None
         )
         if not isinstance(native_telemetry, dict):
             continue
-        signal = native_telemetry.get(signal_key)
-        if signal:
-            counts[agent_type] = counts.get(agent_type, 0) + 1
+        bucket = counts.setdefault(agent_type, {})
+        for signal_key in ("approval", "change_signals", "context_usage"):
+            if native_telemetry.get(signal_key):
+                bucket[signal_key] = bucket.get(signal_key, 0) + 1
     return counts
 
 
@@ -339,25 +339,8 @@ def get_measurement_integrity_stats(
         start_date=start_date,
         end_date=end_date,
     )
-    approval_sessions_by_agent = _grouped_source_signal_counts(
+    source_signal_sessions_by_agent = _grouped_source_signal_counts(
         db,
-        signal_key="approval",
-        team_id=team_id,
-        engineer_id=engineer_id,
-        start_date=start_date,
-        end_date=end_date,
-    )
-    change_signal_sessions_by_agent = _grouped_source_signal_counts(
-        db,
-        signal_key="change_signals",
-        team_id=team_id,
-        engineer_id=engineer_id,
-        start_date=start_date,
-        end_date=end_date,
-    )
-    context_usage_sessions_by_agent = _grouped_source_signal_counts(
-        db,
-        signal_key="context_usage",
         team_id=team_id,
         engineer_id=engineer_id,
         start_date=start_date,
@@ -608,21 +591,33 @@ def get_measurement_integrity_stats(
                 "native_discovery_parity": native_discovery_parity,
                 "approval_signals_parity": approval_signals_parity,
                 "approval_signals_coverage_pct": round(
-                    (approval_sessions_by_agent.get(agent_type, 0) / session_count) * 100,
+                    (
+                        source_signal_sessions_by_agent.get(agent_type, {}).get("approval", 0)
+                        / session_count
+                    )
+                    * 100,
                     1,
                 )
                 if capability and capability.supports_approval_signals and session_count
                 else 0.0,
                 "change_signals_parity": change_signals_parity,
                 "change_signals_coverage_pct": round(
-                    (change_signal_sessions_by_agent.get(agent_type, 0) / session_count) * 100,
+                    (
+                        source_signal_sessions_by_agent.get(agent_type, {}).get("change_signals", 0)
+                        / session_count
+                    )
+                    * 100,
                     1,
                 )
                 if capability and capability.supports_change_signals and session_count
                 else 0.0,
                 "context_usage_parity": context_usage_parity,
                 "context_usage_coverage_pct": round(
-                    (context_usage_sessions_by_agent.get(agent_type, 0) / session_count) * 100,
+                    (
+                        source_signal_sessions_by_agent.get(agent_type, {}).get("context_usage", 0)
+                        / session_count
+                    )
+                    * 100,
                     1,
                 )
                 if capability and capability.supports_context_usage and session_count
