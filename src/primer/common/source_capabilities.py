@@ -9,6 +9,9 @@ TelemetryField = Literal[
     "model_usage",
     "facets",
     "native_discovery",
+    "approval_signals",
+    "change_signals",
+    "context_usage",
 ]
 
 
@@ -20,6 +23,9 @@ class AgentCapability:
     model_usage: TelemetryParity
     facets: TelemetryParity
     native_discovery: TelemetryParity
+    approval_signals: TelemetryParity
+    change_signals: TelemetryParity
+    context_usage: TelemetryParity
 
     def parity_for(self, field_name: TelemetryField) -> TelemetryParity:
         return getattr(self, field_name)
@@ -50,6 +56,18 @@ class AgentCapability:
     def supports_native_discovery(self) -> bool:
         return self.is_available("native_discovery")
 
+    @property
+    def supports_approval_signals(self) -> bool:
+        return self.is_available("approval_signals")
+
+    @property
+    def supports_change_signals(self) -> bool:
+        return self.is_available("change_signals")
+
+    @property
+    def supports_context_usage(self) -> bool:
+        return self.is_available("context_usage")
+
 
 CAPABILITIES: dict[AgentType, AgentCapability] = {
     "claude_code": AgentCapability(
@@ -59,6 +77,9 @@ CAPABILITIES: dict[AgentType, AgentCapability] = {
         model_usage="required",
         facets="required",
         native_discovery="required",
+        approval_signals="unavailable",
+        change_signals="unavailable",
+        context_usage="unavailable",
     ),
     "codex_cli": AgentCapability(
         agent_type="codex_cli",
@@ -67,6 +88,9 @@ CAPABILITIES: dict[AgentType, AgentCapability] = {
         model_usage="required",
         facets="optional",
         native_discovery="required",
+        approval_signals="unavailable",
+        change_signals="unavailable",
+        context_usage="unavailable",
     ),
     "gemini_cli": AgentCapability(
         agent_type="gemini_cli",
@@ -75,6 +99,9 @@ CAPABILITIES: dict[AgentType, AgentCapability] = {
         model_usage="required",
         facets="optional",
         native_discovery="required",
+        approval_signals="unavailable",
+        change_signals="unavailable",
+        context_usage="unavailable",
     ),
     "cursor": AgentCapability(
         agent_type="cursor",
@@ -83,6 +110,9 @@ CAPABILITIES: dict[AgentType, AgentCapability] = {
         model_usage="optional",
         facets="optional",
         native_discovery="required",
+        approval_signals="optional",
+        change_signals="optional",
+        context_usage="optional",
     ),
 }
 

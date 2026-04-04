@@ -12,11 +12,17 @@ def test_cursor_capability_exists():
         model_usage="optional",
         facets="optional",
         native_discovery="required",
+        approval_signals="optional",
+        change_signals="optional",
+        context_usage="optional",
     )
     assert cap.supports_transcript is True
     assert cap.supports_tool_calls is True
     assert cap.supports_model_usage is True
     assert cap.supports_facets is True
+    assert cap.supports_approval_signals is True
+    assert cap.supports_change_signals is True
+    assert cap.supports_context_usage is True
     assert cap.parity_for("transcript") == "required"
     assert cap.parity_for("tool_calls") == "optional"
 

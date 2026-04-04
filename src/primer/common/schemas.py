@@ -435,6 +435,7 @@ class SessionIngestPayload(BaseModel):
     billing_mode: str | None = None
     first_prompt: str | None = None
     summary: str | None = None
+    source_metadata: dict[str, Any] | None = None
     facets: SessionFacetsPayload | None = None
     tool_usages: list[ToolUsagePayload] | None = None
     customizations: list[SessionCustomizationPayload] | None = None
@@ -494,6 +495,7 @@ class SessionResponse(BaseModel):
     primary_model: str | None
     first_prompt: str | None
     summary: str | None
+    source_metadata: dict[str, Any] | None = None
     has_facets: bool
     has_workflow_profile: bool = False
     created_at: datetime
@@ -1087,6 +1089,12 @@ class AgentSourceQuality(BaseModel):
     facet_parity: TelemetryParity
     facet_coverage_pct: float
     native_discovery_parity: TelemetryParity
+    approval_signals_parity: TelemetryParity
+    approval_signals_coverage_pct: float
+    change_signals_parity: TelemetryParity
+    change_signals_coverage_pct: float
+    context_usage_parity: TelemetryParity
+    context_usage_coverage_pct: float
 
 
 class RepositoryQuality(BaseModel):

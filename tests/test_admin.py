@@ -49,6 +49,7 @@ def _create_measurement_integrity_session(
     with_messages=False,
     with_tool_usage=False,
     with_model_usage=False,
+    source_metadata=None,
     outcome=None,
     goal_categories=None,
     confidence_score=None,
@@ -68,6 +69,7 @@ def _create_measurement_integrity_session(
         output_tokens=50 if with_model_usage else 0,
         primary_model="claude-sonnet-4-5-20250929" if with_model_usage else None,
         duration_seconds=60.0,
+        source_metadata=source_metadata,
         has_facets=(
             outcome is not None or goal_categories is not None or confidence_score is not None
         ),
@@ -302,6 +304,12 @@ def test_measurement_integrity_stats_include_source_quality_breakdown(
         "facet_parity": "required",
         "facet_coverage_pct": 100.0,
         "native_discovery_parity": "required",
+        "approval_signals_parity": "unavailable",
+        "approval_signals_coverage_pct": 0.0,
+        "change_signals_parity": "unavailable",
+        "change_signals_coverage_pct": 0.0,
+        "context_usage_parity": "unavailable",
+        "context_usage_coverage_pct": 0.0,
     }
     assert source_quality["cursor"] == {
         "agent_type": "cursor",
@@ -315,6 +323,12 @@ def test_measurement_integrity_stats_include_source_quality_breakdown(
         "facet_parity": "optional",
         "facet_coverage_pct": 0.0,
         "native_discovery_parity": "required",
+        "approval_signals_parity": "optional",
+        "approval_signals_coverage_pct": 0.0,
+        "change_signals_parity": "optional",
+        "change_signals_coverage_pct": 0.0,
+        "context_usage_parity": "optional",
+        "context_usage_coverage_pct": 0.0,
     }
 
 
@@ -424,6 +438,43 @@ def test_measurement_integrity_stats_count_missing_supported_tool_and_model_tele
     assert source_quality["cursor"]["tool_call_coverage_pct"] == 0.0
     assert source_quality["cursor"]["model_usage_parity"] == "optional"
     assert source_quality["cursor"]["model_usage_coverage_pct"] == 0.0
+
+
+def test_measurement_integrity_stats_include_cursor_native_signal_coverage(
+    client, admin_headers, engineer_with_key, db_session
+):
+    eng, _api_key = engineer_with_key
+
+    _create_measurement_integrity_session(
+        db_session,
+        eng.id,
+        agent_type="cursor",
+        with_messages=True,
+        source_metadata={
+            "native_telemetry": {
+                "approval": {"signal_count": 1},
+                "context_usage": {"reference_count": 3},
+                "change_signals": {"signal_count": 1, "target_files": ["src/cursor.py"]},
+            }
+        },
+    )
+    _create_measurement_integrity_session(
+        db_session,
+        eng.id,
+        agent_type="cursor",
+        with_messages=True,
+    )
+
+    response = client.get("/api/v1/admin/measurement-integrity", headers=admin_headers)
+    assert response.status_code == 200
+
+    source_quality = {entry["agent_type"]: entry for entry in response.json()["source_quality"]}
+    assert source_quality["cursor"]["approval_signals_parity"] == "optional"
+    assert source_quality["cursor"]["approval_signals_coverage_pct"] == 50.0
+    assert source_quality["cursor"]["change_signals_parity"] == "optional"
+    assert source_quality["cursor"]["change_signals_coverage_pct"] == 50.0
+    assert source_quality["cursor"]["context_usage_parity"] == "optional"
+    assert source_quality["cursor"]["context_usage_coverage_pct"] == 50.0
 
 
 def test_activation_hub(client, admin_headers, engineer_with_key, db_session, monkeypatch):

@@ -92,6 +92,7 @@ export interface SessionResponse {
   primary_model: string | null
   first_prompt: string | null
   summary: string | null
+  source_metadata?: Record<string, unknown> | null
   has_facets: boolean
   has_workflow_profile?: boolean
   created_at: string
@@ -693,6 +694,12 @@ export interface AgentSourceQuality {
   facet_parity: TelemetryParity
   facet_coverage_pct: number
   native_discovery_parity: TelemetryParity
+  approval_signals_parity: TelemetryParity
+  approval_signals_coverage_pct: number
+  change_signals_parity: TelemetryParity
+  change_signals_coverage_pct: number
+  context_usage_parity: TelemetryParity
+  context_usage_coverage_pct: number
 }
 
 export interface RepositoryQuality {

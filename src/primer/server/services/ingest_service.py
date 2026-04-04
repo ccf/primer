@@ -98,6 +98,7 @@ def upsert_session(db: Session, engineer_id: str, payload: SessionIngestPayload)
         "primary_model",
         "billing_mode",
         "summary",
+        "source_metadata",
     ]:
         value = getattr(payload, field, None)
         if value is not None:

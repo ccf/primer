@@ -138,6 +138,12 @@ describe("AdminSystemTab", () => {
             facet_parity: "required",
             facet_coverage_pct: 100,
             native_discovery_parity: "required",
+            approval_signals_parity: "unavailable",
+            approval_signals_coverage_pct: 0,
+            change_signals_parity: "unavailable",
+            change_signals_coverage_pct: 0,
+            context_usage_parity: "unavailable",
+            context_usage_coverage_pct: 0,
           },
           {
             agent_type: "cursor",
@@ -151,6 +157,12 @@ describe("AdminSystemTab", () => {
             facet_parity: "optional",
             facet_coverage_pct: 0,
             native_discovery_parity: "required",
+            approval_signals_parity: "optional",
+            approval_signals_coverage_pct: 40,
+            change_signals_parity: "optional",
+            change_signals_coverage_pct: 30,
+            context_usage_parity: "optional",
+            context_usage_coverage_pct: 50,
           },
         ],
         repository_quality: [
@@ -203,7 +215,7 @@ describe("AdminSystemTab", () => {
     expect(screen.getAllByText("Required").length).toBeGreaterThan(0)
     expect(screen.getAllByText("-").length).toBeGreaterThan(0)
     expect(screen.getByText("73.3%")).toBeInTheDocument()
-    expect(screen.getByText("50.0%")).toBeInTheDocument()
+    expect(screen.getAllByText("50.0%").length).toBeGreaterThan(0)
     expect(screen.getAllByText("Not expected").length).toBeGreaterThan(0)
     expect(screen.getByText("75.0%")).toBeInTheDocument()
     expect(screen.getByText("66.7%")).toBeInTheDocument()

@@ -14,7 +14,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from primer.common.customizations import build_session_customizations
 
@@ -65,6 +65,7 @@ class SessionMetadata:
     billing_mode: str = ""
     first_prompt: str = ""
     summary: str = ""
+    source_metadata: dict[str, Any] | None = None
     tool_counts: dict[str, int] = field(default_factory=dict)
     model_tokens: dict[str, dict[str, int]] = field(default_factory=dict)
     messages: list[dict] = field(default_factory=list)
@@ -108,6 +109,7 @@ class SessionMetadata:
             "billing_mode": self.billing_mode or None,
             "first_prompt": self.first_prompt[:500] if self.first_prompt else None,
             "summary": self.summary or None,
+            "source_metadata": self.source_metadata or None,
             "tool_usages": [
                 {"tool_name": name, "call_count": count} for name, count in self.tool_counts.items()
             ],

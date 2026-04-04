@@ -122,6 +122,7 @@ class Session(Base):
     billing_mode: Mapped[str | None] = mapped_column(String(30), nullable=True)
     first_prompt: Mapped[str | None] = mapped_column(String(500))
     summary: Mapped[str | None] = mapped_column(Text)
+    source_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     has_facets: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

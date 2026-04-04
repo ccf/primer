@@ -162,6 +162,37 @@ def _grouped_related_counts(
     return {agent_type: count for agent_type, count in rows if agent_type}
 
 
+def _grouped_source_signal_counts(
+    db: Session,
+    *,
+    signal_key: str,
+    team_id: str | None = None,
+    engineer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> dict[str, int]:
+    rows = _apply_session_scope(
+        db.query(SessionModel.agent_type, SessionModel.source_metadata).filter(
+            SessionModel.source_metadata.isnot(None)
+        ),
+        team_id=team_id,
+        engineer_id=engineer_id,
+        start_date=start_date,
+        end_date=end_date,
+    ).all()
+    counts: dict[str, int] = {}
+    for agent_type, source_metadata in rows:
+        native_telemetry = (
+            source_metadata.get("native_telemetry") if isinstance(source_metadata, dict) else None
+        )
+        if not isinstance(native_telemetry, dict):
+            continue
+        signal = native_telemetry.get(signal_key)
+        if signal:
+            counts[agent_type] = counts.get(agent_type, 0) + 1
+    return counts
+
+
 def _normalized_row_updates(row: SessionFacets) -> dict[str, object]:
     updates: dict[str, object] = {}
 
@@ -303,6 +334,30 @@ def get_measurement_integrity_stats(
         db,
         SessionWorkflowProfile,
         SessionWorkflowProfile.session_id,
+        team_id=team_id,
+        engineer_id=engineer_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    approval_sessions_by_agent = _grouped_source_signal_counts(
+        db,
+        signal_key="approval",
+        team_id=team_id,
+        engineer_id=engineer_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    change_signal_sessions_by_agent = _grouped_source_signal_counts(
+        db,
+        signal_key="change_signals",
+        team_id=team_id,
+        engineer_id=engineer_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    context_usage_sessions_by_agent = _grouped_source_signal_counts(
+        db,
+        signal_key="context_usage",
         team_id=team_id,
         engineer_id=engineer_id,
         start_date=start_date,
@@ -520,6 +575,15 @@ def get_measurement_integrity_stats(
         native_discovery_parity = (
             capability.parity_for("native_discovery") if capability else "unavailable"
         )
+        approval_signals_parity = (
+            capability.parity_for("approval_signals") if capability else "unavailable"
+        )
+        change_signals_parity = (
+            capability.parity_for("change_signals") if capability else "unavailable"
+        )
+        context_usage_parity = (
+            capability.parity_for("context_usage") if capability else "unavailable"
+        )
 
         source_quality.append(
             {
@@ -542,6 +606,27 @@ def get_measurement_integrity_stats(
                 if capability and capability.supports_facets and session_count
                 else 0.0,
                 "native_discovery_parity": native_discovery_parity,
+                "approval_signals_parity": approval_signals_parity,
+                "approval_signals_coverage_pct": round(
+                    (approval_sessions_by_agent.get(agent_type, 0) / session_count) * 100,
+                    1,
+                )
+                if capability and capability.supports_approval_signals and session_count
+                else 0.0,
+                "change_signals_parity": change_signals_parity,
+                "change_signals_coverage_pct": round(
+                    (change_signal_sessions_by_agent.get(agent_type, 0) / session_count) * 100,
+                    1,
+                )
+                if capability and capability.supports_change_signals and session_count
+                else 0.0,
+                "context_usage_parity": context_usage_parity,
+                "context_usage_coverage_pct": round(
+                    (context_usage_sessions_by_agent.get(agent_type, 0) / session_count) * 100,
+                    1,
+                )
+                if capability and capability.supports_context_usage and session_count
+                else 0.0,
             }
         )
 
