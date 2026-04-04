@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from time import perf_counter
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import and_, func, or_
@@ -172,7 +173,7 @@ def run_background_job_cycle(
 
         processed += 1
         job_id, job_type, payload, attempts, max_attempts = claimed
-        job_started = _utcnow_naive()
+        job_started = perf_counter()
         with start_span(
             "background_job.execute",
             {
@@ -209,7 +210,7 @@ def run_background_job_cycle(
             finally:
                 record_histogram(
                     "primer.background_jobs.execution.duration_ms",
-                    (_utcnow_naive() - job_started).total_seconds() * 1000,
+                    (perf_counter() - job_started) * 1000,
                     {"job_type": job_type},
                 )
 
