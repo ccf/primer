@@ -67,3 +67,54 @@ def test_request_middleware_uses_route_template_for_metrics(monkeypatch):
             "http.status_code": "200",
         },
     ) in recorded
+
+
+def test_request_middleware_records_error_duration_with_route_template(monkeypatch):
+    counters: list[tuple[str, int | float, dict[str, str]]] = []
+    histograms: list[tuple[str, int | float, dict[str, str]]] = []
+
+    @contextmanager
+    def fake_span(_name, _attributes=None):
+        class DummySpan:
+            def set_attribute(self, *_args, **_kwargs):
+                pass
+
+        yield DummySpan()
+
+    monkeypatch.setattr(observability_service, "start_span", fake_span)
+    monkeypatch.setattr(
+        observability_service,
+        "record_counter",
+        lambda name, value, attributes=None: counters.append((name, value, attributes or {})),
+    )
+    monkeypatch.setattr(
+        observability_service,
+        "record_histogram",
+        lambda name, value, attributes=None: histograms.append((name, value, attributes or {})),
+    )
+
+    app = FastAPI()
+    observability_service._instrument_requests(app)
+
+    @app.get("/items/{item_id}")
+    def get_item(item_id: str):
+        _ = item_id
+        raise RuntimeError("boom")
+
+    client = TestClient(app, raise_server_exceptions=False)
+
+    response = client.get("/items/abc123")
+
+    assert response.status_code == 500
+    expected_attributes = {
+        "http.method": "GET",
+        "http.route": "/items/{item_id}",
+        "http.status_code": "500",
+    }
+    assert ("primer.http.requests", 1, expected_attributes) in counters
+    assert any(
+        name == "primer.http.request.duration_ms"
+        and attributes == expected_attributes
+        and value >= 0
+        for name, value, attributes in histograms
+    )

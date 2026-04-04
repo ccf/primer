@@ -123,19 +123,19 @@ def _instrument_requests(app: FastAPI) -> None:
             try:
                 response = await call_next(request)
             except Exception as exc:
+                duration_ms = (perf_counter() - started) * 1000
                 route_path = _route_path(request)
+                attributes = {
+                    "http.method": request.method,
+                    "http.route": route_path,
+                    "http.status_code": "500",
+                }
                 if span is not None:
                     span.set_attribute("error.type", exc.__class__.__name__)
-                    span.set_attribute("http.route", route_path)
-                record_counter(
-                    "primer.http.requests",
-                    1,
-                    {
-                        "http.method": request.method,
-                        "http.route": route_path,
-                        "http.status_code": "500",
-                    },
-                )
+                    for key, value in attributes.items():
+                        span.set_attribute(key, value)
+                record_counter("primer.http.requests", 1, attributes)
+                record_histogram("primer.http.request.duration_ms", duration_ms, attributes)
                 raise
             duration_ms = (perf_counter() - started) * 1000
             route_path = _route_path(request)
