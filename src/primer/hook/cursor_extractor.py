@@ -30,6 +30,18 @@ _CURSOR_CHANGE_TOOL_MARKERS = (
     "search_replace",
     "apply",
 )
+_CURSOR_CHANGE_ARG_KEYS = (
+    "newText",
+    "oldText",
+    "replacement",
+    "edits",
+    "changes",
+    "diff",
+    "rename",
+    "delete",
+    "create",
+    "patch",
+)
 _CURSOR_APPROVAL_KEYS = (
     "approvalPolicy",
     "permissionMode",
@@ -462,12 +474,12 @@ class CursorExtractor:
                         tool_counter[tool_name] += 1
 
                     parsed_args = _extract_toolformer_args(tool_data)
-                    model_counter.update(_extract_toolformer_models(tool_data))
+                    model_counter.update(_extract_toolformer_models(tool_data, parsed_args))
                     if _toolformer_has_approval_signal(tool_data, parsed_args):
                         approval_signal_count += 1
                     context_reference_count += _count_toolformer_context_references(parsed_args)
                     bubble_target_files = _extract_toolformer_target_files(parsed_args)
-                    if _toolformer_is_change_signal(tool_name, bubble_target_files):
+                    if _toolformer_is_change_signal(tool_name, parsed_args):
                         change_signal_count += 1
                         target_files.update(bubble_target_files)
 
@@ -754,7 +766,9 @@ def _extract_toolformer_args(tool_data: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
-def _extract_toolformer_models(tool_data: dict) -> Counter[str]:
+def _extract_toolformer_models(
+    tool_data: dict[str, Any], parsed_args: dict[str, Any] | None = None
+) -> Counter[str]:
     models: Counter[str] = Counter()
 
     for field_name in ("model", "agentModel", "subagentModel"):
@@ -762,17 +776,23 @@ def _extract_toolformer_models(tool_data: dict) -> Counter[str]:
         if isinstance(field_value, str) and field_value:
             models[field_value] += 1
 
-    for field_name in ("rawArgs", "params"):
-        field_value = tool_data.get(field_name)
-        if not isinstance(field_value, str) or '"model"' not in field_value:
-            continue
-        parsed_value = _load_json_object(field_value)
-        if parsed_value is None:
-            continue
-        for model_name in _iter_model_names(parsed_value):
-            models[model_name] += 1
+    parsed_value = parsed_args or _extract_toolformer_args(tool_data)
+    for model_name in _iter_model_names(parsed_value):
+        models[model_name] += 1
 
     return models
+
+
+def _has_change_arg_key(value: object) -> bool:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key in _CURSOR_CHANGE_ARG_KEYS:
+                return True
+            if _has_change_arg_key(child):
+                return True
+    elif isinstance(value, list):
+        return any(_has_change_arg_key(item) for item in value)
+    return False
 
 
 def _extract_cursor_permission_mode(composer: dict[str, Any]) -> str | None:
@@ -830,11 +850,11 @@ def _extract_path_like_values(value: object) -> set[str]:
     return paths
 
 
-def _toolformer_is_change_signal(tool_name: str | None, target_files: set[str]) -> bool:
+def _toolformer_is_change_signal(tool_name: str | None, parsed_args: dict[str, Any]) -> bool:
     normalized_name = (tool_name or "").lower()
     if any(marker in normalized_name for marker in _CURSOR_CHANGE_TOOL_MARKERS):
         return True
-    return bool(target_files)
+    return _has_change_arg_key(parsed_args)
 
 
 def _build_cursor_source_metadata(

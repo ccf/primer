@@ -524,6 +524,50 @@ def test_extract_native_cursor_transcript_enriches_tool_counts_model_and_branch(
     assert meta.duration_seconds == 600.0
 
 
+def test_cursor_change_signal_ignores_read_only_path_arguments(tmp_path, monkeypatch):
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+    project_path = tmp_path / "demo-project"
+    transcript_path = _setup_native_cursor_transcript(
+        tmp_path,
+        "cursor-native-read-only",
+        project_path,
+        add_workspace_mapping=True,
+    )
+    db_path = _setup_cursor_global_state(tmp_path, "cursor-native-read-only")
+
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "update cursorDiskKV set value = ? where key = ?",
+        (
+            json.dumps(
+                {
+                    "toolFormerData": {
+                        "name": "read_file_v2",
+                        "status": "completed",
+                        "rawArgs": json.dumps({"path": "src/read_only.py"}),
+                    }
+                }
+            ),
+            "bubbleId:cursor-native-read-only:tool-read",
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    meta = CursorExtractor().extract(str(transcript_path))
+
+    assert meta.source_metadata == {
+        "native_telemetry": {
+            "approval": {"signal_count": 1},
+            "context_usage": {"reference_count": 2},
+            "change_signals": {
+                "signal_count": 1,
+                "target_files": ["src/cursor_extractor.py"],
+            },
+        }
+    }
+
+
 def test_imported_cursor_jsonl_does_not_use_native_composer_state(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
     sessions_dir = tmp_path / ".primer" / "cursor" / "sessions"
