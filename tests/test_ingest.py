@@ -52,6 +52,38 @@ def test_create_engineer_persists_api_key_lookup_hash(client, admin_headers, db_
     assert stored.api_key_lookup_hash is not None
 
 
+def test_ingest_session_persists_source_metadata(client, engineer_with_key, db_session):
+    _engineer, api_key = engineer_with_key
+    session_id = str(uuid.uuid4())
+
+    response = client.post(
+        "/api/v1/ingest/session",
+        json={
+            "session_id": session_id,
+            "api_key": api_key,
+            "agent_type": "cursor",
+            "message_count": 1,
+            "source_metadata": {
+                "native_telemetry": {
+                    "approval": {"signal_count": 1},
+                    "context_usage": {"reference_count": 2},
+                    "change_signals": {"signal_count": 1, "target_files": ["src/app.py"]},
+                }
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    stored = db_session.query(SessionModel).filter(SessionModel.id == session_id).one()
+    assert stored.source_metadata == {
+        "native_telemetry": {
+            "approval": {"signal_count": 1},
+            "context_usage": {"reference_count": 2},
+            "change_signals": {"signal_count": 1, "target_files": ["src/app.py"]},
+        }
+    }
+
+
 def test_ingest_session(client, engineer_with_key):
     _eng, api_key = engineer_with_key
     session_id = str(uuid.uuid4())

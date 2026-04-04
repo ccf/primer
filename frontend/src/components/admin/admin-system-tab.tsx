@@ -69,6 +69,39 @@ function CoverageCell({
   )
 }
 
+function NativeSignalsCell({ row }: { row: AgentSourceQuality }) {
+  const items = [
+    {
+      label: "Approval",
+      parity: row.approval_signals_parity,
+      coverage: row.approval_signals_coverage_pct,
+    },
+    {
+      label: "Change",
+      parity: row.change_signals_parity,
+      coverage: row.change_signals_coverage_pct,
+    },
+    {
+      label: "Context",
+      parity: row.context_usage_parity,
+      coverage: row.context_usage_coverage_pct,
+    },
+  ]
+
+  return (
+    <div className="space-y-1">
+      {items.map((item) => (
+        <div key={item.label} className="flex items-center justify-between gap-2 text-xs">
+          <span className="text-muted-foreground">{item.label}</span>
+          <Badge variant={parityVariant(item.parity)}>
+            {item.parity === "unavailable" ? "N/A" : formatCoverage(item.coverage)}
+          </Badge>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function SourceQualityTable({ rows }: { rows: AgentSourceQuality[] }) {
   if (rows.length === 0) {
     return <p className="text-sm text-muted-foreground">No source-quality data yet.</p>
@@ -94,6 +127,7 @@ function SourceQualityTable({ rows }: { rows: AgentSourceQuality[] }) {
                 <th className="pb-3 pr-4 font-medium">Tool Calls</th>
                 <th className="pb-3 pr-4 font-medium">Model Usage</th>
                 <th className="pb-3 pr-4 font-medium">Facets</th>
+                <th className="pb-3 pr-4 font-medium">Native Signals</th>
                 <th className="pb-3 font-medium">Native Discovery</th>
               </tr>
             </thead>
@@ -124,6 +158,9 @@ function SourceQualityTable({ rows }: { rows: AgentSourceQuality[] }) {
                   </td>
                   <td className="py-3 pr-4">
                     <CoverageCell parity={row.facet_parity} coverage={row.facet_coverage_pct} />
+                  </td>
+                  <td className="py-3 pr-4">
+                    <NativeSignalsCell row={row} />
                   </td>
                   <td className="py-3">
                     <CoverageCell parity={row.native_discovery_parity} />

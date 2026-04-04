@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from itertools import chain
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urlparse
 
 from primer.hook.extractor import SessionMetadata
@@ -21,6 +21,44 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 _GIT_REPO_PATTERN = re.compile(r"^Git repo:\s+(.+)$", re.MULTILINE)
+_CURSOR_CHANGE_TOOL_MARKERS = (
+    "edit",
+    "write",
+    "create",
+    "delete",
+    "rename",
+    "search_replace",
+    "apply",
+)
+_CURSOR_APPROVAL_KEYS = (
+    "approvalPolicy",
+    "permissionMode",
+    "requiresApproval",
+    "needsApproval",
+    "approvalState",
+    "approvalStatus",
+)
+_CURSOR_CONTEXT_KEYS = (
+    "selectedFileIds",
+    "selectedFiles",
+    "openFiles",
+    "recentFiles",
+    "contextFiles",
+    "workspaceContext",
+    "codebaseContext",
+    "selection",
+    "selections",
+    "quotedContext",
+    "attachedFiles",
+)
+_CURSOR_TARGET_FILE_KEYS = (
+    "path",
+    "filePath",
+    "targetFile",
+    "targetPath",
+    "uri",
+    "relative_workspace_path",
+)
 
 
 @dataclass
@@ -29,7 +67,9 @@ class NativeCursorComposerState:
     ended_at: datetime | None = None
     git_branch: str | None = None
     primary_model: str | None = None
+    permission_mode: str | None = None
     summary: str | None = None
+    source_metadata: dict[str, Any] | None = None
     tool_counts: dict[str, int] = field(default_factory=dict)
 
 
@@ -195,6 +235,8 @@ class CursorExtractor:
         meta.primary_model = bundle.get("primary_model", "") or ""
         meta.summary = bundle.get("summary", "") or ""
         meta.first_prompt = bundle.get("first_prompt", "") or ""
+        if isinstance(bundle.get("source_metadata"), dict):
+            meta.source_metadata = bundle.get("source_metadata")
         meta.started_at = _parse_timestamp(bundle.get("started_at"))
         meta.ended_at = _parse_timestamp(bundle.get("ended_at"))
         if meta.started_at and meta.ended_at:
@@ -302,7 +344,9 @@ class CursorExtractor:
             if composer_state is not None:
                 meta.git_branch = composer_state.git_branch or meta.git_branch
                 meta.primary_model = composer_state.primary_model or meta.primary_model
+                meta.permission_mode = composer_state.permission_mode or meta.permission_mode
                 meta.summary = meta.summary or composer_state.summary or ""
+                meta.source_metadata = composer_state.source_metadata or meta.source_metadata
                 if composer_state.tool_counts:
                     meta.tool_counts = composer_state.tool_counts
                     meta.tool_call_count = sum(composer_state.tool_counts.values())
@@ -388,6 +432,10 @@ class CursorExtractor:
             }
             tool_counter: Counter[str] = Counter()
             model_counter: Counter[str] = Counter()
+            approval_signal_count = 0
+            context_reference_count = 0
+            change_signal_count = 0
+            target_files: set[str] = set()
 
             if header_ids:
                 bubble_prefix = f"bubbleId:{session_id}:"
@@ -413,7 +461,15 @@ class CursorExtractor:
                     if isinstance(tool_name, str) and tool_name:
                         tool_counter[tool_name] += 1
 
+                    parsed_args = _extract_toolformer_args(tool_data)
                     model_counter.update(_extract_toolformer_models(tool_data))
+                    if _toolformer_has_approval_signal(tool_data, parsed_args):
+                        approval_signal_count += 1
+                    context_reference_count += _count_toolformer_context_references(parsed_args)
+                    bubble_target_files = _extract_toolformer_target_files(parsed_args)
+                    if _toolformer_is_change_signal(tool_name, bubble_target_files):
+                        change_signal_count += 1
+                        target_files.update(bubble_target_files)
 
             active_branch = composer.get("activeBranch")
             git_branch = ""
@@ -425,6 +481,7 @@ class CursorExtractor:
                 committed_to_branch = composer.get("committedToBranch")
                 if isinstance(committed_to_branch, str):
                     git_branch = committed_to_branch
+            permission_mode = _extract_cursor_permission_mode(composer)
 
             summary = ""
             for field_name in ("name", "subtitle"):
@@ -434,13 +491,21 @@ class CursorExtractor:
                     break
 
             primary_model = model_counter.most_common(1)[0][0] if model_counter else None
+            source_metadata = _build_cursor_source_metadata(
+                approval_signal_count=approval_signal_count,
+                context_reference_count=context_reference_count,
+                change_signal_count=change_signal_count,
+                target_files=target_files,
+            )
 
             return NativeCursorComposerState(
                 started_at=_parse_cursor_unix_ms(composer.get("createdAt")),
                 ended_at=_parse_cursor_unix_ms(composer.get("lastUpdatedAt")),
                 git_branch=git_branch or None,
                 primary_model=primary_model,
+                permission_mode=permission_mode,
                 summary=summary or None,
+                source_metadata=source_metadata,
                 tool_counts=dict(tool_counter),
             )
         except (json.JSONDecodeError, sqlite3.Error):
@@ -677,6 +742,18 @@ def _parse_cursor_unix_ms(value: object) -> datetime | None:
     return datetime.fromtimestamp(float(value) / 1000, UTC)
 
 
+def _extract_toolformer_args(tool_data: dict[str, Any]) -> dict[str, Any]:
+    for field_name in ("rawArgs", "params"):
+        field_value = tool_data.get(field_name)
+        if isinstance(field_value, dict):
+            return field_value
+        if isinstance(field_value, str):
+            parsed = _load_json_object(field_value)
+            if parsed is not None:
+                return parsed
+    return {}
+
+
 def _extract_toolformer_models(tool_data: dict) -> Counter[str]:
     models: Counter[str] = Counter()
 
@@ -696,6 +773,90 @@ def _extract_toolformer_models(tool_data: dict) -> Counter[str]:
             models[model_name] += 1
 
     return models
+
+
+def _extract_cursor_permission_mode(composer: dict[str, Any]) -> str | None:
+    for field_name in ("permissionMode", "approvalPolicy", "agentMode"):
+        field_value = composer.get(field_name)
+        if isinstance(field_value, str) and field_value:
+            return field_value
+    return None
+
+
+def _toolformer_has_approval_signal(tool_data: dict[str, Any], parsed_args: dict[str, Any]) -> bool:
+    if any(key in tool_data for key in _CURSOR_APPROVAL_KEYS):
+        return True
+    return any(key in parsed_args for key in _CURSOR_APPROVAL_KEYS)
+
+
+def _count_toolformer_context_references(parsed_args: dict[str, Any]) -> int:
+    return sum(_count_context_value(parsed_args.get(key)) for key in _CURSOR_CONTEXT_KEYS)
+
+
+def _count_context_value(value: object) -> int:
+    if value is None:
+        return 0
+    if isinstance(value, str):
+        return 1 if value else 0
+    if isinstance(value, list):
+        return sum(_count_context_value(item) for item in value)
+    if isinstance(value, dict):
+        nested = sum(_count_context_value(child) for child in value.values())
+        return max(nested, 1)
+    return 1
+
+
+def _extract_toolformer_target_files(parsed_args: dict[str, Any]) -> set[str]:
+    target_files: set[str] = set()
+    for key in _CURSOR_TARGET_FILE_KEYS:
+        target_files.update(_extract_path_like_values(parsed_args.get(key)))
+    return target_files
+
+
+def _extract_path_like_values(value: object) -> set[str]:
+    paths: set[str] = set()
+    if isinstance(value, str):
+        if "/" in value or value.endswith((".py", ".ts", ".tsx", ".js", ".jsx", ".md", ".json")):
+            paths.add(value)
+        return paths
+    if isinstance(value, list):
+        for item in value:
+            paths.update(_extract_path_like_values(item))
+        return paths
+    if isinstance(value, dict):
+        for child in value.values():
+            paths.update(_extract_path_like_values(child))
+        return paths
+    return paths
+
+
+def _toolformer_is_change_signal(tool_name: str | None, target_files: set[str]) -> bool:
+    normalized_name = (tool_name or "").lower()
+    if any(marker in normalized_name for marker in _CURSOR_CHANGE_TOOL_MARKERS):
+        return True
+    return bool(target_files)
+
+
+def _build_cursor_source_metadata(
+    *,
+    approval_signal_count: int,
+    context_reference_count: int,
+    change_signal_count: int,
+    target_files: set[str],
+) -> dict[str, Any] | None:
+    native_telemetry: dict[str, Any] = {}
+    if approval_signal_count > 0:
+        native_telemetry["approval"] = {"signal_count": approval_signal_count}
+    if context_reference_count > 0:
+        native_telemetry["context_usage"] = {"reference_count": context_reference_count}
+    if change_signal_count > 0 or target_files:
+        native_telemetry["change_signals"] = {
+            "signal_count": change_signal_count,
+            "target_files": sorted(target_files)[:20],
+        }
+    if not native_telemetry:
+        return None
+    return {"native_telemetry": native_telemetry}
 
 
 def _iter_model_names(value: object):

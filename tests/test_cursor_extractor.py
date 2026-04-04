@@ -90,6 +90,7 @@ def _setup_cursor_global_state(
                 "toolFormerData": {
                     "name": "run_terminal_command_v2",
                     "status": "error",
+                    "requiresApproval": True,
                 }
             },
         ),
@@ -103,8 +104,19 @@ def _setup_cursor_global_state(
                         {
                             "model": "gpt-5.4-high",
                             "prompt": "Investigate Cursor telemetry sources",
+                            "selectedFileIds": ["src/cursor.py", "tests/test_cursor.py"],
                         }
                     ),
+                }
+            },
+        ),
+        (
+            f"bubbleId:{session_id}:tool-edit-complete",
+            {
+                "toolFormerData": {
+                    "name": "edit_file_v2",
+                    "status": "completed",
+                    "rawArgs": json.dumps({"path": "src/cursor_extractor.py"}),
                 }
             },
         ),
@@ -122,6 +134,7 @@ def _setup_cursor_global_state(
         "createdAt": created_at,
         "lastUpdatedAt": updated_at,
         "activeBranch": {"branchName": branch_name},
+        "approvalPolicy": "manual",
         "name": "Cursor composer summary",
         "subtitle": "Fallback summary",
         "fullConversationHeadersOnly": [
@@ -486,12 +499,24 @@ def test_extract_native_cursor_transcript_enriches_tool_counts_model_and_branch(
     assert meta.summary == "I'll inspect the local transcript format."
     assert meta.git_branch == "feature/cursor-telemetry"
     assert meta.primary_model == "gpt-5.4-high"
+    assert meta.permission_mode == "manual"
     assert meta.tool_counts == {
         "read_file_v2": 1,
         "run_terminal_command_v2": 1,
         "task_v2": 1,
+        "edit_file_v2": 1,
     }
-    assert meta.tool_call_count == 3
+    assert meta.tool_call_count == 4
+    assert meta.source_metadata == {
+        "native_telemetry": {
+            "approval": {"signal_count": 1},
+            "context_usage": {"reference_count": 2},
+            "change_signals": {
+                "signal_count": 1,
+                "target_files": ["src/cursor_extractor.py"],
+            },
+        }
+    }
     assert meta.started_at is not None
     assert meta.ended_at is not None
     assert meta.started_at.timestamp() == 1_741_431_600
