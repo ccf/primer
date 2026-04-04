@@ -51,6 +51,7 @@ from primer.common.tool_classification import (
     compute_leverage_score,
 )
 from primer.server.services.agent_team_service import classify_agent_team_from_edges
+from primer.server.services.analytics_cache_service import get_cached_json, set_cached_json
 from primer.server.services.analytics_service import base_session_query
 from primer.server.services.delegation_graph_service import extract_session_delegation_edges
 from primer.server.services.effectiveness_service import build_effectiveness_score
@@ -66,6 +67,16 @@ def get_maturity_analytics(
     end_date: datetime | None = None,
 ) -> MaturityAnalyticsResponse:
     """Compute full maturity analytics response."""
+    cache_params = {
+        "team_id": team_id,
+        "engineer_id": engineer_id,
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+    cached = get_cached_json("maturity_analytics", cache_params)
+    if cached is not None:
+        return MaturityAnalyticsResponse.model_validate(cached)
+
     sessions_q = base_session_query(db, team_id, engineer_id, start_date, end_date)
     session_id_subq = sessions_q.with_entities(SessionModel.id).subquery()
     sessions_analyzed = db.query(func.count()).select_from(session_id_subq).scalar() or 0
@@ -1306,7 +1317,7 @@ def get_maturity_analytics(
         sum(all_model_diversities) / len(all_model_diversities) if all_model_diversities else 0.0
     )
 
-    return MaturityAnalyticsResponse(
+    result = MaturityAnalyticsResponse(
         tool_categories=tool_categories,
         engineer_profiles=engineer_profiles,
         daily_leverage=daily_leverage,
@@ -1330,3 +1341,5 @@ def get_maturity_analytics(
         explicit_customization_adoption_rate=round(explicit_customization_adoption_rate, 3),
         model_diversity_avg=round(model_div_avg, 3),
     )
+    set_cached_json("maturity_analytics", cache_params, result.model_dump(mode="json"))
+    return result
