@@ -50,6 +50,7 @@ from primer.server.services.effectiveness_service import (
     build_effectiveness_score,
     get_peer_cost_per_success_benchmark,
 )
+from primer.server.services.observability_service import start_span
 from primer.server.services.quality_service import get_quality_metrics
 from primer.server.services.workflow_patterns import (
     infer_workflow_steps,
@@ -170,150 +171,151 @@ def get_project_workspace(
         "start_date": start_date,
         "end_date": end_date,
     }
-    cached = get_cached_json("project_workspace", cache_params)
-    if cached is not None:
-        return ProjectWorkspaceResponse.model_validate(cached)
+    with start_span("analytics.project_workspace", {"project.name": project_name}):
+        cached = get_cached_json("project_workspace", cache_params)
+        if cached is not None:
+            return ProjectWorkspaceResponse.model_validate(cached)
 
-    session_q = base_session_query(
-        db,
-        team_id=team_id,
-        engineer_id=engineer_id,
-        start_date=start_date,
-        end_date=end_date,
-        project_name=project_name,
-    )
-    total_sessions = session_q.count()
-    if total_sessions == 0:
-        return None
-
-    overview = get_overview(
-        db,
-        team_id=team_id,
-        engineer_id=engineer_id,
-        start_date=start_date,
-        end_date=end_date,
-        project_name=project_name,
-    )
-    productivity = get_productivity_metrics(
-        db,
-        team_id=team_id,
-        engineer_id=engineer_id,
-        start_date=start_date,
-        end_date=end_date,
-        project_name=project_name,
-    )
-    cost = get_cost_analytics(
-        db,
-        team_id=team_id,
-        engineer_id=engineer_id,
-        start_date=start_date,
-        end_date=end_date,
-        project_name=project_name,
-    )
-    quality = get_quality_metrics(
-        db,
-        team_id=team_id,
-        engineer_id=engineer_id,
-        start_date=start_date,
-        end_date=end_date,
-        project_name=project_name,
-    )
-    bottlenecks = get_bottleneck_analytics(
-        db,
-        team_id=team_id,
-        engineer_id=engineer_id,
-        start_date=start_date,
-        end_date=end_date,
-        project_name=project_name,
-    )
-
-    enablement = _build_enablement_summary(db, session_q)
-    agent_mix = _build_project_agent_mix(db, session_q)
-    repositories = _build_repository_summary(db, session_q)
-    repository_context = _build_repository_context_summary(repositories)
-    workflow_summary = _build_workflow_summary(
-        db,
-        session_q,
-        bottlenecks.friction_impacts,
-    )
-    friction = next(
-        (item for item in bottlenecks.project_friction if item.project_name == project_name),
-        None,
-    )
-    enablement = enablement.model_copy(
-        update={
-            "recommendations": _build_project_enablement_recommendations(
-                enablement,
-                repositories,
-                workflow_summary,
-                friction,
-            ),
-            "playbook_templates": _build_project_playbook_templates(
-                enablement,
-                repositories,
-                workflow_summary,
-            ),
-        }
-    )
-    project = ProjectStats(
-        project_name=project_name,
-        total_sessions=overview.total_sessions,
-        unique_engineers=overview.total_engineers,
-        total_tokens=overview.total_input_tokens + overview.total_output_tokens,
-        estimated_cost=cost.total_estimated_cost,
-        outcome_distribution=overview.outcome_counts,
-        top_tools=enablement.top_tools,
-    )
-    effectiveness_score = build_effectiveness_score(
-        success_rate=overview.success_rate,
-        cost_per_successful_outcome=productivity.cost_per_successful_outcome,
-        benchmark_cost_per_successful_outcome=get_peer_cost_per_success_benchmark(
+        session_q = base_session_query(
             db,
-            group_by="project_name",
-            target_value=project_name,
             team_id=team_id,
             engineer_id=engineer_id,
             start_date=start_date,
             end_date=end_date,
-        ),
-        pr_merge_rate=quality.overview.pr_merge_rate,
-        findings_fix_rate=(
-            quality.findings_overview.fix_rate if quality.findings_overview else None
-        ),
-        total_sessions=overview.total_sessions,
-        sessions_with_commits=quality.overview.sessions_with_commits,
-    )
-    scorecard = ProjectScorecard(
-        adoption_rate=productivity.adoption_rate,
-        effectiveness_rate=overview.success_rate,
-        effectiveness_score=effectiveness_score,
-        quality_rate=(
-            quality.findings_overview.fix_rate
-            if quality.findings_overview and quality.findings_overview.fix_rate is not None
-            else quality.overview.pr_merge_rate
-        ),
-        avg_cost_per_session=productivity.avg_cost_per_session,
-        cost_per_successful_outcome=productivity.cost_per_successful_outcome,
-        measurement_confidence=_compute_measurement_confidence(db, session_q),
-    )
+            project_name=project_name,
+        )
+        total_sessions = session_q.count()
+        if total_sessions == 0:
+            return None
 
-    response = ProjectWorkspaceResponse(
-        project=project,
-        scorecard=scorecard,
-        overview=overview,
-        productivity=productivity,
-        cost=cost,
-        quality=quality,
-        friction=friction,
-        friction_impacts=bottlenecks.friction_impacts[:5],
-        repositories=repositories,
-        enablement=enablement,
-        agent_mix=agent_mix,
-        repository_context=repository_context,
-        workflow_summary=workflow_summary,
-    )
-    set_cached_json("project_workspace", cache_params, response.model_dump(mode="json"))
-    return response
+        overview = get_overview(
+            db,
+            team_id=team_id,
+            engineer_id=engineer_id,
+            start_date=start_date,
+            end_date=end_date,
+            project_name=project_name,
+        )
+        productivity = get_productivity_metrics(
+            db,
+            team_id=team_id,
+            engineer_id=engineer_id,
+            start_date=start_date,
+            end_date=end_date,
+            project_name=project_name,
+        )
+        cost = get_cost_analytics(
+            db,
+            team_id=team_id,
+            engineer_id=engineer_id,
+            start_date=start_date,
+            end_date=end_date,
+            project_name=project_name,
+        )
+        quality = get_quality_metrics(
+            db,
+            team_id=team_id,
+            engineer_id=engineer_id,
+            start_date=start_date,
+            end_date=end_date,
+            project_name=project_name,
+        )
+        bottlenecks = get_bottleneck_analytics(
+            db,
+            team_id=team_id,
+            engineer_id=engineer_id,
+            start_date=start_date,
+            end_date=end_date,
+            project_name=project_name,
+        )
+
+        enablement = _build_enablement_summary(db, session_q)
+        agent_mix = _build_project_agent_mix(db, session_q)
+        repositories = _build_repository_summary(db, session_q)
+        repository_context = _build_repository_context_summary(repositories)
+        workflow_summary = _build_workflow_summary(
+            db,
+            session_q,
+            bottlenecks.friction_impacts,
+        )
+        friction = next(
+            (item for item in bottlenecks.project_friction if item.project_name == project_name),
+            None,
+        )
+        enablement = enablement.model_copy(
+            update={
+                "recommendations": _build_project_enablement_recommendations(
+                    enablement,
+                    repositories,
+                    workflow_summary,
+                    friction,
+                ),
+                "playbook_templates": _build_project_playbook_templates(
+                    enablement,
+                    repositories,
+                    workflow_summary,
+                ),
+            }
+        )
+        project = ProjectStats(
+            project_name=project_name,
+            total_sessions=overview.total_sessions,
+            unique_engineers=overview.total_engineers,
+            total_tokens=overview.total_input_tokens + overview.total_output_tokens,
+            estimated_cost=cost.total_estimated_cost,
+            outcome_distribution=overview.outcome_counts,
+            top_tools=enablement.top_tools,
+        )
+        effectiveness_score = build_effectiveness_score(
+            success_rate=overview.success_rate,
+            cost_per_successful_outcome=productivity.cost_per_successful_outcome,
+            benchmark_cost_per_successful_outcome=get_peer_cost_per_success_benchmark(
+                db,
+                group_by="project_name",
+                target_value=project_name,
+                team_id=team_id,
+                engineer_id=engineer_id,
+                start_date=start_date,
+                end_date=end_date,
+            ),
+            pr_merge_rate=quality.overview.pr_merge_rate,
+            findings_fix_rate=(
+                quality.findings_overview.fix_rate if quality.findings_overview else None
+            ),
+            total_sessions=overview.total_sessions,
+            sessions_with_commits=quality.overview.sessions_with_commits,
+        )
+        scorecard = ProjectScorecard(
+            adoption_rate=productivity.adoption_rate,
+            effectiveness_rate=overview.success_rate,
+            effectiveness_score=effectiveness_score,
+            quality_rate=(
+                quality.findings_overview.fix_rate
+                if quality.findings_overview and quality.findings_overview.fix_rate is not None
+                else quality.overview.pr_merge_rate
+            ),
+            avg_cost_per_session=productivity.avg_cost_per_session,
+            cost_per_successful_outcome=productivity.cost_per_successful_outcome,
+            measurement_confidence=_compute_measurement_confidence(db, session_q),
+        )
+
+        response = ProjectWorkspaceResponse(
+            project=project,
+            scorecard=scorecard,
+            overview=overview,
+            productivity=productivity,
+            cost=cost,
+            quality=quality,
+            friction=friction,
+            friction_impacts=bottlenecks.friction_impacts[:5],
+            repositories=repositories,
+            enablement=enablement,
+            agent_mix=agent_mix,
+            repository_context=repository_context,
+            workflow_summary=workflow_summary,
+        )
+        set_cached_json("project_workspace", cache_params, response.model_dump(mode="json"))
+        return response
 
 
 def get_cross_project_comparison(

@@ -8,6 +8,11 @@ from sqlalchemy import and_, func, or_
 from primer.common.config import settings
 from primer.common.database import SessionLocal
 from primer.common.models import BackgroundJob
+from primer.server.services.observability_service import (
+    record_counter,
+    record_histogram,
+    start_span,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -167,19 +172,46 @@ def run_background_job_cycle(
 
         processed += 1
         job_id, job_type, payload, attempts, max_attempts = claimed
-        try:
-            _run_job(db, job_type, payload or {})
-            _mark_job_succeeded(db, job_id)
-            succeeded += 1
-        except Exception as exc:
-            _mark_job_failed(
-                db,
-                job_id,
-                str(exc),
-                attempts=attempts,
-                max_attempts=max_attempts,
-            )
-            failed += 1
+        job_started = _utcnow_naive()
+        with start_span(
+            "background_job.execute",
+            {
+                "job.type": job_type,
+                "job.id": job_id,
+                "job.attempt": attempts,
+            },
+        ) as span:
+            try:
+                _run_job(db, job_type, payload or {})
+                _mark_job_succeeded(db, job_id)
+                succeeded += 1
+                record_counter(
+                    "primer.background_jobs.executions",
+                    1,
+                    {"job_type": job_type, "result": "succeeded"},
+                )
+            except Exception as exc:
+                if span is not None:
+                    span.set_attribute("error.type", exc.__class__.__name__)
+                _mark_job_failed(
+                    db,
+                    job_id,
+                    str(exc),
+                    attempts=attempts,
+                    max_attempts=max_attempts,
+                )
+                failed += 1
+                record_counter(
+                    "primer.background_jobs.executions",
+                    1,
+                    {"job_type": job_type, "result": "failed"},
+                )
+            finally:
+                record_histogram(
+                    "primer.background_jobs.execution.duration_ms",
+                    (_utcnow_naive() - job_started).total_seconds() * 1000,
+                    {"job_type": job_type},
+                )
 
     return {"processed": processed, "succeeded": succeeded, "failed": failed}
 

@@ -18,6 +18,7 @@ from primer.server.services.analytics_service import (
 )
 from primer.server.services.engineer_profile_service import get_engineer_profile
 from primer.server.services.maturity_service import get_maturity_analytics
+from primer.server.services.observability_service import start_span
 from primer.server.services.project_workspace_service import get_project_workspace
 from primer.server.services.quality_service import get_quality_metrics
 
@@ -40,50 +41,55 @@ def get_compare_response(
         "start_date": start_date,
         "end_date": end_date,
     }
-    cached = get_cached_json("compare_response", cache_params)
-    if cached is not None:
-        return CompareResponse.model_validate(cached)
+    with start_span("analytics.compare", {"compare.mode": mode}):
+        cached = get_cached_json("compare_response", cache_params)
+        if cached is not None:
+            return CompareResponse.model_validate(cached)
 
-    if mode == "team":
-        if not left_key or not right_key:
-            raise ValueError("team compare requires left_key and right_key")
-        left = _build_team_snapshot(db, left_key, start_date=start_date, end_date=end_date)
-        right = _build_team_snapshot(db, right_key, start_date=start_date, end_date=end_date)
-    elif mode == "engineer":
-        if not left_key or not right_key:
-            raise ValueError("engineer compare requires left_key and right_key")
-        left = _build_engineer_snapshot(db, left_key, start_date=start_date, end_date=end_date)
-        right = _build_engineer_snapshot(db, right_key, start_date=start_date, end_date=end_date)
-    elif mode == "project":
-        if not left_key or not right_key:
-            raise ValueError("project compare requires left_key and right_key")
-        left = _build_project_snapshot(
-            db,
-            left_key,
-            team_id=team_id,
-            start_date=start_date,
-            end_date=end_date,
-        )
-        right = _build_project_snapshot(
-            db,
-            right_key,
-            team_id=team_id,
-            start_date=start_date,
-            end_date=end_date,
-        )
-    elif mode == "period":
-        left, right = _build_period_snapshots(
-            db,
-            team_id=team_id,
-            start_date=start_date,
-            end_date=end_date,
-        )
-    else:
-        raise ValueError(f"Unsupported compare mode: {mode}")
+        if mode == "team":
+            if not left_key or not right_key:
+                raise ValueError("team compare requires left_key and right_key")
+            left = _build_team_snapshot(db, left_key, start_date=start_date, end_date=end_date)
+            right = _build_team_snapshot(db, right_key, start_date=start_date, end_date=end_date)
+        elif mode == "engineer":
+            if not left_key or not right_key:
+                raise ValueError("engineer compare requires left_key and right_key")
+            left = _build_engineer_snapshot(db, left_key, start_date=start_date, end_date=end_date)
+            right = _build_engineer_snapshot(
+                db, right_key, start_date=start_date, end_date=end_date
+            )
+        elif mode == "project":
+            if not left_key or not right_key:
+                raise ValueError("project compare requires left_key and right_key")
+            left = _build_project_snapshot(
+                db,
+                left_key,
+                team_id=team_id,
+                start_date=start_date,
+                end_date=end_date,
+            )
+            right = _build_project_snapshot(
+                db,
+                right_key,
+                team_id=team_id,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        elif mode == "period":
+            left, right = _build_period_snapshots(
+                db,
+                team_id=team_id,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        else:
+            raise ValueError(f"Unsupported compare mode: {mode}")
 
-    response = CompareResponse(mode=mode, left=left, right=right, delta=_build_delta(left, right))
-    set_cached_json("compare_response", cache_params, response.model_dump(mode="json"))
-    return response
+        response = CompareResponse(
+            mode=mode, left=left, right=right, delta=_build_delta(left, right)
+        )
+        set_cached_json("compare_response", cache_params, response.model_dump(mode="json"))
+        return response
 
 
 def _build_team_snapshot(

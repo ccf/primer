@@ -38,6 +38,7 @@ from primer.server.services.insights_service import (
     get_learning_paths,
     get_skill_inventory,
 )
+from primer.server.services.observability_service import start_span
 from primer.server.services.workflow_playbook_service import get_workflow_playbooks
 
 logger = logging.getLogger(__name__)
@@ -867,215 +868,219 @@ def get_engineer_profile(
         "start_date": start_date,
         "end_date": end_date,
     }
-    cached = get_cached_json("engineer_profile", cache_params)
-    if cached is not None:
-        return EngineerProfileResponse.model_validate(cached)
+    with start_span("analytics.engineer_profile", {"engineer.id": engineer_id}):
+        cached = get_cached_json("engineer_profile", cache_params)
+        if cached is not None:
+            return EngineerProfileResponse.model_validate(cached)
 
-    engineer = db.query(Engineer).filter(Engineer.id == engineer_id).first()
-    if not engineer:
-        return None
+        engineer = db.query(Engineer).filter(Engineer.id == engineer_id).first()
+        if not engineer:
+            return None
 
-    team_name = None
-    if engineer.team_id:
-        from primer.common.models import Team
+        team_name = None
+        if engineer.team_id:
+            from primer.common.models import Team
 
-        team = db.query(Team).filter(Team.id == engineer.team_id).first()
-        team_name = team.name if team else None
+            team = db.query(Team).filter(Team.id == engineer.team_id).first()
+            team_name = team.name if team else None
 
-    # Overview stats scoped to this engineer
-    overview = _build_overview(
-        db, engineer_id=engineer_id, start_date=start_date, end_date=end_date
-    )
-
-    # Weekly trajectory
-    trajectory = _get_weekly_trajectory(db, engineer_id, start_date, end_date)
-
-    # Friction report
-    friction = get_friction_report(
-        db, engineer_id=engineer_id, start_date=start_date, end_date=end_date
-    )
-
-    # Config suggestions
-    config = get_config_optimization(
-        db, engineer_id=engineer_id, start_date=start_date, end_date=end_date
-    )
-
-    # Skill inventory
-    skills = get_skill_inventory(
-        db, engineer_id=engineer_id, start_date=start_date, end_date=end_date
-    )
-
-    # Learning paths — use team scope so adoption baselines are team-wide
-    learning = get_learning_paths(
-        db, team_id=engineer.team_id, start_date=start_date, end_date=end_date
-    )
-    # Extract this engineer's learning path
-    eng_paths = [p for p in learning.engineer_paths if p.engineer_id == engineer_id]
-
-    # Quality data from PR/commit tracking
-    quality: dict = {}
-    quality_metrics = None
-    try:
-        from primer.server.services.quality_service import get_quality_metrics
-
-        quality_metrics = get_quality_metrics(
+        # Overview stats scoped to this engineer
+        overview = _build_overview(
             db, engineer_id=engineer_id, start_date=start_date, end_date=end_date
         )
-        ov = quality_metrics.overview
-        if ov.total_commits > 0 or ov.total_prs > 0:
-            merge_rate = f"{ov.pr_merge_rate * 100:.0f}%" if ov.pr_merge_rate is not None else None
-            merge_time = (
-                f"{ov.avg_time_to_merge_hours:.1f}h"
-                if ov.avg_time_to_merge_hours is not None
-                else None
+
+        # Weekly trajectory
+        trajectory = _get_weekly_trajectory(db, engineer_id, start_date, end_date)
+
+        # Friction report
+        friction = get_friction_report(
+            db, engineer_id=engineer_id, start_date=start_date, end_date=end_date
+        )
+
+        # Config suggestions
+        config = get_config_optimization(
+            db, engineer_id=engineer_id, start_date=start_date, end_date=end_date
+        )
+
+        # Skill inventory
+        skills = get_skill_inventory(
+            db, engineer_id=engineer_id, start_date=start_date, end_date=end_date
+        )
+
+        # Learning paths — use team scope so adoption baselines are team-wide
+        learning = get_learning_paths(
+            db, team_id=engineer.team_id, start_date=start_date, end_date=end_date
+        )
+        # Extract this engineer's learning path
+        eng_paths = [p for p in learning.engineer_paths if p.engineer_id == engineer_id]
+
+        # Quality data from PR/commit tracking
+        quality: dict = {}
+        quality_metrics = None
+        try:
+            from primer.server.services.quality_service import get_quality_metrics
+
+            quality_metrics = get_quality_metrics(
+                db, engineer_id=engineer_id, start_date=start_date, end_date=end_date
             )
-            quality = {
-                "total_commits": ov.total_commits,
-                "lines_added": f"+{ov.total_lines_added:,}",
-                "lines_deleted": f"-{ov.total_lines_deleted:,}",
-                "pull_requests": ov.total_prs,
-                "merge_rate": merge_rate,
-                "avg_time_to_merge": merge_time,
-            }
-            if quality_metrics.findings_overview:
+            ov = quality_metrics.overview
+            if ov.total_commits > 0 or ov.total_prs > 0:
+                merge_rate = (
+                    f"{ov.pr_merge_rate * 100:.0f}%" if ov.pr_merge_rate is not None else None
+                )
+                merge_time = (
+                    f"{ov.avg_time_to_merge_hours:.1f}h"
+                    if ov.avg_time_to_merge_hours is not None
+                    else None
+                )
+                quality = {
+                    "total_commits": ov.total_commits,
+                    "lines_added": f"+{ov.total_lines_added:,}",
+                    "lines_deleted": f"-{ov.total_lines_deleted:,}",
+                    "pull_requests": ov.total_prs,
+                    "merge_rate": merge_rate,
+                    "avg_time_to_merge": merge_time,
+                }
+                if quality_metrics.findings_overview:
+                    quality["findings_overview"] = quality_metrics.findings_overview.model_dump()
+            elif quality_metrics.github_connected:
+                quality = {"github_connected": True, "no_data_yet": True}
+            if quality_metrics.findings_overview and "findings_overview" not in quality:
                 quality["findings_overview"] = quality_metrics.findings_overview.model_dump()
-        elif quality_metrics.github_connected:
-            quality = {"github_connected": True, "no_data_yet": True}
-        if quality_metrics.findings_overview and "findings_overview" not in quality:
-            quality["findings_overview"] = quality_metrics.findings_overview.model_dump()
-    except Exception:
-        logger.exception("Failed to compute quality data for engineer %s", engineer_id)
-        quality = {}
 
-    productivity = get_productivity_metrics(
-        db, engineer_id=engineer_id, start_date=start_date, end_date=end_date
-    )
+        except Exception:
+            logger.exception("Failed to compute quality data for engineer %s", engineer_id)
+            quality = {}
 
-    # Tool rankings
-    tool_rankings = get_tool_rankings(
-        db, engineer_id=engineer_id, limit=10, start_date=start_date, end_date=end_date
-    )
-
-    workflow_playbooks = get_workflow_playbooks(
-        db,
-        engineer_id,
-        team_id=engineer.team_id,
-        start_date=start_date,
-        end_date=end_date,
-    )
-    top_workflows = _get_top_workflows(
-        db,
-        engineer_id,
-        start_date=start_date,
-        end_date=end_date,
-    )
-
-    # Distinct project names
-    project_rows = (
-        db.query(SessionModel.project_name)
-        .filter(
-            SessionModel.engineer_id == engineer_id,
-            SessionModel.project_name.isnot(None),
-        )
-        .distinct()
-        .all()
-    )
-    projects = [r[0] for r in project_rows if r[0]]
-    tool_recommendations = _build_tool_recommendations(
-        db,
-        engineer_id,
-        eng_paths,
-        start_date=start_date,
-        end_date=end_date,
-    )
-    model_recommendations = _build_model_recommendations(
-        db,
-        engineer_id,
-        engineer.team_id,
-        start_date=start_date,
-        end_date=end_date,
-    )
-
-    # Leverage score from maturity analytics
-    leverage_score: float | None = None
-    try:
-        from primer.server.services.maturity_service import get_maturity_analytics
-
-        maturity = get_maturity_analytics(
+        productivity = get_productivity_metrics(
             db, engineer_id=engineer_id, start_date=start_date, end_date=end_date
         )
-        for ep in maturity.engineer_profiles:
-            if ep.engineer_id == engineer_id:
-                leverage_score = ep.leverage_score
-                break
-    except Exception:
-        leverage_score = None
 
-    effectiveness = build_effectiveness_score(
-        success_rate=overview.success_rate,
-        cost_per_successful_outcome=productivity.cost_per_successful_outcome,
-        benchmark_cost_per_successful_outcome=get_peer_cost_per_success_benchmark(
+        # Tool rankings
+        tool_rankings = get_tool_rankings(
+            db, engineer_id=engineer_id, limit=10, start_date=start_date, end_date=end_date
+        )
+
+        workflow_playbooks = get_workflow_playbooks(
             db,
-            group_by="engineer_id",
-            target_value=engineer_id,
+            engineer_id,
             team_id=engineer.team_id,
             start_date=start_date,
             end_date=end_date,
-        ),
-        pr_merge_rate=quality_metrics.overview.pr_merge_rate if quality_metrics else None,
-        findings_fix_rate=(
-            quality_metrics.findings_overview.fix_rate
-            if quality_metrics and quality_metrics.findings_overview
-            else None
-        ),
-        total_sessions=overview.total_sessions,
-        sessions_with_commits=(
-            quality_metrics.overview.sessions_with_commits if quality_metrics else 0
-        ),
-    )
-    impact_review = None
-    if overview.total_sessions > 0:
-        impact_review = _build_personal_impact_review(
-            engineer.display_name or engineer.name,
-            overview,
-            trajectory,
-            friction,
-            quality_metrics,
-            productivity,
-            leverage_score,
-            effectiveness,
-            top_workflows,
-            eng_paths,
-            tool_recommendations,
-            model_recommendations,
-            workflow_playbooks,
+        )
+        top_workflows = _get_top_workflows(
+            db,
+            engineer_id,
+            start_date=start_date,
+            end_date=end_date,
         )
 
-    response = EngineerProfileResponse(
-        engineer_id=engineer.id,
-        name=engineer.name,
-        email=engineer.email,
-        display_name=engineer.display_name,
-        team_id=engineer.team_id,
-        team_name=team_name,
-        avatar_url=engineer.avatar_url,
-        github_username=engineer.github_username,
-        created_at=engineer.created_at.isoformat() if engineer.created_at else "",
-        overview=overview,
-        weekly_trajectory=trajectory,
-        friction=friction,
-        config_suggestions=config.suggestions,
-        strengths=skills,
-        learning_paths=eng_paths,
-        tool_recommendations=tool_recommendations,
-        model_recommendations=model_recommendations,
-        quality=quality,
-        leverage_score=leverage_score,
-        effectiveness=effectiveness,
-        impact_review=impact_review,
-        projects=projects,
-        tool_rankings=tool_rankings,
-        workflow_playbooks=workflow_playbooks,
-    )
-    set_cached_json("engineer_profile", cache_params, response.model_dump(mode="json"))
-    return response
+        # Distinct project names
+        project_rows = (
+            db.query(SessionModel.project_name)
+            .filter(
+                SessionModel.engineer_id == engineer_id,
+                SessionModel.project_name.isnot(None),
+            )
+            .distinct()
+            .all()
+        )
+        projects = [r[0] for r in project_rows if r[0]]
+        tool_recommendations = _build_tool_recommendations(
+            db,
+            engineer_id,
+            eng_paths,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        model_recommendations = _build_model_recommendations(
+            db,
+            engineer_id,
+            engineer.team_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        # Leverage score from maturity analytics
+        leverage_score: float | None = None
+        try:
+            from primer.server.services.maturity_service import get_maturity_analytics
+
+            maturity = get_maturity_analytics(
+                db, engineer_id=engineer_id, start_date=start_date, end_date=end_date
+            )
+            for ep in maturity.engineer_profiles:
+                if ep.engineer_id == engineer_id:
+                    leverage_score = ep.leverage_score
+                    break
+        except Exception:
+            leverage_score = None
+
+        effectiveness = build_effectiveness_score(
+            success_rate=overview.success_rate,
+            cost_per_successful_outcome=productivity.cost_per_successful_outcome,
+            benchmark_cost_per_successful_outcome=get_peer_cost_per_success_benchmark(
+                db,
+                group_by="engineer_id",
+                target_value=engineer_id,
+                team_id=engineer.team_id,
+                start_date=start_date,
+                end_date=end_date,
+            ),
+            pr_merge_rate=quality_metrics.overview.pr_merge_rate if quality_metrics else None,
+            findings_fix_rate=(
+                quality_metrics.findings_overview.fix_rate
+                if quality_metrics and quality_metrics.findings_overview
+                else None
+            ),
+            total_sessions=overview.total_sessions,
+            sessions_with_commits=(
+                quality_metrics.overview.sessions_with_commits if quality_metrics else 0
+            ),
+        )
+        impact_review = None
+        if overview.total_sessions > 0:
+            impact_review = _build_personal_impact_review(
+                engineer.display_name or engineer.name,
+                overview,
+                trajectory,
+                friction,
+                quality_metrics,
+                productivity,
+                leverage_score,
+                effectiveness,
+                top_workflows,
+                eng_paths,
+                tool_recommendations,
+                model_recommendations,
+                workflow_playbooks,
+            )
+
+        response = EngineerProfileResponse(
+            engineer_id=engineer.id,
+            name=engineer.name,
+            email=engineer.email,
+            display_name=engineer.display_name,
+            team_id=engineer.team_id,
+            team_name=team_name,
+            avatar_url=engineer.avatar_url,
+            github_username=engineer.github_username,
+            created_at=engineer.created_at.isoformat() if engineer.created_at else "",
+            overview=overview,
+            weekly_trajectory=trajectory,
+            friction=friction,
+            config_suggestions=config.suggestions,
+            strengths=skills,
+            learning_paths=eng_paths,
+            tool_recommendations=tool_recommendations,
+            model_recommendations=model_recommendations,
+            quality=quality,
+            leverage_score=leverage_score,
+            effectiveness=effectiveness,
+            impact_review=impact_review,
+            projects=projects,
+            tool_rankings=tool_rankings,
+            workflow_playbooks=workflow_playbooks,
+        )
+        set_cached_json("engineer_profile", cache_params, response.model_dump(mode="json"))
+        return response

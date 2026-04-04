@@ -68,6 +68,11 @@ async def _background_job_worker_loop() -> None:
         ensure_recurring_jobs,
         run_background_job_cycle,
     )
+    from primer.server.services.observability_service import (
+        record_counter,
+        record_histogram,
+        start_span,
+    )
 
     while True:
         try:
@@ -84,7 +89,32 @@ async def _background_job_worker_loop() -> None:
                 finally:
                     db.close()
 
-            result = await asyncio.to_thread(_run_cycle)
+            with start_span("background_jobs.worker_cycle"):
+                cycle_started = asyncio.get_running_loop().time()
+                result = await asyncio.to_thread(_run_cycle)
+                duration_ms = (asyncio.get_running_loop().time() - cycle_started) * 1000
+                record_counter("primer.background_jobs.cycles", 1, None)
+                record_histogram(
+                    "primer.background_jobs.cycle.duration_ms",
+                    duration_ms,
+                    None,
+                )
+                if result["processed"] > 0:
+                    record_counter(
+                        "primer.background_jobs.processed",
+                        result["processed"],
+                        {"result": "processed"},
+                    )
+                    record_counter(
+                        "primer.background_jobs.processed",
+                        result["succeeded"],
+                        {"result": "succeeded"},
+                    )
+                    record_counter(
+                        "primer.background_jobs.processed",
+                        result["failed"],
+                        {"result": "failed"},
+                    )
             if result["processed"] > 0:
                 logger.info(
                     "Background jobs processed: %d succeeded, %d failed",
@@ -109,7 +139,10 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    from primer.server.services.observability_service import setup_observability
+
     app = FastAPI(title="Primer", version="0.1.0", lifespan=lifespan)
+    setup_observability(app)
 
     # Rate limiting
     app.state.limiter = limiter
