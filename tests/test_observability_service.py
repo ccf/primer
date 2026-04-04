@@ -1,3 +1,8 @@
+from contextlib import contextmanager
+
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
 from primer.server.app import create_app
 from primer.server.services import observability_service
 
@@ -20,3 +25,45 @@ def test_observability_helpers_noop_without_otel(monkeypatch):
 
     observability_service.record_counter("primer.test.counter", 1, {"scope": "test"})
     observability_service.record_histogram("primer.test.histogram", 12.5, {"scope": "test"})
+
+
+def test_request_middleware_uses_route_template_for_metrics(monkeypatch):
+    recorded: list[tuple[str, int | float, dict[str, str]]] = []
+
+    @contextmanager
+    def fake_span(_name, _attributes=None):
+        class DummySpan:
+            def set_attribute(self, *_args, **_kwargs):
+                pass
+
+        yield DummySpan()
+
+    monkeypatch.setattr(observability_service, "start_span", fake_span)
+    monkeypatch.setattr(
+        observability_service,
+        "record_counter",
+        lambda name, value, attributes=None: recorded.append((name, value, attributes or {})),
+    )
+    monkeypatch.setattr(observability_service, "record_histogram", lambda *args, **kwargs: None)
+
+    app = FastAPI()
+    observability_service._instrument_requests(app)
+
+    @app.get("/items/{item_id}")
+    def get_item(item_id: str):
+        return {"item_id": item_id}
+
+    client = TestClient(app)
+
+    response = client.get("/items/abc123")
+
+    assert response.status_code == 200
+    assert (
+        "primer.http.requests",
+        1,
+        {
+            "http.method": "GET",
+            "http.route": "/items/{item_id}",
+            "http.status_code": "200",
+        },
+    ) in recorded
