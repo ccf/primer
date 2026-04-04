@@ -4,14 +4,15 @@ from datetime import datetime
 import pytest
 from pydantic import ValidationError
 
-from primer.common.models import Session as SessionModel
 from primer.common.models import (
+    Engineer,
     SessionChangeShape,
     SessionCustomization,
     SessionExecutionEvidence,
     SessionFacets,
     SessionRecoveryPath,
 )
+from primer.common.models import Session as SessionModel
 from primer.common.schemas import SessionFacetsPayload, SessionResponse
 from primer.server.services.ingest_service import upsert_facets
 
@@ -36,6 +37,19 @@ def test_create_engineer(client, admin_headers):
     data = r.json()
     assert "api_key" in data
     assert data["engineer"]["email"] == "eve@co.com"
+
+
+def test_create_engineer_persists_api_key_lookup_hash(client, admin_headers, db_session):
+    response = client.post(
+        "/api/v1/engineers",
+        json={"name": "Lookup Eve", "email": "lookup-eve@co.com"},
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    engineer_id = response.json()["engineer"]["id"]
+    stored = db_session.query(Engineer).filter(Engineer.id == engineer_id).one()
+    assert stored.api_key_lookup_hash is not None
 
 
 def test_ingest_session(client, engineer_with_key):

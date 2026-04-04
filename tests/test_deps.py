@@ -4,15 +4,22 @@ from starlette.requests import Request
 
 from primer.common.models import Engineer, Team
 from primer.server.deps import get_auth_context, verify_api_key
-from primer.server.services.auth_service import create_access_token
+from primer.server.services.auth_service import create_access_token, create_engineer_api_key
 
 
 def _request() -> Request:
     return Request({"type": "http", "headers": []})
 
 
-def test_verify_api_key_returns_engineer(engineer_with_key, db_session):
+def test_verify_api_key_returns_engineer(engineer_with_key, db_session, monkeypatch):
     engineer, raw_key = engineer_with_key
+
+    monkeypatch.setattr(
+        "primer.server.services.auth_service.bcrypt.checkpw",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("fast lookup should not fall back to bcrypt")
+        ),
+    )
 
     verified = verify_api_key(raw_key, db_session)
 
@@ -24,14 +31,13 @@ def test_verify_api_key_rejects_deactivated_engineer(db_session):
     db_session.add(team)
     db_session.flush()
 
-    import bcrypt
-
-    raw_key = "primer_test_inactive_key"
+    raw_key, hashed, lookup_hash = create_engineer_api_key(raw_key="primer_test_inactive_key")
     engineer = Engineer(
         name="Inactive Engineer",
         email="inactive@example.com",
         team_id=team.id,
-        api_key_hash=bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt()).decode(),
+        api_key_hash=hashed,
+        api_key_lookup_hash=lookup_hash,
         is_active=False,
     )
     db_session.add(engineer)
@@ -41,6 +47,27 @@ def test_verify_api_key_rejects_deactivated_engineer(db_session):
         verify_api_key(raw_key, db_session)
 
     assert exc_info.value.status_code == 403
+
+
+def test_verify_api_key_supports_legacy_rows_without_lookup_hash(db_session):
+    team = Team(name="Legacy Team")
+    db_session.add(team)
+    db_session.flush()
+
+    raw_key, hashed, _lookup_hash = create_engineer_api_key(raw_key="primer_test_legacy_key")
+    engineer = Engineer(
+        name="Legacy Engineer",
+        email="legacy@example.com",
+        team_id=team.id,
+        api_key_hash=hashed,
+        api_key_lookup_hash=None,
+    )
+    db_session.add(engineer)
+    db_session.flush()
+
+    verified = verify_api_key(raw_key, db_session)
+
+    assert verified.id == engineer.id
 
 
 def test_get_auth_context_rejects_missing_engineer_for_valid_cookie(db_session):

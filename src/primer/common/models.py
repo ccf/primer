@@ -39,6 +39,7 @@ class Engineer(Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     team_id: Mapped[str | None] = mapped_column(ForeignKey("teams.id"), nullable=True)
     api_key_hash: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    api_key_lookup_hash: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
     role: Mapped[str] = mapped_column(String(20), nullable=False, server_default="engineer")
     github_id: Mapped[int | None] = mapped_column(Integer, unique=True, nullable=True)
     github_username: Mapped[str | None] = mapped_column(String(255), nullable=True)

@@ -3,6 +3,7 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
+import bcrypt
 import httpx
 import jwt
 from sqlalchemy.orm import Session
@@ -150,6 +151,12 @@ def create_refresh_token(db: Session, engineer: Engineer) -> str:
     return raw
 
 
+def create_engineer_api_key(*, raw_key: str | None = None) -> tuple[str, str, str]:
+    raw = raw_key or f"primer_{secrets.token_urlsafe(32)}"
+    hashed = bcrypt.hashpw(raw.encode(), bcrypt.gensalt()).decode()
+    return raw, hashed, _hash_token(raw)
+
+
 def create_device_token(
     db: Session,
     engineer: Engineer,
@@ -253,6 +260,24 @@ def exchange_device_setup_code(
     )
     db.flush()
     return engineer, device_token, raw_token, setup_code.id
+
+
+def find_engineer_by_api_key(db: Session, raw_key: str) -> Engineer | None:
+    lookup_hash = _hash_token(raw_key)
+    engineer = db.query(Engineer).filter(Engineer.api_key_lookup_hash == lookup_hash).first()
+    if engineer is not None:
+        return engineer
+
+    encoded_key = raw_key.encode()
+    legacy_engineers = db.query(Engineer).filter(
+        Engineer.api_key_lookup_hash.is_(None),
+        Engineer.api_key_hash.is_not(None),
+        Engineer.api_key_hash != "",
+    )
+    for engineer in legacy_engineers:
+        if bcrypt.checkpw(encoded_key, engineer.api_key_hash.encode()):
+            return engineer
+    return None
 
 
 def find_engineer_by_device_token(db: Session, raw_token: str) -> Engineer | None:

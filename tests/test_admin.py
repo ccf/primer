@@ -904,7 +904,7 @@ def test_deactivate_not_found(client, admin_headers):
     assert r.status_code == 404
 
 
-def test_rotate_api_key(client, admin_headers, engineer_with_key):
+def test_rotate_api_key(client, admin_headers, engineer_with_key, db_session):
     eng, old_key = engineer_with_key
 
     r = client.post(f"/api/v1/engineers/{eng.id}/rotate-key", headers=admin_headers)
@@ -913,6 +913,8 @@ def test_rotate_api_key(client, admin_headers, engineer_with_key):
     assert "api_key" in data
     assert data["api_key"] != old_key
     assert data["api_key"].startswith("primer_")
+    db_session.refresh(eng)
+    assert eng.api_key_lookup_hash is not None
 
     # New key should work for ingest
     r = client.post(

@@ -1,6 +1,3 @@
-import secrets
-
-import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session, selectinload
 
@@ -16,6 +13,7 @@ from primer.common.schemas import (
 )
 from primer.server.deps import AuthContext, get_auth_context, require_role
 from primer.server.services import audit_service
+from primer.server.services.auth_service import create_engineer_api_key
 
 router = APIRouter(prefix="/api/v1/engineers", tags=["engineers"])
 
@@ -31,14 +29,14 @@ def create_engineer(
     if existing:
         raise HTTPException(status_code=409, detail="Engineer with this email already exists")
 
-    raw_key = f"primer_{secrets.token_urlsafe(32)}"
-    hashed = bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt()).decode()
+    raw_key, hashed, lookup_hash = create_engineer_api_key()
 
     engineer = Engineer(
         name=payload.name,
         email=payload.email,
         team_id=payload.team_id,
         api_key_hash=hashed,
+        api_key_lookup_hash=lookup_hash,
     )
     db.add(engineer)
     db.flush()
@@ -182,9 +180,9 @@ def rotate_api_key(
     engineer = db.query(Engineer).filter(Engineer.id == engineer_id).first()
     if not engineer:
         raise HTTPException(status_code=404, detail="Engineer not found")
-    raw_key = f"primer_{secrets.token_urlsafe(32)}"
-    hashed = bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt()).decode()
+    raw_key, hashed, lookup_hash = create_engineer_api_key()
     engineer.api_key_hash = hashed
+    engineer.api_key_lookup_hash = lookup_hash
     ip = request.client.host if request.client else None
     audit_service.log_action(db, auth, "rotate_key", "engineer", engineer_id, ip_address=ip)
     db.commit()
