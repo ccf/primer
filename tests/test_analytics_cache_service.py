@@ -38,3 +38,31 @@ def test_get_cached_json_backs_off_after_redis_error(monkeypatch):
     assert analytics_cache_service.get_cached_json("overview", {"team_id": None}) is None
     assert analytics_cache_service._redis_client is None
     assert analytics_cache_service._redis_disabled_until is not None
+
+
+def test_get_cached_json_records_decode_error_without_hit(monkeypatch):
+    counters: list[tuple[str, int | float, dict[str, str]]] = []
+
+    class BrokenPayloadRedis:
+        def get(self, _key):
+            return "{not-json"
+
+    monkeypatch.setattr(analytics_cache_service, "Redis", object)
+    monkeypatch.setattr(
+        analytics_cache_service,
+        "record_counter",
+        lambda name, value, attributes=None: counters.append((name, value, attributes or {})),
+    )
+    analytics_cache_service._redis_client = BrokenPayloadRedis()
+    analytics_cache_service._redis_disabled_until = None
+    monkeypatch.setattr(analytics_cache_service.settings, "analytics_cache_enabled", True)
+    monkeypatch.setattr(analytics_cache_service.settings, "redis_url", "redis://localhost:6379/0")
+
+    assert analytics_cache_service.get_cached_json("overview", {"team_id": None}) is None
+    assert counters == [
+        (
+            "primer.analytics_cache.requests",
+            1,
+            {"namespace": "overview", "result": "decode_error"},
+        )
+    ]

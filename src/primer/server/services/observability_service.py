@@ -109,11 +109,13 @@ def _instrument_requests(app: FastAPI) -> None:
 
     @app.middleware("http")
     async def otel_request_middleware(request, call_next):
+        route = request.scope.get("route")
+        route_path = getattr(route, "path", request.url.path)
         with start_span(
             "http.request",
             {
                 "http.method": request.method,
-                "http.target": request.url.path,
+                "http.route": route_path,
             },
         ) as span:
             started = perf_counter()
@@ -127,14 +129,12 @@ def _instrument_requests(app: FastAPI) -> None:
                     1,
                     {
                         "http.method": request.method,
-                        "http.target": request.url.path,
+                        "http.route": route_path,
                         "http.status_code": "500",
                     },
                 )
                 raise
             duration_ms = (perf_counter() - started) * 1000
-            route = request.scope.get("route")
-            route_path = getattr(route, "path", request.url.path)
             attributes = {
                 "http.method": request.method,
                 "http.route": route_path,
