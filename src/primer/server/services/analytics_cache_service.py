@@ -74,11 +74,6 @@ def _disable_cache_client() -> None:
 def get_cached_json(namespace: str, params: dict[str, Any]) -> Any | None:
     client = _get_redis_client()
     if client is None:
-        record_counter(
-            "primer.analytics_cache.requests",
-            1,
-            {"namespace": namespace, "result": "disabled"},
-        )
         return None
     try:
         payload = client.get(_build_cache_key(namespace, params))
@@ -123,11 +118,6 @@ def set_cached_json(
 ) -> None:
     client = _get_redis_client()
     if client is None:
-        record_counter(
-            "primer.analytics_cache.writes",
-            1,
-            {"namespace": namespace, "result": "disabled"},
-        )
         return
     try:
         client.setex(
