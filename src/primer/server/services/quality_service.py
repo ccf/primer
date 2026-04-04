@@ -32,6 +32,7 @@ from primer.common.schemas import (
     QualityMetricsResponse,
     QualityOverview,
 )
+from primer.server.services.analytics_cache_service import get_cached_json, set_cached_json
 from primer.server.services.analytics_service import base_session_query
 from primer.server.services.github_service import is_configured
 
@@ -100,6 +101,16 @@ def get_quality_metrics(
     project_name: str | None = None,
 ) -> QualityMetricsResponse:
     """Compute quality metrics from session commits and pull requests."""
+    cache_params = {
+        "team_id": team_id,
+        "engineer_id": engineer_id,
+        "start_date": start_date,
+        "end_date": end_date,
+        "project_name": project_name,
+    }
+    cached = get_cached_json("quality_metrics", cache_params)
+    if cached is not None:
+        return QualityMetricsResponse.model_validate(cached)
 
     base_q = base_session_query(
         db,
@@ -153,7 +164,7 @@ def get_quality_metrics(
                 avg_time_to_merge_hours=None,
             )
         )
-        return QualityMetricsResponse(
+        result = QualityMetricsResponse(
             overview=pr_overview,
             daily_volume=[],
             by_session_type=[],
@@ -166,6 +177,8 @@ def get_quality_metrics(
             sessions_analyzed=0,
             github_connected=is_configured(),
         )
+        set_cached_json("quality_metrics", cache_params, result.model_dump(mode="json"))
+        return result
 
     if project_name:
         overview = _compute_overview_for_session_scope(db, session_id_subq)
@@ -207,7 +220,7 @@ def get_quality_metrics(
                 merged_prs.append(pr)
         merged_prs.sort(key=lambda p: p.pr_created_at or "", reverse=True)
 
-    return QualityMetricsResponse(
+    result = QualityMetricsResponse(
         overview=overview,
         daily_volume=daily_volume,
         by_session_type=by_session_type,
@@ -220,6 +233,8 @@ def get_quality_metrics(
         sessions_analyzed=total_sessions,
         github_connected=is_configured(),
     )
+    set_cached_json("quality_metrics", cache_params, result.model_dump(mode="json"))
+    return result
 
 
 def _compute_overview(db: Session, session_id_q) -> QualityOverview:

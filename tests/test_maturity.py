@@ -18,6 +18,8 @@ from primer.common.models import (
     Team,
     ToolUsage,
 )
+from primer.common.schemas import MaturityAnalyticsResponse
+from primer.server.services.maturity_service import get_maturity_analytics
 
 
 @pytest.fixture()
@@ -91,6 +93,22 @@ def test_maturity_empty(client, admin_headers):
     assert data["engineer_profiles"] == []
     assert data["daily_leverage"] == []
     assert data["agent_skill_breakdown"] == []
+
+
+def test_get_maturity_analytics_uses_cached_payload(monkeypatch, db_session):
+    cached = get_maturity_analytics(db_session)
+
+    monkeypatch.setattr(
+        "primer.server.services.maturity_service.get_cached_json",
+        lambda namespace, params: (
+            cached.model_dump(mode="json") if namespace == "maturity_analytics" else None
+        ),
+    )
+
+    result = get_maturity_analytics(object())
+
+    assert isinstance(result, MaturityAnalyticsResponse)
+    assert result.sessions_analyzed == cached.sessions_analyzed
 
 
 def test_maturity_with_data(client, admin_headers, seeded_maturity_data):

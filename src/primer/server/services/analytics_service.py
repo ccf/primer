@@ -981,6 +981,17 @@ def get_cost_analytics(
     project_name: str | None = None,
 ) -> CostAnalytics:
     """Compute cost breakdown by model and daily cost trend."""
+    cache_params = {
+        "team_id": team_id,
+        "engineer_id": engineer_id,
+        "start_date": start_date,
+        "end_date": end_date,
+        "project_name": project_name,
+    }
+    cached = get_cached_json("cost_analytics", cache_params)
+    if cached is not None:
+        return CostAnalytics.model_validate(cached)
+
     # Per-model breakdown
     q = db.query(
         ModelUsage.model_name,
@@ -1166,12 +1177,14 @@ def get_cost_analytics(
         )
     )
 
-    return CostAnalytics(
+    result = CostAnalytics(
         total_estimated_cost=total_cost,
         model_breakdown=breakdown,
         daily_costs=daily_costs,
         workflow_breakdown=workflow_breakdown,
     )
+    set_cached_json("cost_analytics", cache_params, result.model_dump(mode="json"))
+    return result
 
 
 def get_engineer_analytics(
@@ -1483,6 +1496,17 @@ def get_productivity_metrics(
     project_name: str | None = None,
 ) -> ProductivityMetrics:
     """Compute ROI / productivity metrics."""
+    cache_params = {
+        "team_id": team_id,
+        "engineer_id": engineer_id,
+        "start_date": start_date,
+        "end_date": end_date,
+        "project_name": project_name,
+    }
+    cached = get_cached_json("productivity_metrics", cache_params)
+    if cached is not None:
+        return ProductivityMetrics.model_validate(cached)
+
     q = base_session_query(
         db,
         team_id,
@@ -1640,7 +1664,7 @@ def get_productivity_metrics(
         estimated_value / total_cost if total_cost > 0 and estimated_value is not None else None
     )
 
-    return ProductivityMetrics(
+    result = ProductivityMetrics(
         sessions_per_engineer_per_day=round(sessions_per_engineer_per_day, 3),
         avg_cost_per_session=(
             round(avg_cost_per_session, 4) if avg_cost_per_session is not None else None
@@ -1660,6 +1684,8 @@ def get_productivity_metrics(
         total_cost=round(total_cost, 4),
         roi_ratio=round(roi_ratio, 2) if roi_ratio is not None else None,
     )
+    set_cached_json("productivity_metrics", cache_params, result.model_dump(mode="json"))
+    return result
 
 
 def get_engineer_benchmarks(
@@ -1838,6 +1864,17 @@ def get_bottleneck_analytics(
     project_name: str | None = None,
 ) -> BottleneckAnalytics:
     """Analyse friction patterns across sessions for bottleneck detection."""
+    cache_params = {
+        "team_id": team_id,
+        "engineer_id": engineer_id,
+        "start_date": start_date,
+        "end_date": end_date,
+        "project_name": project_name,
+    }
+    cached = get_cached_json("bottleneck_analytics", cache_params)
+    if cached is not None:
+        return BottleneckAnalytics.model_validate(cached)
+
     # Fetch sessions with their facets (inner join so only sessions with
     # facets data are included in friction rate denominators)
     q = db.query(SessionModel, SessionFacets).join(
@@ -1861,7 +1898,7 @@ def get_bottleneck_analytics(
 
     total_sessions = len(rows)
     if total_sessions == 0:
-        return BottleneckAnalytics(
+        result = BottleneckAnalytics(
             friction_impacts=[],
             project_friction=[],
             friction_trends=[],
@@ -1879,6 +1916,8 @@ def get_bottleneck_analytics(
             sessions_with_any_friction=0,
             overall_friction_rate=0.0,
         )
+        set_cached_json("bottleneck_analytics", cache_params, result.model_dump(mode="json"))
+        return result
 
     session_ids = [session.id for session, _ in rows]
     tool_counts_by_session: dict[str, Counter[str]] = defaultdict(Counter)
@@ -2240,7 +2279,7 @@ def get_bottleneck_analytics(
         )
 
     sessions_with_count = len(sessions_with_friction)
-    return BottleneckAnalytics(
+    result = BottleneckAnalytics(
         friction_impacts=friction_impacts,
         project_friction=project_friction_list,
         friction_trends=friction_trends,
@@ -2253,6 +2292,8 @@ def get_bottleneck_analytics(
         if total_sessions > 0
         else 0.0,
     )
+    set_cached_json("bottleneck_analytics", cache_params, result.model_dump(mode="json"))
+    return result
 
 
 def get_tool_adoption_analytics(

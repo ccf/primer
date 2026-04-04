@@ -3,8 +3,20 @@ from datetime import UTC, datetime
 
 from primer.common.models import DailyAnalyticsRollup, GitRepository, SessionFacets
 from primer.common.models import Session as SessionModel
-from primer.common.schemas import DailyStatsResponse, OverviewStats
-from primer.server.services.analytics_service import get_daily_stats, get_overview
+from primer.common.schemas import (
+    BottleneckAnalytics,
+    CostAnalytics,
+    DailyStatsResponse,
+    OverviewStats,
+    ProductivityMetrics,
+)
+from primer.server.services.analytics_service import (
+    get_bottleneck_analytics,
+    get_cost_analytics,
+    get_daily_stats,
+    get_overview,
+    get_productivity_metrics,
+)
 
 
 def _messages(count: int) -> list[dict[str, str | int]]:
@@ -107,6 +119,54 @@ def test_get_overview_populates_cache_on_miss(monkeypatch, db_session):
     assert result.total_sessions == 0
     assert observed["namespace"] == "overview"
     assert observed["payload"]["total_sessions"] == 0
+
+
+def test_get_productivity_metrics_uses_cached_payload(monkeypatch, db_session):
+    cached = get_productivity_metrics(db_session)
+
+    monkeypatch.setattr(
+        "primer.server.services.analytics_service.get_cached_json",
+        lambda namespace, params: (
+            cached.model_dump(mode="json") if namespace == "productivity_metrics" else None
+        ),
+    )
+
+    result = get_productivity_metrics(object())
+
+    assert isinstance(result, ProductivityMetrics)
+    assert result.total_cost == cached.total_cost
+
+
+def test_get_cost_analytics_uses_cached_payload(monkeypatch, db_session):
+    cached = get_cost_analytics(db_session)
+
+    monkeypatch.setattr(
+        "primer.server.services.analytics_service.get_cached_json",
+        lambda namespace, params: (
+            cached.model_dump(mode="json") if namespace == "cost_analytics" else None
+        ),
+    )
+
+    result = get_cost_analytics(object())
+
+    assert isinstance(result, CostAnalytics)
+    assert result.total_estimated_cost == cached.total_estimated_cost
+
+
+def test_get_bottleneck_analytics_uses_cached_payload(monkeypatch, db_session):
+    cached = get_bottleneck_analytics(db_session)
+
+    monkeypatch.setattr(
+        "primer.server.services.analytics_service.get_cached_json",
+        lambda namespace, params: (
+            cached.model_dump(mode="json") if namespace == "bottleneck_analytics" else None
+        ),
+    )
+
+    result = get_bottleneck_analytics(object())
+
+    assert isinstance(result, BottleneckAnalytics)
+    assert result.total_sessions_analyzed == cached.total_sessions_analyzed
 
 
 def test_overview_with_data(client, engineer_with_key, admin_headers):

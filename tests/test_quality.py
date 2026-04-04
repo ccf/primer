@@ -14,6 +14,8 @@ from primer.common.models import (
     SessionCommit,
 )
 from primer.common.models import Session as SessionModel
+from primer.common.schemas import QualityMetricsResponse
+from primer.server.services.quality_service import get_quality_metrics
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -131,6 +133,22 @@ class TestIngestWithCommits:
             .all()
         )
         assert len(commits) == 0
+
+
+def test_get_quality_metrics_uses_cached_payload(monkeypatch, db_session):
+    cached = get_quality_metrics(db_session)
+
+    monkeypatch.setattr(
+        "primer.server.services.quality_service.get_cached_json",
+        lambda namespace, params: (
+            cached.model_dump(mode="json") if namespace == "quality_metrics" else None
+        ),
+    )
+
+    result = get_quality_metrics(object())
+
+    assert isinstance(result, QualityMetricsResponse)
+    assert result.sessions_analyzed == cached.sessions_analyzed
 
 
 # ---------------------------------------------------------------------------
