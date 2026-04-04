@@ -107,23 +107,26 @@ def _instrument_requests(app: FastAPI) -> None:
     if getattr(app.state, "_otel_request_middleware_installed", False):
         return
 
+    def _route_path(request) -> str:
+        route = request.scope.get("route")
+        return getattr(route, "path", request.url.path)
+
     @app.middleware("http")
     async def otel_request_middleware(request, call_next):
-        route = request.scope.get("route")
-        route_path = getattr(route, "path", request.url.path)
         with start_span(
             "http.request",
             {
                 "http.method": request.method,
-                "http.route": route_path,
             },
         ) as span:
             started = perf_counter()
             try:
                 response = await call_next(request)
             except Exception as exc:
+                route_path = _route_path(request)
                 if span is not None:
                     span.set_attribute("error.type", exc.__class__.__name__)
+                    span.set_attribute("http.route", route_path)
                 record_counter(
                     "primer.http.requests",
                     1,
@@ -135,6 +138,7 @@ def _instrument_requests(app: FastAPI) -> None:
                 )
                 raise
             duration_ms = (perf_counter() - started) * 1000
+            route_path = _route_path(request)
             attributes = {
                 "http.method": request.method,
                 "http.route": route_path,
