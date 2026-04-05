@@ -88,4 +88,12 @@ def is_delegate_tool(name: str) -> bool:
 
 def _is_integrate_tool(name: str) -> bool:
     normalized = _normalized_tool_name(name)
+    if (
+        _is_search_tool(name)
+        or _is_read_tool(name)
+        or _is_edit_tool(name)
+        or _is_execute_tool(name)
+        or is_delegate_tool(name)
+    ):
+        return False
     return classify_tool(name) == "mcp" or any(hint in normalized for hint in _INTEGRATE_HINTS)

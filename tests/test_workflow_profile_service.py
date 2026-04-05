@@ -189,3 +189,87 @@ def test_extract_session_workflow_profile_counts_all_verification_runs():
 
     assert record is not None
     assert record.verification_run_count == 4
+
+
+def test_extract_session_workflow_profile_maps_cursor_change_signals_to_feature_delivery():
+    record = extract_session_workflow_profile(
+        {
+            "agent_type": "cursor",
+            "first_prompt": "Implement the new review summary flow",
+            "summary": "Added the new workflow path.",
+        },
+        [
+            {"tool_name": "read_file_v2", "call_count": 2},
+            {"tool_name": "task_v2", "call_count": 1},
+        ],
+        [],
+        source_metadata={
+            "native_telemetry": {
+                "change_signals": {
+                    "signal_count": 1,
+                    "target_files": ["src/review_summary.py"],
+                },
+                "context_usage": {"reference_count": 2},
+            }
+        },
+        agent_type="cursor",
+    )
+
+    assert record is not None
+    assert record.archetype == "feature_delivery"
+    assert record.steps == ["read", "edit", "delegate"]
+    assert record.label == "feature delivery: read -> edit -> delegate"
+
+
+def test_extract_session_workflow_profile_uses_cursor_prompt_cues_for_debugging():
+    record = extract_session_workflow_profile(
+        {
+            "agent_type": "cursor",
+            "first_prompt": "Debug the failing auth regression in CI",
+            "summary": "Narrowed the error to the auth middleware.",
+        },
+        [
+            {"tool_name": "edit_file_v2", "call_count": 1},
+            {"tool_name": "run_terminal_command_v2", "call_count": 2},
+        ],
+        [],
+        source_metadata={
+            "native_telemetry": {
+                "change_signals": {
+                    "signal_count": 1,
+                    "target_files": ["src/auth.py"],
+                }
+            }
+        },
+        agent_type="cursor",
+    )
+
+    assert record is not None
+    assert record.archetype == "debugging"
+    assert record.steps == ["edit", "execute"]
+    assert "debugging loop" in (record.archetype_reason or "")
+
+
+def test_extract_session_workflow_profile_uses_cursor_target_files_for_docs():
+    record = extract_session_workflow_profile(
+        {
+            "agent_type": "cursor",
+            "first_prompt": "Refresh the onboarding docs",
+        },
+        [{"tool_name": "task_v2", "call_count": 1}],
+        [],
+        source_metadata={
+            "native_telemetry": {
+                "change_signals": {
+                    "signal_count": 1,
+                    "target_files": ["README.md", "docs/setup.md"],
+                },
+                "context_usage": {"reference_count": 1},
+            }
+        },
+        agent_type="cursor",
+    )
+
+    assert record is not None
+    assert record.archetype == "docs"
+    assert record.steps == ["read", "edit", "delegate"]
