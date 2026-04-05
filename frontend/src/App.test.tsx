@@ -52,6 +52,7 @@ vi.mock("@/hooks/use-api-queries", () => ({
   useSessionDetail: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useTranscript: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useFriction: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+  useExplorerSavedItems: vi.fn().mockReturnValue({ data: [], isLoading: false }),
   useProjectAnalytics: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useProjectComparison: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
   useInterventions: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
@@ -70,6 +71,8 @@ vi.mock("@/hooks/use-api-mutations", () => ({
   useCreateEngineer: vi.fn().mockReturnValue({ mutate: vi.fn() }),
   useCreateIntervention: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
   useUpdateIntervention: vi.fn().mockReturnValue({ mutate: vi.fn() }),
+  useCreateExplorerSavedItem: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
+  useDeleteExplorerSavedItem: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false, variables: null }),
 }))
 
 import { getApiKey } from "@/lib/api"

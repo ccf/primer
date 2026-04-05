@@ -44,6 +44,23 @@ export interface DeviceTokenSetupCodeCreateResponse {
   expires_at: string
 }
 
+export type ExplorerSavedItemType = "prompt" | "report_card"
+
+export interface ExplorerSavedItemResponse {
+  id: string
+  engineer_id: string | null
+  owner_role: string
+  item_type: ExplorerSavedItemType
+  title: string
+  prompt_text: string
+  result_preview: string | null
+  scope_team_id: string | null
+  scope_start_date: string | null
+  scope_end_date: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type AgentType = 'claude_code' | 'codex_cli' | 'gemini_cli' | 'cursor'
 export type TelemetryParity = 'required' | 'optional' | 'unavailable'
 export type RecoveryStrategy =

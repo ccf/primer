@@ -67,6 +67,7 @@ RecoveryStrategy = Literal[
     "delegate_or_parallelize",
 ]
 RecoveryResult = Literal["recovered", "abandoned", "unresolved"]
+ExplorerSavedItemType = Literal["prompt", "report_card"]
 CustomizationType = Literal["mcp", "subagent", "skill", "command", "template"]
 CustomizationState = Literal["available", "enabled", "invoked"]
 CustomizationProvenance = Literal[
@@ -171,6 +172,33 @@ class DeviceSetupCodeExchangeResponse(BaseModel):
     engineer: EngineerResponse
     device_token: DeviceTokenResponse
     raw_token: str = Field(description="Copy this device token now; it cannot be retrieved again.")
+
+
+class ExplorerSavedItemCreate(BaseModel):
+    item_type: ExplorerSavedItemType
+    title: str = Field(min_length=1, max_length=255)
+    prompt_text: str = Field(min_length=1)
+    result_preview: str | None = None
+    scope_team_id: str | None = None
+    scope_start_date: datetime | None = None
+    scope_end_date: datetime | None = None
+
+
+class ExplorerSavedItemResponse(BaseModel):
+    id: str
+    engineer_id: str | None
+    owner_role: str
+    item_type: ExplorerSavedItemType
+    title: str
+    prompt_text: str
+    result_preview: str | None
+    scope_team_id: str | None
+    scope_start_date: datetime | None
+    scope_end_date: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 # --- Session Facets ---

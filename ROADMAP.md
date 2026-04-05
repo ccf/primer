@@ -225,7 +225,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Auto-refresh via lifespan task
 - [x] Conversational data explorer (SSE-streamed tool-use chat)
 - [x] AI-powered recommendations panel
-- [ ] [P1] Saved explorer prompts and reusable report cards
+- [x] [P1] Saved explorer prompts and reusable report cards
 - [x] [P1] Compare mode for engineer, team, project, and time-period analysis
 - [x] [P2] Weekly manager review packs that combine quality, friction, growth, and cost
 - [x] [P2] Recommendation narratives that explain why a workflow is likely to help
