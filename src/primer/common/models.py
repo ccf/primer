@@ -59,6 +59,9 @@ class Engineer(Base):
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="engineer")
     device_tokens: Mapped[list["DeviceToken"]] = relationship(back_populates="engineer")
     device_setup_codes: Mapped[list["DeviceSetupCode"]] = relationship(back_populates="engineer")
+    explorer_saved_items: Mapped[list["ExplorerSavedItem"]] = relationship(
+        back_populates="engineer"
+    )
 
 
 class GitRepository(Base):
@@ -581,6 +584,31 @@ class NarrativeCache(Base):
     completion_tokens: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     expires_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class ExplorerSavedItem(Base):
+    __tablename__ = "explorer_saved_items"
+    __table_args__ = (
+        Index("ix_explorer_saved_items_engineer_created", "engineer_id", "created_at"),
+        Index("ix_explorer_saved_items_role_created", "owner_role", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    engineer_id: Mapped[str | None] = mapped_column(ForeignKey("engineers.id"), nullable=True)
+    owner_role: Mapped[str] = mapped_column(String(20), nullable=False)
+    item_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    prompt_text: Mapped[str] = mapped_column(Text, nullable=False)
+    result_preview: Mapped[str | None] = mapped_column(Text, nullable=True)
+    scope_team_id: Mapped[str | None] = mapped_column(ForeignKey("teams.id"), nullable=True)
+    scope_start_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    scope_end_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    engineer: Mapped[Engineer | None] = relationship(back_populates="explorer_saved_items")
 
 
 class SessionCommit(Base):

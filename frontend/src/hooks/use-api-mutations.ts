@@ -5,6 +5,7 @@ import type {
   BudgetStatus,
   DeviceTokenSetupCodeCreateResponse,
   DeviceTokenCreateResponse,
+  ExplorerSavedItemResponse,
   NarrativeResponse,
   WorkflowProfileBackfillSummary,
 } from "@/types/api"
@@ -78,6 +79,37 @@ export function useCreateDeviceTokenSetupCode() {
         method: "POST",
         body: JSON.stringify(payload ?? {}),
       }),
+  })
+}
+
+export function useCreateExplorerSavedItem() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: {
+      item_type: "prompt" | "report_card"
+      title: string
+      prompt_text: string
+      result_preview?: string | null
+      scope_team_id?: string | null
+      scope_start_date?: string | null
+      scope_end_date?: string | null
+    }) =>
+      apiFetch<ExplorerSavedItemResponse>("/api/v1/explorer/saved-items", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["explorer-saved-items"] }),
+  })
+}
+
+export function useDeleteExplorerSavedItem() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (itemId: string) =>
+      apiFetch<{ status: string }>(`/api/v1/explorer/saved-items/${itemId}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["explorer-saved-items"] }),
   })
 }
 

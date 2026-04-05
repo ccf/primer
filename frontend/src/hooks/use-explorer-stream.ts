@@ -11,7 +11,14 @@ export interface ChatMessage {
 
 interface UseExplorerStreamReturn {
   messages: ChatMessage[]
-  sendMessage: (content: string) => void
+  sendMessage: (
+    content: string,
+    options?: {
+      teamId?: string | null
+      startDate?: string
+      endDate?: string
+    },
+  ) => void
   isStreaming: boolean
   error: string | null
   clearMessages: () => void
@@ -32,7 +39,14 @@ export function useExplorerStream(
   }, [])
 
   const sendMessage = useCallback(
-    (content: string) => {
+    (
+      content: string,
+      options?: {
+        teamId?: string | null
+        startDate?: string
+        endDate?: string
+      },
+    ) => {
       if (isStreaming || !content.trim()) return
 
       const userMsg: ChatMessage = {
@@ -67,9 +81,12 @@ export function useExplorerStream(
 
       const body: Record<string, unknown> = {
         messages: apiMessages,
-        team_id: teamId,
+        team_id: options?.teamId ?? teamId,
       }
-      if (dateRange) {
+      if (options?.startDate || options?.endDate) {
+        body.start_date = options?.startDate
+        body.end_date = options?.endDate
+      } else if (dateRange) {
         body.start_date = dateRange.startDate
         body.end_date = dateRange.endDate
       }

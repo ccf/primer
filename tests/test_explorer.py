@@ -9,6 +9,7 @@ import pytest
 
 from primer.common.models import (
     Engineer,
+    ExplorerSavedItem,
     GitRepository,
     PullRequest,
     SessionCommit,
@@ -124,6 +125,67 @@ class TestExplorerEndpoint:
 
         assert resp.status_code == 200
         assert resp.headers["content-type"].startswith("text/event-stream")
+
+    def test_saved_items_crud_with_engineer_cookie(self, client, engineer, db_session):
+        cookies = _jwt_cookie(engineer)
+
+        create_resp = client.post(
+            "/api/v1/explorer/saved-items",
+            json={
+                "item_type": "prompt",
+                "title": "Weekly check-in",
+                "prompt_text": "How am I trending this week?",
+                "scope_start_date": "2026-04-01T00:00:00Z",
+                "scope_end_date": "2026-04-07T00:00:00Z",
+            },
+            cookies=cookies,
+        )
+
+        assert create_resp.status_code == 200
+        created = create_resp.json()
+        assert created["item_type"] == "prompt"
+        assert created["title"] == "Weekly check-in"
+        assert created["engineer_id"] == engineer.id
+
+        list_resp = client.get("/api/v1/explorer/saved-items", cookies=cookies)
+        assert list_resp.status_code == 200
+        items = list_resp.json()
+        assert len(items) == 1
+        assert items[0]["id"] == created["id"]
+
+        delete_resp = client.delete(
+            f"/api/v1/explorer/saved-items/{created['id']}",
+            cookies=cookies,
+        )
+        assert delete_resp.status_code == 200
+        assert delete_resp.json() == {"status": "ok"}
+        assert db_session.query(ExplorerSavedItem).count() == 0
+
+    def test_saved_items_allow_admin_key_for_global_report_cards(
+        self, client, admin_headers, db_session
+    ):
+        create_resp = client.post(
+            "/api/v1/explorer/saved-items",
+            json={
+                "item_type": "report_card",
+                "title": "Org friction snapshot",
+                "prompt_text": "What is costing us the most time right now?",
+                "result_preview": "Permission issues and timeouts dominate the week.",
+            },
+            headers=admin_headers,
+        )
+
+        assert create_resp.status_code == 200
+        created = create_resp.json()
+        assert created["engineer_id"] is None
+        assert created["owner_role"] == "admin"
+        assert created["item_type"] == "report_card"
+
+        list_resp = client.get("/api/v1/explorer/saved-items", headers=admin_headers)
+        assert list_resp.status_code == 200
+        items = list_resp.json()
+        assert len(items) == 1
+        assert items[0]["title"] == "Org friction snapshot"
 
     def test_no_api_key_returns_error_event(self, client, engineer, db_session):
         """When no Anthropic API key is configured, returns an error SSE event."""

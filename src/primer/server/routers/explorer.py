@@ -2,12 +2,13 @@
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from primer.common.database import get_db
+from primer.common.schemas import ExplorerSavedItemCreate, ExplorerSavedItemResponse
 from primer.server.deps import AuthContext, get_auth_context
 
 router = APIRouter(prefix="/api/v1/explorer", tags=["explorer"])
@@ -29,6 +30,16 @@ def _resolve_scope(
     if auth.role == "team_lead":
         return auth.team_id, None
     return None, auth.engineer_id
+
+
+def _resolve_saved_item_scope_team_id(
+    auth: AuthContext, requested_team_id: str | None
+) -> str | None:
+    if auth.role == "admin":
+        return requested_team_id
+    if auth.role == "team_lead":
+        return auth.team_id
+    return None
 
 
 @router.post("/chat")
@@ -58,3 +69,60 @@ async def explorer_chat(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.get("/saved-items", response_model=list[ExplorerSavedItemResponse])
+def list_saved_items(
+    item_type: str | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.explorer_saved_item_service import list_explorer_saved_items
+
+    items = list_explorer_saved_items(
+        db,
+        engineer_id=auth.engineer_id,
+        owner_role=auth.role,
+        item_type=item_type,
+    )
+    return [ExplorerSavedItemResponse.model_validate(item) for item in items]
+
+
+@router.post("/saved-items", response_model=ExplorerSavedItemResponse)
+def create_saved_item(
+    payload: ExplorerSavedItemCreate,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.explorer_saved_item_service import create_explorer_saved_item
+
+    item = create_explorer_saved_item(
+        db,
+        engineer_id=auth.engineer_id,
+        owner_role=auth.role,
+        payload=payload,
+        scope_team_id=_resolve_saved_item_scope_team_id(auth, payload.scope_team_id),
+    )
+    db.commit()
+    db.refresh(item)
+    return ExplorerSavedItemResponse.model_validate(item)
+
+
+@router.delete("/saved-items/{item_id}")
+def delete_saved_item(
+    item_id: str,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from primer.server.services.explorer_saved_item_service import delete_explorer_saved_item
+
+    item = delete_explorer_saved_item(
+        db,
+        item_id=item_id,
+        engineer_id=auth.engineer_id,
+        owner_role=auth.role,
+    )
+    if item is None:
+        raise HTTPException(status_code=404, detail="Saved item not found")
+    db.commit()
+    return {"status": "ok"}

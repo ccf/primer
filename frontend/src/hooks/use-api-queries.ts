@@ -25,6 +25,7 @@ import type {
   EngineerBenchmarkResponse,
   EngineerProfileResponse,
   EngineerResponse,
+  ExplorerSavedItemResponse,
   FrictionReport,
   IngestEventResponse,
   InterventionResponse,
@@ -100,6 +101,16 @@ export function useDeviceTokens(enabled = true) {
     queryKey: ["device-tokens"],
     queryFn: () => apiFetch<DeviceTokenResponse[]>("/api/v1/auth/device-tokens"),
     enabled,
+  })
+}
+
+export function useExplorerSavedItems(itemType?: string) {
+  return useQuery({
+    queryKey: ["explorer-saved-items", itemType],
+    queryFn: () =>
+      apiFetch<ExplorerSavedItemResponse[]>(
+        `/api/v1/explorer/saved-items${buildParams({ item_type: itemType })}`,
+      ),
   })
 }
 
