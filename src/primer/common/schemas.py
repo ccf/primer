@@ -1203,6 +1203,9 @@ class FrictionImpact(BaseModel):
     success_rate_with: float | None
     success_rate_without: float | None
     impact_score: float | None
+    estimated_minutes_lost: float = 0.0
+    avg_minutes_lost_per_affected_session: float | None = None
+    avg_minutes_lost_per_occurrence: float | None = None
     sample_details: list[str]
 
 
@@ -1213,6 +1216,19 @@ class ProjectFriction(BaseModel):
     friction_rate: float
     top_friction_types: list[str]
     total_friction_count: int
+    estimated_minutes_lost: float = 0.0
+    avg_minutes_lost_per_friction_session: float | None = None
+
+
+class EngineerFrictionTimeLost(BaseModel):
+    engineer_id: str
+    engineer_name: str
+    total_sessions: int
+    sessions_with_friction: int
+    total_friction_count: int
+    estimated_minutes_lost: float
+    avg_minutes_lost_per_friction_session: float | None = None
+    top_friction_types: list[str] = Field(default_factory=list)
 
 
 class FrictionTrend(BaseModel):
@@ -1260,6 +1276,7 @@ class RecoveryPattern(BaseModel):
 class BottleneckAnalytics(BaseModel):
     friction_impacts: list[FrictionImpact]
     project_friction: list[ProjectFriction]
+    engineer_time_lost: list[EngineerFrictionTimeLost] = []
     friction_trends: list[FrictionTrend]
     root_cause_clusters: list[RootCauseCluster]
     recovery_overview: RecoveryOverview | None = None
@@ -1267,6 +1284,7 @@ class BottleneckAnalytics(BaseModel):
     total_sessions_analyzed: int
     sessions_with_any_friction: int
     overall_friction_rate: float
+    total_estimated_minutes_lost: float = 0.0
 
 
 class AuditLogResponse(BaseModel):

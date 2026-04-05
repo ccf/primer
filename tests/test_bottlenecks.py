@@ -21,7 +21,7 @@ def _create_session(db_session, engineer, **kwargs):
         tool_call_count=3,
         input_tokens=1000,
         output_tokens=500,
-        duration_seconds=120.0,
+        duration_seconds=1800.0,
         **kwargs,
     )
     db_session.add(session)
@@ -43,6 +43,8 @@ def test_bottlenecks_empty(client, admin_headers):
     assert data["root_cause_clusters"] == []
     assert data["recovery_overview"]["sessions_with_recovery_paths"] == 0
     assert data["recovery_patterns"] == []
+    assert data["engineer_time_lost"] == []
+    assert data["total_estimated_minutes_lost"] == 0.0
 
 
 def test_bottlenecks_with_friction(client, db_session, engineer_with_key, admin_headers):
@@ -157,6 +159,9 @@ def test_bottlenecks_with_friction(client, db_session, engineer_with_key, admin_
     assert perm_impact["occurrence_count"] == 5  # 3 + 2
     assert perm_impact["sessions_affected"] == 2
     assert perm_impact["success_rate_with"] is not None
+    assert perm_impact["estimated_minutes_lost"] == 36.3
+    assert perm_impact["avg_minutes_lost_per_affected_session"] == 18.2
+    assert perm_impact["avg_minutes_lost_per_occurrence"] == 7.3
     assert len(perm_impact["sample_details"]) > 0
 
     # Project friction
@@ -167,6 +172,8 @@ def test_bottlenecks_with_friction(client, db_session, engineer_with_key, admin_
     assert proj_a["sessions_with_friction"] == 2
     assert proj_a["total_sessions"] == 2
     assert "permission_denied" in proj_a["top_friction_types"]
+    assert proj_a["estimated_minutes_lost"] == 44.0
+    assert proj_a["avg_minutes_lost_per_friction_session"] == 22.0
 
     clusters = data["root_cause_clusters"]
     assert len(clusters) >= 1
@@ -200,6 +207,18 @@ def test_bottlenecks_with_friction(client, db_session, engineer_with_key, admin_
     assert inspect_pattern["session_count"] == 2
     assert inspect_pattern["recovered_sessions"] == 1
     assert "pytest tests/test_auth.py" in inspect_pattern["sample_commands"]
+
+    engineer_time_lost = data["engineer_time_lost"]
+    assert len(engineer_time_lost) == 1
+    assert engineer_time_lost[0]["engineer_id"] == eng.id
+    assert engineer_time_lost[0]["engineer_name"] == eng.name
+    assert engineer_time_lost[0]["sessions_with_friction"] == 2
+    assert engineer_time_lost[0]["total_friction_count"] == 6
+    assert engineer_time_lost[0]["estimated_minutes_lost"] == 44.0
+    assert engineer_time_lost[0]["avg_minutes_lost_per_friction_session"] == 22.0
+    assert "permission_denied" in engineer_time_lost[0]["top_friction_types"]
+
+    assert data["total_estimated_minutes_lost"] == 44.0
 
     # Friction trends
     assert len(data["friction_trends"]) > 0
