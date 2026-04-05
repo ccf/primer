@@ -247,7 +247,28 @@ def test_extract_session_workflow_profile_uses_cursor_prompt_cues_for_debugging(
     assert record is not None
     assert record.archetype == "debugging"
     assert record.steps == ["edit", "execute"]
-    assert "debugging loop" in (record.archetype_reason or "")
+    assert (
+        record.archetype_reason
+        == "Cursor-native change signals plus debugging-style prompt cues suggest a debugging loop."
+    )
+
+
+def test_extract_session_workflow_profile_uses_text_cues_for_debugging_reason():
+    record = extract_session_workflow_profile(
+        {
+            "first_prompt": "Debug the failing auth regression in CI",
+            "summary": "Narrowed the error to the auth middleware.",
+        },
+        [
+            {"tool_name": "Edit", "call_count": 1},
+            {"tool_name": "Bash", "call_count": 1},
+        ],
+        [],
+    )
+
+    assert record is not None
+    assert record.archetype == "debugging"
+    assert record.archetype_reason == "Debugging-style prompt cues suggest a debugging loop."
 
 
 def test_extract_session_workflow_profile_uses_cursor_target_files_for_docs():

@@ -296,7 +296,14 @@ def _infer_archetype(
         return (
             "debugging",
             "heuristic",
-            _cursor_debugging_reason(agent_type, source_metadata),
+            _debugging_reason(
+                text,
+                execution_types,
+                recovery_path,
+                steps,
+                agent_type=agent_type,
+                source_metadata=source_metadata,
+            ),
         )
 
     if _looks_like_refactor(text, change_shape):
@@ -564,13 +571,29 @@ def _bool_attr(value: object | None, field: str) -> bool:
     return bool(candidate)
 
 
-def _cursor_debugging_reason(agent_type: str | None, source_metadata: object | None) -> str:
+def _debugging_reason(
+    text: str,
+    execution_types: set[str],
+    recovery_path: object | None,
+    steps: list[str],
+    *,
+    agent_type: str | None,
+    source_metadata: object | None,
+) -> str:
+    if _int_attr(recovery_path, "recovery_step_count") > 0 or _string_attr(
+        recovery_path, "recovery_result"
+    ) in {"recovered", "unresolved"}:
+        return "Recovery behavior suggests a debugging loop."
+    if "fix" in steps or ("test" in execution_types and "edit" in steps):
+        return "Verification evidence suggests a debugging loop."
     if agent_type == "cursor" and _cursor_change_metadata(source_metadata):
         return (
             "Cursor-native change signals plus debugging-style prompt cues suggest a "
             "debugging loop."
         )
-    return "Failed verification or recovery behavior suggests a debugging loop."
+    if _DEBUG_TEXT_RE.search(text) and ("edit" in steps or "execute" in steps):
+        return "Debugging-style prompt cues suggest a debugging loop."
+    return "Heuristic debugging signals suggest a debugging loop."
 
 
 def _cursor_feature_delivery_reason(agent_type: str | None, source_metadata: object | None) -> str:
