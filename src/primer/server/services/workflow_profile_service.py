@@ -44,7 +44,7 @@ _SESSION_TYPE_ARCHETYPES = {
 _DOC_TEXT_RE = re.compile(r"\b(?:docs?|documentation|readme|changelog|guide)\b")
 _MIGRATION_TEXT_RE = re.compile(r"\b(?:migrat\w*|upgrade|moderniz\w*|deprecat\w*|port(?:ing|ed))\b")
 _DEBUG_TEXT_RE = re.compile(
-    r"\b(?:bug|debug|failing|failure|regression|error|broken|traceback|incident|hotfix|repair)\b"
+    r"\b(?:debug|failing|failure|regression|broken|traceback|incident|hotfix|repair)\b"
 )
 
 

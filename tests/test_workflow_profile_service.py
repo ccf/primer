@@ -271,6 +271,28 @@ def test_extract_session_workflow_profile_uses_text_cues_for_debugging_reason():
     assert record.archetype_reason == "Debugging-style prompt cues suggest a debugging loop."
 
 
+def test_extract_session_workflow_profile_does_not_treat_error_handling_as_debugging():
+    record = extract_session_workflow_profile(
+        {
+            "first_prompt": "Implement custom error handling middleware",
+            "summary": "Add structured error responses for API clients.",
+        },
+        [
+            {"tool_name": "Read", "call_count": 1},
+            {"tool_name": "Edit", "call_count": 2},
+        ],
+        [],
+        change_shape={
+            "files_touched_count": 2,
+            "diff_size": 18,
+            "edit_operations": 2,
+        },
+    )
+
+    assert record is not None
+    assert record.archetype == "feature_delivery"
+
+
 def test_extract_session_workflow_profile_uses_cursor_target_files_for_docs():
     record = extract_session_workflow_profile(
         {
