@@ -100,6 +100,11 @@ def _setup_cursor_global_state(
                 "toolFormerData": {
                     "name": "task_v2",
                     "status": "completed",
+                    "usage": {
+                        "inputTokens": 120,
+                        "outputTokens": 45,
+                        "cacheReadTokens": 10,
+                    },
                     "rawArgs": json.dumps(
                         {
                             "model": "gpt-5.4-high",
@@ -499,6 +504,14 @@ def test_extract_native_cursor_transcript_enriches_tool_counts_model_and_branch(
     assert meta.summary == "I'll inspect the local transcript format."
     assert meta.git_branch == "feature/cursor-telemetry"
     assert meta.primary_model == "gpt-5.4-high"
+    assert meta.model_tokens == {
+        "gpt-5.4-high": {
+            "input": 120,
+            "output": 45,
+            "cache_read": 10,
+            "cache_creation": 0,
+        }
+    }
     assert meta.permission_mode == "manual"
     assert meta.tool_counts == {
         "read_file_v2": 1,
@@ -507,6 +520,20 @@ def test_extract_native_cursor_transcript_enriches_tool_counts_model_and_branch(
         "edit_file_v2": 1,
     }
     assert meta.tool_call_count == 4
+    assert meta.input_tokens == 120
+    assert meta.output_tokens == 45
+    assert meta.cache_read_tokens == 10
+    assert meta.cache_creation_tokens == 0
+    payload = meta.to_ingest_payload()
+    assert payload["model_usages"] == [
+        {
+            "model_name": "gpt-5.4-high",
+            "input_tokens": 120,
+            "output_tokens": 45,
+            "cache_read_tokens": 10,
+            "cache_creation_tokens": 0,
+        }
+    ]
     assert meta.source_metadata == {
         "native_telemetry": {
             "approval": {"signal_count": 1},
@@ -514,6 +541,14 @@ def test_extract_native_cursor_transcript_enriches_tool_counts_model_and_branch(
             "change_signals": {
                 "signal_count": 1,
                 "target_files": ["src/cursor_extractor.py"],
+            },
+            "model_usage": {
+                "confidence": "high",
+                "models": ["gpt-5.4-high"],
+                "total_input_tokens": 120,
+                "total_output_tokens": 45,
+                "total_cache_read_tokens": 10,
+                "total_cache_creation_tokens": 0,
             },
         }
     }
@@ -563,6 +598,14 @@ def test_cursor_change_signal_ignores_read_only_path_arguments(tmp_path, monkeyp
             "change_signals": {
                 "signal_count": 1,
                 "target_files": ["src/cursor_extractor.py"],
+            },
+            "model_usage": {
+                "confidence": "high",
+                "models": ["gpt-5.4-high"],
+                "total_input_tokens": 120,
+                "total_output_tokens": 45,
+                "total_cache_read_tokens": 10,
+                "total_cache_creation_tokens": 0,
             },
         }
     }
