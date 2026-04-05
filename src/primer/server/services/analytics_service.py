@@ -2106,11 +2106,10 @@ def get_bottleneck_analytics(
         if friction_counts:
             has_friction = False
             detail_assigned = False
-            normalized_outcome = canonical_outcome(facets.outcome) if facets else None
             distributed_minutes_by_type, total_minutes_lost = _estimate_session_time_lost_minutes(
                 session,
                 friction_counts,
-                outcome=normalized_outcome,
+                outcome=outcome,
                 recovery_path=recovery_by_session.get(sid),
             )
             for friction_type, count in friction_counts.items():
