@@ -82,6 +82,7 @@ class NativeCursorComposerState:
     permission_mode: str | None = None
     summary: str | None = None
     source_metadata: dict[str, Any] | None = None
+    model_tokens: dict[str, dict[str, int]] = field(default_factory=dict)
     tool_counts: dict[str, int] = field(default_factory=dict)
 
 
@@ -359,6 +360,13 @@ class CursorExtractor:
                 meta.permission_mode = composer_state.permission_mode or meta.permission_mode
                 meta.summary = meta.summary or composer_state.summary or ""
                 meta.source_metadata = composer_state.source_metadata or meta.source_metadata
+                if composer_state.model_tokens:
+                    meta.model_tokens = composer_state.model_tokens
+                    for model_data in composer_state.model_tokens.values():
+                        meta.input_tokens += model_data.get("input", 0)
+                        meta.output_tokens += model_data.get("output", 0)
+                        meta.cache_read_tokens += model_data.get("cache_read", 0)
+                        meta.cache_creation_tokens += model_data.get("cache_creation", 0)
                 if composer_state.tool_counts:
                     meta.tool_counts = composer_state.tool_counts
                     meta.tool_call_count = sum(composer_state.tool_counts.values())
@@ -444,6 +452,7 @@ class CursorExtractor:
             }
             tool_counter: Counter[str] = Counter()
             model_counter: Counter[str] = Counter()
+            model_tokens: dict[str, dict[str, int]] = {}
             approval_signal_count = 0
             context_reference_count = 0
             change_signal_count = 0
@@ -474,7 +483,18 @@ class CursorExtractor:
                         tool_counter[tool_name] += 1
 
                     parsed_args = _extract_toolformer_args(tool_data)
-                    model_counter.update(_extract_toolformer_models(tool_data, parsed_args))
+                    model_names = _extract_toolformer_models(tool_data, parsed_args)
+                    model_counter.update(model_names)
+                    usage_model_name, usage = _extract_toolformer_usage(tool_data, parsed_args)
+                    if usage_model_name and usage:
+                        bucket = model_tokens.setdefault(
+                            usage_model_name,
+                            {"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0},
+                        )
+                        bucket["input"] += usage["input"]
+                        bucket["output"] += usage["output"]
+                        bucket["cache_read"] += usage["cache_read"]
+                        bucket["cache_creation"] += usage["cache_creation"]
                     if _toolformer_has_approval_signal(tool_data, parsed_args):
                         approval_signal_count += 1
                     context_reference_count += _count_toolformer_context_references(parsed_args)
@@ -508,6 +528,7 @@ class CursorExtractor:
                 context_reference_count=context_reference_count,
                 change_signal_count=change_signal_count,
                 target_files=target_files,
+                model_tokens=model_tokens,
             )
 
             return NativeCursorComposerState(
@@ -518,6 +539,7 @@ class CursorExtractor:
                 permission_mode=permission_mode,
                 summary=summary or None,
                 source_metadata=source_metadata,
+                model_tokens=model_tokens,
                 tool_counts=dict(tool_counter),
             )
         except (json.JSONDecodeError, sqlite3.Error):
@@ -783,6 +805,78 @@ def _extract_toolformer_models(
     return models
 
 
+def _extract_toolformer_usage(
+    tool_data: dict[str, Any],
+    parsed_args: dict[str, Any],
+) -> tuple[str | None, dict[str, int] | None]:
+    usage_sources = [
+        tool_data.get("usage"),
+        tool_data.get("usageMetadata"),
+        tool_data.get("tokenUsage"),
+        parsed_args.get("usage"),
+        parsed_args.get("usageMetadata"),
+        parsed_args.get("tokenUsage"),
+        parsed_args.get("tokens"),
+    ]
+    usage = None
+    for source in usage_sources:
+        usage = _normalize_cursor_usage(source)
+        if usage is not None:
+            break
+    if usage is None:
+        return None, None
+
+    model_names = _extract_toolformer_models(tool_data, parsed_args)
+    if not model_names:
+        return None, None
+    model_name = model_names.most_common(1)[0][0]
+    return model_name, usage
+
+
+def _normalize_cursor_usage(value: object) -> dict[str, int] | None:
+    if not isinstance(value, dict):
+        return None
+
+    def _pick(*keys: str) -> int:
+        for key in keys:
+            if key in value:
+                return _safe_non_negative_int(value.get(key))
+        return 0
+
+    usage = {
+        "input": _pick(
+            "inputTokens",
+            "input_tokens",
+            "inputTokenCount",
+            "promptTokens",
+            "prompt_tokens",
+        ),
+        "output": _pick(
+            "outputTokens",
+            "output_tokens",
+            "outputTokenCount",
+            "completionTokens",
+            "completion_tokens",
+        ),
+        "cache_read": _pick(
+            "cacheReadTokens",
+            "cache_read_tokens",
+            "cachedInputTokens",
+            "cached_input_tokens",
+            "cacheReadInputTokens",
+        ),
+        "cache_creation": _pick(
+            "cacheCreationTokens",
+            "cache_creation_tokens",
+            "cacheWriteTokens",
+            "cache_write_tokens",
+        ),
+    }
+    if any(usage.values()):
+        return usage
+    return None
+
+
 def _has_change_arg_key(value: object) -> bool:
     if isinstance(value, dict):
         for key, child in value.items():
@@ -863,6 +957,7 @@ def _build_cursor_source_metadata(
     context_reference_count: int,
     change_signal_count: int,
     target_files: set[str],
+    model_tokens: dict[str, dict[str, int]],
 ) -> dict[str, Any] | None:
     native_telemetry: dict[str, Any] = {}
     if approval_signal_count > 0:
@@ -873,6 +968,19 @@ def _build_cursor_source_metadata(
         native_telemetry["change_signals"] = {
             "signal_count": change_signal_count,
             "target_files": sorted(target_files)[:20],
+        }
+    if model_tokens:
+        native_telemetry["model_usage"] = {
+            "confidence": "high",
+            "models": sorted(model_tokens.keys()),
+            "total_input_tokens": sum(tokens.get("input", 0) for tokens in model_tokens.values()),
+            "total_output_tokens": sum(tokens.get("output", 0) for tokens in model_tokens.values()),
+            "total_cache_read_tokens": sum(
+                tokens.get("cache_read", 0) for tokens in model_tokens.values()
+            ),
+            "total_cache_creation_tokens": sum(
+                tokens.get("cache_creation", 0) for tokens in model_tokens.values()
+            ),
         }
     if not native_telemetry:
         return None

@@ -440,6 +440,34 @@ def test_measurement_integrity_stats_count_missing_supported_tool_and_model_tele
     assert source_quality["cursor"]["model_usage_coverage_pct"] == 0.0
 
 
+def test_measurement_integrity_stats_include_cursor_model_usage_coverage(
+    client, admin_headers, engineer_with_key, db_session
+):
+    eng, _api_key = engineer_with_key
+
+    _create_measurement_integrity_session(
+        db_session,
+        eng.id,
+        agent_type="cursor",
+        with_messages=True,
+        with_model_usage=True,
+    )
+    _create_measurement_integrity_session(
+        db_session,
+        eng.id,
+        agent_type="cursor",
+        with_messages=True,
+        with_model_usage=False,
+    )
+
+    response = client.get("/api/v1/admin/measurement-integrity", headers=admin_headers)
+    assert response.status_code == 200
+
+    source_quality = {entry["agent_type"]: entry for entry in response.json()["source_quality"]}
+    assert source_quality["cursor"]["model_usage_parity"] == "optional"
+    assert source_quality["cursor"]["model_usage_coverage_pct"] == 50.0
+
+
 def test_measurement_integrity_stats_include_cursor_native_signal_coverage(
     client, admin_headers, engineer_with_key, db_session
 ):
