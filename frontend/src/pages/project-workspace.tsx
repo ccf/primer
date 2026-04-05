@@ -187,7 +187,7 @@ export function ProjectWorkspacePage({ teamId, dateRange }: ProjectWorkspacePage
           <CardContent className="space-y-4">
             {data.friction ? (
               <>
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-4">
                   <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">Friction Rate</p>
                     <p className="mt-1 font-display text-2xl">{formatPercent(data.friction.friction_rate)}</p>
@@ -199,6 +199,12 @@ export function ProjectWorkspacePage({ teamId, dateRange }: ProjectWorkspacePage
                   <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">Total Frictions</p>
                     <p className="mt-1 font-display text-2xl">{formatNumber(data.friction.total_friction_count)}</p>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Time Lost</p>
+                    <p className="mt-1 font-display text-2xl">
+                      {formatDuration(data.friction.estimated_minutes_lost * 60)}
+                    </p>
                   </div>
                 </div>
 

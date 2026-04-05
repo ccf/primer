@@ -30,6 +30,7 @@ from primer.common.schemas import (
     EngineerAnalytics,
     EngineerBenchmark,
     EngineerBenchmarkResponse,
+    EngineerFrictionTimeLost,
     EngineerStats,
     EngineerToolProfile,
     FrictionImpact,
@@ -160,6 +161,34 @@ _ROOT_CAUSE_KEYWORDS: dict[str, tuple[str, ...]] = {
         "over-engineered",
     ),
 }
+
+_FRICTION_TIME_LOST_MINUTES: dict[str, float] = {
+    "permission_denied": 4.0,
+    "user_rejected_action": 3.0,
+    "timeout": 6.0,
+    "tool_error": 5.0,
+    "external_tool_issue": 6.0,
+    "exec_error": 8.0,
+    "compile_error": 8.0,
+    "buggy_code": 8.0,
+    "context_switching": 5.0,
+    "context_limit": 7.0,
+    "slow_or_verbose": 3.0,
+    "edit_conflict": 6.0,
+    "wrong_file_or_location": 5.0,
+    "assistant_got_blocked": 4.0,
+    "wrong_approach": 10.0,
+    "misunderstood_request": 8.0,
+    "excessive_changes": 9.0,
+}
+_DEFAULT_FRICTION_TIME_LOST_MINUTES = 5.0
+_RECOVERY_STEP_TIME_LOST_MINUTES = 2.5
+_ABANDONED_SESSION_TIME_LOST_FACTOR = 0.35
+_ABANDONED_SESSION_TIME_LOST_CAP_MINUTES = 20.0
+_ABANDONED_SESSION_TIME_LOST_FALLBACK_MINUTES = 12.0
+_UNRESOLVED_SESSION_TIME_LOST_FACTOR = 0.2
+_UNRESOLVED_SESSION_TIME_LOST_CAP_MINUTES = 10.0
+_UNRESOLVED_SESSION_TIME_LOST_FALLBACK_MINUTES = 6.0
 
 _STAGE_TOOL_WEIGHTS: dict[str, tuple[str, ...]] = {
     "search": ("Glob", "Grep", "WebSearch", "WebFetch"),
@@ -292,6 +321,75 @@ def _root_cause_title(category: str, workflow_stage: str) -> str:
     if workflow_stage == "general":
         return base
     return f"{base} during {workflow_stage} work"
+
+
+def _friction_time_lost_weight(friction_type: str) -> float:
+    return _FRICTION_TIME_LOST_MINUTES.get(friction_type, _DEFAULT_FRICTION_TIME_LOST_MINUTES)
+
+
+def _estimate_session_time_lost_minutes(
+    session: SessionModel,
+    friction_counts: dict[str, int],
+    *,
+    outcome: str | None,
+    recovery_path: SessionRecoveryPath | None,
+) -> tuple[dict[str, float], float]:
+    positive_counts = {
+        friction_type: count
+        for friction_type, count in friction_counts.items()
+        if count and count > 0
+    }
+    if not positive_counts:
+        return {}, 0.0
+
+    weighted_minutes = {
+        friction_type: _friction_time_lost_weight(friction_type) * count
+        for friction_type, count in positive_counts.items()
+    }
+    base_minutes = sum(weighted_minutes.values())
+
+    extra_minutes = 0.0
+    recovery_steps = recovery_path.recovery_step_count if recovery_path is not None else 0
+    if recovery_steps > 0:
+        extra_minutes += recovery_steps * _RECOVERY_STEP_TIME_LOST_MINUTES
+
+    duration_minutes = max((session.duration_seconds or 0.0) / 60.0, 0.0)
+    recovery_result = recovery_path.recovery_result if recovery_path is not None else None
+    if outcome == "abandoned" or recovery_result == "abandoned":
+        extra_minutes += (
+            min(
+                duration_minutes * _ABANDONED_SESSION_TIME_LOST_FACTOR,
+                _ABANDONED_SESSION_TIME_LOST_CAP_MINUTES,
+            )
+            if duration_minutes > 0
+            else _ABANDONED_SESSION_TIME_LOST_FALLBACK_MINUTES
+        )
+    elif recovery_result == "unresolved":
+        extra_minutes += (
+            min(
+                duration_minutes * _UNRESOLVED_SESSION_TIME_LOST_FACTOR,
+                _UNRESOLVED_SESSION_TIME_LOST_CAP_MINUTES,
+            )
+            if duration_minutes > 0
+            else _UNRESOLVED_SESSION_TIME_LOST_FALLBACK_MINUTES
+        )
+
+    total_minutes = base_minutes + extra_minutes
+    if duration_minutes > 0:
+        total_minutes = min(total_minutes, duration_minutes)
+    if total_minutes <= 0:
+        return {}, 0.0
+
+    weighted_total = sum(weighted_minutes.values())
+    if weighted_total <= 0:
+        share = total_minutes / len(positive_counts)
+        return ({friction_type: share for friction_type in positive_counts}, total_minutes)
+
+    distributed_minutes = {
+        friction_type: total_minutes * (weight / weighted_total)
+        for friction_type, weight in weighted_minutes.items()
+    }
+    return distributed_minutes, total_minutes
 
 
 def _message_backed_stats(
@@ -1920,6 +2018,18 @@ def get_bottleneck_analytics(
         return result
 
     session_ids = [session.id for session, _ in rows]
+    recovery_rows = (
+        db.query(SessionRecoveryPath).filter(SessionRecoveryPath.session_id.in_(session_ids)).all()
+    )
+    recovery_by_session = {row.session_id: row for row in recovery_rows}
+    engineer_names = {
+        engineer_id: name
+        for engineer_id, name in (
+            db.query(Engineer.id, Engineer.name)
+            .filter(Engineer.id.in_({session.engineer_id for session, _ in rows}))
+            .all()
+        )
+    }
     tool_counts_by_session: dict[str, Counter[str]] = defaultdict(Counter)
     for session_id, tool_name, call_count in (
         db.query(ToolUsage.session_id, ToolUsage.tool_name, ToolUsage.call_count)
@@ -1959,6 +2069,16 @@ def get_bottleneck_analytics(
     project_sessions: dict[str, int] = {}
     project_friction_sessions: dict[str, set[str]] = {}
     project_friction_counts: dict[str, Counter[str]] = {}
+    project_time_lost_minutes: dict[str, float] = defaultdict(float)
+
+    # --- Engineer Time Lost ---
+    engineer_sessions: dict[str, set[str]] = defaultdict(set)
+    engineer_friction_sessions: dict[str, set[str]] = defaultdict(set)
+    engineer_friction_counts: dict[str, Counter[str]] = defaultdict(Counter)
+    engineer_time_lost_minutes: dict[str, float] = defaultdict(float)
+
+    # --- Time Lost by Friction Type ---
+    friction_time_lost_minutes: dict[str, float] = defaultdict(float)
 
     # --- Friction Trends ---
     daily_friction: dict[str, int] = {}
@@ -1974,6 +2094,7 @@ def get_bottleneck_analytics(
 
         # Track project sessions
         project_sessions[project] = project_sessions.get(project, 0) + 1
+        engineer_sessions[session.engineer_id].add(sid)
 
         # Track daily total sessions
         if date_key:
@@ -1985,6 +2106,13 @@ def get_bottleneck_analytics(
         if friction_counts:
             has_friction = False
             detail_assigned = False
+            normalized_outcome = canonical_outcome(facets.outcome) if facets else None
+            distributed_minutes_by_type, total_minutes_lost = _estimate_session_time_lost_minutes(
+                session,
+                friction_counts,
+                outcome=normalized_outcome,
+                recovery_path=recovery_by_session.get(sid),
+            )
             for friction_type, count in friction_counts.items():
                 if count > 0:
                     has_friction = True
@@ -2017,12 +2145,26 @@ def get_bottleneck_analytics(
                     if date_key:
                         daily_friction[date_key] = daily_friction.get(date_key, 0) + count
 
+                    friction_time_lost_minutes[friction_type] += distributed_minutes_by_type.get(
+                        friction_type, 0.0
+                    )
+
             if has_friction:
                 sessions_with_friction.add(sid)
 
                 if project not in project_friction_sessions:
                     project_friction_sessions[project] = set()
                 project_friction_sessions[project].add(sid)
+                project_time_lost_minutes[project] += total_minutes_lost
+                engineer_friction_sessions[session.engineer_id].add(sid)
+                engineer_time_lost_minutes[session.engineer_id] += total_minutes_lost
+                engineer_friction_counts[session.engineer_id].update(
+                    {
+                        friction_type: count
+                        for friction_type, count in friction_counts.items()
+                        if count and count > 0
+                    }
+                )
 
                 if date_key:
                     if date_key not in daily_friction_sessions:
@@ -2059,6 +2201,20 @@ def get_bottleneck_analytics(
                 success_rate_with=round(sr_with, 3) if sr_with is not None else None,
                 success_rate_without=round(sr_without, 3) if sr_without is not None else None,
                 impact_score=impact,
+                estimated_minutes_lost=round(friction_time_lost_minutes.get(ft, 0.0), 1),
+                avg_minutes_lost_per_affected_session=(
+                    round(
+                        friction_time_lost_minutes.get(ft, 0.0) / len(type_sessions.get(ft, set())),
+                        1,
+                    )
+                    if type_sessions.get(ft)
+                    else None
+                ),
+                avg_minutes_lost_per_occurrence=(
+                    round(friction_time_lost_minutes.get(ft, 0.0) / occ_count, 1)
+                    if occ_count > 0
+                    else None
+                ),
                 sample_details=type_details.get(ft, []),
             )
         )
@@ -2167,9 +2323,6 @@ def get_bottleneck_analytics(
         )[:8]
     ]
 
-    recovery_rows = (
-        db.query(SessionRecoveryPath).filter(SessionRecoveryPath.session_id.in_(session_ids)).all()
-    )
     recovered_sessions = sum(1 for row in recovery_rows if row.recovery_result == "recovered")
     abandoned_sessions = sum(1 for row in recovery_rows if row.recovery_result == "abandoned")
     unresolved_sessions = max(len(recovery_rows) - recovered_sessions - abandoned_sessions, 0)
@@ -2260,9 +2413,49 @@ def get_bottleneck_analytics(
                 friction_rate=round(friction_count / total, 3) if total > 0 else 0.0,
                 top_friction_types=top_types,
                 total_friction_count=total_fc,
+                estimated_minutes_lost=round(project_time_lost_minutes.get(proj, 0.0), 1),
+                avg_minutes_lost_per_friction_session=(
+                    round(project_time_lost_minutes.get(proj, 0.0) / friction_count, 1)
+                    if friction_count > 0
+                    else None
+                ),
             )
         )
     project_friction_list.sort(key=lambda p: p.total_friction_count, reverse=True)
+
+    engineer_time_lost = [
+        EngineerFrictionTimeLost(
+            engineer_id=engineer_id,
+            engineer_name=engineer_names.get(engineer_id, "Unknown"),
+            total_sessions=len(engineer_sessions.get(engineer_id, set())),
+            sessions_with_friction=len(engineer_friction_sessions.get(engineer_id, set())),
+            total_friction_count=sum(engineer_friction_counts.get(engineer_id, Counter()).values()),
+            estimated_minutes_lost=round(engineer_time_lost_minutes.get(engineer_id, 0.0), 1),
+            avg_minutes_lost_per_friction_session=(
+                round(
+                    engineer_time_lost_minutes.get(engineer_id, 0.0)
+                    / len(engineer_friction_sessions.get(engineer_id, set())),
+                    1,
+                )
+                if engineer_friction_sessions.get(engineer_id)
+                else None
+            ),
+            top_friction_types=[
+                friction_type
+                for friction_type, _count in engineer_friction_counts.get(
+                    engineer_id, Counter()
+                ).most_common(3)
+            ],
+        )
+        for engineer_id in sorted(
+            engineer_friction_sessions,
+            key=lambda value: (
+                engineer_time_lost_minutes.get(value, 0.0),
+                len(engineer_friction_sessions.get(value, set())),
+            ),
+            reverse=True,
+        )
+    ]
 
     # Build friction trends
     all_dates = sorted(set(daily_total_sessions.keys()))
@@ -2282,6 +2475,7 @@ def get_bottleneck_analytics(
     result = BottleneckAnalytics(
         friction_impacts=friction_impacts,
         project_friction=project_friction_list,
+        engineer_time_lost=engineer_time_lost,
         friction_trends=friction_trends,
         root_cause_clusters=root_cause_clusters,
         recovery_overview=recovery_overview,
@@ -2291,6 +2485,7 @@ def get_bottleneck_analytics(
         overall_friction_rate=round(sessions_with_count / total_sessions, 3)
         if total_sessions > 0
         else 0.0,
+        total_estimated_minutes_lost=round(sum(project_time_lost_minutes.values()), 1),
     )
     set_cached_json("bottleneck_analytics", cache_params, result.model_dump(mode="json"))
     return result

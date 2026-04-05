@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatDuration } from "@/lib/utils"
 import { cn } from "@/lib/utils"
 import type { FrictionImpact } from "@/types/api"
 
@@ -36,6 +37,7 @@ export function FrictionImpactTable({ data }: FrictionImpactTableProps) {
                 <th className="pb-2 text-right font-medium">Sessions</th>
                 <th className="pb-2 text-right font-medium">Success w/</th>
                 <th className="pb-2 text-right font-medium">Success w/o</th>
+                <th className="pb-2 text-right font-medium">Time Lost</th>
                 <th className="pb-2 text-right font-medium">Impact</th>
               </tr>
             </thead>
@@ -54,6 +56,14 @@ export function FrictionImpactTable({ data }: FrictionImpactTableProps) {
                     {item.success_rate_without != null
                       ? `${(item.success_rate_without * 100).toFixed(0)}%`
                       : "--"}
+                  </td>
+                  <td className="py-2 text-right">
+                    <div>{formatDuration(item.estimated_minutes_lost * 60)}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {item.avg_minutes_lost_per_affected_session != null
+                        ? `${formatDuration(item.avg_minutes_lost_per_affected_session * 60)}/session`
+                        : "--"}
+                    </div>
                   </td>
                   <td className="py-2 text-right">
                     <ImpactBadge score={item.impact_score} />

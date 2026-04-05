@@ -4,6 +4,7 @@ import { BottleneckSummary } from "@/components/bottlenecks/bottleneck-summary"
 import { FrictionTrendChart } from "@/components/bottlenecks/friction-trend-chart"
 import { FrictionImpactTable } from "@/components/bottlenecks/friction-impact-table"
 import { ProjectFrictionTable } from "@/components/bottlenecks/project-friction-table"
+import { EngineerTimeLostTable } from "@/components/bottlenecks/engineer-time-lost-table"
 import { RootCauseClusterList } from "@/components/bottlenecks/root-cause-cluster-list"
 import { RecoveryPatternList } from "@/components/bottlenecks/recovery-pattern-list"
 import { CardSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleton"
@@ -61,6 +62,11 @@ export function FrictionPage({ teamId, dateRange }: FrictionPageProps) {
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-muted-foreground">By Project</h2>
         <ProjectFrictionTable data={data.project_friction} />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground">By Engineer</h2>
+        <EngineerTimeLostTable data={data.engineer_time_lost} />
       </section>
     </div>
   )
