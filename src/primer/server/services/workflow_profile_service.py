@@ -481,11 +481,8 @@ def _augment_cursor_steps(
 
     ordered_steps = list(steps)
     if _cursor_context_metadata(source_metadata) and "read" not in ordered_steps:
-        ordered_steps.insert(0, "read")
-
-    if _cursor_change_metadata(source_metadata) and "edit" not in ordered_steps:
-        insert_at = ordered_steps.index("read") + 1 if "read" in ordered_steps else 0
-        ordered_steps.insert(insert_at, "edit")
+        insert_at = ordered_steps.index("search") + 1 if "search" in ordered_steps else 0
+        ordered_steps.insert(insert_at, "read")
 
     return ordered_steps
 
