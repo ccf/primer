@@ -316,3 +316,23 @@ def test_extract_session_workflow_profile_uses_cursor_target_files_for_docs():
     assert record is not None
     assert record.archetype == "docs"
     assert record.steps == ["read", "edit", "delegate"]
+
+
+def test_extract_session_workflow_profile_inserts_cursor_read_after_search():
+    record = extract_session_workflow_profile(
+        {
+            "agent_type": "cursor",
+            "first_prompt": "Search the codebase for the auth middleware and update it",
+        },
+        [{"tool_name": "codebase_search", "call_count": 2}],
+        [],
+        source_metadata={
+            "native_telemetry": {
+                "context_usage": {"reference_count": 2},
+            }
+        },
+        agent_type="cursor",
+    )
+
+    assert record is not None
+    assert record.steps == ["search", "read"]
