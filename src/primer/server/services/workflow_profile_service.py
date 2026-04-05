@@ -541,12 +541,7 @@ def _looks_like_feature_delivery(
 ) -> bool:
     if has_commit or "ship" in steps:
         return True
-    return bool(
-        _int_attr(change_shape, "create_operations") > 0
-        or _int_attr(change_shape, "diff_size") > 0
-        or _int_attr(change_shape, "files_touched_count") > 0
-        or _has_mutations(change_shape, source_metadata=source_metadata)
-    )
+    return _has_mutations(change_shape, source_metadata=source_metadata)
 
 
 def _looks_like_investigation(
