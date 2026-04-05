@@ -43,6 +43,9 @@ _SESSION_TYPE_ARCHETYPES = {
 }
 _DOC_TEXT_RE = re.compile(r"\b(?:docs?|documentation|readme|changelog|guide)\b")
 _MIGRATION_TEXT_RE = re.compile(r"\b(?:migrat\w*|upgrade|moderniz\w*|deprecat\w*|port(?:ing|ed))\b")
+_DEBUG_TEXT_RE = re.compile(
+    r"\b(?:bug|debug|failing|failure|regression|error|broken|traceback|incident|hotfix|repair)\b"
+)
 
 
 @dataclass
@@ -69,6 +72,8 @@ def extract_session_workflow_profile(
     change_shape: object | None = None,
     recovery_path: object | None = None,
     facets: object | None = None,
+    source_metadata: object | None = None,
+    agent_type: str | None = None,
     has_commit: bool = False,
 ) -> WorkflowProfileRecord | None:
     tool_counts = _tool_counts(tool_usages)
@@ -83,7 +88,7 @@ def extract_session_workflow_profile(
         if isinstance(strategy, str) and strategy
     }
     session_type = _string_attr(facets, "session_type")
-    has_mutations = _has_mutations(change_shape)
+    has_mutations = _has_mutations(change_shape, source_metadata=source_metadata)
     steps = infer_workflow_steps(
         tool_counts,
         has_commit,
@@ -91,12 +96,19 @@ def extract_session_workflow_profile(
         recovery_strategies=recovery_strategies,
         has_mutations=has_mutations,
     )
+    steps = _augment_cursor_steps(
+        steps,
+        agent_type=agent_type,
+        source_metadata=source_metadata,
+    )
 
     archetype, archetype_source, archetype_reason = _infer_archetype(
         session,
         facets,
         change_shape,
         recovery_path,
+        source_metadata=source_metadata,
+        agent_type=agent_type,
         session_type=session_type,
         steps=steps,
         execution_types=execution_types,
@@ -168,6 +180,8 @@ def derive_session_workflow_profile(db: Session, session_id: str) -> WorkflowPro
         change_shape=change_shape,
         recovery_path=recovery_path,
         facets=facets,
+        source_metadata=session.source_metadata,
+        agent_type=session.agent_type,
         has_commit=has_commit is not None,
     )
 
@@ -250,6 +264,8 @@ def _infer_archetype(
     change_shape: object | None,
     recovery_path: object | None,
     *,
+    source_metadata: object | None,
+    agent_type: str | None,
     session_type: str | None,
     steps: list[str],
     execution_types: set[str],
@@ -265,7 +281,7 @@ def _infer_archetype(
         )
 
     text = _hint_text(session, facets)
-    named_files = _named_files(change_shape)
+    named_files = _named_files(change_shape) + _cursor_named_files(source_metadata)
     if _looks_like_docs(text, named_files):
         return "docs", "heuristic", "Documentation-heavy prompt or changed files suggest docs work."
 
@@ -276,11 +292,11 @@ def _infer_archetype(
             "Prompt hints and broad file changes suggest a migration or upgrade effort.",
         )
 
-    if _looks_like_debugging(execution_types, recovery_path, steps):
+    if _looks_like_debugging(text, execution_types, recovery_path, steps):
         return (
             "debugging",
             "heuristic",
-            "Failed verification or recovery behavior suggests a debugging loop.",
+            _cursor_debugging_reason(agent_type, source_metadata),
         )
 
     if _looks_like_refactor(text, change_shape):
@@ -290,18 +306,18 @@ def _infer_archetype(
             "Rewrite or rename signals point to a refactor-oriented session.",
         )
 
-    if _looks_like_feature_delivery(change_shape, has_commit, steps):
+    if _looks_like_feature_delivery(change_shape, source_metadata, has_commit, steps):
         return (
             "feature_delivery",
             "heuristic",
-            "Mutating changes and shipping signals suggest feature delivery work.",
+            _cursor_feature_delivery_reason(agent_type, source_metadata),
         )
 
-    if _looks_like_investigation(change_shape, has_commit, steps):
+    if _looks_like_investigation(change_shape, source_metadata, has_commit, steps):
         return (
             "investigation",
             "heuristic",
-            "Read-heavy activity without durable changes suggests investigation work.",
+            _cursor_investigation_reason(agent_type, source_metadata),
         )
 
     return None, None, None
@@ -398,8 +414,8 @@ def _named_files(change_shape: object | None) -> list[str]:
     return [value for value in values if isinstance(value, str) and value]
 
 
-def _has_mutations(change_shape: object | None) -> bool:
-    return any(
+def _has_mutations(change_shape: object | None, *, source_metadata: object | None = None) -> bool:
+    if any(
         _int_attr(change_shape, field) > 0
         for field in (
             "files_touched_count",
@@ -409,7 +425,62 @@ def _has_mutations(change_shape: object | None) -> bool:
             "delete_operations",
             "rename_operations",
         )
-    )
+    ):
+        return True
+    return bool(_cursor_change_metadata(source_metadata))
+
+
+def _cursor_native_telemetry(source_metadata: object | None) -> dict | None:
+    if not isinstance(source_metadata, dict):
+        return None
+    native = source_metadata.get("native_telemetry")
+    return native if isinstance(native, dict) else None
+
+
+def _cursor_change_metadata(source_metadata: object | None) -> dict | None:
+    native = _cursor_native_telemetry(source_metadata)
+    if native is None:
+        return None
+    change_signals = native.get("change_signals")
+    return change_signals if isinstance(change_signals, dict) else None
+
+
+def _cursor_context_metadata(source_metadata: object | None) -> dict | None:
+    native = _cursor_native_telemetry(source_metadata)
+    if native is None:
+        return None
+    context_usage = native.get("context_usage")
+    return context_usage if isinstance(context_usage, dict) else None
+
+
+def _cursor_named_files(source_metadata: object | None) -> list[str]:
+    change_signals = _cursor_change_metadata(source_metadata)
+    if change_signals is None:
+        return []
+    target_files = change_signals.get("target_files")
+    if not isinstance(target_files, list):
+        return []
+    return [value for value in target_files if isinstance(value, str) and value]
+
+
+def _augment_cursor_steps(
+    steps: list[str],
+    *,
+    agent_type: str | None,
+    source_metadata: object | None,
+) -> list[str]:
+    if agent_type != "cursor":
+        return steps
+
+    ordered_steps = list(steps)
+    if _cursor_context_metadata(source_metadata) and "read" not in ordered_steps:
+        ordered_steps.insert(0, "read")
+
+    if _cursor_change_metadata(source_metadata) and "edit" not in ordered_steps:
+        insert_at = ordered_steps.index("read") + 1 if "read" in ordered_steps else 0
+        ordered_steps.insert(insert_at, "edit")
+
+    return ordered_steps
 
 
 def _looks_like_docs(text: str, named_files: list[str]) -> bool:
@@ -436,6 +507,7 @@ def _looks_like_migration(text: str, change_shape: object | None) -> bool:
 
 
 def _looks_like_debugging(
+    text: str,
     execution_types: set[str],
     recovery_path: object | None,
     steps: list[str],
@@ -445,6 +517,8 @@ def _looks_like_debugging(
     if _string_attr(recovery_path, "recovery_result") in {"recovered", "unresolved"}:
         return True
     if "fix" in steps:
+        return True
+    if _DEBUG_TEXT_RE.search(text) and ("edit" in steps or "execute" in steps):
         return True
     return "test" in execution_types and "edit" in steps
 
@@ -461,6 +535,7 @@ def _looks_like_refactor(text: str, change_shape: object | None) -> bool:
 
 def _looks_like_feature_delivery(
     change_shape: object | None,
+    source_metadata: object | None,
     has_commit: bool,
     steps: list[str],
 ) -> bool:
@@ -470,15 +545,17 @@ def _looks_like_feature_delivery(
         _int_attr(change_shape, "create_operations") > 0
         or _int_attr(change_shape, "diff_size") > 0
         or _int_attr(change_shape, "files_touched_count") > 0
+        or _has_mutations(change_shape, source_metadata=source_metadata)
     )
 
 
 def _looks_like_investigation(
     change_shape: object | None,
+    source_metadata: object | None,
     has_commit: bool,
     steps: list[str],
 ) -> bool:
-    if has_commit or _has_mutations(change_shape):
+    if has_commit or _has_mutations(change_shape, source_metadata=source_metadata):
         return False
     return bool(steps) and set(steps).issubset(
         {"search", "read", "execute", "delegate", "integrate"}
@@ -490,3 +567,30 @@ def _bool_attr(value: object | None, field: str) -> bool:
         return False
     candidate = value.get(field) if isinstance(value, dict) else getattr(value, field, None)
     return bool(candidate)
+
+
+def _cursor_debugging_reason(agent_type: str | None, source_metadata: object | None) -> str:
+    if agent_type == "cursor" and _cursor_change_metadata(source_metadata):
+        return (
+            "Cursor-native change signals plus debugging-style prompt cues suggest a "
+            "debugging loop."
+        )
+    return "Failed verification or recovery behavior suggests a debugging loop."
+
+
+def _cursor_feature_delivery_reason(agent_type: str | None, source_metadata: object | None) -> str:
+    if agent_type == "cursor" and _cursor_change_metadata(source_metadata):
+        return (
+            "Cursor-native change signals indicate durable edits, which suggests feature delivery "
+            "work."
+        )
+    return "Mutating changes and shipping signals suggest feature delivery work."
+
+
+def _cursor_investigation_reason(agent_type: str | None, source_metadata: object | None) -> str:
+    if agent_type == "cursor" and _cursor_context_metadata(source_metadata):
+        return (
+            "Cursor-native context selection without durable changes suggests an investigation "
+            "workflow."
+        )
+    return "Read-heavy activity without durable changes suggests investigation work."

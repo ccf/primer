@@ -11,6 +11,7 @@ from primer.common.models import (
     SessionExecutionEvidence,
     SessionFacets,
     SessionRecoveryPath,
+    SessionWorkflowProfile,
 )
 from primer.common.models import Session as SessionModel
 from primer.common.schemas import SessionFacetsPayload, SessionResponse
@@ -239,6 +240,59 @@ def test_ingest_session_accepts_cursor_agent_type_and_persists(
     assert stored.primary_model == "gpt-4.1"
     assert stored.first_prompt == "Imported from Cursor"
     assert stored.has_facets is False
+
+
+def test_ingest_session_derives_cursor_workflow_profile_from_native_signals(
+    client, engineer_with_key, db_session
+):
+    _eng, api_key = engineer_with_key
+    session_id = str(uuid.uuid4())
+    payload = {
+        "session_id": session_id,
+        "api_key": api_key,
+        "agent_type": "cursor",
+        "project_name": "cursor-workflow-project",
+        "message_count": 2,
+        "user_message_count": 1,
+        "assistant_message_count": 1,
+        "messages": [
+            {
+                "ordinal": 0,
+                "role": "human",
+                "content_text": "Implement the review summary flow",
+            },
+            {
+                "ordinal": 1,
+                "role": "assistant",
+                "content_text": "I found the main integration point",
+            },
+        ],
+        "tool_usages": [
+            {"tool_name": "read_file_v2", "call_count": 2},
+            {"tool_name": "task_v2", "call_count": 1},
+        ],
+        "source_metadata": {
+            "native_telemetry": {
+                "change_signals": {
+                    "signal_count": 1,
+                    "target_files": ["src/review_summary.py"],
+                },
+                "context_usage": {"reference_count": 2},
+            }
+        },
+    }
+
+    response = client.post("/api/v1/ingest/session", json=payload)
+
+    assert response.status_code == 200
+    profile = (
+        db_session.query(SessionWorkflowProfile)
+        .filter(SessionWorkflowProfile.session_id == session_id)
+        .one()
+    )
+    assert profile.archetype == "feature_delivery"
+    assert profile.steps == ["read", "edit", "delegate"]
+    assert profile.label == "feature delivery: read -> edit -> delegate"
 
 
 def test_ingest_session_auto_extracts_facets_for_codex_transcripts(
