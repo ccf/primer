@@ -75,7 +75,7 @@ export function WorkflowCostTable({ rows }: WorkflowCostTableProps) {
                   {DIMENSION_LABELS[dimension] ?? formatLabel(dimension)}
                 </h3>
                 <span className="text-xs text-muted-foreground">
-                  {isExpanded ? items.length : `Top ${visibleItems.length} of ${items.length}`} pattern{items.length === 1 ? "" : "s"}
+                  {hasMore && !isExpanded ? `Top ${visibleItems.length} of ${items.length}` : items.length} pattern{items.length === 1 ? "" : "s"}
                 </span>
               </div>
               <div className="overflow-x-auto rounded-xl border border-border/60 bg-background">

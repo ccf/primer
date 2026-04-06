@@ -24,7 +24,7 @@ describe("AdminPerformanceTab", () => {
         cost_per_successful_outcome: 2.4,
         estimated_time_saved_hours: 12,
         estimated_value_created: 1200,
-        adoption_rate: 0.72,
+        adoption_rate: 72.0,
         power_users: 4,
         total_engineers_in_scope: 9,
         total_cost: 18.4,
