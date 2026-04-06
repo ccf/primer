@@ -110,10 +110,13 @@ def compute_leverage_score(
 ) -> tuple[float, dict[str, float]]:
     """Compute a 0-100 composite leverage score with sub-score breakdown.
 
-    Three sub-scores (33.3% each):
+    Three base sub-scores (33.3% each):
     - Tool Mastery: tool diversity (entropy) + category spread
     - Orchestration Depth: orch+skill ratio + agent team score (bonus)
-    - Efficiency: cache hit rate + model diversity
+    - Efficiency: cache hit rate
+
+    Plus an explicit model-strategy bonus when trustworthy model usage exists:
+    - Model Strategy Bonus: up to +15 points from model diversity
 
     Returns (score, breakdown) where breakdown contains all factor values.
     """
@@ -146,14 +149,14 @@ def compute_leverage_score(
 
     # --- Efficiency (33.3%) ---
     cache = cache_hit_rate if cache_hit_rate is not None else 0.0
+    efficiency = cache
+
     model_div = compute_model_diversity(model_token_counts or {}, model_tier_counts)
+    model_strategy = model_div if model_token_counts else 0.0
+    model_strategy_bonus_points = (15.0 * model_strategy) if model_token_counts else 0.0
 
-    # Bonus: model diversity can only help, never hurt. Use max to ensure no penalty.
-    blended_eff = 0.5 * cache + 0.5 * model_div
-    efficiency = max(blended_eff, cache) if model_token_counts else cache
-
-    score = (100 / 3) * tool_mastery + (100 / 3) * orchestration_depth + (100 / 3) * efficiency
-    score = round(min(score, 100.0), 1)
+    base_score = (100 / 3) * tool_mastery + (100 / 3) * orchestration_depth + (100 / 3) * efficiency
+    score = round(min(base_score + model_strategy_bonus_points, 100.0), 1)
 
     breakdown = {
         "tool_diversity": round(diversity, 3),
@@ -165,6 +168,8 @@ def compute_leverage_score(
         "cache_efficiency": round(cache, 3),
         "model_diversity": round(model_div, 3),
         "efficiency": round(efficiency, 3),
+        "model_strategy": round(model_strategy, 3),
+        "model_strategy_bonus_points": round(model_strategy_bonus_points, 3),
     }
 
     return score, breakdown

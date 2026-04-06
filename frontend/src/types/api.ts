@@ -1830,6 +1830,8 @@ export interface LeverageBreakdown {
   cache_efficiency: number
   model_diversity: number
   efficiency: number
+  model_strategy: number
+  model_strategy_bonus_points: number
 }
 
 export interface EngineerLeverageProfile {

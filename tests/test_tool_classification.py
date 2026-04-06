@@ -202,6 +202,8 @@ def test_leverage_breakdown_keys():
         "cache_efficiency",
         "model_diversity",
         "efficiency",
+        "model_strategy",
+        "model_strategy_bonus_points",
     }
     assert set(breakdown.keys()) == expected_keys
 
@@ -215,21 +217,26 @@ def test_leverage_backward_compat_no_model_data():
     assert bd["model_diversity"] == 0.0
     assert bd["cache_efficiency"] == 0.5
     assert bd["efficiency"] == 0.5  # cache only when no model data
+    assert bd["model_strategy"] == 0.0
+    assert bd["model_strategy_bonus_points"] == 0.0
 
 
 def test_leverage_with_model_diversity():
-    _, bd_no_model = compute_leverage_score(
+    score_no_model, bd_no_model = compute_leverage_score(
         {"Read": 10, "Glob": 5},
         cache_hit_rate=0.3,
     )
-    _, bd_with_model = compute_leverage_score(
+    score_with_model, bd_with_model = compute_leverage_score(
         {"Read": 10, "Glob": 5},
         cache_hit_rate=0.3,
         model_token_counts={"claude-haiku-4-5": 500, "claude-opus-4-5": 500},
         model_tier_counts={"economy": 500, "premium": 500},
     )
     assert bd_with_model["model_diversity"] > 0
-    assert bd_with_model["efficiency"] != bd_no_model["efficiency"]
+    assert bd_with_model["model_strategy"] > 0
+    assert bd_with_model["model_strategy_bonus_points"] > 0
+    assert score_with_model > score_no_model
+    assert bd_with_model["efficiency"] == bd_no_model["efficiency"]
 
 
 def test_leverage_with_teams_bonus():
@@ -251,13 +258,14 @@ def test_teams_never_penalize():
 
 
 def test_model_diversity_never_penalizes():
-    """Low model diversity should not reduce efficiency below cache-only."""
-    _, bd_no_model = compute_leverage_score({"Read": 10}, cache_hit_rate=0.6)
+    """Low model diversity should not reduce leverage below cache-only."""
+    score_no_model, _ = compute_leverage_score({"Read": 10}, cache_hit_rate=0.6)
     # Single model = low diversity, but should not hurt
-    _, bd_with_model = compute_leverage_score(
+    score_with_model, bd_with_model = compute_leverage_score(
         {"Read": 10},
         cache_hit_rate=0.6,
         model_token_counts={"claude-sonnet-4": 1000},
         model_tier_counts={"standard": 1000},
     )
-    assert bd_with_model["efficiency"] >= bd_no_model["efficiency"]
+    assert bd_with_model["model_strategy"] > 0
+    assert score_with_model >= score_no_model

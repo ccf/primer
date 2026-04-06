@@ -171,7 +171,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Tool adoption rates and trend charts
 - [x] Engineer tool proficiency table
 - [x] Daily leverage trend tracking
-- [ ] [P1] Model diversity factor in leverage scoring
+- [x] [P1] Model diversity factor in leverage scoring
 - [x] [P1] Agent team detection for coordinated multi-agent orchestration
 - [x] [P1] Session customization snapshot: capture enabled MCP servers, subagents, skills, commands, and templates alongside what was actually invoked
 - [x] [P1] Tool source classification: built-in vs marketplace vs custom
