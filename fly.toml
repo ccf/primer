@@ -1,0 +1,42 @@
+app = "primer-demo"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile.demo"
+
+[env]
+  PRIMER_DEMO_MODE = "true"
+  PRIMER_RATE_LIMIT_ENABLED = "true"
+  PRIMER_CORS_ORIGINS = '["https://primer-demo.fly.dev"]'
+  PRIMER_BASE_URL = "https://primer-demo.fly.dev"
+  PRIMER_ANALYTICS_CACHE_ENABLED = "true"
+  PRIMER_BACKGROUND_JOBS_ENABLED = "false"
+  PRIMER_NARRATIVE_AUTO_REFRESH = "false"
+  PRIMER_FACET_EXTRACTION_ENABLED = "false"
+  PRIMER_OTEL_ENABLED = "false"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 250
+    soft_limit = 200
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+[checks]
+  [checks.health]
+    grace_period = "120s"
+    interval = "15s"
+    method = "GET"
+    path = "/health"
+    port = 8000
+    timeout = "5s"
+    type = "http"

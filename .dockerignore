@@ -33,9 +33,12 @@ dist/
 build/
 site/
 
-# Tests & scripts
+# Tests
 tests/
-scripts/
+# Exclude non-essential scripts from production Dockerfile (demo uses scripts/)
+scripts/install_hook.py
+scripts/verify_github.py
+scripts/provision_user.py
 
 # Documentation & branding
 docs/
