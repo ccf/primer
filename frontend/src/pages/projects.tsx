@@ -49,7 +49,7 @@ export function ProjectsPage({ teamId, dateRange }: ProjectsPageProps) {
         description="Dedicated workspaces for readiness, friction, quality, cost, and enablement"
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <InlineStat label="Active Projects" value={formatNumber(data.total_count)} icon={FolderGit2} />
         <InlineStat label="Sessions" value={formatNumber(totalSessions)} icon={Sparkles} />
         <InlineStat label="Tracked Tokens" value={formatTokens(totalTokens)} icon={FolderKanban} />

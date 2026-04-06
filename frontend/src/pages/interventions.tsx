@@ -87,7 +87,7 @@ export function InterventionsPage({ teamId }: InterventionsPageProps) {
         </Button>
       </PageHeader>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
         <InlineStat label="Planned" value={String(plannedCount)} icon={Target} />
         <InlineStat label="In Progress" value={String(inProgressCount)} icon={PlayCircle} />
         <InlineStat label="Completed" value={String(completedCount)} icon={CheckCircle2} />
