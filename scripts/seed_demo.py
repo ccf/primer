@@ -47,6 +47,7 @@ from primer.common.models import (  # noqa: E402
     Intervention,
     PullRequest,
     ReviewFinding,
+    ModelUsage,
     Session as SessionModel,
     SessionCommit,
     SessionCustomization,
@@ -1405,6 +1406,18 @@ def seed_cursor_sessions(db: Session, repo_map: dict[str, str]) -> int:
                     )
 
                 session.tool_call_count = tool_count
+
+                # Model usages
+                db.add(
+                    ModelUsage(
+                        session_id=session_id,
+                        model_name=model,
+                        input_tokens=inp_tokens,
+                        output_tokens=out_tokens,
+                        cache_read_tokens=cache_read,
+                        cache_creation_tokens=cache_creation,
+                    )
+                )
 
                 # Facets
                 if random.random() < 0.85:
