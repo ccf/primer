@@ -12,14 +12,14 @@ FROM python:3.12-slim AS runtime
 
 WORKDIR /app
 
-# Install Python dependencies
+# Copy source and alembic (hatch force-includes alembic in the wheel)
 COPY pyproject.toml .
 COPY src/ src/
-RUN pip install --no-cache-dir .
-
-# Copy Alembic migrations
 COPY alembic.ini .
 COPY alembic/ alembic/
+
+# Install Python dependencies
+RUN pip install --no-cache-dir .
 
 # Copy seed scripts
 COPY scripts/ scripts/
