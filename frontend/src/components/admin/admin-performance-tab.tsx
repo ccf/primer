@@ -64,7 +64,7 @@ export function AdminPerformanceTab({
           />
           <StatCard
             label="Adoption"
-            value={formatPercent(productivity.adoption_rate)}
+            value={formatPercent(productivity.adoption_rate / 100)}
             subtitle={`${productivity.power_users} power users`}
             icon={Target}
           />
