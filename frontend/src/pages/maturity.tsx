@@ -28,7 +28,8 @@ import type { DateRange } from "@/components/layout/date-range-picker"
 
 const tabs = [
   { id: "overview", label: "Overview" },
-  { id: "agents", label: "Agents & Skills" },
+  { id: "agents", label: "Agents" },
+  { id: "customizations", label: "Customizations" },
   { id: "tools", label: "Tools" },
   { id: "engineers", label: "Engineers" },
   { id: "effectiveness", label: "Effectiveness" },
@@ -82,14 +83,18 @@ export function MaturityPage({ teamId, dateRange }: MaturityPageProps) {
         <div className="space-y-6">
           <SectionHeader
             title="Agent usage and coordination"
-            description="See how agent choice, delegation, and orchestration patterns vary across the team."
+            description="How agent choice, delegation, and orchestration patterns vary across the team."
           />
           <AgentSkillTable data={data.agent_skill_breakdown} />
           <div className="grid gap-6 xl:grid-cols-2">
             <AgentTeamModeTable rows={data.agent_team_modes} />
             <DelegationPatternTable rows={data.delegation_patterns} />
           </div>
+        </div>
+      )}
 
+      {data && activeTab === "customizations" && (
+        <div className="space-y-6">
           <SectionHeader
             title="Customization signals"
             description="Trace explicit customizations from availability through adoption, reliability, and outcome."
