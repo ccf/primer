@@ -1064,6 +1064,61 @@ def _now() -> datetime:
 # ============================================================================
 
 
+NEW_HIRE_EMAILS = {
+    "yuki@example.com",
+    "raj@example.com",
+    "oscar@example.com",
+    "zara@example.com",
+}
+RAMPING_EMAILS = {
+    "lily@example.com",
+    "fatima@example.com",
+    "liam@example.com",
+}
+
+
+def trim_sessions_for_cohorts(db: Session) -> None:
+    """Delete old sessions for new-hire and ramping engineers.
+
+    The onboarding analytics classify engineers by their first session date:
+    - new_hire: first session within last 20 days
+    - ramping: first session within last 50 days
+    - experienced: first session >90 days ago
+
+    The base seed creates 90 days of sessions for everyone, so we trim the
+    older sessions for new_hire and ramping personas so their cohort
+    classification works correctly.
+    """
+    print("\n=== Trimming sessions for onboarding cohorts ===")
+    now = _now()
+    cutoffs = {
+        "new_hire": now - timedelta(days=20),
+        "ramping": now - timedelta(days=50),
+    }
+
+    all_engineers = db.execute(select(Engineer)).scalars().all()
+    email_to_eng = {e.email: e for e in all_engineers}
+
+    for persona, emails in [("new_hire", NEW_HIRE_EMAILS), ("ramping", RAMPING_EMAILS)]:
+        cutoff = cutoffs[persona]
+        for email in emails:
+            eng = email_to_eng.get(email)
+            if not eng:
+                continue
+            deleted = (
+                db.query(SessionModel)
+                .filter(
+                    SessionModel.engineer_id == eng.id,
+                    SessionModel.started_at < cutoff,
+                )
+                .delete(synchronize_session="fetch")
+            )
+            if deleted:
+                print(f"  {eng.name} ({persona}): removed {deleted} sessions before cutoff")
+
+    db.commit()
+
+
 def seed_git_repositories(db: Session) -> dict[str, str]:
     """Create GitRepository records for each project. Returns {project_name: repo_id}."""
     print("\n=== Seeding Git Repositories ===")
@@ -1186,7 +1241,15 @@ def seed_cursor_sessions(db: Session, repo_map: dict[str, str]) -> int:
         # Cursor sessions are typically ~15-25% of an engineer's total sessions
         cursor_session_ratio = 0.2 if persona_type == "power_user" else 0.15
 
-        for day_offset in range(90):
+        # Limit date range for new-hire and ramping engineers so cohort
+        # classification works (first session date determines cohort)
+        max_days = 90
+        if eng.email in NEW_HIRE_EMAILS:
+            max_days = 20
+        elif eng.email in RAMPING_EMAILS:
+            max_days = 50
+
+        for day_offset in range(max_days):
             day = now - timedelta(days=day_offset)
             is_weekend = day.weekday() >= 5
 
@@ -2169,6 +2232,9 @@ def main():
     # Open a DB session for direct SQLAlchemy operations
     db = DBSessionFactory()
     try:
+        # Step 0.5: Trim sessions so new hires and ramping engineers have correct cohorts
+        trim_sessions_for_cohorts(db)
+
         # Step 1: Git repositories
         repo_map = seed_git_repositories(db)
 
