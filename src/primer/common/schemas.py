@@ -2249,6 +2249,8 @@ class LeverageBreakdown(BaseModel):
     cache_efficiency: float = 0.0
     model_diversity: float = 0.0
     efficiency: float = 0.0
+    model_strategy: float = 0.0
+    model_strategy_bonus_points: float = 0.0
 
 
 class EngineerLeverageProfile(BaseModel):

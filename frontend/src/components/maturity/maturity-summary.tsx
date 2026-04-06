@@ -1,4 +1,4 @@
-import { BarChart3, Sparkles, Target, Users } from "lucide-react"
+import { BarChart3, Cpu, Sparkles, Target, Users } from "lucide-react"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { formatNumber, formatPercent } from "@/lib/utils"
 import type { MaturityAnalyticsResponse } from "@/types/api"
@@ -9,7 +9,7 @@ interface MaturitySummaryProps {
 
 export function MaturitySummary({ data }: MaturitySummaryProps) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
       <StatCard
         label="Avg Leverage Score"
         value={data.avg_leverage_score.toFixed(1)}
@@ -33,6 +33,12 @@ export function MaturitySummary({ data }: MaturitySummaryProps) {
         value={formatPercent(data.explicit_customization_adoption_rate)}
         subtitle="Engineers using explicit MCPs, skills, or subagents"
         icon={Users}
+      />
+      <StatCard
+        label="Avg Model Diversity"
+        value={formatPercent(data.model_diversity_avg)}
+        subtitle="Leverage bonus from model strategy"
+        icon={Cpu}
       />
       <StatCard
         label="Sessions Analyzed"
