@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatPercent, titleize } from "@/lib/utils"
@@ -7,8 +8,15 @@ interface RootCauseClusterListProps {
   data: RootCauseCluster[]
 }
 
+const DEFAULT_VISIBLE = 5
+
 export function RootCauseClusterList({ data }: RootCauseClusterListProps) {
+  const [showAll, setShowAll] = useState(false)
+
   if (data.length === 0) return null
+
+  const visible = showAll ? data : data.slice(0, DEFAULT_VISIBLE)
+  const hasMore = data.length > DEFAULT_VISIBLE
 
   return (
     <Card>
@@ -16,7 +24,7 @@ export function RootCauseClusterList({ data }: RootCauseClusterListProps) {
         <CardTitle className="text-sm font-medium">Root-Cause Clusters</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {data.map((cluster) => (
+        {visible.map((cluster) => (
           <div
             key={cluster.cluster_id}
             className="rounded-xl border border-border/60 bg-background p-4"
@@ -105,6 +113,15 @@ export function RootCauseClusterList({ data }: RootCauseClusterListProps) {
             )}
           </div>
         ))}
+        {hasMore && (
+          <button
+            type="button"
+            onClick={() => setShowAll(!showAll)}
+            className="text-xs text-primary hover:underline"
+          >
+            {showAll ? "Show top 5" : `Show all ${data.length} clusters`}
+          </button>
+        )}
       </CardContent>
     </Card>
   )
