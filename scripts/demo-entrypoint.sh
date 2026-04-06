@@ -1,6 +1,11 @@
 #!/usr/bin/env sh
 set -e
 
+# Fly.io sets DATABASE_URL; Primer expects PRIMER_DATABASE_URL
+if [ -n "$DATABASE_URL" ] && [ -z "$PRIMER_DATABASE_URL" ]; then
+  export PRIMER_DATABASE_URL="$DATABASE_URL"
+fi
+
 echo "=== Primer Demo Instance ==="
 echo "Database: ${PRIMER_DATABASE_URL:-sqlite:///./primer.db}"
 
