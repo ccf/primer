@@ -1,5 +1,6 @@
 import { vi } from "vitest"
 import { render, screen } from "@testing-library/react"
+import { MemoryRouter } from "react-router-dom"
 import { RecommendationsPanel } from "@/components/dashboard/recommendations-panel"
 import type { Recommendation } from "@/types/api"
 
@@ -38,10 +39,14 @@ describe("RecommendationsPanel", () => {
   })
 
   it("shows empty state when data is empty", () => {
-    render(<RecommendationsPanel data={[]} teamId={null} />)
+    render(
+      <MemoryRouter>
+        <RecommendationsPanel data={[]} teamId={null} />
+      </MemoryRouter>,
+    )
 
     expect(
-      screen.getByText("No recommendations — everything looks good!"),
+      screen.getByText("No recommendations right now"),
     ).toBeInTheDocument()
   })
 

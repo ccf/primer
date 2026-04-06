@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen } from "@testing-library/react"
 import { RecommendationCard } from "@/components/dashboard/recommendation-card"
 import type { Recommendation } from "@/types/api"
 
@@ -26,7 +26,11 @@ describe("RecommendationCard", () => {
   it("renders recommendation narrative when present", () => {
     render(<RecommendationCard rec={sampleRec} />)
 
-    expect(screen.getByText("Why this helps")).toBeInTheDocument()
+    const toggle = screen.getByRole("button", { name: /Why this helps/ })
+    expect(toggle).toBeInTheDocument()
+
+    fireEvent.click(toggle)
+
     expect(screen.getByText("It removes the most common failure loop.")).toBeInTheDocument()
     expect(screen.getByText(/Likely impact:/)).toBeInTheDocument()
   })

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen } from "@testing-library/react"
 import { NextStepPlanSection } from "@/components/interventions/next-step-plan-section"
 import type { NextStepPlanResponse } from "@/types/api"
 
@@ -32,7 +32,12 @@ describe("NextStepPlanSection", () => {
     render(<NextStepPlanSection plan={samplePlan} />)
 
     expect(screen.getByText("Turn the best workflow into a project playbook")).toBeInTheDocument()
-    expect(screen.getByText("Why this helps")).toBeInTheDocument()
+
+    const toggle = screen.getByRole("button", { name: /Why this helps/ })
+    expect(toggle).toBeInTheDocument()
+
+    fireEvent.click(toggle)
+
     expect(
       screen.getByText("It standardizes the highest-success workflow for similar work."),
     ).toBeInTheDocument()

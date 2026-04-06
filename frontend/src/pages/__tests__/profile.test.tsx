@@ -176,13 +176,18 @@ describe("ProfilePage", () => {
   })
 
   it("lets API-key admins pick and remember an engineer profile", () => {
-    renderPage()
+    render(
+      <MemoryRouter initialEntries={["/profile"]}>
+        <Routes>
+          <Route path="/profile" element={<ProfilePage teamId={null} dateRange={null} />} />
+          <Route path="/engineers/:id" element={<div>engineer profile page</div>} />
+        </Routes>
+      </MemoryRouter>,
+    )
 
     fireEvent.click(screen.getByText("Alice Example"))
 
-    expect(screen.getByText("Viewing engineer profile context")).toBeInTheDocument()
-    expect(screen.getAllByText("Alice Example").length).toBeGreaterThan(0)
-    expect(screen.getByText("overview tab")).toBeInTheDocument()
+    expect(screen.getByText("engineer profile page")).toBeInTheDocument()
     expect(storage.primer_profile_engineer_id).toBe("eng-1")
   })
 })
