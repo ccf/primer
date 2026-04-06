@@ -157,6 +157,12 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Demo mode: block all mutations
+    if settings.demo_mode:
+        from primer.server.demo_middleware import DemoReadOnlyMiddleware
+
+        app.add_middleware(DemoReadOnlyMiddleware)
+
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(engineers.router)

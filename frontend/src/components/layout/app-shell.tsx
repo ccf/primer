@@ -39,21 +39,38 @@ export function AppShell({ children, teamId, onTeamChange, dateRange, onDateRang
     })
   }, [])
 
+  const demoMode = typeof window !== "undefined" && localStorage.getItem("primer_demo_mode") === "true"
+
   return (
-    <div className="flex h-screen">
-      <Sidebar collapsed={collapsed} onToggle={toggleSidebar} />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header
-          teamId={teamId}
-          onTeamChange={onTeamChange}
-          dateRange={dateRange}
-          onDateRangeChange={onDateRangeChange}
-          sidebarCollapsed={collapsed}
-          onToggleSidebar={toggleSidebar}
-        />
-        <main className="flex flex-1 flex-col overflow-y-auto p-6">
-          <div key={location.pathname} className="mx-auto w-full max-w-[1280px] flex-1 animate-fade-in">{children}</div>
-        </main>
+    <div className="flex h-screen flex-col">
+      {demoMode && (
+        <div className="flex items-center justify-center gap-2 bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground">
+          You are viewing a read-only demo of Primer with sample data.
+          <a
+            href="https://github.com/ccf/primer"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 hover:opacity-80"
+          >
+            View on GitHub
+          </a>
+        </div>
+      )}
+      <div className="flex min-h-0 flex-1">
+        <Sidebar collapsed={collapsed} onToggle={toggleSidebar} />
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <Header
+            teamId={teamId}
+            onTeamChange={onTeamChange}
+            dateRange={dateRange}
+            onDateRangeChange={onDateRangeChange}
+            sidebarCollapsed={collapsed}
+            onToggleSidebar={toggleSidebar}
+          />
+          <main className="flex flex-1 flex-col overflow-y-auto p-6">
+            <div key={location.pathname} className="mx-auto w-full max-w-[1280px] flex-1 animate-fade-in">{children}</div>
+          </main>
+        </div>
       </div>
     </div>
   )

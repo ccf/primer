@@ -110,5 +110,8 @@ class PrimerSettings(BaseSettings):
     analytics_cache_ttl_seconds: int = 60
     analytics_cache_error_backoff_seconds: int = 30
 
+    # Demo mode (public read-only instance)
+    demo_mode: bool = False
+
 
 settings = PrimerSettings()
