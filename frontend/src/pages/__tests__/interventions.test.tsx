@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
+import { MemoryRouter } from "react-router-dom"
 
 vi.mock("@/lib/auth-context", () => ({
   useAuth: vi.fn(() => ({
@@ -221,7 +222,7 @@ describe("InterventionsPage", () => {
     expect(screen.getAllByText("Planned").length).toBeGreaterThan(0)
     expect(screen.getByText("training rollout")).toBeInTheDocument()
     expect(screen.getByText(/Hypothesis:/)).toBeInTheDocument()
-    expect(screen.getByText("Tracked follow-through for recommendations, coaching, and workflow changes")).toBeInTheDocument()
+    expect(screen.getByText(/completed.*in progress.*planned/)).toBeInTheDocument()
     expect(screen.getByText(/Recurring friction/)).toBeInTheDocument()
     expect(screen.getByText("By Team")).toBeInTheDocument()
     expect(screen.getByText("By Experiment Type")).toBeInTheDocument()
@@ -239,10 +240,12 @@ describe("InterventionsPage", () => {
       isLoading: false,
     } as unknown as ReturnType<typeof useInterventions>)
 
-    render(<InterventionsPage teamId="team-1" />)
+    render(
+      <MemoryRouter>
+        <InterventionsPage teamId="team-1" />
+      </MemoryRouter>,
+    )
 
-    expect(
-      screen.getByText(/No interventions yet. Create one from a recommendation/i),
-    ).toBeInTheDocument()
+    expect(screen.getByText("No interventions yet")).toBeInTheDocument()
   })
 })
