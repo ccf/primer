@@ -1,3 +1,4 @@
+import { useState } from "react"
 import {
   useDailyStats,
   useOverview,
@@ -19,6 +20,8 @@ import { formatNumber, formatPercent, formatDuration } from "@/lib/utils"
 import { exportToCsv } from "@/lib/csv-export"
 import { exportToPdf } from "@/lib/pdf-export"
 import {
+  ChevronDown,
+  ChevronRight,
   Download,
   FileText,
   LayoutDashboard,
@@ -26,7 +29,6 @@ import {
   Users,
   Target,
   Clock,
-  Heart,
 } from "lucide-react"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
@@ -38,6 +40,7 @@ interface DashboardPageProps {
 export function DashboardPage({ teamId, dateRange }: DashboardPageProps) {
   const startDate = dateRange?.startDate
   const endDate = dateRange?.endDate
+  const [showHeatmap, setShowHeatmap] = useState(false)
 
   const { data: overview, isLoading: loadingOverview } = useOverview(teamId, startDate, endDate)
   const { data: team } = useTeam(teamId ?? "")
@@ -73,8 +76,8 @@ export function DashboardPage({ teamId, dateRange }: DashboardPageProps) {
     return (
       <div className="space-y-6">
         <CardSkeleton />
-        <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, i) => (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
             <CardSkeleton key={i} />
           ))}
         </div>
@@ -89,11 +92,6 @@ export function DashboardPage({ teamId, dateRange }: DashboardPageProps) {
     { label: "Engineers", value: formatNumber(overview.total_engineers), icon: Users },
     { label: "Success Rate", value: formatPercent(overview.success_rate), icon: Target },
     { label: "Avg Duration", value: formatDuration(overview.avg_session_duration), icon: Clock },
-    {
-      label: "Health Score",
-      value: overview.avg_health_score != null ? overview.avg_health_score.toFixed(1) : "-",
-      icon: Heart,
-    },
   ]
 
   return (
@@ -115,7 +113,7 @@ export function DashboardPage({ teamId, dateRange }: DashboardPageProps) {
       </PageHeader>
 
       {/* KPI Strip */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {kpiItems.map((item, i) => (
           <div
             key={item.label}
@@ -134,9 +132,22 @@ export function DashboardPage({ teamId, dateRange }: DashboardPageProps) {
           {loadingDaily ? <ChartSkeleton /> : daily && <DailyActivityChart data={daily} />}
           <OutcomeChart data={overview.outcome_counts} />
         </div>
-        {loadingHeatmap
-          ? <ChartSkeleton />
-          : heatmap && heatmap.cells.length > 0 && <ActivityHeatmap data={heatmap} />}
+        <button
+          type="button"
+          onClick={() => setShowHeatmap(!showHeatmap)}
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {showHeatmap ? (
+            <ChevronDown className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5" />
+          )}
+          Activity heatmap
+        </button>
+        {showHeatmap &&
+          (loadingHeatmap
+            ? <ChartSkeleton />
+            : heatmap && heatmap.cells.length > 0 && <ActivityHeatmap data={heatmap} />)}
       </section>
 
       {/* Attention Section */}
@@ -149,7 +160,7 @@ export function DashboardPage({ teamId, dateRange }: DashboardPageProps) {
         <DeepDiveCards teamId={teamId} startDate={startDate} endDate={endDate} />
       </section>
 
-      {/* Recommendations */}
+      {/* Recommendations (limited to top 3) */}
       <section>
         {loadingRecs ? (
           <ChartSkeleton />
@@ -160,6 +171,7 @@ export function DashboardPage({ teamId, dateRange }: DashboardPageProps) {
               teamId={teamId}
               startDate={startDate}
               endDate={endDate}
+              limit={3}
             />
           )
         )}

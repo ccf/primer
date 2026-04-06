@@ -13,6 +13,7 @@ interface RecommendationsPanelProps {
   startDate?: string
   endDate?: string
   defaultOwnerEngineerId?: string | null
+  limit?: number
 }
 
 export function RecommendationsPanel({
@@ -23,8 +24,13 @@ export function RecommendationsPanel({
   startDate,
   endDate,
   defaultOwnerEngineerId,
+  limit,
 }: RecommendationsPanelProps) {
   const [selectedRecommendation, setSelectedRecommendation] = useState<Recommendation | null>(null)
+  const [showAll, setShowAll] = useState(false)
+
+  const visibleData = limit && !showAll ? data.slice(0, limit) : data
+  const hasMore = limit != null && data.length > limit && !showAll
 
   return (
     <>
@@ -37,13 +43,22 @@ export function RecommendationsPanel({
             <EmptyState message="No recommendations — everything looks good!" />
           ) : (
             <div className="space-y-3">
-              {data.map((rec, i) => (
+              {visibleData.map((rec, i) => (
                 <RecommendationCard
                   key={i}
                   rec={rec}
                   onCreateIntervention={() => setSelectedRecommendation(rec)}
                 />
               ))}
+              {hasMore && (
+                <button
+                  type="button"
+                  onClick={() => setShowAll(true)}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Show all {data.length} recommendations
+                </button>
+              )}
             </div>
           )}
         </CardContent>
