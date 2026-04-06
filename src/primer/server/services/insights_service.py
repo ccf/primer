@@ -172,7 +172,7 @@ def get_config_optimization(
                     title=f"Automate '{stype}' sessions with a hook",
                     description=(
                         f"The session type '{stype}' appeared {count} times. "
-                        "Consider creating a Claude Code hook to streamline this workflow."
+                        "Consider setting up agent hooks to streamline this workflow."
                     ),
                     severity="info",
                     evidence={"session_type": stype, "count": count},

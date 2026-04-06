@@ -46,8 +46,8 @@ function TeamDetailRoute({ dateRange }: { dateRange: DateRange | null }) {
   return <TeamDetailPage teamId={teamId ?? ""} dateRange={dateRange} />
 }
 
-function EngineerProfileRoute({ dateRange }: { dateRange: DateRange | null }) {
-  return <EngineerProfilePage dateRange={dateRange} />
+function EngineerProfileRoute({ teamId, dateRange }: { teamId: string | null; dateRange: DateRange | null }) {
+  return <EngineerProfilePage teamId={teamId} dateRange={dateRange} />
 }
 
 function ProjectWorkspaceRoute({ teamId, dateRange }: { teamId: string | null; dateRange: DateRange | null }) {
@@ -89,11 +89,11 @@ function AuthenticatedApp() {
       >
         <Routes>
           <Route path="/" element={<RoleRedirect />} />
-          <Route path="/profile" element={<ProfilePage teamId={teamId} dateRange={dateRange} />} />
+          <Route path="/profile" element={<ProfilePage />} />
           <Route path="/dashboard" element={<DashboardPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/sessions" element={<SessionsPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/sessions/:id" element={<SessionDetailPage />} />
-          <Route path="/engineers/:id" element={<EngineerProfileRoute dateRange={dateRange} />} />
+          <Route path="/engineers/:id" element={<EngineerProfileRoute teamId={teamId} dateRange={dateRange} />} />
           <Route path="/engineers" element={<EngineersPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/finops" element={<FinOpsPage teamId={teamId} dateRange={dateRange} />} />
           <Route path="/maturity" element={<MaturityPage teamId={teamId} dateRange={dateRange} />} />
