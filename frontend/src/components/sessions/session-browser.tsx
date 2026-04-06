@@ -195,7 +195,10 @@ export function SessionBrowser({
       {loadingSessions ? (
         <TableSkeleton />
       ) : !sessions || items.length === 0 ? (
-        <EmptyState message="No sessions found" />
+        <EmptyState
+          title="No sessions found"
+          description="Sessions appear after engineers use AI coding tools with Primer's hooks installed. Try adjusting the date range or filters."
+        />
       ) : (
         <>
           <SessionTable sessions={items} selectedIndex={selectedIndex} />

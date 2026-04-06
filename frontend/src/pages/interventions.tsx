@@ -102,7 +102,13 @@ export function InterventionsPage({ teamId }: InterventionsPageProps) {
       )}
 
       {interventions.length === 0 ? (
-        <EmptyState message="No interventions yet. Create one from a recommendation or start a manual experiment." />
+        <EmptyState
+          title="No interventions yet"
+          description="Interventions track the follow-through on recommendations. Create one from a dashboard recommendation, or start a manual experiment to measure a workflow change."
+          icon={ClipboardList}
+          actionLabel="View recommendations"
+          actionHref="/dashboard"
+        />
       ) : (
         <div className="space-y-4">
           {interventions.map((intervention) => (

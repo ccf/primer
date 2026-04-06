@@ -40,7 +40,10 @@ export function RecommendationsPanel({
         </CardHeader>
         <CardContent>
           {data.length === 0 ? (
-            <EmptyState message="No recommendations — everything looks good!" />
+            <EmptyState
+              title="No recommendations right now"
+              description="Recommendations appear when Primer detects friction patterns, cost opportunities, or workflow improvements worth acting on."
+            />
           ) : (
             <div className="space-y-3">
               {visibleData.map((rec, i) => (
