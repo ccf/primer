@@ -175,7 +175,7 @@ def get_quality_metrics(
             recent_post_merge_prs=recent_post_merge_prs,
             findings_overview=findings_overview,
             sessions_analyzed=0,
-            github_connected=is_configured(),
+            github_connected=is_configured() or pr_overview.total_prs > 0,
         )
         set_cached_json("quality_metrics", cache_params, result.model_dump(mode="json"))
         return result
@@ -231,7 +231,7 @@ def get_quality_metrics(
         recent_post_merge_prs=recent_post_merge_prs,
         findings_overview=findings_overview,
         sessions_analyzed=total_sessions,
-        github_connected=is_configured(),
+        github_connected=is_configured() or overview.total_prs > 0,
     )
     set_cached_json("quality_metrics", cache_params, result.model_dump(mode="json"))
     return result
