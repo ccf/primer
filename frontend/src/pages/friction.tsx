@@ -1,6 +1,8 @@
+import { useState } from "react"
 import { useBottleneckAnalytics } from "@/hooks/use-api-queries"
 import { formatNumber, formatPercent } from "@/lib/utils"
 import { PageHeader } from "@/components/shared/page-header"
+import { PageTabs } from "@/components/ui/page-tabs"
 import { BottleneckSummary } from "@/components/bottlenecks/bottleneck-summary"
 import { FrictionTrendChart } from "@/components/bottlenecks/friction-trend-chart"
 import { FrictionImpactTable } from "@/components/bottlenecks/friction-impact-table"
@@ -12,6 +14,15 @@ import { CardSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleto
 import { AlertTriangle } from "lucide-react"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
+const tabs = [
+  { id: "overview", label: "Overview" },
+  { id: "root-causes", label: "Root Causes" },
+  { id: "by-project", label: "By Project" },
+  { id: "by-engineer", label: "By Engineer" },
+] as const
+
+type TabId = (typeof tabs)[number]["id"]
+
 interface FrictionPageProps {
   teamId: string | null
   dateRange: DateRange | null
@@ -21,6 +32,7 @@ export function FrictionPage({ teamId, dateRange }: FrictionPageProps) {
   const startDate = dateRange?.startDate
   const endDate = dateRange?.endDate
   const { data, isLoading } = useBottleneckAnalytics(teamId, startDate, endDate)
+  const [activeTab, setActiveTab] = useState<TabId>("overview")
 
   if (isLoading) {
     return (
@@ -52,37 +64,53 @@ export function FrictionPage({ teamId, dateRange }: FrictionPageProps) {
 
       <BottleneckSummary data={data} />
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <FrictionTrendChart data={data.friction_trends} />
-        <FrictionImpactTable data={data.friction_impacts} />
+      <PageTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+
+      <div className="mt-6">
+        {activeTab === "overview" && (
+          <div className="space-y-8">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <FrictionTrendChart data={data.friction_trends} />
+              <FrictionImpactTable data={data.friction_impacts} />
+            </div>
+          </div>
+        )}
+
+        {activeTab === "root-causes" && (
+          <div className="space-y-8">
+            <RootCauseClusterList data={data.root_cause_clusters} />
+
+            <RecoveryPatternList
+              overview={data.recovery_overview}
+              patterns={data.recovery_patterns}
+            />
+          </div>
+        )}
+
+        {activeTab === "by-project" && (
+          <div className="space-y-3">
+            <div>
+              <h2 className="text-sm font-semibold text-muted-foreground">Friction by Project</h2>
+              <p className="text-xs text-muted-foreground/80">
+                Which repositories generate the most friction and where enablement work would help.
+              </p>
+            </div>
+            <ProjectFrictionTable data={data.project_friction} />
+          </div>
+        )}
+
+        {activeTab === "by-engineer" && (
+          <div className="space-y-3">
+            <div>
+              <h2 className="text-sm font-semibold text-muted-foreground">Time Lost by Engineer</h2>
+              <p className="text-xs text-muted-foreground/80">
+                Estimated engineering minutes lost to friction, broken down by engineer and friction type.
+              </p>
+            </div>
+            <EngineerTimeLostTable data={data.engineer_time_lost} />
+          </div>
+        )}
       </div>
-
-      <RootCauseClusterList data={data.root_cause_clusters} />
-
-      <RecoveryPatternList
-        overview={data.recovery_overview}
-        patterns={data.recovery_patterns}
-      />
-
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-sm font-semibold text-muted-foreground">Friction by Project</h2>
-          <p className="text-xs text-muted-foreground/80">
-            Which repositories generate the most friction and where enablement work would help.
-          </p>
-        </div>
-        <ProjectFrictionTable data={data.project_friction} />
-      </section>
-
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-sm font-semibold text-muted-foreground">Time Lost by Engineer</h2>
-          <p className="text-xs text-muted-foreground/80">
-            Estimated engineering minutes lost to friction, broken down by engineer and friction type.
-          </p>
-        </div>
-        <EngineerTimeLostTable data={data.engineer_time_lost} />
-      </section>
     </div>
   )
 }

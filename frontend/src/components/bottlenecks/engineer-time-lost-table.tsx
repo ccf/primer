@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatDuration } from "@/lib/utils"
 import type { EngineerFrictionTimeLost } from "@/types/api"
@@ -6,8 +7,15 @@ interface EngineerTimeLostTableProps {
   data: EngineerFrictionTimeLost[]
 }
 
+const DEFAULT_VISIBLE = 10
+
 export function EngineerTimeLostTable({ data }: EngineerTimeLostTableProps) {
+  const [showAll, setShowAll] = useState(false)
+
   if (data.length === 0) return null
+
+  const visible = showAll ? data : data.slice(0, DEFAULT_VISIBLE)
+  const hasMore = data.length > DEFAULT_VISIBLE
 
   return (
     <Card>
@@ -27,7 +35,7 @@ export function EngineerTimeLostTable({ data }: EngineerTimeLostTableProps) {
               </tr>
             </thead>
             <tbody>
-              {data.map((item) => (
+              {visible.map((item) => (
                 <tr key={item.engineer_id} className="border-b border-border last:border-0">
                   <td className="py-2 font-medium">{item.engineer_name}</td>
                   <td className="py-2 text-right">{item.sessions_with_friction}</td>
@@ -57,6 +65,15 @@ export function EngineerTimeLostTable({ data }: EngineerTimeLostTableProps) {
             </tbody>
           </table>
         </div>
+        {hasMore && (
+          <button
+            type="button"
+            onClick={() => setShowAll(!showAll)}
+            className="mt-3 text-xs text-primary hover:underline"
+          >
+            {showAll ? "Show top 10" : `Show all ${data.length} engineers`}
+          </button>
+        )}
       </CardContent>
     </Card>
   )

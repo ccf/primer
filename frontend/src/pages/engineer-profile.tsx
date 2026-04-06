@@ -1,5 +1,4 @@
-import { useState } from "react"
-import { Link, useParams } from "react-router-dom"
+import { Link, useParams, useSearchParams } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
 import { useEngineerProfile } from "@/hooks/use-api-queries"
 import { PageTabs } from "@/components/ui/page-tabs"
@@ -23,6 +22,8 @@ const tabs = [
 
 type TabId = (typeof tabs)[number]["id"]
 
+const validTabIds = new Set<string>(tabs.map((t) => t.id))
+
 interface EngineerProfilePageProps {
   dateRange: DateRange | null
 }
@@ -33,8 +34,17 @@ export function EngineerProfilePage({ dateRange }: EngineerProfilePageProps) {
   const startDate = dateRange?.startDate
   const endDate = dateRange?.endDate
 
+  const [searchParams, setSearchParams] = useSearchParams()
+  const rawTab = searchParams.get("tab")
+  const activeTab: TabId = rawTab && validTabIds.has(rawTab) ? (rawTab as TabId) : "impact"
+
   const { data: profile, isLoading } = useEngineerProfile(engineerId, startDate, endDate)
-  const [activeTab, setActiveTab] = useState<TabId>("impact")
+
+  const handleTabChange = (tab: TabId) => {
+    const nextParams = new URLSearchParams()
+    if (tab !== "impact") nextParams.set("tab", tab)
+    setSearchParams(nextParams)
+  }
 
   if (isLoading) {
     return (
@@ -85,7 +95,7 @@ export function EngineerProfilePage({ dateRange }: EngineerProfilePageProps) {
 
         {/* Right content */}
         <div className="min-w-0 flex-1">
-          <PageTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+          <PageTabs tabs={tabs} activeTab={activeTab} onChange={handleTabChange} />
 
           <div className="mt-6">
             {activeTab === "impact" && (
