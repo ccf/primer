@@ -1711,16 +1711,17 @@ def main():
                 elif "flash" in model or "mini" in model:
                     token_scale *= 0.7
 
-                inp_tokens = _lognormal_tokens(8.5, 1.0, token_scale)
-                out_tokens = _lognormal_tokens(7.5, 1.0, token_scale)
+                inp_tokens = _lognormal_tokens(11.8, 0.7, token_scale)
+                out_tokens = _lognormal_tokens(9.5, 0.7, token_scale)
 
                 # Cache tokens (agent-specific probability)
-                cache_prob = {"claude_code": 0.5, "codex_cli": 0.35, "gemini_cli": 0.3}
+                # Most sessions have significant cache reads in practice
+                cache_prob = {"claude_code": 0.85, "codex_cli": 0.6, "gemini_cli": 0.5}
                 cache_read = 0
                 cache_creation = 0
-                if random.random() < cache_prob[agent_type]:
-                    cache_read = int(inp_tokens * random.uniform(0.1, 0.6))
-                    cache_creation = int(inp_tokens * random.uniform(0.02, 0.15))
+                if random.random() < cache_prob.get(agent_type, 0.5):
+                    cache_read = int(inp_tokens * random.uniform(0.3, 0.7))
+                    cache_creation = int(inp_tokens * random.uniform(0.05, 0.2))
 
                 # Model usages (sometimes split across models within same agent)
                 model_usages = []
@@ -1887,13 +1888,13 @@ def seed_budgets(teams: list[dict]) -> None:
         # Org-wide budgets (no team_id)
         {
             "name": "Org Monthly API Budget",
-            "amount": 5000.0,
+            "amount": 15000.0,
             "period": "monthly",
             "alert_threshold_pct": 80,
         },
         {
             "name": "Org Quarterly API Budget",
-            "amount": 12000.0,
+            "amount": 40000.0,
             "period": "quarterly",
             "alert_threshold_pct": 75,
         },
@@ -1901,42 +1902,42 @@ def seed_budgets(teams: list[dict]) -> None:
         {
             "name": "Platform Team Monthly",
             "team_id": team_by_name.get("Platform"),
-            "amount": 2000.0,
+            "amount": 5000.0,
             "period": "monthly",
             "alert_threshold_pct": 85,
         },
         {
             "name": "Backend Team Monthly",
             "team_id": team_by_name.get("Backend"),
-            "amount": 1800.0,
+            "amount": 4500.0,
             "period": "monthly",
             "alert_threshold_pct": 80,
         },
         {
             "name": "Frontend Team Monthly",
             "team_id": team_by_name.get("Frontend"),
-            "amount": 1200.0,
+            "amount": 3000.0,
             "period": "monthly",
             "alert_threshold_pct": 90,
         },
         {
             "name": "Mobile Team Monthly",
             "team_id": team_by_name.get("Mobile"),
-            "amount": 800.0,
+            "amount": 2000.0,
             "period": "monthly",
             "alert_threshold_pct": 85,
         },
         {
             "name": "Data Team Monthly",
             "team_id": team_by_name.get("Data"),
-            "amount": 2500.0,
+            "amount": 6000.0,
             "period": "monthly",
             "alert_threshold_pct": 75,
         },
         {
             "name": "DevEx Team Monthly",
             "team_id": team_by_name.get("DevEx"),
-            "amount": 1500.0,
+            "amount": 3500.0,
             "period": "monthly",
             "alert_threshold_pct": 80,
         },

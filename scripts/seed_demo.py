@@ -1312,14 +1312,14 @@ def seed_cursor_sessions(db: Session, repo_map: dict[str, str]) -> int:
                     token_scale *= 1.2
                 elif "gemini" in model:
                     token_scale *= 1.3
-                inp_tokens = _lognormal_tokens(8.3, 0.9, token_scale)
-                out_tokens = _lognormal_tokens(7.3, 0.9, token_scale)
+                inp_tokens = _lognormal_tokens(11.6, 0.7, token_scale)
+                out_tokens = _lognormal_tokens(9.3, 0.7, token_scale)
 
                 cache_read = 0
                 cache_creation = 0
                 if random.random() < 0.25:  # Cursor has lower cache rates
-                    cache_read = int(inp_tokens * random.uniform(0.05, 0.3))
-                    cache_creation = int(inp_tokens * random.uniform(0.01, 0.08))
+                    cache_read = int(inp_tokens * random.uniform(0.2, 0.6))
+                    cache_creation = int(inp_tokens * random.uniform(0.03, 0.15))
 
                 # Outcome
                 outcome_weights = {}
