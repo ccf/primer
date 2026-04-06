@@ -1145,6 +1145,8 @@ def seed_git_repositories(db: Session) -> dict[str, str]:
             existing.repo_context_checked_at = _now() - timedelta(days=random.randint(1, 7))
             if not existing.default_branch:
                 existing.default_branch = "main"
+            if not existing.github_id:
+                existing.github_id = random.randint(100000, 999999)
             repo_map[project_name] = existing.id
             readiness = config["ai_readiness_score"]
             print(f"  Updated repository: {config['full_name']} (readiness={readiness})")
