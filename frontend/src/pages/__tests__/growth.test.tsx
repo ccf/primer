@@ -235,7 +235,7 @@ describe("GrowthPage", () => {
     expect(screen.getByText("exemplar session library")).toBeInTheDocument()
   })
 
-  it("shows learning paths on the skills tab", () => {
+  it("shows learning paths on the learning & reuse tab", () => {
     mockUseSkillInventory.mockReturnValue({
       data: {
         engineer_profiles: [],
@@ -273,7 +273,7 @@ describe("GrowthPage", () => {
     } as unknown as ReturnType<typeof useEngineerProfile>)
 
     renderPage()
-    fireEvent.click(screen.getByRole("button", { name: "Skills" }))
+    fireEvent.click(screen.getByRole("button", { name: "Learning & Reuse" }))
 
     expect(screen.getByText("Learning Paths")).toBeInTheDocument()
     expect(screen.getByText("learning paths")).toBeInTheDocument()
