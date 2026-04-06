@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import {
   ArrowLeft,
@@ -7,6 +8,7 @@ import {
 } from "lucide-react"
 import { useProjectWorkspace } from "@/hooks/use-api-queries"
 import { PageHeader } from "@/components/shared/page-header"
+import { PageTabs } from "@/components/ui/page-tabs"
 import { CardSkeleton, ChartSkeleton } from "@/components/shared/loading-skeleton"
 import { ProjectScorecard } from "@/components/projects/project-scorecard"
 import { ProjectAgentMixCard } from "@/components/projects/project-agent-mix-card"
@@ -15,11 +17,21 @@ import { ProjectRepositoriesCard } from "@/components/projects/project-repositor
 import { ProjectWorkflowSection } from "@/components/projects/project-workflow-section"
 import { PRTable } from "@/components/quality/pr-table"
 import { QualityAttributionTable } from "@/components/quality/quality-attribution-table"
+import { SectionHeader } from "@/components/shared/section-header"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatCost, formatDuration, formatNumber, formatPercent, formatTokens } from "@/lib/utils"
 import type { DateRange } from "@/components/layout/date-range-picker"
+
+const pageTabs = [
+  { id: "overview", label: "Overview" },
+  { id: "workflows", label: "Workflows & Friction" },
+  { id: "quality", label: "Quality" },
+  { id: "cost", label: "Cost" },
+] as const
+
+type TabId = (typeof pageTabs)[number]["id"]
 
 interface ProjectWorkspacePageProps {
   teamId: string | null
@@ -32,6 +44,7 @@ export function ProjectWorkspacePage({ teamId, dateRange }: ProjectWorkspacePage
   const startDate = dateRange?.startDate
   const endDate = dateRange?.endDate
   const { data, isLoading, error } = useProjectWorkspace(projectName, teamId, startDate, endDate)
+  const [activeTab, setActiveTab] = useState<TabId>("overview")
 
   if (isLoading) {
     return (
@@ -88,7 +101,7 @@ export function ProjectWorkspacePage({ teamId, dateRange }: ProjectWorkspacePage
       <PageHeader
         icon={FolderKanban}
         title={data.project.project_name}
-        description={`${formatNumber(data.project.total_sessions)} sessions • ${formatNumber(data.project.unique_engineers)} engineers • ${formatCost(data.project.estimated_cost)} spend`}
+        description={`${formatNumber(data.project.total_sessions)} sessions \u2022 ${formatNumber(data.project.unique_engineers)} engineers \u2022 ${formatCost(data.project.estimated_cost)} spend`}
       >
         <Link to={`/sessions?project=${encodeURIComponent(data.project.project_name)}`}>
           <Button variant="outline" size="sm">
@@ -100,266 +113,281 @@ export function ProjectWorkspacePage({ teamId, dateRange }: ProjectWorkspacePage
 
       <ProjectScorecard scorecard={data.scorecard} overview={data.overview} />
 
-      <ProjectAgentMixCard agentMix={data.agent_mix} />
+      <PageTabs tabs={pageTabs} activeTab={activeTab} onChange={setActiveTab} />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Project Overview</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Messages</p>
-                <p className="mt-1 font-display text-2xl">{formatNumber(data.overview.total_messages)}</p>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Tool Calls</p>
-                <p className="mt-1 font-display text-2xl">{formatNumber(data.overview.total_tool_calls)}</p>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Tracked Tokens</p>
-                <p className="mt-1 font-display text-2xl">
-                  {formatTokens(data.overview.total_input_tokens + data.overview.total_output_tokens)}
-                </p>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Avg Duration</p>
-                <p className="mt-1 font-display text-2xl">{formatDuration(data.overview.avg_session_duration)}</p>
-              </div>
+      <div className="mt-6">
+        {activeTab === "overview" && (
+          <div className="space-y-8">
+            <ProjectAgentMixCard agentMix={data.agent_mix} />
+
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Project Overview</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Messages</p>
+                      <p className="mt-1 font-display text-2xl">{formatNumber(data.overview.total_messages)}</p>
+                    </div>
+                    <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Tool Calls</p>
+                      <p className="mt-1 font-display text-2xl">{formatNumber(data.overview.total_tool_calls)}</p>
+                    </div>
+                    <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Tracked Tokens</p>
+                      <p className="mt-1 font-display text-2xl">
+                        {formatTokens(data.overview.total_input_tokens + data.overview.total_output_tokens)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Avg Duration</p>
+                      <p className="mt-1 font-display text-2xl">{formatDuration(data.overview.avg_session_duration)}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="space-y-2">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Outcomes
+                      </h3>
+                      {outcomeEntries.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No facet outcomes recorded yet.</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {outcomeEntries.map(([outcome, count]) => (
+                            <Badge key={outcome} variant="secondary" className="gap-1">
+                              <span className="capitalize">{outcome}</span>
+                              <span className="text-muted-foreground">{count}</span>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Session Health
+                      </h3>
+                      <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                        <p className="font-display text-2xl">
+                          {data.overview.avg_health_score != null ? data.overview.avg_health_score.toFixed(1) : "-"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Composite score from outcomes, friction, duration, and satisfaction where available.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <ProjectEnablementCard
+                enablement={data.enablement}
+                teamId={teamId}
+                projectName={data.project.project_name}
+                startDate={startDate}
+                endDate={endDate}
+              />
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="space-y-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Outcomes
-                </h3>
-                {outcomeEntries.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No facet outcomes recorded yet.</p>
+            <ProjectRepositoriesCard
+              repositories={data.repositories}
+              repositoryContext={data.repository_context}
+            />
+          </div>
+        )}
+
+        {activeTab === "workflows" && (
+          <div className="space-y-8">
+            <ProjectWorkflowSection workflowSummary={data.workflow_summary} />
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">Friction</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {data.friction ? (
+                  <>
+                    <div className="grid gap-3 sm:grid-cols-4">
+                      <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Friction Rate</p>
+                        <p className="mt-1 font-display text-2xl">{formatPercent(data.friction.friction_rate)}</p>
+                      </div>
+                      <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Affected Sessions</p>
+                        <p className="mt-1 font-display text-2xl">{formatNumber(data.friction.sessions_with_friction)}</p>
+                      </div>
+                      <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Total Frictions</p>
+                        <p className="mt-1 font-display text-2xl">{formatNumber(data.friction.total_friction_count)}</p>
+                      </div>
+                      <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Time Lost</p>
+                        <p className="mt-1 font-display text-2xl">
+                          {formatDuration(data.friction.estimated_minutes_lost * 60)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Top Friction Types
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {data.friction.top_friction_types.map((item) => (
+                          <Badge key={item} variant="secondary">{item.replaceAll("_", " ")}</Badge>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Highest Impact Patterns
+                      </h3>
+                      {data.friction_impacts.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No friction impact clusters yet.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {data.friction_impacts.map((impact) => (
+                            <div
+                              key={impact.friction_type}
+                              className="rounded-xl border border-border/60 p-3"
+                            >
+                              <div className="flex items-center justify-between gap-4">
+                                <p className="font-medium">{impact.friction_type.replaceAll("_", " ")}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {formatPercent(impact.success_rate_with)} with friction
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
                 ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {outcomeEntries.map(([outcome, count]) => (
-                      <Badge key={outcome} variant="secondary" className="gap-1">
-                        <span className="capitalize">{outcome}</span>
-                        <span className="text-muted-foreground">{count}</span>
-                      </Badge>
-                    ))}
+                  <p className="text-sm text-muted-foreground">
+                    No project-scoped friction telemetry yet.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === "quality" && (
+          <div className="space-y-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">Quality Overview</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">PRs</p>
+                    <p className="mt-1 font-display text-2xl">{formatNumber(data.quality.overview.total_prs)}</p>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">PR Merge Rate</p>
+                    <p className="mt-1 font-display text-2xl">{formatPercent(data.quality.overview.pr_merge_rate)}</p>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Findings</p>
+                    <p className="mt-1 font-display text-2xl">{formatNumber(data.quality.findings_overview?.total_findings ?? 0)}</p>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Fix Rate</p>
+                    <p className="mt-1 font-display text-2xl">{formatPercent(data.quality.findings_overview?.fix_rate)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <section className="space-y-3">
+              <SectionHeader
+                title="Linked pull requests"
+                description="PRs directly linked to this project's sessions."
+              />
+              {data.quality.recent_prs.length === 0 ? (
+                <Card>
+                  <CardContent className="py-8 text-sm text-muted-foreground">
+                    No project-linked pull requests yet.
+                  </CardContent>
+                </Card>
+              ) : (
+                <PRTable prs={data.quality.recent_prs} />
+              )}
+            </section>
+
+            <section className="space-y-3">
+              <div className="flex items-center gap-2">
+                <GitPullRequest className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold text-muted-foreground">Quality Attribution</h2>
+              </div>
+              <Card>
+                <CardContent className="pt-6">
+                  <QualityAttributionTable rows={data.quality.attribution} framed={false} />
+                </CardContent>
+              </Card>
+            </section>
+          </div>
+        )}
+
+        {activeTab === "cost" && (
+          <div className="space-y-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">Cost Overview</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Total Spend</p>
+                    <p className="mt-1 font-display text-2xl">{formatCost(data.cost.total_estimated_cost)}</p>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Avg Cost / Session</p>
+                    <p className="mt-1 font-display text-2xl">{data.scorecard.avg_cost_per_session != null ? formatCost(data.scorecard.avg_cost_per_session) : "-"}</p>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Cost / Success</p>
+                    <p className="mt-1 font-display text-2xl">{data.scorecard.cost_per_successful_outcome != null ? formatCost(data.scorecard.cost_per_successful_outcome) : "-"}</p>
+                  </div>
+                </div>
+
+                {data.cost.model_breakdown.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No model-usage telemetry yet.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border text-left text-muted-foreground">
+                          <th className="pb-2 font-medium">Model</th>
+                          <th className="pb-2 text-right font-medium">Input</th>
+                          <th className="pb-2 text-right font-medium">Output</th>
+                          <th className="pb-2 text-right font-medium">Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.cost.model_breakdown.slice(0, 5).map((model) => (
+                          <tr key={model.model_name} className="border-b border-border/40 last:border-0">
+                            <td className="py-2">{model.model_name}</td>
+                            <td className="py-2 text-right">{formatTokens(model.input_tokens)}</td>
+                            <td className="py-2 text-right">{formatTokens(model.output_tokens)}</td>
+                            <td className="py-2 text-right">{formatCost(model.estimated_cost)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Session Health
-                </h3>
-                <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
-                  <p className="font-display text-2xl">
-                    {data.overview.avg_health_score != null ? data.overview.avg_health_score.toFixed(1) : "-"}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Composite score from outcomes, friction, duration, and satisfaction where available.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <ProjectEnablementCard
-          enablement={data.enablement}
-          teamId={teamId}
-          projectName={data.project.project_name}
-          startDate={startDate}
-          endDate={endDate}
-        />
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <ProjectRepositoriesCard
-          repositories={data.repositories}
-          repositoryContext={data.repository_context}
-        />
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Friction</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {data.friction ? (
-              <>
-                <div className="grid gap-3 sm:grid-cols-4">
-                  <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Friction Rate</p>
-                    <p className="mt-1 font-display text-2xl">{formatPercent(data.friction.friction_rate)}</p>
-                  </div>
-                  <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Affected Sessions</p>
-                    <p className="mt-1 font-display text-2xl">{formatNumber(data.friction.sessions_with_friction)}</p>
-                  </div>
-                  <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Total Frictions</p>
-                    <p className="mt-1 font-display text-2xl">{formatNumber(data.friction.total_friction_count)}</p>
-                  </div>
-                  <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Time Lost</p>
-                    <p className="mt-1 font-display text-2xl">
-                      {formatDuration(data.friction.estimated_minutes_lost * 60)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Top Friction Types
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {data.friction.top_friction_types.map((item) => (
-                      <Badge key={item} variant="secondary">{item.replaceAll("_", " ")}</Badge>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Highest Impact Patterns
-                  </h3>
-                  {data.friction_impacts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No friction impact clusters yet.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {data.friction_impacts.map((impact) => (
-                        <div
-                          key={impact.friction_type}
-                          className="rounded-xl border border-border/60 p-3"
-                        >
-                          <div className="flex items-center justify-between gap-4">
-                            <p className="font-medium">{impact.friction_type.replaceAll("_", " ")}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {formatPercent(impact.success_rate_with)} with friction
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No project-scoped friction telemetry yet.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <ProjectWorkflowSection workflowSummary={data.workflow_summary} />
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Cost View</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Total Spend</p>
-                <p className="mt-1 font-display text-2xl">{formatCost(data.cost.total_estimated_cost)}</p>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Avg Cost / Session</p>
-                <p className="mt-1 font-display text-2xl">{data.scorecard.avg_cost_per_session != null ? formatCost(data.scorecard.avg_cost_per_session) : "-"}</p>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Cost / Success</p>
-                <p className="mt-1 font-display text-2xl">{data.scorecard.cost_per_successful_outcome != null ? formatCost(data.scorecard.cost_per_successful_outcome) : "-"}</p>
-              </div>
-            </div>
-
-            {data.cost.model_breakdown.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No model-usage telemetry yet.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-left text-muted-foreground">
-                      <th className="pb-2 font-medium">Model</th>
-                      <th className="pb-2 text-right font-medium">Input</th>
-                      <th className="pb-2 text-right font-medium">Output</th>
-                      <th className="pb-2 text-right font-medium">Cost</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.cost.model_breakdown.slice(0, 5).map((model) => (
-                      <tr key={model.model_name} className="border-b border-border/40 last:border-0">
-                        <td className="py-2">{model.model_name}</td>
-                        <td className="py-2 text-right">{formatTokens(model.input_tokens)}</td>
-                        <td className="py-2 text-right">{formatTokens(model.output_tokens)}</td>
-                        <td className="py-2 text-right">{formatCost(model.estimated_cost)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Quality View</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">PRs</p>
-                <p className="mt-1 font-display text-2xl">{formatNumber(data.quality.overview.total_prs)}</p>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">PR Merge Rate</p>
-                <p className="mt-1 font-display text-2xl">{formatPercent(data.quality.overview.pr_merge_rate)}</p>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Findings</p>
-                <p className="mt-1 font-display text-2xl">{formatNumber(data.quality.findings_overview?.total_findings ?? 0)}</p>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Fix Rate</p>
-                <p className="mt-1 font-display text-2xl">{formatPercent(data.quality.findings_overview?.fix_rate)}</p>
-              </div>
-            </div>
-
-            <p className="text-sm text-muted-foreground">
-              Project quality is scoped to PRs directly linked to this project’s sessions, so the workspace stays attribution-safe.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground">Linked Pull Requests</h2>
-        {data.quality.recent_prs.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-sm text-muted-foreground">
-              No project-linked pull requests yet.
-            </CardContent>
-          </Card>
-        ) : (
-          <PRTable prs={data.quality.recent_prs} />
+              </CardContent>
+            </Card>
+          </div>
         )}
-      </section>
-
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <GitPullRequest className="h-4 w-4 text-primary" />
-          <h2 className="text-sm font-semibold text-muted-foreground">Quality Attribution</h2>
-        </div>
-        <Card>
-          <CardContent className="pt-6">
-            <QualityAttributionTable rows={data.quality.attribution} framed={false} />
-          </CardContent>
-        </Card>
-      </section>
+      </div>
     </div>
   )
 }

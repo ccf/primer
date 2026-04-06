@@ -1,5 +1,7 @@
+import { useState } from "react"
 import { useQualityMetrics, useReviewFindings } from "@/hooks/use-api-queries"
 import { PageHeader } from "@/components/shared/page-header"
+import { PageTabs } from "@/components/ui/page-tabs"
 import { QualityOverviewCards } from "@/components/quality/quality-overview"
 import { ClaudePRComparison } from "@/components/quality/claude-pr-comparison"
 import { PRTable } from "@/components/quality/pr-table"
@@ -16,6 +18,14 @@ import { SectionHeader } from "@/components/shared/section-header"
 import { GitPullRequest } from "lucide-react"
 import type { DateRange } from "@/components/layout/date-range-picker"
 
+const tabs = [
+  { id: "overview", label: "Overview" },
+  { id: "findings", label: "Findings" },
+  { id: "outcomes", label: "Outcomes" },
+] as const
+
+type TabId = (typeof tabs)[number]["id"]
+
 interface QualityPageProps {
   teamId: string | null
   dateRange: DateRange | null
@@ -24,6 +34,7 @@ interface QualityPageProps {
 export function QualityPage({ teamId, dateRange }: QualityPageProps) {
   const startDate = dateRange?.startDate
   const endDate = dateRange?.endDate
+  const [activeTab, setActiveTab] = useState<TabId>("overview")
 
   const { data: quality, isLoading } = useQualityMetrics(teamId, startDate, endDate)
   const { data: findingsData } = useReviewFindings(teamId, startDate, endDate)
@@ -49,64 +60,80 @@ export function QualityPage({ teamId, dateRange }: QualityPageProps) {
       <PageHeader
         icon={GitPullRequest}
         title="Code Quality"
-        description="PR metrics, code volume, and Claude-assisted comparison"
+        description="PR metrics, review findings, and post-merge outcomes"
       />
 
       <GitHubStatusBanner connected={quality.github_connected} />
 
-      <QualityOverviewCards overview={quality.overview} />
+      <PageTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <ClaudePRComparison teamId={teamId} startDate={startDate} endDate={endDate} />
-        <QualityByTypeChart data={quality.by_session_type} />
+      <div className="mt-6">
+        {activeTab === "overview" && (
+          <div className="space-y-8">
+            <QualityOverviewCards overview={quality.overview} />
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <ClaudePRComparison teamId={teamId} startDate={startDate} endDate={endDate} />
+              <QualityByTypeChart data={quality.by_session_type} />
+            </div>
+
+            <section className="space-y-3">
+              <SectionHeader
+                title="Recent pull requests"
+                description="PRs and review behavior feeding the quality view."
+              />
+              <PRTable prs={quality.recent_prs} />
+            </section>
+
+            <section className="space-y-3">
+              <SectionHeader
+                title="Engineer quality"
+                description="Who is generating strong outcomes and where quality support is needed."
+              />
+              <EngineerQualityTable engineers={quality.engineer_quality} />
+            </section>
+          </div>
+        )}
+
+        {activeTab === "findings" && (
+          <div className="space-y-8">
+            {quality.findings_overview && (
+              <FindingsOverviewSection findings={quality.findings_overview} />
+            )}
+
+            {findingsData && findingsData.items.length > 0 && (
+              <section className="space-y-3">
+                <SectionHeader
+                  title="Review findings detail"
+                  description="Automated review issues behind the summary metrics."
+                />
+                <FindingsTable findings={findingsData.items} />
+              </section>
+            )}
+
+            <section className="space-y-3">
+              <QualityAttributionTable rows={quality.attribution} />
+            </section>
+          </div>
+        )}
+
+        {activeTab === "outcomes" && (
+          <div className="space-y-8">
+            <section className="space-y-3">
+              <SectionHeader
+                title="Post-merge outcomes"
+                description="Stabilization work after merge: reverts, hotfixes, and follow-up fixes."
+              />
+              <PostMergeOutcomesSection
+                summary={quality.post_merge_outcomes}
+                prs={quality.recent_post_merge_prs}
+              />
+            </section>
+
+            <CodeVolumeChart data={quality.daily_volume} />
+          </div>
+        )}
       </div>
-
-      {quality.findings_overview && (
-        <FindingsOverviewSection findings={quality.findings_overview} />
-      )}
-
-      <section className="space-y-3">
-        <SectionHeader
-          title="Post-merge outcomes"
-          description="Track the stabilization work that shows up after merge, including reverts, hotfixes, and follow-up fixes."
-        />
-        <PostMergeOutcomesSection
-          summary={quality.post_merge_outcomes}
-          prs={quality.recent_post_merge_prs}
-        />
-      </section>
-
-      {findingsData && findingsData.items.length > 0 && (
-        <section className="space-y-3">
-          <SectionHeader
-            title="Review findings detail"
-            description="Inspect the actual automated review issues behind the summary metrics."
-          />
-          <FindingsTable findings={findingsData.items} />
-        </section>
-      )}
-
-      <CodeVolumeChart data={quality.daily_volume} />
-
-      <section className="space-y-3">
-        <SectionHeader
-          title="Recent pull requests"
-          description="A closer read on the PRs and review behavior feeding the quality view."
-        />
-        <PRTable prs={quality.recent_prs} />
-      </section>
-
-      <section className="space-y-3">
-        <SectionHeader
-          title="Engineer quality"
-          description="See who is generating strong outcomes and where quality support is needed."
-        />
-        <EngineerQualityTable engineers={quality.engineer_quality} />
-      </section>
-
-      <section className="space-y-3">
-        <QualityAttributionTable rows={quality.attribution} />
-      </section>
     </div>
   )
 }
