@@ -75,7 +75,11 @@ export function InterventionsPage({ teamId }: InterventionsPageProps) {
       <PageHeader
         icon={ClipboardList}
         title="Interventions"
-        description="Tracked follow-through for recommendations, coaching, and workflow changes"
+        description={
+          interventions && interventions.length > 0
+            ? `${interventions.filter((i) => i.status === "completed").length} completed, ${interventions.filter((i) => i.status === "in_progress").length} in progress, ${interventions.filter((i) => i.status === "planned").length} planned`
+            : "Tracked follow-through for recommendations, coaching, and workflow changes"
+        }
       >
         <Button onClick={() => setShowCreateModal(true)}>
           <Plus className="mr-1 h-4 w-4" />

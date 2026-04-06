@@ -127,7 +127,13 @@ export function DashboardPage({ teamId, dateRange }: DashboardPageProps) {
 
       {/* Activity Section */}
       <section className="space-y-4">
-        <h2 className="text-sm font-semibold text-muted-foreground">Activity</h2>
+        <div>
+          <h2 className="text-sm font-semibold text-muted-foreground">Activity</h2>
+          <p className="text-xs text-muted-foreground/80">
+            {formatNumber(overview.total_sessions)} sessions across {formatNumber(overview.total_engineers)} engineers
+            {overview.success_rate != null ? ` \u2014 ${formatPercent(overview.success_rate)} successful` : ""}
+          </p>
+        </div>
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
           {loadingDaily ? <ChartSkeleton /> : daily && <DailyActivityChart data={daily} />}
           <OutcomeChart data={overview.outcome_counts} />

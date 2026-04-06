@@ -1,4 +1,5 @@
 import { useBottleneckAnalytics } from "@/hooks/use-api-queries"
+import { formatNumber, formatPercent } from "@/lib/utils"
 import { PageHeader } from "@/components/shared/page-header"
 import { BottleneckSummary } from "@/components/bottlenecks/bottleneck-summary"
 import { FrictionTrendChart } from "@/components/bottlenecks/friction-trend-chart"
@@ -42,7 +43,11 @@ export function FrictionPage({ teamId, dateRange }: FrictionPageProps) {
       <PageHeader
         icon={AlertTriangle}
         title="Friction Intelligence"
-        description="What's blocking your engineers and how much it costs"
+        description={
+          data.overall_friction_rate != null
+            ? `${formatPercent(data.overall_friction_rate)} of sessions hit friction across ${formatNumber(data.sessions_with_any_friction)} sessions`
+            : "What's blocking your engineers and how much it costs"
+        }
       />
 
       <BottleneckSummary data={data} />
@@ -60,12 +65,22 @@ export function FrictionPage({ teamId, dateRange }: FrictionPageProps) {
       />
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground">By Project</h2>
+        <div>
+          <h2 className="text-sm font-semibold text-muted-foreground">Friction by Project</h2>
+          <p className="text-xs text-muted-foreground/80">
+            Which repositories generate the most friction and where enablement work would help.
+          </p>
+        </div>
         <ProjectFrictionTable data={data.project_friction} />
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground">By Engineer</h2>
+        <div>
+          <h2 className="text-sm font-semibold text-muted-foreground">Time Lost by Engineer</h2>
+          <p className="text-xs text-muted-foreground/80">
+            Estimated engineering minutes lost to friction, broken down by engineer and friction type.
+          </p>
+        </div>
         <EngineerTimeLostTable data={data.engineer_time_lost} />
       </section>
     </div>
