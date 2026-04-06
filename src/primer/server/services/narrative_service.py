@@ -24,7 +24,7 @@ MIN_SESSIONS = 5
 
 ENGINEER_SECTIONS = [
     "At a Glance",
-    "How You Use Claude Code",
+    "How You Use AI Agents",
     "Impressive Things You Did",
     "Where Things Go Wrong",
     "New Usage Patterns",
@@ -99,6 +99,7 @@ def _gather_data(
         "outcome_counts": overview.outcome_counts,
         "cache_hit_rate": overview.cache_hit_rate,
         "avg_health_score": overview.avg_health_score,
+        "agent_type_counts": overview.agent_type_counts,
     }
 
     # Friction (top 5)
@@ -217,8 +218,8 @@ def _build_prompt(scope: str, scope_label: str, data: dict) -> tuple[str, str]:
     }[scope]
 
     system_prompt = """You are an expert engineering analytics advisor for a software organization \
-that uses Claude Code (Anthropic's AI coding assistant). You analyze usage data and produce \
-concise, high-signal narrative reports.
+that uses multiple AI coding agents (Claude Code, Cursor, Codex CLI, Gemini CLI). You analyze \
+usage data across all agent types and produce concise, high-signal narrative reports.
 
 Your output MUST be a valid JSON array of objects with "title" and "content" keys.
 
@@ -247,8 +248,9 @@ Section formatting rules (FOLLOW EXACTLY):
    - **Quick wins:** (1-2 actionable suggestions)
    - **Ambitious workflows:** (1-2 forward-looking ideas)
 
-2. "How You Use Claude Code" — 2-3 paragraphs analyzing interaction style and patterns.
-   End with a callout line: **Key pattern:** followed by a one-sentence insight.
+2. "How You Use AI Agents" — 2-3 paragraphs analyzing interaction style, agent mix, and patterns.
+   Note which agents the engineer uses (Claude Code, Cursor, Codex, Gemini) and how their
+   workflow differs across them. End with: **Key pattern:** one-sentence insight.
 
 3. "Impressive Things You Did" — 2-3 items. Each item as:
    ### Title

@@ -65,7 +65,6 @@ export function EngineersPage({ teamId, dateRange }: EngineersPageProps) {
       ) : (
         <EngineerLeaderboard
           engineers={engineers}
-          benchmark={benchmarks?.benchmark}
           onSortChange={setSortBy}
           sortBy={sortBy}
         />

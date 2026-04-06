@@ -4,6 +4,7 @@ import type {
   EngineerQuality,
   EngineerLeverageProfile,
 } from "@/types/api"
+// EngineerBenchmark still used for percentile/vs_team_avg extraction
 import type { UnifiedEngineerRow } from "./engineer-leaderboard"
 
 /** Merge data from multiple API sources into unified rows. */
@@ -35,7 +36,6 @@ export function mergeEngineerData(
       pr_count: q?.pr_count,
       merge_rate: q?.merge_rate,
       leverage_score: l?.leverage_score,
-      _benchmark: b,
     }
   })
 }

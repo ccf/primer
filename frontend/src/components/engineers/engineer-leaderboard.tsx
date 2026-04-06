@@ -1,14 +1,12 @@
-import { Fragment, useState } from "react"
+import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowUpDown, Download, FileText, ChevronDown, ChevronRight } from "lucide-react"
+import { ArrowUpDown, Download, FileText } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { formatCost, formatPercent } from "@/lib/utils"
 import { exportToCsv } from "@/lib/csv-export"
 import { exportToPdf } from "@/lib/pdf-export"
-import { BenchmarkRadar } from "./benchmark-radar"
-import type { EngineerBenchmark, BenchmarkContext } from "@/types/api"
 
 export interface UnifiedEngineerRow {
   engineer_id: string
@@ -27,13 +25,10 @@ export interface UnifiedEngineerRow {
   merge_rate?: number | null
   // maturity
   leverage_score?: number
-  // full benchmark record (for radar)
-  _benchmark?: EngineerBenchmark
 }
 
 interface EngineerLeaderboardProps {
   engineers: UnifiedEngineerRow[]
-  benchmark?: BenchmarkContext
   onSortChange: (sortBy: string) => void
   sortBy: string
 }
@@ -81,13 +76,11 @@ function LeverageBar({ score }: { score: number }) {
 
 export function EngineerLeaderboard({
   engineers,
-  benchmark,
   onSortChange,
   sortBy,
 }: EngineerLeaderboardProps) {
   const navigate = useNavigate()
   const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const hasBenchmarks = engineers.some((e) => e.percentile_sessions != null)
   const hasQuality = engineers.some((e) => e.pr_count != null)
@@ -146,9 +139,6 @@ export function EngineerLeaderboard({
             <thead>
               <tr className="border-b border-border bg-muted/60">
                 {hasBenchmarks && (
-                  <th className="w-8 px-2 py-2.5" />
-                )}
-                {hasBenchmarks && (
                   <th className="px-3 py-2.5 text-center font-medium text-muted-foreground">
                     Rank
                   </th>
@@ -203,123 +193,81 @@ export function EngineerLeaderboard({
             </thead>
             <tbody>
               {engineers.map((eng) => (
-                <Fragment key={eng.engineer_id}>
-                  <tr
-                    className="cursor-pointer border-b border-border/40 last:border-0 even:bg-muted/15 hover:bg-accent/50"
-                    onMouseEnter={() => setHoveredId(eng.engineer_id)}
-                    onMouseLeave={() => setHoveredId(null)}
-                    onClick={() => navigate(`/engineers/${eng.engineer_id}`)}
-                  >
-                    {hasBenchmarks && (
-                      <td className="w-8 px-2 py-2.5">
-                        {eng._benchmark && benchmark && (
-                          <button
-                            className="text-muted-foreground hover:text-foreground"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setExpandedId(
-                                expandedId === eng.engineer_id ? null : eng.engineer_id,
-                              )
-                            }}
-                          >
-                            {expandedId === eng.engineer_id ? (
-                              <ChevronDown className="h-3.5 w-3.5" />
-                            ) : (
-                              <ChevronRight className="h-3.5 w-3.5" />
-                            )}
-                          </button>
-                        )}
-                      </td>
-                    )}
-                    {hasBenchmarks && (
-                      <td className="px-3 py-2.5 text-center">
-                        {eng.percentile_sessions != null ? (
-                          <PercentileBadge value={eng.percentile_sessions} />
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </td>
-                    )}
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-2">
-                        {eng.avatar_url ? (
-                          <img
-                            src={eng.avatar_url}
-                            alt={eng.display_name ?? eng.name}
-                            className="h-6 w-6 rounded-full"
-                          />
-                        ) : (
-                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-medium">
-                            {(eng.display_name ?? eng.name).charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <span
-                          className={
-                            hoveredId === eng.engineer_id ? "font-medium underline" : "font-medium"
-                          }
-                        >
-                          {eng.display_name ?? eng.name}
+                <tr
+                  key={eng.engineer_id}
+                  className="cursor-pointer border-b border-border/40 last:border-0 even:bg-muted/15 hover:bg-accent/50"
+                  onMouseEnter={() => setHoveredId(eng.engineer_id)}
+                  onMouseLeave={() => setHoveredId(null)}
+                  onClick={() => navigate(`/engineers/${eng.engineer_id}`)}
+                >
+                  {hasBenchmarks && (
+                    <td className="px-3 py-2.5 text-center">
+                      {eng.percentile_sessions != null ? (
+                        <PercentileBadge value={eng.percentile_sessions} />
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </td>
+                  )}
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      {eng.avatar_url ? (
+                        <img
+                          src={eng.avatar_url}
+                          alt={eng.display_name ?? eng.name}
+                          className="h-6 w-6 rounded-full"
+                        />
+                      ) : (
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-medium">
+                          {(eng.display_name ?? eng.name).charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <span
+                        className={
+                          hoveredId === eng.engineer_id ? "font-medium underline" : "font-medium"
+                        }
+                      >
+                        {eng.display_name ?? eng.name}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2.5 text-right">
+                    {eng.total_sessions}
+                    <DeltaIndicator value={eng.vs_team_avg?.sessions} />
+                  </td>
+                  <td className="px-3 py-2.5 text-right">
+                    {formatCost(eng.estimated_cost)}
+                    <DeltaIndicator value={eng.vs_team_avg?.cost} />
+                  </td>
+                  <td className="px-3 py-2.5 text-right">
+                    {formatPercent(eng.success_rate)}
+                  </td>
+                  {hasQuality && (
+                    <td className="px-3 py-2.5 text-right">
+                      {eng.pr_count != null ? (
+                        <span>
+                          {eng.pr_count}
+                          {eng.merge_rate != null && (
+                            <span className="ml-1 text-[10px] text-muted-foreground">
+                              ({(eng.merge_rate * 100).toFixed(0)}% merged)
+                            </span>
+                          )}
                         </span>
-                      </div>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </td>
-                    <td className="px-3 py-2.5 text-right">
-                      {eng.total_sessions}
-                      <DeltaIndicator value={eng.vs_team_avg?.sessions} />
+                  )}
+                  {hasLeverage && (
+                    <td className="px-3 py-2.5">
+                      {eng.leverage_score != null ? (
+                        <LeverageBar score={eng.leverage_score} />
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </td>
-                    <td className="px-3 py-2.5 text-right">
-                      {formatCost(eng.estimated_cost)}
-                      <DeltaIndicator value={eng.vs_team_avg?.cost} />
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      {formatPercent(eng.success_rate)}
-                    </td>
-                    {hasQuality && (
-                      <td className="px-3 py-2.5 text-right">
-                        {eng.pr_count != null ? (
-                          <span>
-                            {eng.pr_count}
-                            {eng.merge_rate != null && (
-                              <span className="ml-1 text-[10px] text-muted-foreground">
-                                ({(eng.merge_rate * 100).toFixed(0)}% merged)
-                              </span>
-                            )}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </td>
-                    )}
-                    {hasLeverage && (
-                      <td className="px-3 py-2.5">
-                        {eng.leverage_score != null ? (
-                          <LeverageBar score={eng.leverage_score} />
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </td>
-                    )}
-                  </tr>
-                  {hasBenchmarks &&
-                    expandedId === eng.engineer_id &&
-                    eng._benchmark &&
-                    benchmark && (
-                      <tr key={`${eng.engineer_id}-radar`}>
-                        <td
-                          colSpan={
-                            4 +
-                            (hasBenchmarks ? 2 : 0) +
-                            (hasQuality ? 1 : 0) +
-                            (hasLeverage ? 1 : 0)
-                          }
-                          className="bg-muted/20 px-4 py-4"
-                        >
-                          <div className="mx-auto max-w-md">
-                            <BenchmarkRadar engineer={eng._benchmark} benchmark={benchmark} />
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                </Fragment>
+                  )}
+                </tr>
               ))}
             </tbody>
           </table>
