@@ -27,6 +27,7 @@ export function ExplorerPage({ teamId, dateRange }: ExplorerPageProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
   const { messages, sendMessage, isStreaming, error } = useExplorerStream(
     teamId,
     dateRange,
@@ -131,6 +132,21 @@ export function ExplorerPage({ teamId, dateRange }: ExplorerPageProps) {
     })
   }
 
+  function handleDeleteSavedItem(itemId: string) {
+    setSaveError(null)
+    setDeletingItemId(itemId)
+    deleteSavedItem.mutate(itemId, {
+      onError: (mutationError) => {
+        setSaveError(
+          mutationError instanceof Error ? mutationError.message : "Failed to delete saved item",
+        )
+      },
+      onSettled: () => {
+        setDeletingItemId(null)
+      },
+    })
+  }
+
   return (
     <div className="grid h-full min-h-0 xl:grid-cols-[320px_minmax(0,1fr)]">
       <aside className="border-b border-border px-6 py-4 xl:border-b-0 xl:border-r xl:overflow-y-auto">
@@ -144,8 +160,8 @@ export function ExplorerPage({ teamId, dateRange }: ExplorerPageProps) {
           <SavedExplorerItems
             items={savedItems ?? []}
             onRun={handleRunSavedItem}
-            onDelete={(itemId) => deleteSavedItem.mutate(itemId)}
-            deletingId={deleteSavedItem.variables ?? null}
+            onDelete={handleDeleteSavedItem}
+            deletingId={deletingItemId}
           />
         </div>
       </aside>
