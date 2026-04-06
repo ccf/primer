@@ -7,7 +7,7 @@ import { ClaudePRComparison } from "@/components/quality/claude-pr-comparison"
 import { PRTable } from "@/components/quality/pr-table"
 import { CodeVolumeChart } from "@/components/quality/code-volume-chart"
 import { QualityByTypeChart } from "@/components/quality/quality-by-type"
-import { GitHubStatusBanner } from "@/components/quality/github-status-banner"
+
 import { EngineerQualityTable } from "@/components/quality/engineer-quality-table"
 import { FindingsOverviewSection } from "@/components/quality/findings-overview"
 import { FindingsTable } from "@/components/quality/findings-table"
@@ -62,8 +62,6 @@ export function QualityPage({ teamId, dateRange }: QualityPageProps) {
         title="Code Quality"
         description="PR metrics, review findings, and post-merge outcomes"
       />
-
-      <GitHubStatusBanner connected={quality.github_connected} />
 
       <PageTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 

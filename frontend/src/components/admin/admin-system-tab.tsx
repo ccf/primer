@@ -610,12 +610,6 @@ export function AdminSystemTab() {
               subtitle="Confidence score below 0.70"
               icon={AlertTriangle}
             />
-            <StatCard
-              label="Remaining Legacy Rows"
-              value={formatNumber(integrity.remaining_legacy_rows)}
-              subtitle={`${formatNumber(integrity.legacy_outcome_sessions)} outcome rows, ${formatNumber(integrity.legacy_goal_category_sessions)} goal-category rows`}
-              icon={RefreshCcw}
-            />
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">Measurement integrity data is unavailable.</p>
