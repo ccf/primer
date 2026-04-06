@@ -1,6 +1,5 @@
 import { Activity, BadgeCheck, Target, DollarSign, Clock, Zap } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
-import { InlineStat } from "@/components/ui/inline-stat"
 import { formatNumber, formatPercent, formatCost, formatDuration } from "@/lib/utils"
 
 interface ProfileSidebarProps {
@@ -84,15 +83,16 @@ export function ProfileSidebar({ profile }: ProfileSidebarProps) {
           <p className="mt-1 text-sm text-muted-foreground">{profile.email}</p>
         </div>
 
-        {/* Stats grid */}
-        <div className="mt-5 grid grid-cols-2 gap-3">
+        {/* Stats grid — compact for sidebar */}
+        <div className="mt-5 grid grid-cols-2 gap-2">
           {stats.map((s, i) => (
             <div
               key={s.label}
-              className="animate-stagger-in"
+              className="animate-stagger-in rounded-lg border border-border/60 bg-card px-2.5 py-2"
               style={{ animationDelay: `${i * 60}ms` }}
             >
-              <InlineStat label={s.label} value={s.value} icon={s.icon} />
+              <p className="font-display text-lg leading-tight">{s.value}</p>
+              <p className="text-[10px] text-muted-foreground">{s.label}</p>
             </div>
           ))}
         </div>

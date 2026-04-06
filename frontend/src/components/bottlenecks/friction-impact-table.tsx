@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatDuration } from "@/lib/utils"
 import { cn } from "@/lib/utils"
@@ -6,6 +7,8 @@ import type { FrictionImpact } from "@/types/api"
 interface FrictionImpactTableProps {
   data: FrictionImpact[]
 }
+
+const DEFAULT_VISIBLE = 10
 
 function ImpactBadge({ score }: { score: number | null }) {
   if (score == null) return <span className="text-muted-foreground">--</span>
@@ -20,7 +23,12 @@ function ImpactBadge({ score }: { score: number | null }) {
 }
 
 export function FrictionImpactTable({ data }: FrictionImpactTableProps) {
+  const [showAll, setShowAll] = useState(false)
+
   if (data.length === 0) return null
+
+  const visible = showAll ? data : data.slice(0, DEFAULT_VISIBLE)
+  const hasMore = data.length > DEFAULT_VISIBLE
 
   return (
     <Card>
@@ -42,7 +50,7 @@ export function FrictionImpactTable({ data }: FrictionImpactTableProps) {
               </tr>
             </thead>
             <tbody>
-              {data.map((item) => (
+              {visible.map((item) => (
                 <tr key={item.friction_type} className="border-b border-border last:border-0">
                   <td className="py-2 font-medium">{item.friction_type}</td>
                   <td className="py-2 text-right">{item.occurrence_count}</td>
@@ -73,6 +81,15 @@ export function FrictionImpactTable({ data }: FrictionImpactTableProps) {
             </tbody>
           </table>
         </div>
+        {hasMore && (
+          <button
+            type="button"
+            onClick={() => setShowAll(!showAll)}
+            className="mt-3 text-xs text-primary hover:underline"
+          >
+            {showAll ? "Show top 10" : `Show all ${data.length} types`}
+          </button>
+        )}
       </CardContent>
     </Card>
   )
