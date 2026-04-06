@@ -43,6 +43,7 @@ const tabs = [
   { id: "onboarding", label: "Onboarding" },
   { id: "patterns", label: "Patterns" },
   { id: "skills", label: "Skills" },
+  { id: "learning", label: "Learning & Reuse" },
   { id: "playbooks", label: "Playbooks" },
 ] as const
 
@@ -112,6 +113,17 @@ function SkillsTab({ teamId, startDate, endDate }: TabProps) {
           <SkillUniverseChart universe={learning.team_skill_universe} />
         </div>
       )}
+      {skills && <EngineerSkillTable data={skills.engineer_profiles} />}
+    </div>
+  )
+}
+
+function LearningTab({ teamId, startDate, endDate }: TabProps) {
+  const { data: skills, isLoading: loadingSkills } = useSkillInventory(teamId, startDate, endDate)
+  const { data: learning, isLoading: loadingLearning } = useLearningPaths(teamId, startDate, endDate)
+  if (loadingSkills || loadingLearning) return <ChartSkeleton />
+  return (
+    <div className="space-y-6">
       {learning && learning.engineer_paths.length > 0 && (
         <div className="space-y-3">
           <SectionHeader
@@ -129,7 +141,6 @@ function SkillsTab({ teamId, startDate, endDate }: TabProps) {
       )}
       {skills && <ReusableAssetTable assets={skills.reusable_assets} />}
       {skills && <PromptReuseTable patterns={skills.prompt_patterns} />}
-      {skills && <EngineerSkillTable data={skills.engineer_profiles} />}
     </div>
   )
 }
@@ -235,6 +246,7 @@ export function GrowthPage({ teamId, dateRange }: GrowthPageProps) {
       {activeTab === "onboarding" && <OnboardingTab teamId={teamId} startDate={startDate} endDate={endDate} />}
       {activeTab === "patterns" && <PatternsTab teamId={teamId} startDate={startDate} endDate={endDate} />}
       {activeTab === "skills" && <SkillsTab teamId={teamId} startDate={startDate} endDate={endDate} />}
+      {activeTab === "learning" && <LearningTab teamId={teamId} startDate={startDate} endDate={endDate} />}
       {activeTab === "playbooks" && <PlaybooksTab startDate={startDate} endDate={endDate} />}
     </div>
   )
