@@ -25,16 +25,19 @@ export function isDemoMode(): boolean {
 export async function initDemoMode(): Promise<boolean> {
   try {
     const res = await fetch("/api/v1/demo-config")
-    if (!res.ok) return false
-    const data = await res.json()
-    if (data.demo_mode && data.admin_key) {
-      setApiKey(data.admin_key)
-      localStorage.setItem(DEMO_MODE_STORAGE, "true")
-      return true
+    if (res.ok) {
+      const data = await res.json()
+      if (data.demo_mode && data.admin_key) {
+        setApiKey(data.admin_key)
+        localStorage.setItem(DEMO_MODE_STORAGE, "true")
+        return true
+      }
     }
   } catch {
-    // Server not reachable or not in demo mode
+    // Server not reachable or not in demo mode — fall through to cleanup
   }
+  // Not in demo mode (or server unreachable): clear any stale flag so that
+  // apiFetch's 403 handling can clear the API key if it becomes invalid.
   localStorage.removeItem(DEMO_MODE_STORAGE)
   return false
 }

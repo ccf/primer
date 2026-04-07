@@ -9,7 +9,9 @@ if [ -n "$DATABASE_URL" ] && [ -z "$PRIMER_DATABASE_URL" ]; then
 fi
 
 echo "=== Primer Demo Instance ==="
-echo "Database: ${PRIMER_DATABASE_URL:-sqlite:///./primer.db}"
+# Redact credentials before logging the database URL
+REDACTED_DB_URL=$(echo "${PRIMER_DATABASE_URL:-sqlite:///./primer.db}" | sed -E 's#(://[^:]+:)[^@]+(@)#\1***\2#')
+echo "Database: $REDACTED_DB_URL"
 
 # Run migrations
 echo "Running database migrations..."
