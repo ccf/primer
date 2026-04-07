@@ -198,7 +198,7 @@ def create_app() -> FastAPI:
         # proper 404 JSON instead of HTML.
         @app.get("/{full_path:path}", include_in_schema=False)
         async def spa_fallback(full_path: str):
-            if full_path.startswith("api/") or full_path.startswith("health"):
+            if full_path.startswith("api/") or full_path == "health":
                 return JSONResponse({"detail": "Not Found"}, status_code=404)
             if full_path:
                 candidate = (FRONTEND_DIST / full_path).resolve()
