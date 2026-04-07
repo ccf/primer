@@ -13,8 +13,12 @@ Fixes two issues that surface when seeding ran racy/partial:
 
 from __future__ import annotations
 
+import os
 import random
 import sys
+
+# Allow `import seed_demo` when run as `python scripts/backfill_demo_links.py`
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from sqlalchemy.orm import sessionmaker
 
@@ -38,7 +42,7 @@ def _backfill_pull_requests(db) -> int:
         repo_map[short] = repo.id
 
     # Import here so this script doesn't fail when run on a fresh DB
-    from scripts.seed_demo import seed_pull_requests, seed_review_findings
+    from seed_demo import seed_pull_requests, seed_review_findings
 
     pr_map = seed_pull_requests(db, repo_map)
     seed_review_findings(db, pr_map)
