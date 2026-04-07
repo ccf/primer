@@ -28,8 +28,9 @@ print(db.query(func.count(Session.id)).scalar())
 
 if [ "$SESSIONS" = "0" ]; then
   echo "Database is empty — seeding demo data..."
-  # Disable rate limiting for seeding
+  # Disable rate limiting AND demo read-only middleware for seeding
   export PRIMER_RATE_LIMIT_ENABLED=false
+  export PRIMER_DEMO_MODE=false
 
   # Start the server in the background for API-based seeding
   uvicorn primer.server.app:app --host 0.0.0.0 --port 8000 &
@@ -59,8 +60,9 @@ else
   echo "Database already has $SESSIONS sessions — skipping seed."
 fi
 
-# Re-enable rate limiting for production
+# Re-enable rate limiting and demo mode for production
 export PRIMER_RATE_LIMIT_ENABLED=true
+export PRIMER_DEMO_MODE=true
 
 # Start the production server
 echo "Starting Primer demo server..."
