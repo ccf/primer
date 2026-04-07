@@ -21,9 +21,7 @@ _SAFE_POST_PATHS: set[str] = {
 # entire subtree is provably mutation-free.
 _SAFE_POST_PREFIXES: tuple[str, ...] = ()
 
-_BLOCKED_BODY = {
-    "detail": "This is a read-only demo instance. Mutations are disabled."
-}
+_BLOCKED_BODY = {"detail": "This is a read-only demo instance. Mutations are disabled."}
 
 
 def _blocked_response() -> JSONResponse:

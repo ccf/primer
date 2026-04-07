@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -194,8 +194,12 @@ def create_app() -> FastAPI:
         # SPA catch-all: serve index.html for any non-API path so client-side
         # routes survive a hard refresh. Guards against path traversal by
         # resolving and verifying containment within FRONTEND_DIST.
+        # API paths are explicitly excluded so unmatched endpoints return
+        # proper 404 JSON instead of HTML.
         @app.get("/{full_path:path}", include_in_schema=False)
-        async def spa_fallback(full_path: str) -> FileResponse:
+        async def spa_fallback(full_path: str):
+            if full_path.startswith("api/") or full_path.startswith("health"):
+                return JSONResponse({"detail": "Not Found"}, status_code=404)
             if full_path:
                 candidate = (FRONTEND_DIST / full_path).resolve()
                 try:
