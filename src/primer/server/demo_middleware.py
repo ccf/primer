@@ -21,10 +21,14 @@ _SAFE_POST_PATHS: set[str] = {
 # entire subtree is provably mutation-free.
 _SAFE_POST_PREFIXES: tuple[str, ...] = ()
 
-_BLOCKED_RESPONSE = JSONResponse(
-    {"detail": "This is a read-only demo instance. Mutations are disabled."},
-    status_code=403,
-)
+_BLOCKED_BODY = {
+    "detail": "This is a read-only demo instance. Mutations are disabled."
+}
+
+
+def _blocked_response() -> JSONResponse:
+    """Fresh response per request — Response objects carry mutable state."""
+    return JSONResponse(_BLOCKED_BODY, status_code=403)
 
 
 class DemoReadOnlyMiddleware(BaseHTTPMiddleware):
@@ -43,6 +47,6 @@ class DemoReadOnlyMiddleware(BaseHTTPMiddleware):
                     if path.startswith(prefix):
                         return await call_next(request)
 
-            return _BLOCKED_RESPONSE
+            return _blocked_response()
 
         return await call_next(request)
