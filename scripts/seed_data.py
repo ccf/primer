@@ -10,6 +10,24 @@ import httpx
 
 SERVER_URL = os.environ.get("PRIMER_SERVER_URL", "http://localhost:8000")
 
+# Override httpx default 5s timeout for slow seed operations against remote DBs
+_original_httpx_post = httpx.post
+_original_httpx_get = httpx.get
+
+
+def _patched_post(*args, **kwargs):
+    kwargs.setdefault("timeout", 60.0)
+    return _original_httpx_post(*args, **kwargs)
+
+
+def _patched_get(*args, **kwargs):
+    kwargs.setdefault("timeout", 60.0)
+    return _original_httpx_get(*args, **kwargs)
+
+
+httpx.post = _patched_post
+httpx.get = _patched_get
+
 
 def _build_seed_auth_headers() -> dict[str, str]:
     """Prefer an explicit admin key, but allow an admin-role API key for local seeding."""
