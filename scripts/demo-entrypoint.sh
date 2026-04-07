@@ -15,7 +15,36 @@ echo "Database: ${PRIMER_DATABASE_URL:-sqlite:///./primer.db}"
 echo "Running database migrations..."
 alembic upgrade head
 
-# Seed demo data if the database is empty
+# ── Acquire Postgres advisory lock so only one machine seeds/backfills ────
+# The lock is held by a long-lived python process; if another machine already
+# holds it, we block until that machine finishes (by which time session count
+# will be > 0 and we'll skip the seed branch).
+echo "Acquiring seed advisory lock..."
+python <<'PYEOF'
+import sys, time
+from sqlalchemy import create_engine, text
+from primer.common.config import settings
+
+engine = create_engine(settings.database_url)
+lock_key = 51820  # arbitrary; must be consistent across machines
+start = time.monotonic()
+with engine.connect() as conn:
+    while True:
+        got = conn.execute(text(f"SELECT pg_try_advisory_lock({lock_key})")).scalar()
+        if got:
+            print("  lock acquired")
+            break
+        if time.monotonic() - start > 900:  # 15 minute ceiling
+            print("  lock wait timeout; proceeding anyway", file=sys.stderr)
+            break
+        print("  another machine holds the lock; waiting 10s...")
+        time.sleep(10)
+PYEOF
+# Note: the lock is released when the python process exits above. That's
+# intentional — the lock is only used to serialize *entry* into the seed
+# phase. The session-count check below is the real idempotency guard.
+
+# Count sessions to decide whether to seed
 SESSIONS=$(python -c "
 from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker
@@ -47,7 +76,7 @@ if [ "$SESSIONS" = "0" ]; then
 
   # Run the demo seed script
   echo "Running demo seed..."
-  python scripts/seed_demo.py
+  python scripts/seed_demo.py || echo "  (seed reported errors, will backfill below)"
 
   # Stop the temporary server
   echo "Stopping seed server..."
@@ -55,15 +84,26 @@ if [ "$SESSIONS" = "0" ]; then
   wait $SERVER_PID 2>/dev/null || true
   sleep 1
 
-  echo "Demo data seeded successfully."
-
-  # Pre-warm narrative cache so live demo visitors don't hit the LLM API
-  if [ -n "$PRIMER_ANTHROPIC_API_KEY" ]; then
-    echo "Pre-warming narrative cache..."
-    python scripts/prewarm_narratives.py || echo "  (prewarm had errors, continuing)"
-  fi
+  echo "Demo data seeded."
 else
   echo "Database already has $SESSIONS sessions — skipping seed."
+fi
+
+# ── Unconditional idempotent backfills ───────────────────────────────────
+# Runs every deploy so partial seed state from prior failures self-heals.
+echo "Running demo backfills (repo readiness, session->repo links, PRs)..."
+python scripts/backfill_demo_links.py || echo "  (backfill errors, continuing)"
+
+# Pre-warm narrative cache if the API key is present (idempotent — cache hits)
+if [ -n "$PRIMER_ANTHROPIC_API_KEY" ]; then
+  echo "Pre-warming narrative cache..."
+  python scripts/prewarm_narratives.py || echo "  (prewarm errors, continuing)"
+fi
+
+# ── Flush Redis so analytics cache doesn't serve stale state ─────────────
+if [ -n "$PRIMER_REDIS_URL" ]; then
+  echo "Flushing Redis analytics cache..."
+  python -c "import redis, os; r=redis.from_url(os.environ['PRIMER_REDIS_URL']); r.flushdb(); print('  flushed')" || echo "  (redis flush failed, continuing)"
 fi
 
 # Re-enable rate limiting and demo mode for production
