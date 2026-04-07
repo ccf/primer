@@ -7,6 +7,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from primer.common.config import settings
 from primer.common.database import get_db
 from primer.common.schemas import ExplorerSavedItemCreate, ExplorerSavedItemResponse
 from primer.server.deps import AuthContext, get_auth_context
@@ -48,6 +49,12 @@ async def explorer_chat(
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(get_auth_context),
 ):
+    if settings.demo_mode:
+        raise HTTPException(
+            status_code=403,
+            detail="Explorer chat is disabled in the public demo to prevent abuse.",
+        )
+
     from primer.server.services.explorer_service import stream_explorer_chat
 
     tid, eid = _resolve_scope(auth, body.team_id)
