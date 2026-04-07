@@ -54,6 +54,11 @@ def main() -> int:
     db = factory()
 
     try:
+        # ── 0. Refresh repo readiness columns from REPO_CONFIGS ─────────
+        from backfill_repo_readiness import main as backfill_readiness
+
+        backfill_readiness()
+
         # ── 1. Link sessions to repositories ────────────────────────────
         repos = db.query(GitRepository).all()
         # Map both short name (everything after the last `/`) and full_name
