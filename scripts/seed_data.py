@@ -9,24 +9,14 @@ from datetime import datetime, timedelta
 import httpx
 
 SERVER_URL = os.environ.get("PRIMER_SERVER_URL", "http://localhost:8000")
+HTTP_TIMEOUT = 60.0
 
-# Override httpx default 5s timeout for slow seed operations against remote DBs
-_original_httpx_post = httpx.post
-_original_httpx_get = httpx.get
-
-
-def _patched_post(*args, **kwargs):
-    kwargs.setdefault("timeout", 60.0)
-    return _original_httpx_post(*args, **kwargs)
-
-
-def _patched_get(*args, **kwargs):
-    kwargs.setdefault("timeout", 60.0)
-    return _original_httpx_get(*args, **kwargs)
-
-
-httpx.post = _patched_post
-httpx.get = _patched_get
+# Long-lived client with a 60s timeout. httpx's default is 5s which is
+# too tight for seed runs against remote Postgres. Keeping this as a
+# module-local client (instead of monkey-patching httpx globals) confines
+# the timeout override so importing this module has no side effects on
+# httpx for any other code.
+http = httpx.Client(timeout=HTTP_TIMEOUT)
 
 
 def _build_seed_auth_headers() -> dict[str, str]:
@@ -1541,7 +1531,7 @@ def main():
     teams = []
     team_names = ["Platform", "Backend", "Frontend", "Mobile", "Data", "DevEx"]
     for name in team_names:
-        r = httpx.post(f"{SERVER_URL}/api/v1/teams", json={"name": name}, headers=ADMIN_HEADERS)
+        r = http.post(f"{SERVER_URL}/api/v1/teams", json={"name": name}, headers=ADMIN_HEADERS)
         if r.status_code == 200:
             teams.append(r.json())
             print(f"Created team: {name} ({r.json()['id']})")
@@ -1550,7 +1540,7 @@ def main():
 
     # If teams weren't created (already existed), fetch them
     if len(teams) < len(team_names):
-        r = httpx.get(f"{SERVER_URL}/api/v1/teams", headers=ADMIN_HEADERS)
+        r = http.get(f"{SERVER_URL}/api/v1/teams", headers=ADMIN_HEADERS)
         if r.status_code == 200:
             all_teams = r.json()
             teams = [t for t in all_teams if t["name"] in team_names]
@@ -1560,7 +1550,7 @@ def main():
     engineers = []
     for name, email, team_idx, role, github_user, github_id, persona_type, agent_mix in ENGINEERS:
         team_id = teams[team_idx]["id"] if teams else None
-        r = httpx.post(
+        r = http.post(
             f"{SERVER_URL}/api/v1/engineers",
             json={"name": name, "email": email, "team_id": team_id},
             headers=ADMIN_HEADERS,
@@ -1574,7 +1564,7 @@ def main():
             print(f"Created engineer: {name} (persona: {persona_type}, key: {key_preview}...)")
             eng_id = data["engineer"]["id"]
             avatar = f"https://avatars.githubusercontent.com/u/{github_id}"
-            httpx.patch(
+            http.patch(
                 f"{SERVER_URL}/api/v1/engineers/{eng_id}",
                 json={
                     "role": role,
@@ -1589,7 +1579,7 @@ def main():
 
     # If some engineers already existed, fetch them from the API
     if len(engineers) < len(ENGINEERS):
-        r = httpx.get(f"{SERVER_URL}/api/v1/engineers", headers=ADMIN_HEADERS)
+        r = http.get(f"{SERVER_URL}/api/v1/engineers", headers=ADMIN_HEADERS)
         if r.status_code == 200:
             all_engs = r.json()
             eng_lookup = {e["email"]: e for e in all_engs}
@@ -1599,7 +1589,7 @@ def main():
                     eng_data = eng_lookup[email]
                     # Rotate API key so we have a valid key for session seeding
                     # (api_key is not returned by the list endpoint)
-                    rot = httpx.post(
+                    rot = http.post(
                         f"{SERVER_URL}/api/v1/engineers/{eng_data['id']}/rotate-key",
                         headers=ADMIN_HEADERS,
                     )
@@ -1874,7 +1864,7 @@ def main():
                     "messages": session_messages,
                     "facets": facets,
                 }
-                r = httpx.post(f"{SERVER_URL}/api/v1/ingest/session", json=payload)
+                r = http.post(f"{SERVER_URL}/api/v1/ingest/session", json=payload)
                 if r.status_code == 200:
                     eng_sessions += 1
                     total_sessions += 1
@@ -1895,7 +1885,7 @@ def main():
 def seed_budgets(teams: list[dict]) -> None:
     """Create sample budgets. Skips any that already exist (matched by name)."""
     # Fetch existing budget names so we can skip duplicates
-    r = httpx.get(f"{SERVER_URL}/api/v1/finops/budgets", headers=ADMIN_HEADERS)
+    r = http.get(f"{SERVER_URL}/api/v1/finops/budgets", headers=ADMIN_HEADERS)
     existing_names: set[str] = set()
     if r.status_code == 200:
         existing_names = {b["name"] for b in r.json()}
@@ -1966,7 +1956,7 @@ def seed_budgets(teams: list[dict]) -> None:
         if bdef["name"] in existing_names:
             print(f"Budget '{bdef['name']}' already exists — skipping")
             continue
-        r = httpx.post(
+        r = http.post(
             f"{SERVER_URL}/api/v1/finops/budgets",
             json=bdef,
             headers=ADMIN_HEADERS,

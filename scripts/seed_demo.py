@@ -24,7 +24,6 @@ import sys
 import uuid
 from datetime import datetime, timedelta
 
-import httpx
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -71,6 +70,7 @@ from seed_data import (  # noqa: E402
     _generate_summary,
     _lognormal_tokens,
     _weighted_choice,
+    http,
 )
 
 # ---------------------------------------------------------------------------
@@ -2167,7 +2167,7 @@ def trigger_post_seed_jobs() -> None:
     # Backfill workflow profiles
     print("  Backfilling workflow profiles...")
     try:
-        r = httpx.post(
+        r = http.post(
             f"{SERVER_URL}/api/v1/admin/backfill-workflow-profiles",
             headers=ADMIN_HEADERS,
             params={"recompute": "false"},
@@ -2184,7 +2184,7 @@ def trigger_post_seed_jobs() -> None:
     # Normalize facets
     print("  Normalizing facets...")
     try:
-        r = httpx.post(
+        r = http.post(
             f"{SERVER_URL}/api/v1/admin/normalize-facets",
             headers=ADMIN_HEADERS,
             timeout=120.0,
@@ -2200,7 +2200,7 @@ def trigger_post_seed_jobs() -> None:
     # Detect anomalies
     print("  Running anomaly detection...")
     try:
-        r = httpx.post(
+        r = http.post(
             f"{SERVER_URL}/api/v1/alerts/detect",
             headers=ADMIN_HEADERS,
             timeout=60.0,
