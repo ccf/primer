@@ -90,13 +90,15 @@ def main() -> int:
         if created_prs:
             print(f"Backfilled {created_prs} pull requests from existing commits")
 
-        # ── 3. Detach a fraction of PRs from sessions to populate non-Claude ──
+        # ── 3. Ensure ~35% of PRs are non-Claude for the comparison view ──
+        # IDEMPOTENT: only detaches when the current ratio is far from target.
+        # Without this guard, repeated deploys would progressively detach all
+        # PRs and leave the Claude bucket empty.
         all_pr_ids = [row[0] for row in db.query(PullRequest.id).all()]
         if not all_pr_ids:
             print("No PRs found; skipping non-claude split.")
             return 0
 
-        # Find PRs currently linked to a session via SessionCommit
         linked_pr_ids = sorted(
             {
                 row[0]
@@ -105,14 +107,23 @@ def main() -> int:
                 .all()
             }
         )
+        non_claude_count = len(all_pr_ids) - len(linked_pr_ids)
+        target_non_claude = int(len(all_pr_ids) * 0.35)
+        deficit = target_non_claude - non_claude_count
+
+        if deficit <= 0:
+            print(
+                f"Claude/non-Claude split already at target "
+                f"({len(linked_pr_ids)} Claude / {non_claude_count} non-Claude); skipping detach"
+            )
+            return 0
 
         if not linked_pr_ids:
             print("No PRs linked to sessions; nothing to detach.")
             return 0
 
         random.seed(42)
-        target_non_claude = int(len(all_pr_ids) * 0.35)
-        to_detach = random.sample(linked_pr_ids, min(target_non_claude, len(linked_pr_ids)))
+        to_detach = random.sample(linked_pr_ids, min(deficit, len(linked_pr_ids)))
 
         detached = (
             db.query(SessionCommit)
@@ -122,7 +133,8 @@ def main() -> int:
         db.commit()
         print(
             f"Detached {detached} SessionCommit rows across {len(to_detach)} PRs "
-            f"(now non-Claude); {len(linked_pr_ids) - len(to_detach)} PRs remain Claude-assisted"
+            f"to reach {target_non_claude} non-Claude target "
+            f"({len(linked_pr_ids) - len(to_detach)} PRs remain Claude-assisted)"
         )
 
         return 0

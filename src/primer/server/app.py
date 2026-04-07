@@ -187,14 +187,21 @@ def create_app() -> FastAPI:
             app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
 
         index_file = FRONTEND_DIST / "index.html"
+        frontend_root = FRONTEND_DIST.resolve()
 
         # SPA catch-all: serve index.html for any non-API path so client-side
-        # routes survive a hard refresh
+        # routes survive a hard refresh. Guards against path traversal by
+        # resolving and verifying containment within FRONTEND_DIST.
         @app.get("/{full_path:path}", include_in_schema=False)
         async def spa_fallback(full_path: str) -> FileResponse:
-            candidate = FRONTEND_DIST / full_path
-            if full_path and candidate.is_file():
-                return FileResponse(candidate)
+            if full_path:
+                candidate = (FRONTEND_DIST / full_path).resolve()
+                try:
+                    candidate.relative_to(frontend_root)
+                except ValueError:
+                    return FileResponse(index_file)
+                if candidate.is_file():
+                    return FileResponse(candidate)
             return FileResponse(index_file)
 
     return app
