@@ -56,6 +56,12 @@ if [ "$SESSIONS" = "0" ]; then
   sleep 1
 
   echo "Demo data seeded successfully."
+
+  # Pre-warm narrative cache so live demo visitors don't hit the LLM API
+  if [ -n "$PRIMER_ANTHROPIC_API_KEY" ]; then
+    echo "Pre-warming narrative cache..."
+    python scripts/prewarm_narratives.py || echo "  (prewarm had errors, continuing)"
+  fi
 else
   echo "Database already has $SESSIONS sessions — skipping seed."
 fi
