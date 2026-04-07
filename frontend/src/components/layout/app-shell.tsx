@@ -4,6 +4,7 @@ import { Sidebar } from "./sidebar"
 import { Header } from "./header"
 import type { DateRange } from "./date-range-picker"
 import { SIDEBAR_KEY } from "@/lib/constants"
+import { isDemoMode } from "@/lib/api"
 
 interface AppShellProps {
   children: ReactNode
@@ -39,7 +40,7 @@ export function AppShell({ children, teamId, onTeamChange, dateRange, onDateRang
     })
   }, [])
 
-  const demoMode = typeof window !== "undefined" && localStorage.getItem("primer_demo_mode") === "true"
+  const demoMode = typeof window !== "undefined" && isDemoMode()
 
   return (
     <div className="flex h-screen flex-col">
