@@ -148,15 +148,21 @@ def create_app() -> FastAPI:
     # Rate limiting
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
-    app.add_middleware(SlowAPIMiddleware)
 
-    # Demo mode: block all mutations. Must be added BEFORE CORSMiddleware
-    # so that CORSMiddleware wraps it in the execution stack (middleware
-    # runs in LIFO order) and blocked 403 responses still get CORS headers.
+    # Middleware add order matters: Starlette runs them LIFO, so the
+    # last-added middleware is the outermost. We want the execution
+    # stack (outermost → innermost) to be:
+    #   CORSMiddleware -> SlowAPIMiddleware -> DemoReadOnlyMiddleware -> router
+    # so that:
+    #   - CORS headers are applied to every response, including demo 403s
+    #   - blocked mutation requests still get counted by the rate limiter
+    #     (preventing an attacker from flooding with no rate limit)
     if settings.demo_mode:
         from primer.server.demo_middleware import DemoReadOnlyMiddleware
 
         app.add_middleware(DemoReadOnlyMiddleware)
+
+    app.add_middleware(SlowAPIMiddleware)
 
     app.add_middleware(
         CORSMiddleware,

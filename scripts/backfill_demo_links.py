@@ -28,18 +28,24 @@ from primer.common.models import Session as SessionModel
 
 
 def _backfill_pull_requests(db) -> int:
-    """If no PRs exist, run seed_demo's seed_pull_requests against current data."""
-    from primer.common.models import GitRepository as Repo
-    from primer.common.models import PullRequest
+    """Run seed_demo's seed_pull_requests against current data.
 
-    if db.query(PullRequest).count() > 0:
-        return 0
+    Always runs — seed_pull_requests is per-branch idempotent (it looks up
+    existing PRs by repo_id + head_branch and reuses them), so partial PR
+    state from a prior failed run gets completed on the next invocation.
+    seed_review_findings is idempotent at the (pr, source, external_id)
+    level via a unique constraint.
+    """
+    from primer.common.models import GitRepository as Repo
 
     # Build repo_map keyed the way seed_demo expects (short project_name)
     repo_map: dict[str, str] = {}
     for repo in db.query(Repo).all():
         short = repo.full_name.split("/")[-1]
         repo_map[short] = repo.id
+
+    if not repo_map:
+        return 0
 
     # Import here so this script doesn't fail when run on a fresh DB
     from seed_demo import seed_pull_requests, seed_review_findings
@@ -87,8 +93,7 @@ def main() -> int:
 
         # ── 2. Backfill PRs if missing ──────────────────────────────────
         created_prs = _backfill_pull_requests(db)
-        if created_prs:
-            print(f"Backfilled {created_prs} pull requests from existing commits")
+        print(f"Pull request backfill touched {created_prs} PR branches")
 
         # ── 3. Ensure ~35% of PRs are non-Claude for the comparison view ──
         # IDEMPOTENT: only detaches when the current ratio is far from target.
