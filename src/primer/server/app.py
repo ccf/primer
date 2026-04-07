@@ -150,6 +150,14 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
     app.add_middleware(SlowAPIMiddleware)
 
+    # Demo mode: block all mutations. Must be added BEFORE CORSMiddleware
+    # so that CORSMiddleware wraps it in the execution stack (middleware
+    # runs in LIFO order) and blocked 403 responses still get CORS headers.
+    if settings.demo_mode:
+        from primer.server.demo_middleware import DemoReadOnlyMiddleware
+
+        app.add_middleware(DemoReadOnlyMiddleware)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -157,12 +165,6 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
-    # Demo mode: block all mutations
-    if settings.demo_mode:
-        from primer.server.demo_middleware import DemoReadOnlyMiddleware
-
-        app.add_middleware(DemoReadOnlyMiddleware)
 
     app.include_router(health.router)
     app.include_router(auth.router)

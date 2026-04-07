@@ -7,6 +7,7 @@ vi.mock("@/lib/api", () => ({
   setApiKey: vi.fn(),
   clearApiKey: vi.fn(),
   apiFetch: vi.fn(),
+  isDemoMode: vi.fn(() => false),
 }))
 
 vi.mock("@/lib/auth-context", async () => {
