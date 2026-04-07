@@ -84,45 +84,62 @@ def _run_seed() -> None:
 def main() -> int:
     engine = create_engine(settings.database_url)
 
-    # Hold the advisory lock for the entire seed-decision phase by keeping
-    # this connection open until we've finished (or skipped) seeding.
-    with engine.connect() as conn:
+    # Hold the advisory lock across the entire seed-decision phase. We use
+    # an AUTOCOMMIT isolation level so the connection is never left
+    # idle-in-transaction — Fly Postgres may enforce
+    # idle_in_transaction_session_timeout which would silently drop the
+    # connection (and its lock) mid-seed. Session-level pg_advisory_lock
+    # survives commit and persists until the session ends or we
+    # explicitly unlock.
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
         start = time.monotonic()
         got_lock = False
-        while True:
-            got_lock = bool(conn.execute(text(f"SELECT pg_try_advisory_lock({LOCK_KEY})")).scalar())
-            if got_lock:
-                print(f"Acquired seed advisory lock ({LOCK_KEY})")
-                break
-            if time.monotonic() - start > LOCK_WAIT_SECONDS:
+        try:
+            while True:
+                got_lock = bool(
+                    conn.execute(text(f"SELECT pg_try_advisory_lock({LOCK_KEY})")).scalar()
+                )
+                if got_lock:
+                    print(f"Acquired seed advisory lock ({LOCK_KEY})")
+                    break
+                if time.monotonic() - start > LOCK_WAIT_SECONDS:
+                    print(
+                        f"Timed out waiting for seed lock after {LOCK_WAIT_SECONDS}s",
+                        file=sys.stderr,
+                    )
+                    break
+                print("  another machine holds the seed lock; waiting 10s...")
+                time.sleep(10)
+
+            session_factory = sessionmaker(bind=engine)
+            with session_factory() as db:
+                session_count = db.query(func.count(SessionModel.id)).scalar() or 0
+
+            if not got_lock:
+                # Lock timeout: defer to whichever machine is seeding. Never
+                # run seed without the lock — backfill on the next deploy
+                # will repair.
                 print(
-                    f"Timed out waiting for seed lock after {LOCK_WAIT_SECONDS}s",
+                    f"Skipping seed (no lock held); db has {session_count} sessions",
                     file=sys.stderr,
                 )
-                break
-            print("  another machine holds the seed lock; waiting 10s...")
-            time.sleep(10)
+                return 0
 
-        session_factory = sessionmaker(bind=engine)
-        with session_factory() as db:
-            session_count = db.query(func.count(SessionModel.id)).scalar() or 0
-
-        if not got_lock:
-            # Lock timeout: defer to whichever machine is seeding. Never run
-            # seed without the lock — backfill on the next deploy will repair.
-            print(
-                f"Skipping seed (no lock held); db has {session_count} sessions",
-                file=sys.stderr,
-            )
-            return 0
-
-        if session_count == 0:
-            print("Database is empty — running seed under lock")
-            _run_seed()
-        else:
-            print(f"Database already has {session_count} sessions — skipping seed")
-
-        # Lock is released when this `with engine.connect()` block exits
+            if session_count == 0:
+                print("Database is empty — running seed under lock")
+                _run_seed()
+            else:
+                print(f"Database already has {session_count} sessions — skipping seed")
+        finally:
+            # Explicitly release the session-level advisory lock. Session
+            # locks survive conn.close() since the connection may be
+            # returned to the pool rather than closed, so we unlock
+            # explicitly here for correctness.
+            if got_lock:
+                try:
+                    conn.execute(text(f"SELECT pg_advisory_unlock({LOCK_KEY})"))
+                except Exception as e:
+                    print(f"  failed to release advisory lock: {e}", file=sys.stderr)
 
     return 0
 
