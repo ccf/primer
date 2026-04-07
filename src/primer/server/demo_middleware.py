@@ -9,14 +9,17 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-# POST endpoints that are semantically read-only (no mutations)
+# POST endpoints that are semantically read-only (no mutations).
+# Note: explorer chat is intentionally NOT whitelisted; it's blocked with
+# 403 in the router itself in demo mode to prevent abuse of the LLM API.
 _SAFE_POST_PATHS: set[str] = {
     "/api/v1/auth/refresh",
     "/api/v1/auth/logout",
 }
 
-# Prefixes for safe POST paths (e.g. explorer chat uses SSE streaming)
-_SAFE_POST_PREFIXES: tuple[str, ...] = ("/api/v1/explorer/",)
+# Prefixes for safe POST paths. Empty by default — add only paths whose
+# entire subtree is provably mutation-free.
+_SAFE_POST_PREFIXES: tuple[str, ...] = ()
 
 _BLOCKED_RESPONSE = JSONResponse(
     {"detail": "This is a read-only demo instance. Mutations are disabled."},
