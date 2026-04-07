@@ -2,8 +2,10 @@
 set -e
 
 # Fly.io sets DATABASE_URL; Primer expects PRIMER_DATABASE_URL
+# Also convert the legacy postgres:// scheme to postgresql:// for SQLAlchemy 2.x
 if [ -n "$DATABASE_URL" ] && [ -z "$PRIMER_DATABASE_URL" ]; then
-  export PRIMER_DATABASE_URL="$DATABASE_URL"
+  NORMALIZED_URL=$(echo "$DATABASE_URL" | sed 's|^postgres://|postgresql://|')
+  export PRIMER_DATABASE_URL="$NORMALIZED_URL"
 fi
 
 echo "=== Primer Demo Instance ==="
