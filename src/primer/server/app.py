@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -180,7 +181,21 @@ def create_app() -> FastAPI:
     app.include_router(finops.router)
 
     if FRONTEND_DIST.is_dir():
-        app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")
+        # Serve hashed asset files directly
+        assets_dir = FRONTEND_DIST / "assets"
+        if assets_dir.is_dir():
+            app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
+
+        index_file = FRONTEND_DIST / "index.html"
+
+        # SPA catch-all: serve index.html for any non-API path so client-side
+        # routes survive a hard refresh
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def spa_fallback(full_path: str) -> FileResponse:
+            candidate = FRONTEND_DIST / full_path
+            if full_path and candidate.is_file():
+                return FileResponse(candidate)
+            return FileResponse(index_file)
 
     return app
 
