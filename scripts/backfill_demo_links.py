@@ -23,6 +23,28 @@ from primer.common.models import GitRepository, PullRequest, SessionCommit
 from primer.common.models import Session as SessionModel
 
 
+def _backfill_pull_requests(db) -> int:
+    """If no PRs exist, run seed_demo's seed_pull_requests against current data."""
+    from primer.common.models import GitRepository as Repo
+    from primer.common.models import PullRequest
+
+    if db.query(PullRequest).count() > 0:
+        return 0
+
+    # Build repo_map keyed the way seed_demo expects (short project_name)
+    repo_map: dict[str, str] = {}
+    for repo in db.query(Repo).all():
+        short = repo.full_name.split("/")[-1]
+        repo_map[short] = repo.id
+
+    # Import here so this script doesn't fail when run on a fresh DB
+    from scripts.seed_demo import seed_pull_requests, seed_review_findings
+
+    pr_map = seed_pull_requests(db, repo_map)
+    seed_review_findings(db, pr_map)
+    return len(pr_map)
+
+
 def main() -> int:
     factory = sessionmaker(bind=engine)
     db = factory()
@@ -54,7 +76,12 @@ def main() -> int:
         db.commit()
         print(f"Linked {linked}/{len(unlinked)} unlinked sessions to repositories")
 
-        # ── 2. Detach a fraction of PRs from sessions to populate non-Claude ──
+        # ── 2. Backfill PRs if missing ──────────────────────────────────
+        created_prs = _backfill_pull_requests(db)
+        if created_prs:
+            print(f"Backfilled {created_prs} pull requests from existing commits")
+
+        # ── 3. Detach a fraction of PRs from sessions to populate non-Claude ──
         all_pr_ids = [row[0] for row in db.query(PullRequest.id).all()]
         if not all_pr_ids:
             print("No PRs found; skipping non-claude split.")
