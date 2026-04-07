@@ -51,7 +51,7 @@ def _run_seed() -> None:
     env["PRIMER_DEMO_MODE"] = "false"
 
     print("  starting temp server for seeding...")
-    server = subprocess.Popen(  # noqa: S603
+    server = subprocess.Popen(
         ["uvicorn", "primer.server.app:app", "--host", "0.0.0.0", "--port", "8000"],
         env=env,
     )
@@ -61,7 +61,7 @@ def _run_seed() -> None:
             return
 
         print("  running seed_demo.py...")
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(
             [sys.executable, "scripts/seed_demo.py"],
             env=env,
             check=False,
