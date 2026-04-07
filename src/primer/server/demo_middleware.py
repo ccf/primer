@@ -34,13 +34,14 @@ class DemoReadOnlyMiddleware(BaseHTTPMiddleware):
         if method in {"POST", "PUT", "PATCH", "DELETE"}:
             path = request.url.path
 
-            # Allow whitelisted safe endpoints
-            if path in _SAFE_POST_PATHS:
-                return await call_next(request)
-
-            for prefix in _SAFE_POST_PREFIXES:
-                if path.startswith(prefix):
+            # Whitelist only applies to POST — we never allow PUT/PATCH/DELETE
+            if method == "POST":
+                if path in _SAFE_POST_PATHS:
                     return await call_next(request)
+
+                for prefix in _SAFE_POST_PREFIXES:
+                    if path.startswith(prefix):
+                        return await call_next(request)
 
             return _BLOCKED_RESPONSE
 
