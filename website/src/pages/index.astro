@@ -218,7 +218,7 @@ const structuredData = [
         <div class="mb-3 flex flex-col items-center justify-center gap-4 sm:flex-row animate-fade-in-up" style="--delay: 240ms">
           <a
             href="https://demo.useprimer.dev"
-            class="inline-flex items-center gap-2 rounded-lg bg-primer-brand px-6 py-3 font-medium text-white transition-colors hover:bg-primer-600"
+            class="inline-flex items-center gap-2 rounded-lg bg-primer-600 px-6 py-3 font-medium text-white transition-colors hover:bg-primer-700"
           >
             <span>Try the live demo</span>
             <span aria-hidden="true">→</span>
@@ -282,6 +282,8 @@ const structuredData = [
             <img
               src={`${import.meta.env.BASE_URL}agent-marks/${mark.src}`}
               alt=""
+              width="64"
+              height="64"
               class="agent-cluster__logo"
               loading="lazy"
             />
@@ -295,6 +297,8 @@ const structuredData = [
             <img
               src={`${import.meta.env.BASE_URL}agent-marks/${mark.src}`}
               alt={mark.alt}
+              width="56"
+              height="56"
               class="agent-cluster__logo"
               loading="lazy"
             />
@@ -323,7 +327,7 @@ const structuredData = [
             }`}
           >
             <div class="space-y-6">
-              <p class="text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand">{chapter.eyebrow}</p>
+              <p class="text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand dark:text-primer-400">{chapter.eyebrow}</p>
               <h3 class="font-display text-3xl tracking-tight md:text-4xl">{chapter.title}</h3>
               <p class="text-lg leading-relaxed text-muted-foreground">{chapter.description}</p>
               <ul class="space-y-3 text-sm leading-relaxed text-foreground/90">
@@ -360,7 +364,7 @@ const structuredData = [
   <section class="bg-muted/50 py-18 md:py-24">
     <div class="mx-auto max-w-6xl px-6">
       <div class="mb-12 text-center">
-        <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand">Who it is for</p>
+        <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand dark:text-primer-400">Who it is for</p>
         <h2 class="font-display mb-4 text-3xl tracking-tight md:text-4xl">
           One product, three kinds of operating decisions
         </h2>
@@ -383,7 +387,7 @@ const structuredData = [
   <section id="faq" class="border-t border-border py-18 md:py-24">
     <div class="mx-auto max-w-4xl px-6">
       <div class="mb-12 text-center">
-        <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand">FAQ</p>
+        <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand dark:text-primer-400">FAQ</p>
         <h2 class="font-display text-3xl tracking-tight md:text-4xl">Common questions</h2>
       </div>
       <div class="space-y-4">
@@ -417,7 +421,7 @@ const structuredData = [
       <div class="mb-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
         <a
           href="https://demo.useprimer.dev"
-          class="inline-flex items-center gap-2 rounded-lg bg-primer-brand px-6 py-3 font-medium text-white transition-colors hover:bg-primer-600"
+          class="inline-flex items-center gap-2 rounded-lg bg-primer-600 px-6 py-3 font-medium text-white transition-colors hover:bg-primer-700"
         >
           <span>Try the live demo</span>
           <span aria-hidden="true">→</span>
