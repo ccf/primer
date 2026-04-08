@@ -152,20 +152,24 @@ const audiences = [
           that telemetry into workflow fingerprints, quality attribution, cost proof, exemplars,
           and experiments your team can standardize.
         </p>
-        <div class="mb-8 flex flex-col items-center justify-center gap-4 sm:flex-row animate-fade-in-up" style="--delay: 240ms">
+        <div class="mb-3 flex flex-col items-center justify-center gap-4 sm:flex-row animate-fade-in-up" style="--delay: 240ms">
+          <a
+            href="https://demo.useprimer.dev"
+            class="inline-flex items-center gap-2 rounded-lg bg-primer-brand px-6 py-3 font-medium text-white transition-colors hover:bg-primer-600"
+          >
+            <span>Try the live demo</span>
+            <span aria-hidden="true">→</span>
+          </a>
           <a
             href={`${import.meta.env.BASE_URL}docs/`}
-            class="inline-flex items-center rounded-lg bg-primer-brand px-6 py-3 font-medium text-white transition-colors hover:bg-primer-600"
+            class="inline-flex items-center rounded-lg border border-white/15 bg-white/8 px-6 py-3 font-medium text-white transition-colors hover:bg-white/12"
           >
             Read the docs
           </a>
-          <a
-            href={`${import.meta.env.BASE_URL}#product`}
-            class="inline-flex items-center rounded-lg border border-white/15 bg-white/8 px-6 py-3 font-medium text-white transition-colors hover:bg-white/12"
-          >
-            See how it works
-          </a>
         </div>
+        <p class="mb-8 text-sm text-white/45 animate-fade-in-up" style="--delay: 280ms">
+          No signup. Read-only. Sample data from a fictional 25-engineer org.
+        </p>
         <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm text-white/50 animate-fade-in-up" style="--delay: 320ms">
           {heroChips.map((chip, idx) => (
             <div class="flex items-center gap-4">
@@ -325,8 +329,15 @@ const audiences = [
       </p>
       <div class="mb-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
         <a
+          href="https://demo.useprimer.dev"
+          class="inline-flex items-center gap-2 rounded-lg bg-primer-brand px-6 py-3 font-medium text-white transition-colors hover:bg-primer-600"
+        >
+          <span>Try the live demo</span>
+          <span aria-hidden="true">→</span>
+        </a>
+        <a
           href={`${import.meta.env.BASE_URL}docs/installation/`}
-          class="inline-flex items-center rounded-lg bg-primer-brand px-6 py-3 font-medium text-white transition-colors hover:bg-primer-600"
+          class="inline-flex items-center rounded-lg border border-white/15 bg-white/8 px-6 py-3 font-medium text-white transition-colors hover:bg-white/12"
         >
           Install Primer
         </a>
