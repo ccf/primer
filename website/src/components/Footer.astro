@@ -1,15 +1,15 @@
 ---
 const base = import.meta.env.BASE_URL;
 const year = new Date().getFullYear();
+
 const columns = [
   {
-    title: "Product",
+    title: "The Book",
     links: [
-      { href: `${base}#proof`, label: "Workflow Proof" },
-      { href: `${base}#product`, label: "Product" },
-      { href: `${base}docs/`, label: "Documentation" },
-      { href: `${base}docs/server/`, label: "Architecture" },
+      { href: `${base}#faq`, label: "Common questions" },
+      { href: `${base}docs/`, label: "Field guide" },
       { href: `${base}docs/installation/`, label: "Install" },
+      { href: `${base}docs/server/`, label: "Architecture" },
     ],
   },
   {
@@ -24,35 +24,26 @@ const columns = [
 ];
 ---
 
-<footer class="border-t border-border bg-muted/50 dark:bg-[#0d1117]">
-  <div class="max-w-6xl mx-auto px-6 py-16">
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
-      <!-- Brand column -->
-      <div class="col-span-2 md:col-span-2">
-        <a href={base} class="flex items-center gap-2 mb-4">
-          <img src={`${base}logo-mark.svg`} alt="" width="24" height="24" class="dark:hidden" />
-          <img src={`${base}logo-mark-light.svg`} alt="" width="24" height="24" class="hidden dark:block" />
-          <span class="font-display text-lg tracking-tight">primer</span>
-        </a>
-        <p class="text-sm text-muted-foreground leading-relaxed">
-          See which AI workflows actually work. Primer connects workflows, customizations,
-          exemplars, and experiments into one workflow intelligence layer.
+<footer class="ed-footer">
+  <div class="ed-footer__inner">
+    <div class="ed-footer__top">
+      <div class="ed-footer__brand">
+        <a href={base} class="ed-footer__mark" aria-label="Primer">Primer</a>
+        <p class="ed-footer__tag">
+          <em>See which AI workflows actually work.</em>
         </p>
       </div>
 
-      {columns.map(col => (
-        <div>
-          <h3 class="text-sm font-semibold mb-3">{col.title}</h3>
-          <ul class="space-y-2">
-            {col.links.map(link => (
+      {columns.map((col) => (
+        <div class="ed-footer__col">
+          <h3 class="ed-footer__col-title">{col.title}</h3>
+          <ul>
+            {col.links.map((link) => (
               <li>
                 <a
                   href={link.href}
-                  class="text-sm text-muted-foreground hover:text-foreground transition-colors"
                   {...(link.href.startsWith("http") ? { target: "_blank", rel: "noopener" } : {})}
-                >
-                  {link.label}
-                </a>
+                >{link.label}</a>
               </li>
             ))}
           </ul>
@@ -60,13 +51,103 @@ const columns = [
       ))}
     </div>
 
-    <div class="mt-12 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
-      <p class="text-sm text-muted-foreground">
-        &copy; {year} Charles C. Figueiredo. Released under the MIT License.
-      </p>
-      <p class="text-xs text-muted-foreground">
-        Named after the Young Lady's Illustrated Primer
-      </p>
+    <hr class="ed-footer__rule" />
+
+    <div class="ed-footer__bottom">
+      <p>&copy; {year} Charles C. Figueiredo · Released under the MIT License.</p>
+      <p class="ed-footer__epigraph">Named after the Young Lady's Illustrated Primer.</p>
     </div>
   </div>
 </footer>
+
+<style>
+  .ed-footer {
+    background: var(--color-paper);
+    border-top: 1px solid var(--color-rule);
+  }
+  .ed-footer__inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 80px 48px 56px;
+  }
+  .ed-footer__top {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 48px;
+    margin-bottom: 56px;
+  }
+  .ed-footer__brand {
+    max-width: 38ch;
+  }
+  .ed-footer__mark {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 28px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    color: var(--color-ink);
+    text-decoration: none;
+    font-variation-settings: "opsz" 144;
+  }
+  .ed-footer__tag {
+    margin-top: 16px;
+    font-family: var(--font-display);
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--color-ink-muted);
+  }
+  .ed-footer__col-title {
+    font-family: var(--font-body);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--color-ink-faint);
+    margin: 0 0 18px;
+  }
+  .ed-footer__col ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .ed-footer__col li {
+    margin-bottom: 10px;
+  }
+  .ed-footer__col a {
+    font-family: var(--font-body);
+    font-size: 14px;
+    color: var(--color-ink-muted);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .ed-footer__col a:hover { color: var(--color-accent); }
+
+  .ed-footer__rule {
+    border: 0;
+    border-top: 1px solid var(--color-rule);
+    margin: 0 0 28px;
+  }
+  .ed-footer__bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-family: var(--font-body);
+    font-size: 12px;
+    color: var(--color-ink-muted);
+  }
+  .ed-footer__epigraph {
+    font-family: var(--font-display);
+    font-style: italic;
+    color: var(--color-ink-faint);
+  }
+
+  @media (max-width: 720px) {
+    .ed-footer__inner { padding: 64px 28px 40px; }
+    .ed-footer__top {
+      grid-template-columns: 1fr;
+      gap: 40px;
+    }
+  }
+</style>
