@@ -54,7 +54,7 @@ def _font(size: int, weight: str = "regular") -> ImageFont.FreeTypeFont:
                     font = ImageFont.truetype(path, size, index=index)
                 except OSError:
                     break
-                family, style = font.getname()
+                _, style = font.getname()
                 if "bold" in (style or "").lower() and "italic" not in (style or "").lower():
                     return font
             # No bold face found in this collection — fall through to next
