@@ -27,10 +27,15 @@ python scripts/seed_phase.py || echo "  (seed phase reported errors, continuing)
 echo "Running demo backfills (repo readiness, session->repo links, PRs)..."
 python scripts/backfill_demo_links.py || echo "  (backfill errors, continuing)"
 
-# Pre-warm narrative cache if the API key is present (idempotent — cache hits)
+# Pre-warm narrative cache in the background. There are ~32 narratives
+# (org + every team + every engineer), each requiring an LLM round-trip,
+# so synchronous prewarm would easily blow past the deploy health-check
+# window. The narrative endpoint populates the cache on first read
+# regardless, so this is purely a latency optimization for the first
+# visitor and is safe to run async.
 if [ -n "$PRIMER_ANTHROPIC_API_KEY" ]; then
-  echo "Pre-warming narrative cache..."
-  python scripts/prewarm_narratives.py || echo "  (prewarm errors, continuing)"
+  echo "Spawning narrative prewarm in background..."
+  nohup python scripts/prewarm_narratives.py >/tmp/prewarm.log 2>&1 &
 fi
 
 # Flush Redis so analytics cache doesn't serve stale state from before backfill
