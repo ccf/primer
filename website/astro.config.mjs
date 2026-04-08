@@ -7,7 +7,15 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   site: "https://useprimer.dev",
   base: "/",
-  integrations: [mdx(), react(), sitemap()],
+  integrations: [
+    mdx(),
+    react(),
+    sitemap({
+      changefreq: "weekly",
+      priority: 0.7,
+      lastmod: new Date(),
+    }),
+  ],
   markdown: {
     shikiConfig: {
       themes: { light: "github-light", dark: "github-dark-dimmed" },
