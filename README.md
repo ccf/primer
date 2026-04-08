@@ -11,6 +11,7 @@
 </p>
 
 <p align="center">
+  <a href="https://demo.useprimer.dev"><b>🎮 Try the Live Demo</b></a> &middot;
   <a href="https://useprimer.dev/docs/installation/">Get Started</a> &middot;
   <a href="https://useprimer.dev/docs/">Docs</a> &middot;
   <a href="ROADMAP.md">Roadmap</a> &middot;
@@ -121,6 +122,8 @@ actually improved outcomes.
 | **GitHub Integration** | OAuth SSO, PR sync, commit correlation, repository AI-readiness scoring |
 
 ## Quickstart
+
+> **🎮 Want to see it first?** [demo.useprimer.dev](https://demo.useprimer.dev) is a live, read-only instance with sample data from a fictional 25-engineer org. No signup required.
 
 **One-liner install:**
 
