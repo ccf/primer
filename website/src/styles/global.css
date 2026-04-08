@@ -15,14 +15,11 @@
   --color-ink-muted:    #5A5462;
   --color-ink-faint:    #6C6572;
   --color-rule:         #DDD6C7;
-  --color-rule-strong:  #B8B0A0;
   --color-accent:       #8B2E2E;     /* oxblood */
-  --color-accent-ink:   #6B2222;
 
   /* ── Inline dark moments (Interlude / Colophon) ── */
   --color-dark:         #0E0E1C;
   --color-dark-soft:    #151524;
-  --color-dark-lift:    #1C1C2C;
   --color-dark-rule:    #2A2A3A;
   --color-dark-text:    #F0EBE1;
   --color-dark-muted:   #A29DB0;
