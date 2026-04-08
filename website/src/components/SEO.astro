@@ -4,6 +4,7 @@ interface Props {
   description?: string;
   ogImage?: string;
   canonical?: string;
+  structuredData?: Record<string, unknown> | Record<string, unknown>[];
 }
 
 const {
@@ -11,11 +12,18 @@ const {
   description = "See which AI workflows actually work. Primer turns session telemetry into workflow intelligence, cost and quality proof, exemplars, and experiments for agentic engineering teams.",
   ogImage = "/og-image.png",
   canonical,
+  structuredData,
 } = Astro.props;
 
 const siteUrl = Astro.site?.toString().replace(/\/$/, "") ?? "https://useprimer.dev";
 const canonicalUrl = canonical ?? new URL(Astro.url.pathname, siteUrl).toString();
 const ogImageUrl = new URL(ogImage, siteUrl).toString();
+
+const structuredDataArray = structuredData
+  ? Array.isArray(structuredData)
+    ? structuredData
+    : [structuredData]
+  : [];
 ---
 
 <meta charset="utf-8" />
@@ -39,6 +47,10 @@ const ogImageUrl = new URL(ogImage, siteUrl).toString();
 
 <!-- Favicon -->
 <link rel="icon" type="image/svg+xml" href={`${import.meta.env.BASE_URL}logo-mark.svg`} />
+
+{structuredDataArray.map((data) => (
+  <script type="application/ld+json" set:html={JSON.stringify(data)} />
+))}
 
 <!-- Theme initialization (before render to prevent flash) -->
 <script is:inline>
