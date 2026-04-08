@@ -9,9 +9,10 @@ interface Props {
   description?: string;
   ogImage?: string;
   structuredData?: Record<string, unknown> | Record<string, unknown>[];
+  forceLight?: boolean;
 }
 
-const { title, description, ogImage, structuredData } = Astro.props;
+const { title, description, ogImage, structuredData, forceLight } = Astro.props;
 ---
 
 <!doctype html>
@@ -22,6 +23,7 @@ const { title, description, ogImage, structuredData } = Astro.props;
       description={description}
       ogImage={ogImage}
       structuredData={structuredData}
+      forceLight={forceLight}
     />
   </head>
   <body class="min-h-screen flex flex-col">

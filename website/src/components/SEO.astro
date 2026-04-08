@@ -5,6 +5,7 @@ interface Props {
   ogImage?: string;
   canonical?: string;
   structuredData?: Record<string, unknown> | Record<string, unknown>[];
+  forceLight?: boolean;
 }
 
 const {
@@ -13,6 +14,7 @@ const {
   ogImage = "/og-image.png",
   canonical,
   structuredData,
+  forceLight = false,
 } = Astro.props;
 
 const siteUrl = Astro.site?.toString().replace(/\/$/, "") ?? "https://useprimer.dev";
@@ -61,10 +63,16 @@ const structuredDataArray = structuredData
 ))}
 
 <!-- Theme initialization (before render to prevent flash) -->
-<script is:inline>
-  (function() {
-    const theme = localStorage.getItem("primer-theme") || "system";
-    const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    if (isDark) document.documentElement.classList.add("dark");
-  })();
-</script>
+{forceLight ? (
+  <script is:inline>
+    document.documentElement.classList.remove("dark");
+  </script>
+) : (
+  <script is:inline>
+    (function() {
+      const theme = localStorage.getItem("primer-theme") || "system";
+      const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      if (isDark) document.documentElement.classList.add("dark");
+    })();
+  </script>
+)}
