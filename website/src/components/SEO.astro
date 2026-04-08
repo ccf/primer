@@ -13,7 +13,7 @@ const {
   canonical,
 } = Astro.props;
 
-const siteUrl = Astro.site?.toString().replace(/\/$/, "") ?? "https://primer.dev";
+const siteUrl = Astro.site?.toString().replace(/\/$/, "") ?? "https://useprimer.dev";
 const canonicalUrl = canonical ?? new URL(Astro.url.pathname, siteUrl).toString();
 const ogImageUrl = new URL(ogImage, siteUrl).toString();
 ---
