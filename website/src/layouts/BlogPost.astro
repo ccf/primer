@@ -6,6 +6,7 @@ interface Props {
     title: string;
     description: string;
     date: string;
+    updated?: string;
     author?: string;
   };
 }
@@ -16,9 +17,52 @@ const formattedDate = new Date(frontmatter.date).toLocaleDateString("en-US", {
   month: "long",
   day: "numeric",
 });
+
+const siteOrigin = "https://useprimer.dev";
+const pagePath = Astro.url.pathname.replace(/\/$/, "") || "/";
+const pageUrl = `${siteOrigin}${pagePath}/`;
+const datePublished = new Date(frontmatter.date).toISOString();
+const dateModified = frontmatter.updated
+  ? new Date(frontmatter.updated).toISOString()
+  : datePublished;
+
+const structuredData = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: frontmatter.title,
+    description: frontmatter.description,
+    datePublished,
+    dateModified,
+    inLanguage: "en",
+    mainEntityOfPage: { "@type": "WebPage", "@id": pageUrl },
+    author: {
+      "@type": "Person",
+      name: frontmatter.author ?? "Charles C. Figueiredo",
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "Primer",
+      url: siteOrigin,
+      logo: { "@type": "ImageObject", url: `${siteOrigin}/logo-mark.svg` },
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Blog", item: `${siteOrigin}/blog/` },
+      { "@type": "ListItem", position: 2, name: frontmatter.title, item: pageUrl },
+    ],
+  },
+];
 ---
 
-<BaseLayout title={`${frontmatter.title} — Primer Blog`} description={frontmatter.description}>
+<BaseLayout
+  title={`${frontmatter.title} — Primer Blog`}
+  description={frontmatter.description}
+  structuredData={structuredData}
+>
   <article class="max-w-3xl mx-auto px-6 py-20">
     <header class="mb-12 animate-fade-in-up">
       <a href={`${import.meta.env.BASE_URL}blog/`} class="text-sm text-muted-foreground hover:text-foreground transition-colors mb-4 inline-block">

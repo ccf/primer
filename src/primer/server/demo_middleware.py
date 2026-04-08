@@ -39,12 +39,22 @@ class DemoReadOnlyMiddleware(BaseHTTPMiddleware):
             # Whitelist only applies to POST — we never allow PUT/PATCH/DELETE
             if method == "POST":
                 if path in _SAFE_POST_PATHS:
-                    return await call_next(request)
+                    response = await call_next(request)
+                    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+                    return response
 
                 for prefix in _SAFE_POST_PREFIXES:
                     if path.startswith(prefix):
-                        return await call_next(request)
+                        response = await call_next(request)
+                        response.headers["X-Robots-Tag"] = "noindex, nofollow"
+                        return response
 
-            return _blocked_response()
+            blocked = _blocked_response()
+            blocked.headers["X-Robots-Tag"] = "noindex, nofollow"
+            return blocked
 
-        return await call_next(request)
+        response = await call_next(request)
+        # Demo instance must never be indexed — it's seeded with synthetic
+        # data and would otherwise compete with the marketing site in search.
+        response.headers["X-Robots-Tag"] = "noindex, nofollow"
+        return response
