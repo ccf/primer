@@ -1,132 +1,66 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
-import TerminalAnimation from "../components/TerminalAnimation";
 
-const heroChips = [
-  "Workflow fingerprints",
-  "Quality attribution",
-  "Cost per successful outcome",
-  "Exemplar sessions",
-];
+const base = import.meta.env.BASE_URL;
 
-const proofSignals = [
-  {
-    label: "Fingerprint workflows",
-    detail: "Archetypes and session fingerprints tied to what happened next.",
-  },
-  {
-    label: "Prove quality and cost",
-    detail: "See which workflows lead to better PR outcomes per dollar.",
-  },
-  {
-    label: "Standardize what works",
-    detail: "Turn bright spots into exemplars, playbooks, and reusable assets.",
-  },
-  {
-    label: "Measure rollout impact",
-    detail: "Track whether interventions and experiments actually improved outcomes.",
-  },
-];
-
-const agentMarks = [
-  { name: "Anthropic", src: "anthropic.svg", alt: "Anthropic logo" },
-  { name: "Cursor", src: "cursor.svg", alt: "Cursor logo" },
-  { name: "Codex", src: "codex.svg", alt: "Codex logo" },
-  { name: "Gemini", src: "gemini.svg", alt: "Gemini logo" },
-];
+const captures = ["Claude Code", "Cursor", "Codex CLI", "Gemini CLI"];
 
 const chapters = [
   {
+    num: "Chapter II",
     eyebrow: "Workflow intelligence",
-    title: "Fingerprint how work actually gets done",
-    description:
-      "Primer turns noisy sessions into workflow archetypes and fingerprints, then shows which patterns lead to cleaner reviews, stronger merge rates, and better follow-through.",
+    title: "Fingerprint how work <em>actually</em> gets done.",
+    body: "Primer turns noisy sessions into workflow archetypes and fingerprints, then shows which patterns lead to cleaner reviews, stronger merge rates, and better follow-through. It is less a dashboard than a ledger of how your team thinks.",
     bullets: [
-      "Compare workflow archetypes by merge rate, review load, findings, and time to merge",
-      "See which workflows create quality without overspending",
-      "Move from raw transcripts to durable workflow evidence",
+      "Compare workflow archetypes by merge rate, review load, findings, and time to merge.",
+      "See which workflows create quality without overspending.",
+      "Move from raw transcripts to durable workflow evidence.",
     ],
-    image: "readme-quality-dark.png",
-    caption:
-      "Quality becomes much more useful once it is grouped by the workflow patterns behind it.",
+    plate: "screenshots/readme-quality-dark.png",
+    caption: "Plate I. Quality clustered by workflow archetype.",
+    layout: "right",
   },
   {
+    num: "Chapter III",
     eyebrow: "Cost intelligence",
-    title: "See cost through the lens of successful workflows",
-    description:
-      "FinOps is stronger when it stops treating model spend as the whole story. Primer shows which workflows are efficient, which are expensive but justified, and where teams are overspending without better outcomes.",
+    title: "See cost through the <em>lens</em> of successful workflows.",
+    body: "FinOps becomes useful only when it stops treating model spend as the whole story. Primer shows which workflows are efficient, which are expensive but justified, and where teams are overspending without better outcomes.",
     bullets: [
-      "Break down spend by workflow archetype and fingerprint",
-      "Tie workflow cost to successful outcomes instead of raw activity",
-      "Spot where model choice and workflow shape drift apart",
+      "Break down spend by workflow archetype and fingerprint.",
+      "Tie cost to successful outcomes instead of raw activity.",
+      "Spot when model choice and workflow shape drift apart.",
     ],
-    image: "readme-finops-dark.png",
-    caption:
-      "The aha moment is seeing spend clustered around workflows, not just models or people.",
+    plate: "screenshots/readme-finops-dark.png",
+    caption: "Plate II. Spend grouped by archetype, not by model.",
+    layout: "left",
   },
   {
+    num: "Chapter IV",
     eyebrow: "Reusable behavior",
-    title: "Turn bright spots into exemplars your team can copy",
-    description:
-      "Primer surfaces reusable prompts, skills, commands, templates, and exemplar sessions so teams can standardize what is already working inside the org.",
+    title: "Turn bright spots into <em>exemplars</em> your team can copy.",
+    body: "Primer surfaces reusable prompts, skills, commands, templates, and exemplar sessions so teams can standardize what is already working inside the org — coaching with evidence, not generic enablement advice.",
     bullets: [
-      "Promote strong sessions into bright spots and exemplar libraries",
-      "Find underused high-value assets worth spreading to other teams",
-      "Coach with evidence instead of generic enablement advice",
+      "Promote strong sessions into bright spots and exemplar libraries.",
+      "Find underused high-value assets worth spreading to other teams.",
+      "Coach with evidence instead of generic enablement advice.",
     ],
-    image: "readme-growth-dark.png",
-    caption:
-      "Growth becomes concrete when the platform can point at exact sessions and reusable assets worth copying.",
-  },
-  {
-    eyebrow: "Agent stacks",
-    title: "Understand the agent stacks behind high performers",
-    description:
-      "Capture MCPs, skills, commands, templates, delegation, and agent-team modes so you can see which explicit configurations differentiate top performers and which toolchains create friction.",
-    bullets: [
-      "Separate built-ins from user, repo, and org-defined customizations",
-      "Measure toolchain reliability, explicit stacks, and delegation patterns",
-      "See when coordinated agent teams outperform solo work",
-    ],
-    image: "readme-maturity-dark.png",
-    caption:
-      "Agentic engineering is not just prompts. The stack, orchestration pattern, and reliability all matter.",
-  },
-  {
-    eyebrow: "Measured change",
-    title: "Turn recommendations into experiments and measured change",
-    description:
-      "Primer closes the loop. Recommendations become interventions, interventions become experiments, and the platform measures whether rollouts, playbooks, and model changes actually improved outcomes.",
-    bullets: [
-      "Track before-and-after changes by team, project, and engineer cohort",
-      "Measure whether a playbook or training program moved the needle",
-      "Move from insight to operating cadence instead of accumulating dashboards",
-    ],
-    image: "readme-dashboard-dark.png",
-    caption:
-      "The product is strongest when teams can turn a recommendation into something they can test and measure.",
+    plate: "screenshots/readme-growth-dark.png",
+    caption: "Plate III. A bright spot promoted into an exemplar.",
+    layout: "right",
   },
 ];
 
-const audiences = [
-  {
-    audience: "Engineering leadership",
-    summary: "Decide where AI is compounding engineering output and where it is leaking money or quality.",
-  },
-  {
-    audience: "Platform and enablement",
-    summary: "See which repo setup, customizations, and agent stacks help engineers move faster.",
-  },
-  {
-    audience: "Team leads and managers",
-    summary: "Coach with workflow evidence, exemplars, and concrete experiments instead of instinct alone.",
-  },
+const metrics = [
+  { k: "Sessions captured",    v: "4,947", d: "across Claude, Cursor, Codex, Gemini" },
+  { k: "Success rate",         v: "96",    suffix: "%", accent: true, d: "+4.1 after intervention" },
+  { k: "Median time to merge", v: "7.1",   suffix: "h", d: "−37% versus Q3 baseline" },
+  { k: "Cost per success",     v: "$0.41", d: "−22% after playbook rollout" },
 ];
 
 const faqs = [
   {
     q: "What is Primer?",
-    a: "Primer is an open-source workflow intelligence and analytics platform for agentic engineering teams. It captures session data from Claude Code, Cursor, Codex CLI, and Gemini CLI and turns it into workflow fingerprints, cost and quality proof, exemplar libraries, and measurable experiments — so you can decide which AI coding patterns actually work in your org.",
+    a: "Primer is an open-source workflow intelligence platform for agentic engineering teams. It captures session data from Claude Code, Cursor, Codex CLI, and Gemini CLI and turns it into workflow fingerprints, cost and quality proof, exemplar libraries, and measurable experiments — so you can decide which AI coding patterns actually work in your org.",
   },
   {
     q: "Which AI coding tools does Primer support?",
@@ -142,7 +76,7 @@ const faqs = [
   },
   {
     q: "Can I try Primer without installing anything?",
-    a: "Yes. demo.useprimer.dev is a live read-only instance pre-loaded with a fictional 25-engineer org so you can explore every dashboard, FinOps view, friction analysis, quality comparison, and AI maturity scorecard before installing.",
+    a: "Yes — demo.useprimer.dev is a live read-only instance pre-loaded with a fictional 25-engineer org so you can explore every dashboard before installing.",
   },
 ];
 
@@ -159,11 +93,7 @@ const structuredData = [
     url: "https://useprimer.dev",
     sameAs: ["https://github.com/ccf/primer"],
     license: "https://opensource.org/licenses/MIT",
-    offers: {
-      "@type": "Offer",
-      price: "0",
-      priceCurrency: "USD",
-    },
+    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
     softwareHelp: { "@type": "CreativeWork", url: "https://useprimer.dev/docs/" },
   },
   {
@@ -191,257 +121,693 @@ const structuredData = [
   description="See which AI workflows actually work. Primer turns session telemetry into workflow intelligence, cost and quality proof, exemplars, and experiments for agentic engineering teams."
   structuredData={structuredData}
 >
-  <section class="relative overflow-hidden bg-hero-bg text-hero-text">
-    <div class="absolute inset-0 overflow-hidden">
-      <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(129,140,248,0.22),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(99,102,241,0.18),transparent_32%)]"></div>
-      <div
-        class="absolute inset-0 opacity-55"
-        style="background-image: linear-gradient(rgba(129,140,248,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(129,140,248,0.08) 1px, transparent 1px); background-size: 44px 44px;"
-      ></div>
-    </div>
+  <!-- ─── Chapter I — The Primer ─────────────────────── -->
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="eyebrow reveal" style="--delay: 0ms"><span>Chapter I &nbsp;·&nbsp; The Primer</span></div>
 
-    <div class="relative mx-auto max-w-6xl px-6 py-24 md:py-30 lg:py-36">
-      <div class="mx-auto max-w-4xl text-center">
-        <div class="mb-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-4 py-1.5 text-sm text-white/75 animate-fade-in-up">
-          <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-          Open source workflow intelligence for agentic engineering
-        </div>
-        <h1 class="font-display mb-6 text-4xl tracking-tight md:text-5xl lg:text-7xl animate-fade-in-up" style="--delay: 80ms">
-          See which AI workflows
-          <span class="text-primer-400"> actually work</span>
-        </h1>
-        <p class="mx-auto mb-10 max-w-3xl text-lg leading-relaxed text-white/68 md:text-xl animate-fade-in-up" style="--delay: 160ms">
-          Primer captures work across Claude Code, Cursor, Codex CLI, and Gemini CLI, then turns
-          that telemetry into workflow fingerprints, quality attribution, cost proof, exemplars,
-          and experiments your team can standardize.
-        </p>
-        <div class="mb-3 flex flex-col items-center justify-center gap-4 sm:flex-row animate-fade-in-up" style="--delay: 240ms">
-          <a
-            href="https://demo.useprimer.dev"
-            class="inline-flex items-center gap-2 rounded-lg bg-primer-600 px-6 py-3 font-medium text-white transition-colors hover:bg-primer-700"
-          >
-            <span>Try the live demo</span>
-            <span aria-hidden="true">→</span>
-          </a>
-          <a
-            href={`${import.meta.env.BASE_URL}docs/`}
-            class="inline-flex items-center rounded-lg border border-white/15 bg-white/8 px-6 py-3 font-medium text-white transition-colors hover:bg-white/12"
-          >
-            Read the docs
-          </a>
-        </div>
-        <p class="mb-8 text-sm text-white/45 animate-fade-in-up" style="--delay: 280ms">
-          No signup. Read-only. Sample data from a fictional 25-engineer org.
-        </p>
-        <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm text-white/50 animate-fade-in-up" style="--delay: 320ms">
-          {heroChips.map((chip, idx) => (
-            <div class="flex items-center gap-4">
-              <span class="uppercase tracking-[0.18em]">{chip}</span>
-              {idx < heroChips.length - 1 && <span class="hidden h-1 w-1 rounded-full bg-white/22 sm:inline-block"></span>}
-            </div>
-          ))}
-        </div>
-      </div>
+      <h1 class="hero-title reveal" style="--delay: 80ms">
+        See which<br>
+        AI workflows<br>
+        <em>actually work.</em>
+      </h1>
 
-      <div class="mt-14 animate-fade-in-up" style="--delay: 400ms">
-        <TerminalAnimation client:visible />
-      </div>
-    </div>
-  </section>
-
-  <section id="proof" class="border-y border-border bg-background py-8">
-    <div class="mx-auto grid max-w-6xl gap-4 px-6 md:grid-cols-2 xl:grid-cols-4">
-      {proofSignals.map((signal, idx) => (
-        <div
-          class="rounded-2xl border border-border/80 bg-card/70 px-5 py-4 animate-fade-in-up"
-          style={`--delay: ${idx * 70}ms`}
-        >
-          <p class="mb-1 text-sm font-semibold">{signal.label}</p>
-          <p class="text-sm leading-relaxed text-muted-foreground">{signal.detail}</p>
-        </div>
-      ))}
-    </div>
-  </section>
-
-  <section class="agent-atmosphere relative overflow-hidden bg-hero-bg text-hero-text">
-    <div class="mx-auto grid max-w-6xl items-center gap-8 px-6 py-20 md:py-24 lg:grid-cols-[1.08fr_0.92fr]">
-      <div class="relative z-10 max-w-3xl">
-        <h2 class="font-display mb-4 text-3xl tracking-tight md:text-5xl">
-          Primer stays credible across the agent stack
-        </h2>
-        <p class="max-w-2xl text-lg leading-relaxed text-white/66">
-          Claude Code, Cursor, Codex CLI, and Gemini CLI all move quickly and emit different kinds
-          of evidence. Primer is built around source-aware trust, so cross-agent analytics stay
-          comparable instead of collapsing into false precision.
-        </p>
-      </div>
-
-      <div class="agent-cluster agent-cluster--desktop hidden max-w-[26rem] justify-self-start lg:grid lg:grid-cols-2" aria-hidden="true">
-        {agentMarks.map((mark) => (
-          <div class="agent-cluster__mark">
-            <img
-              src={`${import.meta.env.BASE_URL}agent-marks/${mark.src}`}
-              alt=""
-              width="64"
-              height="64"
-              class="agent-cluster__logo"
-              loading="lazy"
-            />
-          </div>
-        ))}
-      </div>
-
-      <div class="agent-cluster agent-cluster--mobile mt-8 grid max-w-sm grid-cols-2 gap-3 lg:hidden">
-        {agentMarks.map((mark) => (
-          <div class="agent-cluster__mark">
-            <img
-              src={`${import.meta.env.BASE_URL}agent-marks/${mark.src}`}
-              alt={mark.alt}
-              width="56"
-              height="56"
-              class="agent-cluster__logo"
-              loading="lazy"
-            />
-            <span class="agent-cluster__label">{mark.name}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  </section>
-
-  <section id="product" class="py-18 md:py-24">
-    <div class="mx-auto max-w-6xl px-6">
-      <div class="mb-12 max-w-3xl">
-        <h2 class="font-display mb-4 text-3xl tracking-tight md:text-5xl">
-          From workflow proof to measured change
-        </h2>
-      </div>
-    </div>
-
-    <div class="space-y-18 md:space-y-24">
-      {chapters.map((chapter, idx) => (
-        <section class={idx % 2 === 1 ? "bg-muted/45 py-18 md:py-22" : "py-18 md:py-22"}>
-          <div
-            class={`mx-auto grid max-w-6xl items-center gap-10 px-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] ${
-              idx % 2 === 1 ? "lg:[&>*:first-child]:order-2 lg:[&>*:last-child]:order-1" : ""
-            }`}
-          >
-            <div class="space-y-6">
-              <p class="text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand dark:text-primer-400">{chapter.eyebrow}</p>
-              <h3 class="font-display text-3xl tracking-tight md:text-4xl">{chapter.title}</h3>
-              <p class="text-lg leading-relaxed text-muted-foreground">{chapter.description}</p>
-              <ul class="space-y-3 text-sm leading-relaxed text-foreground/90">
-                {chapter.bullets.map((bullet) => (
-                  <li class="flex gap-3">
-                    <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primer-brand"></span>
-                    <span>{bullet}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div class="story-frame animate-fade-in-up" style={`--delay: ${idx * 70}ms`}>
-              <div class="story-frame__ornament"></div>
-              <div class="story-frame__header">
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
-              <img
-                src={`${import.meta.env.BASE_URL}screenshots/${chapter.image}`}
-                alt={chapter.caption}
-                class="story-frame__image"
-                loading="lazy"
-              />
-              <p class="story-frame__caption">{chapter.caption}</p>
-            </div>
-          </div>
-        </section>
-      ))}
-    </div>
-  </section>
-
-  <section class="bg-muted/50 py-18 md:py-24">
-    <div class="mx-auto max-w-6xl px-6">
-      <div class="mb-12 text-center">
-        <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand dark:text-primer-400">Who it is for</p>
-        <h2 class="font-display mb-4 text-3xl tracking-tight md:text-4xl">
-          One product, three kinds of operating decisions
-        </h2>
-      </div>
-
-      <div class="grid gap-6 lg:grid-cols-3">
-        {audiences.map((group, idx) => (
-          <div
-            class="rounded-2xl border border-border bg-card p-6 shadow-sm animate-fade-in-up"
-            style={`--delay: ${idx * 80}ms`}
-          >
-            <h3 class="mb-3 font-display text-2xl tracking-tight">{group.audience}</h3>
-            <p class="text-sm leading-relaxed text-muted-foreground">{group.summary}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  </section>
-
-  <section id="faq" class="border-t border-border py-18 md:py-24">
-    <div class="mx-auto max-w-4xl px-6">
-      <div class="mb-12 text-center">
-        <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-brand dark:text-primer-400">FAQ</p>
-        <h2 class="font-display text-3xl tracking-tight md:text-4xl">Common questions</h2>
-      </div>
-      <div class="space-y-4">
-        {faqs.map((faq) => (
-          <details class="group rounded-2xl border border-border bg-card/70 px-6 py-5 transition-colors hover:border-primer-border">
-            <summary class="flex cursor-pointer list-none items-start justify-between gap-6">
-              <h3 class="font-display text-lg tracking-tight md:text-xl">{faq.q}</h3>
-              <span class="mt-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-transform group-open:rotate-45">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-              </span>
-            </summary>
-            <p class="mt-4 text-base leading-relaxed text-muted-foreground">{faq.a}</p>
-          </details>
-        ))}
-      </div>
-    </div>
-  </section>
-
-  <section class="bg-hero-bg py-18 text-hero-text md:py-24">
-    <div class="mx-auto max-w-5xl px-6 text-center">
-      <p class="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primer-400">Get started</p>
-      <h2 class="font-display mb-4 text-3xl tracking-tight md:text-5xl">
-        Build your workflow intelligence layer on your own infrastructure
-      </h2>
-      <p class="mx-auto mb-8 max-w-2xl text-lg leading-relaxed text-white/68">
-        Self-host Primer, connect your agents and GitHub data, and start seeing which workflows,
-        assets, agent stacks, and experiments are worth standardizing.
+      <p class="hero-lede has-dropcap reveal" style="--delay: 180ms">
+        Primer reads the working notes of your engineering team — every session with Claude Code, Cursor, Codex and Gemini — and quietly turns that telemetry into fingerprints, quality attribution, cost proof, exemplars, and measurable experiments.
       </p>
-      <div class="mb-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-        <a
-          href="https://demo.useprimer.dev"
-          class="inline-flex items-center gap-2 rounded-lg bg-primer-600 px-6 py-3 font-medium text-white transition-colors hover:bg-primer-700"
-        >
+
+      <div class="hero-actions reveal" style="--delay: 260ms">
+        <a href="https://demo.useprimer.dev" class="btn-ink">
           <span>Try the live demo</span>
           <span aria-hidden="true">→</span>
         </a>
-        <a
-          href={`${import.meta.env.BASE_URL}docs/installation/`}
-          class="inline-flex items-center rounded-lg border border-white/15 bg-white/8 px-6 py-3 font-medium text-white transition-colors hover:bg-white/12"
-        >
-          Install Primer
-        </a>
-        <a
-          href="https://github.com/ccf/primer"
-          target="_blank"
-          rel="noopener"
-          class="inline-flex items-center rounded-lg border border-white/15 bg-white/8 px-6 py-3 font-medium text-white transition-colors hover:bg-white/12"
-        >
-          Explore the repo
-        </a>
+        <a href={`${base}docs/`} class="link-quiet">Read the field guide</a>
       </div>
-      <p class="text-sm text-white/52">Open source. Self-hosted. Privacy-first.</p>
+
+      <hr class="hairline" />
+
+      <div class="captures reveal" style="--delay: 340ms">
+        <span class="captures-label">Captures</span>
+        {captures.map((name, i) => (
+          <>
+            <span class="captures-name">{name}</span>
+            {i < captures.length - 1 && <span class="captures-dot">·</span>}
+          </>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Chapters II – IV ───────────────────────────── -->
+  {chapters.map((chapter) => (
+    <section class="chapter">
+      <div class="chapter-inner">
+        <div class="chapter-header">
+          <div class="chapter-num">{chapter.num}</div>
+          <h2 class="chapter-title" set:html={chapter.title} />
+        </div>
+
+        <div class={`chapter-body chapter-body--${chapter.layout}`}>
+          <div class="chapter-spacer"></div>
+          <div class="chapter-text">
+            <p class="chapter-lede">{chapter.body}</p>
+            <ul class="chapter-bullets">
+              {chapter.bullets.map((b) => <li>{b}</li>)}
+            </ul>
+          </div>
+          <figure class="chapter-plate">
+            <div class="chapter-plate-frame">
+              <img src={`${base}${chapter.plate}`} alt={chapter.caption} loading="lazy" width="1440" height="900" />
+            </div>
+            <figcaption class="chapter-plate-caption">{chapter.caption}</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+  ))}
+
+  <!-- ─── Technical Interlude (dark) ─────────────────── -->
+  <section class="interlude">
+    <div class="interlude-inner">
+      <div class="interlude-header">
+        <div class="eyebrow eyebrow--dark"><span>Technical interlude</span></div>
+        <h2 class="interlude-title">
+          The platform is <em>evidence-forward.</em><br>
+          Every metric is a trail back to the<br>sessions that earned it.
+        </h2>
+      </div>
+
+      <div class="telemetry">
+        <p class="telemetry-lede">A live snapshot from the public demo instance, updated as sessions arrive.</p>
+
+        <div>
+          <div class="telemetry-panel">
+            <div class="telemetry-panel-header">
+              <div class="telemetry-panel-title">Primer · live instance</div>
+              <div class="telemetry-panel-meta">
+                <span class="telemetry-dot pulse-dot"></span>
+                Synchronised 2s ago
+              </div>
+            </div>
+
+            <div class="telemetry-grid">
+              {metrics.map((m) => (
+                <div class="telemetry-cell">
+                  <div class="telemetry-k">{m.k}</div>
+                  <div class={`telemetry-v ${m.accent ? "telemetry-v--accent" : ""}`}>
+                    {m.v}
+                    {m.suffix && <sup>{m.suffix}</sup>}
+                  </div>
+                  <div class="telemetry-d">{m.d}</div>
+                </div>
+              ))}
+            </div>
+
+            <div class="telemetry-panel-footer">
+              <span>primer / demo.useprimer.dev</span>
+              <span class="telemetry-cursor">▊</span>
+            </div>
+          </div>
+          <div class="chapter-plate-caption chapter-plate-caption--dark">
+            Plate IV. Selected metrics from the open demo.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Pull quote ─────────────────────────────────── -->
+  <section class="pullquote">
+    <div class="pullquote-inner">
+      <div class="pullquote-mark">&ldquo;</div>
+      <q>
+        Knowing which engineers ship more is easy. Knowing <em>how</em> they think, which patterns matter, and which assets to copy across the org — that is the question Primer is written to answer.
+      </q>
+      <div class="pullquote-attrib">— From the Primer field guide</div>
+    </div>
+  </section>
+
+  <!-- ─── FAQ as editorial Q&A ───────────────────────── -->
+  <section id="faq" class="faq">
+    <div class="faq-inner">
+      <div class="chapter-header">
+        <div class="chapter-num">Apparatus</div>
+        <h2 class="chapter-title">Common questions, briefly answered.</h2>
+      </div>
+      <dl class="faq-list">
+        {faqs.map((faq) => (
+          <div class="faq-item">
+            <dt>{faq.q}</dt>
+            <dd>{faq.a}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  </section>
+
+  <!-- ─── Colophon (final CTA) ───────────────────────── -->
+  <section class="colophon">
+    <div class="colophon-inner">
+      <div class="eyebrow eyebrow--dark"><span>Colophon</span></div>
+      <div>
+        <h2 class="colophon-title">
+          Open source. Self-hosted.<br>
+          <em>Your own infrastructure.</em>
+        </h2>
+        <p class="colophon-lede">
+          Primer is MIT-licensed and runs on your own Postgres. Telemetry never leaves your network. Install with a single command, connect your agents and GitHub data, and begin the study.
+        </p>
+        <div class="colophon-actions">
+          <a href="https://demo.useprimer.dev" class="btn-paper">
+            <span>Try the live demo</span>
+            <span aria-hidden="true">→</span>
+          </a>
+          <a href={`${base}docs/installation/`} class="link-quiet link-quiet--dark">Install Primer</a>
+          <a href="https://github.com/ccf/primer" target="_blank" rel="noopener" class="link-quiet link-quiet--dark">View on GitHub</a>
+        </div>
+      </div>
     </div>
   </section>
 </BaseLayout>
+
+<style>
+  /* ─── Hero ─────────────────────────────────────────── */
+  .hero {
+    background: var(--color-paper);
+  }
+  .hero-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 100px 48px 80px;
+  }
+  .hero-title {
+    font-family: var(--font-display);
+    font-weight: 300;
+    font-size: clamp(56px, 9vw, 120px);
+    line-height: 0.92;
+    letter-spacing: -0.035em;
+    color: var(--color-ink);
+    max-width: 13ch;
+    margin: 40px 0 48px;
+    font-variation-settings: "opsz" 144, "SOFT" 50;
+  }
+  .hero-title em {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--color-accent);
+  }
+  .hero-lede {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 22px;
+    line-height: 1.5;
+    color: var(--color-ink);
+    max-width: 48ch;
+    margin: 0 0 56px;
+    font-variation-settings: "opsz" 24;
+  }
+  .hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    margin-bottom: 72px;
+    flex-wrap: wrap;
+  }
+  .captures {
+    padding-top: 28px;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 15px;
+    color: var(--color-ink-muted);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .captures-label {
+    font-family: var(--font-body);
+    font-style: normal;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--color-ink-faint);
+    margin-right: 8px;
+  }
+  .captures-name { color: var(--color-ink); font-weight: 500; }
+  .captures-dot { color: var(--color-accent); }
+
+  /* ─── Chapters ─────────────────────────────────────── */
+  .chapter {
+    background: var(--color-paper);
+  }
+  .chapter-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 120px 48px;
+    border-top: 1px solid var(--color-rule);
+  }
+  .chapter-header {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 48px;
+    margin-bottom: 80px;
+  }
+  .chapter-num {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 13px;
+    color: var(--color-accent);
+    text-transform: uppercase;
+    font-variant: small-caps;
+    letter-spacing: 0.2em;
+    padding-top: 8px;
+  }
+  .chapter-title {
+    font-family: var(--font-display);
+    font-size: clamp(40px, 5.5vw, 72px);
+    font-weight: 300;
+    line-height: 1.0;
+    letter-spacing: -0.025em;
+    max-width: 18ch;
+    color: var(--color-ink);
+  }
+  .chapter-title em {
+    font-style: italic;
+    font-weight: 400;
+  }
+
+  .chapter-body {
+    display: grid;
+    gap: 48px;
+    align-items: start;
+    grid-template-columns: 180px minmax(0, 0.9fr) minmax(0, 1.3fr);
+  }
+  .chapter-body--left {
+    grid-template-columns: 180px minmax(0, 1.3fr) minmax(0, 0.9fr);
+  }
+  .chapter-body--left .chapter-text  { grid-column: 3 / 4; grid-row: 1; }
+  .chapter-body--left .chapter-plate { grid-column: 2 / 3; grid-row: 1; }
+  .chapter-spacer { display: block; }
+
+  .chapter-lede {
+    font-family: var(--font-display);
+    font-size: 18px;
+    line-height: 1.55;
+    color: var(--color-ink);
+    max-width: 36ch;
+    margin-bottom: 28px;
+  }
+  .chapter-bullets {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-top: 1px solid var(--color-rule);
+  }
+  .chapter-bullets li {
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--color-ink-muted);
+    padding: 14px 0 14px 28px;
+    border-bottom: 1px solid var(--color-rule);
+    position: relative;
+  }
+  .chapter-bullets li::before {
+    content: "—";
+    position: absolute;
+    left: 0;
+    color: var(--color-accent);
+  }
+
+  .chapter-plate { margin: 0; }
+  .chapter-plate-frame {
+    border: 1px solid var(--color-rule);
+    padding: 6px;
+    background: var(--color-paper-soft);
+  }
+  .chapter-plate-frame img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 10;
+    object-fit: cover;
+    object-position: top;
+  }
+  .chapter-plate-caption {
+    padding-top: 14px;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 13px;
+    color: var(--color-ink-muted);
+    text-align: right;
+  }
+
+  /* ─── Technical Interlude (dark) ───────────────────── */
+  .interlude {
+    background: var(--color-dark);
+    color: var(--color-dark-text);
+    border-top: 1px solid var(--color-rule);
+    border-bottom: 1px solid var(--color-rule);
+    position: relative;
+    overflow: hidden;
+  }
+  .interlude::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      radial-gradient(ellipse at 20% 0%, rgba(212, 165, 116, 0.06), transparent 60%),
+      repeating-linear-gradient(0deg, transparent 0, transparent 28px, rgba(255, 255, 255, 0.018) 28px, rgba(255, 255, 255, 0.018) 29px);
+  }
+  .interlude-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 140px 48px 160px;
+    position: relative;
+  }
+  .interlude-header {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 48px;
+    margin-bottom: 80px;
+    align-items: start;
+  }
+  .interlude-header .eyebrow { padding-top: 10px; }
+  .interlude-title {
+    font-family: var(--font-display);
+    font-size: clamp(36px, 5vw, 64px);
+    font-weight: 300;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    color: var(--color-dark-text);
+    max-width: 24ch;
+  }
+  .interlude-title em {
+    font-style: italic;
+    color: var(--color-dark-accent);
+    font-weight: 400;
+  }
+  .telemetry {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 48px;
+  }
+  .telemetry-lede {
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-style: italic;
+    line-height: 1.55;
+    color: var(--color-dark-muted);
+    max-width: 26ch;
+    padding-top: 8px;
+  }
+  .telemetry-panel {
+    border: 1px solid var(--color-dark-rule);
+    background: var(--color-dark-soft);
+    font-family: var(--font-mono);
+    position: relative;
+  }
+  .telemetry-panel::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    left: 48px;
+    right: 48px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--color-dark-accent), transparent);
+  }
+  .telemetry-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 18px 36px;
+    border-bottom: 1px solid var(--color-dark-rule);
+  }
+  .telemetry-panel-title {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 14px;
+    color: var(--color-dark-text);
+    font-variation-settings: "opsz" 24;
+  }
+  .telemetry-panel-meta {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-dark-faint);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .telemetry-dot {
+    width: 7px;
+    height: 7px;
+    background: var(--color-dark-accent);
+    box-shadow: 0 0 10px var(--color-dark-accent);
+    border-radius: 50%;
+  }
+  .telemetry-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .telemetry-cell {
+    padding: 40px 32px 36px;
+    border-right: 1px solid var(--color-dark-rule);
+  }
+  .telemetry-cell:last-child { border-right: none; }
+  .telemetry-k {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-dark-faint);
+    margin-bottom: 18px;
+  }
+  .telemetry-v {
+    font-family: var(--font-display);
+    font-size: 56px;
+    font-weight: 300;
+    line-height: 1;
+    letter-spacing: -0.025em;
+    color: var(--color-dark-text);
+    font-variant-numeric: tabular-nums;
+    font-variation-settings: "opsz" 144;
+  }
+  .telemetry-v--accent { color: var(--color-dark-accent); }
+  .telemetry-v sup {
+    font-size: 0.42em;
+    vertical-align: baseline;
+    position: relative;
+    top: -1.2em;
+    color: var(--color-dark-muted);
+    font-family: var(--font-mono);
+    letter-spacing: 0;
+    font-weight: 400;
+    margin-left: 2px;
+  }
+  .telemetry-d {
+    margin-top: 16px;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 13px;
+    color: var(--color-dark-muted);
+    line-height: 1.4;
+  }
+  .telemetry-panel-footer {
+    border-top: 1px solid var(--color-dark-rule);
+    padding: 16px 36px;
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-dark-faint);
+  }
+  .telemetry-cursor {
+    color: var(--color-dark-accent);
+    animation: blink 1.2s steps(2) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  .chapter-plate-caption--dark { color: var(--color-dark-faint); }
+
+  /* ─── Pull quote ───────────────────────────────────── */
+  .pullquote { background: var(--color-paper); }
+  .pullquote-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 160px 48px;
+    text-align: center;
+  }
+  .pullquote-mark {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 200px;
+    line-height: 0.5;
+    color: var(--color-accent);
+    opacity: 0.7;
+    margin-bottom: -28px;
+    font-variation-settings: "opsz" 144;
+  }
+  .pullquote q {
+    display: block;
+    max-width: 760px;
+    margin: 0 auto;
+    font-family: var(--font-display);
+    font-weight: 300;
+    font-style: italic;
+    font-size: clamp(28px, 4vw, 44px);
+    line-height: 1.25;
+    letter-spacing: -0.012em;
+    color: var(--color-ink);
+    font-variation-settings: "opsz" 72;
+    quotes: none;
+  }
+  .pullquote q::before, .pullquote q::after { content: ""; }
+  .pullquote-attrib {
+    margin-top: 48px;
+    font-family: var(--font-body);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--color-ink-faint);
+  }
+
+  /* ─── FAQ ──────────────────────────────────────────── */
+  .faq { background: var(--color-paper); }
+  .faq-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 120px 48px;
+    border-top: 1px solid var(--color-rule);
+  }
+  .faq-list {
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--color-rule);
+  }
+  .faq-item {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr) minmax(0, 1.3fr);
+    gap: 48px;
+    padding: 36px 0;
+    border-bottom: 1px solid var(--color-rule);
+  }
+  .faq-item dt {
+    grid-column: 2 / 3;
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-style: italic;
+    font-size: 22px;
+    line-height: 1.25;
+    color: var(--color-ink);
+    max-width: 22ch;
+    font-variation-settings: "opsz" 36;
+  }
+  .faq-item dd {
+    grid-column: 3 / 4;
+    margin: 0;
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--color-ink-muted);
+    max-width: 56ch;
+  }
+
+  /* ─── Colophon (final dark CTA) ────────────────────── */
+  .colophon {
+    background: var(--color-dark);
+    color: var(--color-dark-text);
+    border-top: 1px solid var(--color-rule);
+    position: relative;
+    overflow: hidden;
+  }
+  .colophon::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse at 80% 100%, rgba(212, 165, 116, 0.06), transparent 60%);
+  }
+  .colophon-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 140px 48px;
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 48px;
+    position: relative;
+  }
+  .colophon-inner > .eyebrow { padding-top: 10px; }
+  .colophon-title {
+    font-family: var(--font-display);
+    font-weight: 300;
+    font-size: clamp(36px, 5vw, 64px);
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    color: var(--color-dark-text);
+    max-width: 20ch;
+    margin-bottom: 48px;
+  }
+  .colophon-title em {
+    font-style: italic;
+    color: var(--color-dark-accent);
+    font-weight: 400;
+  }
+  .colophon-lede {
+    font-family: var(--font-display);
+    font-size: 19px;
+    line-height: 1.55;
+    color: var(--color-dark-muted);
+    max-width: 50ch;
+    margin: 0 0 56px;
+  }
+  .colophon-actions {
+    display: flex;
+    gap: 28px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  /* ─── Responsive ───────────────────────────────────── */
+  @media (max-width: 900px) {
+    .hero-inner,
+    .chapter-inner,
+    .interlude-inner,
+    .pullquote-inner,
+    .faq-inner,
+    .colophon-inner {
+      padding-left: 28px;
+      padding-right: 28px;
+    }
+    .chapter-header,
+    .chapter-body,
+    .interlude-header,
+    .telemetry,
+    .colophon-inner,
+    .faq-item {
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+    .chapter-spacer { display: none; }
+    .chapter-body--left .chapter-text,
+    .chapter-body--left .chapter-plate {
+      grid-column: 1;
+      grid-row: auto;
+    }
+    .telemetry-grid { grid-template-columns: repeat(2, 1fr); }
+    .telemetry-cell {
+      border-right: 1px solid var(--color-dark-rule);
+      border-bottom: 1px solid var(--color-dark-rule);
+    }
+    .telemetry-cell:nth-child(2n) { border-right: none; }
+    .telemetry-cell:nth-last-child(-n+2) { border-bottom: none; }
+    .interlude-inner { padding-top: 100px; padding-bottom: 100px; }
+    .colophon-inner { padding-top: 100px; padding-bottom: 100px; }
+    .faq-item dt,
+    .faq-item dd { grid-column: 1; }
+  }
+</style>

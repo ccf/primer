@@ -2,7 +2,6 @@
 import Nav from "../components/Nav.astro";
 import Footer from "../components/Footer.astro";
 import SEO from "../components/SEO.astro";
-import ThemeToggle from "../components/ThemeToggle";
 import "../styles/global.css";
 
 interface Props {
@@ -27,26 +26,10 @@ const { title, description, ogImage, structuredData } = Astro.props;
   </head>
   <body class="min-h-screen flex flex-col">
     <Nav />
-    <!-- Hydrate theme toggle into nav -->
-    <div class="hidden">
-      <ThemeToggle client:load />
-    </div>
-    <main class="flex-1 pt-16">
+    <main class="flex-1">
       <slot />
     </main>
     <Footer />
-
-    <!-- Mount theme toggle into nav placeholder -->
-    <script>
-      import { createElement } from "react";
-      import { createRoot } from "react-dom/client";
-      import ThemeToggle from "../components/ThemeToggle";
-
-      const el = document.getElementById("theme-toggle");
-      if (el) {
-        createRoot(el).render(createElement(ThemeToggle));
-      }
-    </script>
 
     <!-- Copy button for code blocks -->
     <script>
