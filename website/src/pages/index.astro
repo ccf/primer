@@ -122,11 +122,42 @@ const audiences = [
     summary: "Coach with workflow evidence, exemplars, and concrete experiments instead of instinct alone.",
   },
 ];
+
+const structuredData = [
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "Primer",
+    applicationCategory: "DeveloperApplication",
+    applicationSubCategory: "Engineering Analytics",
+    operatingSystem: "Linux, macOS, Windows",
+    description:
+      "Open-source workflow intelligence for agentic engineering. Captures sessions from Claude Code, Cursor, Codex CLI, and Gemini CLI and turns them into workflow fingerprints, quality attribution, cost proof, exemplars, and experiments.",
+    url: "https://useprimer.dev",
+    sameAs: ["https://github.com/ccf/primer"],
+    license: "https://opensource.org/licenses/MIT",
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "USD",
+    },
+    softwareHelp: { "@type": "CreativeWork", url: "https://useprimer.dev/docs/" },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Primer",
+    url: "https://useprimer.dev",
+    logo: "https://useprimer.dev/logo-mark.svg",
+    sameAs: ["https://github.com/ccf/primer"],
+  },
+];
 ---
 
 <BaseLayout
   title="Primer — Workflow Intelligence for Agentic Engineering"
   description="See which AI workflows actually work. Primer turns session telemetry into workflow intelligence, cost and quality proof, exemplars, and experiments for agentic engineering teams."
+  structuredData={structuredData}
 >
   <section class="relative overflow-hidden bg-hero-bg text-hero-text">
     <div class="absolute inset-0 overflow-hidden">
