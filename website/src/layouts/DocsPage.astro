@@ -31,9 +31,44 @@ const pages = [
 const currentIdx = pages.findIndex(p => p.title === title);
 const prev = currentIdx > 0 ? pages[currentIdx - 1] : null;
 const next = currentIdx >= 0 && currentIdx < pages.length - 1 ? pages[currentIdx + 1] : null;
+
+const siteOrigin = "https://useprimer.dev";
+const pagePath = Astro.url.pathname.replace(/\/$/, "") || "/";
+const pageUrl = `${siteOrigin}${pagePath}/`;
+
+const structuredData = [
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    headline: title,
+    description,
+    inLanguage: "en",
+    isPartOf: { "@type": "WebSite", name: "Primer Documentation", url: `${siteOrigin}/docs/` },
+    mainEntityOfPage: { "@type": "WebPage", "@id": pageUrl },
+    publisher: {
+      "@type": "Organization",
+      name: "Primer",
+      url: siteOrigin,
+      logo: { "@type": "ImageObject", url: `${siteOrigin}/logo-mark.svg` },
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Documentation", item: `${siteOrigin}/docs/` },
+      { "@type": "ListItem", position: 2, name: section },
+      { "@type": "ListItem", position: 3, name: title, item: pageUrl },
+    ],
+  },
+];
 ---
 
-<BaseLayout title={`${title} — Primer Docs`} description={description}>
+<BaseLayout
+  title={`${title} — Primer Docs`}
+  description={description}
+  structuredData={structuredData}
+>
   <div class="max-w-4xl mx-auto px-6 py-20">
     <div class="mb-8 flex items-center gap-2 text-sm text-muted-foreground">
       <a href={`${base}docs/`} class="hover:text-foreground transition-colors">Documentation</a>
