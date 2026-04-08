@@ -54,6 +54,12 @@ const metrics = [
   { k: "Cost per success",     v: "$0.41", d: "−22% after playbook rollout" },
 ];
 
+const slugify = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
 const faqs = [
   {
     q: "What is Primer?",
@@ -253,12 +259,19 @@ const structuredData = [
         <h2 class="chapter-title">Common questions, briefly answered.</h2>
       </div>
       <dl class="faq-list">
-        {faqs.map((faq) => (
-          <div class="faq-item">
-            <dt>{faq.q}</dt>
-            <dd>{faq.a}</dd>
-          </div>
-        ))}
+        {faqs.map((faq) => {
+          const slug = slugify(faq.q);
+          return (
+            <div class="faq-item" id={slug}>
+              <dt>
+                <a href={`#${slug}`} class="faq-anchor" aria-label={`Link to: ${faq.q}`}>
+                  {faq.q}
+                </a>
+              </dt>
+              <dd>{faq.a}</dd>
+            </div>
+          );
+        })}
       </dl>
     </div>
   </section>
@@ -693,6 +706,19 @@ const structuredData = [
     gap: 48px;
     padding: 36px 0;
     border-bottom: 1px solid var(--color-rule);
+  }
+  .faq-anchor {
+    color: inherit;
+    text-decoration: none;
+  }
+  .faq-anchor:hover { color: var(--color-accent); }
+  .faq-item:target {
+    background: var(--color-paper-soft);
+    padding-left: 16px;
+    padding-right: 16px;
+    margin-left: -16px;
+    margin-right: -16px;
+    border-radius: 2px;
   }
   .faq-item dt {
     grid-column: 2 / 3;

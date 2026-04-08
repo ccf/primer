@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -187,6 +187,16 @@ def create_app() -> FastAPI:
     app.include_router(webhooks.router)
     app.include_router(explorer.router)
     app.include_router(finops.router)
+
+    if settings.demo_mode:
+        # Keep the demo instance out of search indexes. Pairs with the
+        # X-Robots-Tag header emitted by DemoReadOnlyMiddleware.
+        @app.get("/robots.txt", include_in_schema=False)
+        async def demo_robots() -> PlainTextResponse:
+            return PlainTextResponse(
+                "User-agent: *\nDisallow: /\n",
+                headers={"X-Robots-Tag": "noindex, nofollow"},
+            )
 
     if FRONTEND_DIST.is_dir():
         # Serve hashed asset files directly
