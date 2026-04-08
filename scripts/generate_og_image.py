@@ -33,24 +33,36 @@ HEIGHT = 630
 
 
 def _font(size: int, weight: str = "regular") -> ImageFont.FreeTypeFont:
-    """Try several mac system fonts; fall back to default."""
-    candidates = []
-    if weight == "bold":
-        candidates += [
-            "/System/Library/Fonts/HelveticaNeue.ttc",
-            "/System/Library/Fonts/Helvetica.ttc",
-        ]
-    else:
-        candidates += [
-            "/System/Library/Fonts/HelveticaNeue.ttc",
-            "/System/Library/Fonts/Helvetica.ttc",
-        ]
+    """Load a system font, honoring the requested weight.
+
+    .ttc TrueType Collections pack multiple faces under different indices
+    and Pillow's truetype() defaults to index 0 (regular). To actually get
+    a bold face we have to enumerate indices and pick the one whose
+    PostScript name contains 'Bold'.
+    """
+    candidates = [
+        "/System/Library/Fonts/HelveticaNeue.ttc",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+    ]
     for path in candidates:
-        if Path(path).exists():
-            try:
-                return ImageFont.truetype(path, size)
-            except OSError:
-                continue
+        if not Path(path).exists():
+            continue
+        if weight == "bold":
+            for index in range(12):
+                try:
+                    font = ImageFont.truetype(path, size, index=index)
+                except OSError:
+                    break
+                family, style = font.getname()
+                if "bold" in (style or "").lower() and "italic" not in (style or "").lower():
+                    return font
+            # No bold face found in this collection — fall through to next
+            continue
+        try:
+            return ImageFont.truetype(path, size, index=0)
+        except OSError:
+            continue
     return ImageFont.load_default()
 
 
