@@ -63,7 +63,11 @@ def _font(size: int, weight: str = "regular") -> ImageFont.FreeTypeFont:
             return ImageFont.truetype(path, size, index=0)
         except OSError:
             continue
-    return ImageFont.load_default()
+    # Fallback: Pillow 10.1+ accepts size; older versions ignore the kwarg.
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
 
 
 def _radial_background(width: int, height: int) -> Image.Image:
