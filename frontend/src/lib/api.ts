@@ -23,8 +23,12 @@ export function isDemoMode(): boolean {
  * This key only grants read access — the server blocks all mutations.
  */
 export async function initDemoMode(): Promise<boolean> {
+  // Hard cap the demo-config check so non-demo instances don't block the
+  // initial render if the server is slow or unreachable.
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 2000)
   try {
-    const res = await fetch("/api/v1/demo-config")
+    const res = await fetch("/api/v1/demo-config", { signal: controller.signal })
     if (res.ok) {
       const data = await res.json()
       if (data.demo_mode && data.admin_key) {
@@ -34,7 +38,9 @@ export async function initDemoMode(): Promise<boolean> {
       }
     }
   } catch {
-    // Server not reachable or not in demo mode — fall through to cleanup
+    // Server not reachable, timed out, or not in demo mode — fall through
+  } finally {
+    clearTimeout(timeoutId)
   }
   // Not in demo mode (or server unreachable): clear any stale flag so that
   // apiFetch's 403 handling can clear the API key if it becomes invalid.
