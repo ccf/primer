@@ -114,4 +114,23 @@ class PrimerSettings(BaseSettings):
     demo_mode: bool = False
 
 
+def _populate_env_from_user_config() -> None:
+    """Load ~/.primer/config.toml into PRIMER_* env vars before settings are
+    instantiated, so the server picks up the same admin key / DB URL / etc.
+    the CLI writes on `primer init` regardless of how the app is launched
+    (uvicorn directly, `primer server start`, docker, debugger, ...).
+
+    Existing env vars win — this is a fallback, not an override.
+    """
+    try:
+        from primer.cli.config import load_config_into_env
+    except ImportError:
+        # Keeps the common module importable in environments where the CLI
+        # subpackage isn't installed (e.g. minimal test images).
+        return
+    load_config_into_env()
+
+
+_populate_env_from_user_config()
+
 settings = PrimerSettings()
