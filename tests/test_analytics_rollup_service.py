@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from primer.common.models import DailyAnalyticsRollup, SessionFacets, SessionMessage, ToolUsage
@@ -12,10 +12,17 @@ def test_refresh_recent_daily_analytics_rollups_creates_org_and_team_rows(
     db_session, engineer_with_key
 ):
     engineer, _api_key = engineer_with_key
+    # Anchor the session inside the lookback window rather than a hard-coded
+    # date — otherwise the test silently falls out of range once enough real
+    # time has passed.
+    session_dt = datetime.now(UTC).replace(hour=12, minute=0, second=0, microsecond=0) - timedelta(
+        days=5
+    )
+    session_date = session_dt.date()
     session = SessionModel(
         id=str(uuid4()),
         engineer_id=engineer.id,
-        started_at=datetime(2026, 4, 2, 12, 0, tzinfo=UTC),
+        started_at=session_dt,
         message_count=2,
         user_message_count=1,
         assistant_message_count=1,
@@ -50,7 +57,7 @@ def test_refresh_recent_daily_analytics_rollups_creates_org_and_team_rows(
     org_row = (
         db_session.query(DailyAnalyticsRollup)
         .filter(
-            DailyAnalyticsRollup.date == datetime(2026, 4, 2, tzinfo=UTC).date(),
+            DailyAnalyticsRollup.date == session_date,
             DailyAnalyticsRollup.scope_key == "org",
         )
         .one()
@@ -58,7 +65,7 @@ def test_refresh_recent_daily_analytics_rollups_creates_org_and_team_rows(
     team_row = (
         db_session.query(DailyAnalyticsRollup)
         .filter(
-            DailyAnalyticsRollup.date == datetime(2026, 4, 2, tzinfo=UTC).date(),
+            DailyAnalyticsRollup.date == session_date,
             DailyAnalyticsRollup.scope_key == f"team:{engineer.team_id}",
         )
         .one()
