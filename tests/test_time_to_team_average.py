@@ -1,6 +1,6 @@
 import secrets
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import bcrypt
 
@@ -10,6 +10,15 @@ from primer.common.models import (
     SessionFacets,
     Team,
 )
+
+
+def _recent_monday() -> datetime:
+    """Return a Monday roughly two months ago, anchored to today. Tests add
+    up to ~4 weeks on top of this so callers get Monday-aligned dates that
+    are recent enough to survive any default time window while still leaving
+    head-room for session sequences that span multiple weeks forward."""
+    now = datetime.now(UTC).replace(hour=10, minute=0, second=0, microsecond=0, tzinfo=None)
+    return now - timedelta(days=now.weekday() + 56)
 
 
 def _make_engineer(db_session, team, *, name="Eng", email=None, role="engineer"):
@@ -81,7 +90,7 @@ class TestTimeToTeamAverage:
         eng_exp, _ = pairs[0]
         eng_new, _ = pairs[1]
 
-        base_date = datetime(2026, 1, 5, 10, 0)  # Monday
+        base_date = _recent_monday()
 
         # Experienced engineer: 2 success + 2 partial across 4 weeks
         exp_outcomes = ["success", "success", "partial", "partial"]
@@ -137,7 +146,7 @@ class TestTimeToTeamAverage:
         eng_good, _ = pairs[0]
         eng_bad, _ = pairs[1]
 
-        base_date = datetime(2026, 1, 5, 10, 0)
+        base_date = _recent_monday()
 
         # Good engineer: all successes
         for w in range(4):
@@ -177,7 +186,7 @@ class TestTimeToTeamAverage:
         eng1, _ = pairs[0]
         eng2, _ = pairs[1]
 
-        base_date = datetime(2026, 1, 5, 10, 0)
+        base_date = _recent_monday()
 
         # Both engineers succeed from week 0
         for eng in [eng1, eng2]:
@@ -216,7 +225,7 @@ class TestTimeToTeamAverage:
         db_session.flush()
         eng_b, _ = _make_engineer(db_session, team_b, name="ScopeB Eng")
 
-        base_date = datetime(2026, 1, 5, 10, 0)
+        base_date = _recent_monday()
 
         for eng in [eng_a, eng_b]:
             for w in range(3):
