@@ -1,5 +1,5 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from primer.common.models import DailyAnalyticsRollup, GitRepository, SessionFacets
 from primer.common.models import Session as SessionModel
@@ -747,8 +747,11 @@ def test_daily_stats_uses_rollups_when_available(
     client, engineer_with_key, admin_headers, db_session
 ):
     engineer, _api_key = engineer_with_key
-    newer_day = datetime(2025, 2, 2, 12, 0, tzinfo=UTC)
-    older_day = datetime(2025, 2, 1, 12, 0, tzinfo=UTC)
+    # Anchor to dates a few days ago so the test is not a time bomb.
+    newer_day = datetime.now(UTC).replace(hour=12, minute=0, second=0, microsecond=0) - timedelta(
+        days=5
+    )
+    older_day = newer_day - timedelta(days=1)
     db_session.add_all(
         [
             SessionModel(
@@ -795,13 +798,13 @@ def test_daily_stats_uses_rollups_when_available(
 
     assert response.status_code == 200
     data = response.json()
-    day_02 = next(d for d in data if d["date"] == "2025-02-02")
+    day_02 = next(d for d in data if d["date"] == newer_day.date().isoformat())
     assert day_02["session_count"] == 5
     assert day_02["message_count"] == 17
     assert day_02["tool_call_count"] == 11
     assert day_02["success_rate"] == 0.8
 
-    day_01 = next(d for d in data if d["date"] == "2025-02-01")
+    day_01 = next(d for d in data if d["date"] == older_day.date().isoformat())
     assert day_01["session_count"] == 3
     assert day_01["message_count"] == 9
 
@@ -810,7 +813,8 @@ def test_daily_stats_falls_back_to_live_query_for_partial_day_filters(
     client, engineer_with_key, admin_headers, db_session
 ):
     engineer, _api_key = engineer_with_key
-    day = datetime(2025, 2, 2, 0, 0, tzinfo=UTC)
+    day = (datetime.now(UTC) - timedelta(days=5)).replace(hour=0, minute=0, second=0, microsecond=0)
+    day_iso = day.date().isoformat()
     db_session.add_all(
         [
             SessionModel(
@@ -845,14 +849,14 @@ def test_daily_stats_falls_back_to_live_query_for_partial_day_filters(
     db_session.commit()
 
     response = client.get(
-        "/api/v1/analytics/daily?start_date=2025-02-02T12:00:00&end_date=2025-02-02T23:59:59",
+        f"/api/v1/analytics/daily?start_date={day_iso}T12:00:00&end_date={day_iso}T23:59:59",
         headers=admin_headers,
     )
 
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
-    assert data[0]["date"] == "2025-02-02"
+    assert data[0]["date"] == day_iso
     assert data[0]["session_count"] == 1
     assert data[0]["message_count"] == 0
     assert data[0]["tool_call_count"] == 0

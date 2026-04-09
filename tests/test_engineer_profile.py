@@ -647,21 +647,28 @@ class TestEngineerProfileWeeklyTrajectory:
         """Create sessions in different ISO weeks, verify grouping."""
         eng, _key = engineer_with_key
 
-        # Week 1: Monday 2026-02-02
+        # Anchor to a Monday that is always recent enough to survive any
+        # default time window the profile endpoint may later introduce.
+        now = datetime.now(UTC).replace(hour=10, minute=0, second=0, microsecond=0, tzinfo=None)
+        week1_monday = now - timedelta(days=now.weekday() + 14)  # Monday ~2-3 weeks ago
+        week2_monday = week1_monday + timedelta(days=7)
+        week2_tuesday = week1_monday + timedelta(days=8)
+
+        # Week 1
         s1 = _create_session(
             db_session,
             eng,
-            started_at=datetime(2026, 2, 2, 10, 0),
+            started_at=week1_monday,
             duration_seconds=100.0,
         )
         db_session.add(SessionFacets(session_id=s1.id, session_type="feature", outcome="success"))
         db_session.add(ToolUsage(session_id=s1.id, tool_name="Read", call_count=5))
 
-        # Week 2: Monday 2026-02-09
+        # Week 2: Monday
         s2 = _create_session(
             db_session,
             eng,
-            started_at=datetime(2026, 2, 9, 10, 0),
+            started_at=week2_monday,
             duration_seconds=200.0,
         )
         db_session.add(SessionFacets(session_id=s2.id, session_type="debugging", outcome="failure"))
@@ -670,7 +677,7 @@ class TestEngineerProfileWeeklyTrajectory:
         s3 = _create_session(
             db_session,
             eng,
-            started_at=datetime(2026, 2, 10, 10, 0),
+            started_at=week2_tuesday,
             duration_seconds=150.0,
         )
         db_session.add(SessionFacets(session_id=s3.id, session_type="feature", outcome="success"))

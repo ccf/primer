@@ -95,7 +95,10 @@ def test_refresh_recent_daily_analytics_rollups_honors_zero_day_lookback(
     older_session = SessionModel(
         id=str(uuid4()),
         engineer_id=engineer.id,
-        started_at=datetime(2026, 3, 31, 12, 0, tzinfo=UTC),
+        # Anchored 30 days back so the session is always "older than today"
+        # regardless of when the suite runs.
+        started_at=datetime.now(UTC).replace(hour=12, minute=0, second=0, microsecond=0)
+        - timedelta(days=30),
         message_count=1,
         user_message_count=1,
         assistant_message_count=0,
