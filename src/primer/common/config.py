@@ -124,11 +124,20 @@ def _populate_env_from_user_config() -> None:
     """
     try:
         from primer.cli.config import load_config_into_env
-    except ImportError:
-        # Keeps the common module importable in environments where the CLI
-        # subpackage isn't installed (e.g. minimal test images).
-        return
-    load_config_into_env()
+
+        load_config_into_env()
+    except Exception as exc:
+        # Guard broadly: ImportError (CLI not installed), TOMLDecodeError
+        # (malformed config), PermissionError, etc. This is a best-effort
+        # fallback — a broken config.toml must not prevent the app from
+        # starting. Env vars and pydantic-settings defaults still apply.
+        import warnings
+
+        warnings.warn(
+            f"Failed to load ~/.primer/config.toml: {exc}",
+            UserWarning,
+            stacklevel=2,
+        )
 
 
 _populate_env_from_user_config()
