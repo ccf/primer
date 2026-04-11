@@ -1,0 +1,11 @@
+# Astro hashed assets — filenames change on every build, so they're immutable.
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Screenshots — content-addressed by name; safe to cache aggressively.
+/screenshots/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Fonts served from our origin (if any are ever self-hosted).
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable

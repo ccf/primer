@@ -181,7 +181,10 @@ const structuredData = [
           </div>
           <figure class="chapter-plate">
             <div class="chapter-plate-frame">
-              <img src={`${base}${chapter.plate}`} alt={chapter.caption} loading="lazy" width="1440" height="900" />
+              <picture>
+                <source srcset={`${base}${chapter.plate.replace('.png', '.webp')}`} type="image/webp" />
+                <img src={`${base}${chapter.plate}`} alt={chapter.caption} loading="lazy" width="1440" height="900" />
+              </picture>
             </div>
             <figcaption class="chapter-plate-caption">{chapter.caption}</figcaption>
           </figure>
