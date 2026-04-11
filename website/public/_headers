@@ -2,9 +2,9 @@
 /_astro/*
   Cache-Control: public, max-age=31536000, immutable
 
-# Screenshots — content-addressed by name; safe to cache aggressively.
+# Screenshots — not content-addressed; use a short cache so updates propagate.
 /screenshots/*
-  Cache-Control: public, max-age=31536000, immutable
+  Cache-Control: public, max-age=86400
 
 # Fonts served from our origin (if any are ever self-hosted).
 /fonts/*
