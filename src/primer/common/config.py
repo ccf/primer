@@ -120,7 +120,16 @@ def _populate_env_from_user_config() -> None:
     the CLI writes on `primer init` regardless of how the app is launched
     (uvicorn directly, `primer server start`, docker, debugger, ...).
 
-    Existing env vars win — this is a fallback, not an override.
+    Effective precedence (highest wins):
+        1. Real environment variables (export PRIMER_FOO=bar)
+        2. config.toml (~/.primer/config.toml, written by `primer init`)
+        3. .env file (read by pydantic-settings at PrimerSettings() time)
+        4. PrimerSettings field defaults
+
+    config.toml beating .env is intentional: config.toml is the user's
+    explicit primary config (generated and maintained by the CLI), while
+    .env is typically used for secrets like OAuth tokens and API keys
+    that config.toml doesn't contain.
     """
     try:
         from primer.cli.config import load_config_into_env
