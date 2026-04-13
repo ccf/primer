@@ -389,7 +389,6 @@ def process_session_ingest_job(db: Session, payload: dict[str, Any]) -> None:
     """
     from primer.common.config import settings as app_settings
     from primer.common.schemas import SessionIngestPayload
-    from primer.server.services.alerting_service import send_alert_notifications
 
     engineer_id: str = payload["engineer_id"]
     ingest_payload = SessionIngestPayload.model_validate(payload["ingest_payload"])
@@ -452,6 +451,8 @@ def process_session_ingest_job(db: Session, payload: dict[str, Any]) -> None:
     # entire ingest job to be retried (producing duplicate alerts/facet jobs).
     if alert_snapshots:
         try:
+            from primer.server.services.alerting_service import send_alert_notifications
+
             send_alert_notifications(alert_snapshots)
         except Exception:
             logger.exception("Slack notification failed after successful ingest")
