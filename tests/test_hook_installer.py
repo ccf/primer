@@ -37,6 +37,11 @@ def test_install_creates_hook(tmp_path):
     assert len(hooks) == 1
     assert hooks[0]["command"] == HOOK_COMMAND
 
+    # PreCompact should also be registered
+    pre_compact = data["hooks"]["PreCompact"]
+    assert len(pre_compact) == 1
+    assert pre_compact[0]["command"] == HOOK_COMMAND
+
 
 def test_install_idempotent(tmp_path):
     settings_path = tmp_path / "settings.json"
@@ -47,6 +52,7 @@ def test_install_idempotent(tmp_path):
 
     data = json.loads(settings_path.read_text())
     assert len(data["hooks"]["SessionEnd"]) == 1
+    assert len(data["hooks"]["PreCompact"]) == 1
 
 
 def test_install_preserves_existing_hooks(tmp_path):
@@ -60,6 +66,7 @@ def test_install_preserves_existing_hooks(tmp_path):
     install(path=settings_path)
     data = json.loads(settings_path.read_text())
     assert len(data["hooks"]["SessionEnd"]) == 2
+    assert len(data["hooks"]["PreCompact"]) == 1
     assert data["other_key"] is True
 
 
@@ -72,6 +79,7 @@ def test_uninstall_removes_hook(tmp_path):
 
     data = json.loads(settings_path.read_text())
     assert len(data["hooks"]["SessionEnd"]) == 0
+    assert len(data["hooks"]["PreCompact"]) == 0
 
 
 def test_uninstall_noop_when_not_installed(tmp_path):

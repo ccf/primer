@@ -108,39 +108,59 @@ def _find_hook_claude(session_end_hooks: list, command: str) -> bool:
 
 
 def _install_claude(settings: dict, config: AgentHookConfig) -> bool:
-    """Add the Primer hook to Claude Code settings. Returns True if already present."""
+    """Add the Primer hook to Claude Code settings. Returns True if already present.
+
+    Registers the hook under both SessionEnd and PreCompact so that long-running
+    sessions are captured incrementally (on each compaction) rather than only at
+    exit.  The server's upsert logic handles repeated ingestion of the same
+    session_id gracefully.
+    """
     hooks = settings.setdefault("hooks", {})
+    already_end = False
+    already_compact = False
+
+    # SessionEnd
     session_end_hooks = hooks.setdefault("SessionEnd", [])
-
     if _find_hook_claude(session_end_hooks, config.hook_command):
-        return True  # already installed
+        already_end = True
+    else:
+        session_end_hooks.append({"command": config.hook_command, "timeout": 10000})
 
-    session_end_hooks.append({"command": config.hook_command, "timeout": 10000})
-    return False
+    # PreCompact — same command, shorter timeout (non-blocking, best-effort)
+    pre_compact_hooks = hooks.setdefault("PreCompact", [])
+    if _find_hook_claude(pre_compact_hooks, config.hook_command):
+        already_compact = True
+    else:
+        pre_compact_hooks.append({"command": config.hook_command, "timeout": 10000})
+
+    return already_end and already_compact
 
 
 def _uninstall_claude(settings: dict, config: AgentHookConfig) -> bool:
     """Remove the Primer hook from Claude Code settings. Returns True if found."""
     hooks = settings.get("hooks", {})
-    session_end_hooks = hooks.get("SessionEnd", [])
+    found = False
 
-    if not _find_hook_claude(session_end_hooks, config.hook_command):
-        return False
+    for event in ("SessionEnd", "PreCompact"):
+        event_hooks = hooks.get(event, [])
+        if _find_hook_claude(event_hooks, config.hook_command):
+            found = True
+            hooks[event] = [
+                h
+                for h in event_hooks
+                if not (
+                    (isinstance(h, dict) and h.get("command") == config.hook_command)
+                    or (isinstance(h, str) and h == config.hook_command)
+                )
+            ]
 
-    hooks["SessionEnd"] = [
-        h
-        for h in session_end_hooks
-        if not (
-            (isinstance(h, dict) and h.get("command") == config.hook_command)
-            or (isinstance(h, str) and h == config.hook_command)
-        )
-    ]
-    return True
+    return found
 
 
 def _status_claude(settings: dict, config: AgentHookConfig) -> bool:
     """Check if Primer hook is installed in Claude Code settings."""
     hooks = settings.get("hooks", {})
+    # Consider installed if at least SessionEnd is registered
     session_end_hooks = hooks.get("SessionEnd", [])
     return _find_hook_claude(session_end_hooks, config.hook_command)
 
