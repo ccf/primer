@@ -389,9 +389,11 @@ def process_session_ingest_job(db: Session, payload: dict[str, Any]) -> None:
     """
     from primer.common.config import settings as app_settings
     from primer.common.schemas import SessionIngestPayload
+    from primer.server.services.alerting_service import send_alert_notifications
 
     engineer_id: str = payload["engineer_id"]
     ingest_payload = SessionIngestPayload.model_validate(payload["ingest_payload"])
+    alert_snapshots: list[dict] = []
 
     try:
         created = upsert_session(db, engineer_id, ingest_payload)
@@ -400,10 +402,7 @@ def process_session_ingest_job(db: Session, payload: dict[str, Any]) -> None:
         # Anomaly detection
         try:
             from primer.common.models import Engineer
-            from primer.server.services.alerting_service import (
-                detect_anomalies,
-                send_alert_notifications,
-            )
+            from primer.server.services.alerting_service import detect_anomalies
 
             engineer = db.query(Engineer).filter(Engineer.id == engineer_id).first()
             team_id = engineer.team_id if engineer else None
@@ -435,9 +434,6 @@ def process_session_ingest_job(db: Session, payload: dict[str, Any]) -> None:
 
         db.commit()
 
-        if alert_snapshots:
-            send_alert_notifications(alert_snapshots)
-
         logger.info(
             "Async ingest %s session %s",
             "created" if created else "updated",
@@ -450,3 +446,12 @@ def process_session_ingest_job(db: Session, payload: dict[str, Any]) -> None:
         )
         db.commit()
         raise
+
+    # Send Slack notifications only after a successful commit and outside the
+    # retry-triggering try block — a notification failure must not cause the
+    # entire ingest job to be retried (producing duplicate alerts/facet jobs).
+    if alert_snapshots:
+        try:
+            send_alert_notifications(alert_snapshots)
+        except Exception:
+            logger.exception("Slack notification failed after successful ingest")
