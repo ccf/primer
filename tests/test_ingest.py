@@ -924,7 +924,7 @@ def test_ingest_session_enqueues_background_job_when_enabled(
     }
     response = client.post("/api/v1/ingest/session", json=payload)
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     data = response.json()
     assert data["status"] == "accepted"
     assert data["session_id"] == session_id
@@ -935,3 +935,5 @@ def test_ingest_session_enqueues_background_job_when_enabled(
     assert job.status == "pending"
     assert job.payload["engineer_id"] == _eng.id
     assert job.payload["ingest_payload"]["session_id"] == session_id
+    # Raw API key must NOT be persisted in the job payload
+    assert "api_key" not in job.payload["ingest_payload"]

@@ -1,6 +1,7 @@
 import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from primer.common.config import settings
@@ -60,17 +61,26 @@ def ingest_session(
 
     # ── Async path: enqueue the heavy work and return immediately ──
     if settings.background_jobs_enabled:
+        # Strip the raw api_key before persisting — engineer_id is already
+        # resolved and the plaintext key must not be stored in the jobs table.
+        serialized = payload.model_dump(mode="json", exclude={"api_key"})
         enqueue_background_job(
             db,
             job_type=JOB_TYPE_SESSION_INGEST,
             payload={
                 "engineer_id": engineer.id,
-                "ingest_payload": payload.model_dump(mode="json"),
+                "ingest_payload": serialized,
             },
             created_by_engineer_id=engineer.id,
         )
         db.commit()
-        return IngestResponse(status="accepted", session_id=payload.session_id, created=False)
+        return Response(
+            content=IngestResponse(
+                status="accepted", session_id=payload.session_id, created=False
+            ).model_dump_json(),
+            status_code=202,
+            media_type="application/json",
+        )
 
     # ── Sync fallback: inline processing when background jobs are disabled ──
     try:
