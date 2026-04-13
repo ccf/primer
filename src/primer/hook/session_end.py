@@ -141,7 +141,7 @@ def main() -> None:
             ),
             timeout=10.0,
         )
-        if resp.status_code == 200:
+        if resp.status_code in (200, 202):
             logger.info(f"Session {session_id} ingested successfully ({agent_type}, {hook_event})")
         else:
             logger.error(f"Ingest failed ({resp.status_code}): {resp.text}")

@@ -16,7 +16,7 @@ from primer.common.schemas import (
 from primer.server.deps import verify_api_key, verify_device_token
 from primer.server.middleware import limiter
 from primer.server.services.background_job_service import (
-    JOB_TYPE_FACET_EXTRACTION,
+    JOB_TYPE_SESSION_INGEST,
     enqueue_background_job,
 )
 from primer.server.services.ingest_service import (
@@ -57,6 +57,22 @@ def ingest_session(
         api_key=payload.api_key,
         device_token=x_device_token,
     )
+
+    # ── Async path: enqueue the heavy work and return immediately ──
+    if settings.background_jobs_enabled:
+        enqueue_background_job(
+            db,
+            job_type=JOB_TYPE_SESSION_INGEST,
+            payload={
+                "engineer_id": engineer.id,
+                "ingest_payload": payload.model_dump(mode="json"),
+            },
+            created_by_engineer_id=engineer.id,
+        )
+        db.commit()
+        return IngestResponse(status="accepted", session_id=payload.session_id, created=False)
+
+    # ── Sync fallback: inline processing when background jobs are disabled ──
     try:
         created = upsert_session(db, engineer.id, payload)
         log_ingest_event(db, engineer.id, "session", payload.session_id, None, "ok")
@@ -75,30 +91,21 @@ def ingest_session(
         except Exception:
             logger.exception("Anomaly detection failed during ingest")
 
-        # Auto-extract facets durably if enabled and not already provided
+        # Auto-extract facets
         if (
             settings.facet_extraction_enabled
             and settings.anthropic_api_key
             and payload.messages
             and not payload.facets
         ):
-            if settings.background_jobs_enabled:
-                enqueue_background_job(
-                    db,
-                    job_type=JOB_TYPE_FACET_EXTRACTION,
-                    payload={"session_id": payload.session_id},
-                    created_by_engineer_id=engineer.id,
-                )
-            else:
-                from primer.server.services.facet_extraction_service import (
-                    extract_and_store_facets_for_session,
-                )
+            from primer.server.services.facet_extraction_service import (
+                extract_and_store_facets_for_session,
+            )
 
-                background_tasks.add_task(extract_and_store_facets_for_session, payload.session_id)
+            background_tasks.add_task(extract_and_store_facets_for_session, payload.session_id)
 
         db.commit()
 
-        # Send Slack notifications only after a successful commit
         if alert_snapshots:
             send_alert_notifications(alert_snapshots)
 

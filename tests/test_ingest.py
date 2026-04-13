@@ -298,15 +298,19 @@ def test_ingest_session_derives_cursor_workflow_profile_from_native_signals(
 def test_ingest_session_auto_extracts_facets_for_codex_transcripts(
     client, engineer_with_key, monkeypatch, db_session
 ):
-    from primer.common.models import BackgroundJob
     from primer.server.routers import ingest as ingest_router
-    from primer.server.services.background_job_service import JOB_TYPE_FACET_EXTRACTION
 
     _eng, api_key = engineer_with_key
     session_id = str(uuid.uuid4())
 
+    observed: list[str] = []
+
     monkeypatch.setattr(ingest_router.settings, "facet_extraction_enabled", True)
     monkeypatch.setattr(ingest_router.settings, "anthropic_api_key", "test-key")
+    monkeypatch.setattr(
+        "primer.server.services.facet_extraction_service.extract_and_store_facets_for_session",
+        lambda incoming_session_id: observed.append(incoming_session_id) or "skipped",
+    )
 
     payload = {
         "session_id": session_id,
@@ -325,13 +329,8 @@ def test_ingest_session_auto_extracts_facets_for_codex_transcripts(
     response = client.post("/api/v1/ingest/session", json=payload)
 
     assert response.status_code == 200
-    job = (
-        db_session.query(BackgroundJob)
-        .filter(BackgroundJob.job_type == JOB_TYPE_FACET_EXTRACTION)
-        .one()
-    )
-    assert job.payload == {"session_id": session_id}
-    assert job.status == "pending"
+    # With background_jobs disabled, facet extraction uses BackgroundTasks
+    assert observed == [session_id]
 
 
 def test_ingest_session_falls_back_to_background_task_when_jobs_disabled(
@@ -900,3 +899,39 @@ def test_ingest_session_with_device_token(client, engineer_with_key, db_session)
 
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+
+
+def test_ingest_session_enqueues_background_job_when_enabled(
+    client, engineer_with_key, db_session, monkeypatch
+):
+    """When background_jobs_enabled is True, the router should enqueue a
+    session_ingest job and return immediately with status 'accepted'."""
+    _eng, api_key = engineer_with_key
+    session_id = str(uuid.uuid4())
+
+    # Re-enable background jobs for this specific test
+    from primer.common.models import BackgroundJob
+    from primer.server.routers import ingest as ingest_router
+
+    monkeypatch.setattr(ingest_router.settings, "background_jobs_enabled", True)
+
+    payload = {
+        "session_id": session_id,
+        "api_key": api_key,
+        "message_count": 5,
+        "user_message_count": 3,
+        "assistant_message_count": 2,
+    }
+    response = client.post("/api/v1/ingest/session", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "accepted"
+    assert data["session_id"] == session_id
+
+    # Verify a background job was enqueued
+    job = db_session.query(BackgroundJob).filter(BackgroundJob.job_type == "session_ingest").first()
+    assert job is not None
+    assert job.status == "pending"
+    assert job.payload["engineer_id"] == _eng.id
+    assert job.payload["ingest_payload"]["session_id"] == session_id

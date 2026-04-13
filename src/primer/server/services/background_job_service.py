@@ -23,6 +23,7 @@ JOB_STATUS_RUNNING = "running"
 JOB_STATUS_SUCCEEDED = "succeeded"
 JOB_STATUS_FAILED = "failed"
 
+JOB_TYPE_SESSION_INGEST = "session_ingest"
 JOB_TYPE_FACET_EXTRACTION = "facet_extract_session"
 JOB_TYPE_FACET_BACKFILL = "facet_backfill"
 JOB_TYPE_NARRATIVE_REFRESH_ALL = "narrative_refresh_all"
@@ -327,6 +328,18 @@ def _mark_job_failed(
 
 
 def _run_job(db: Session | None, job_type: str, payload: dict[str, Any]) -> None:
+    if job_type == JOB_TYPE_SESSION_INGEST:
+        from primer.server.services.ingest_service import process_session_ingest_job
+
+        owns_session = db is None
+        ingest_db = db or SessionLocal()
+        try:
+            process_session_ingest_job(ingest_db, payload)
+        finally:
+            if owns_session:
+                ingest_db.close()
+        return
+
     if job_type == JOB_TYPE_FACET_EXTRACTION:
         from primer.server.services.facet_extraction_service import (
             extract_and_store_facets_for_session,

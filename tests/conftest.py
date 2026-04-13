@@ -37,6 +37,13 @@ def db_session(engine):
     connection.close()
 
 
+@pytest.fixture(autouse=True)
+def _disable_background_jobs_in_tests(monkeypatch):
+    """Tests expect synchronous ingest — disable the background job queue so
+    the ingest router processes inline rather than enqueuing."""
+    monkeypatch.setattr(settings, "background_jobs_enabled", False)
+
+
 @pytest.fixture
 def client(db_session):
     app = create_app()
