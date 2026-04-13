@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -377,3 +378,75 @@ def log_ingest_event(
         )
     )
     db.flush()
+
+
+def process_session_ingest_job(db: Session, payload: dict[str, Any]) -> None:
+    """Background job handler for async session ingestion.
+
+    Receives the full ingest payload (serialised by the router), runs
+    upsert_session, anomaly detection, and facet extraction enqueue —
+    the same work the router previously did inline.
+    """
+    from primer.common.config import settings as app_settings
+    from primer.common.schemas import SessionIngestPayload
+
+    engineer_id: str = payload["engineer_id"]
+    ingest_payload = SessionIngestPayload.model_validate(payload["ingest_payload"])
+
+    try:
+        created = upsert_session(db, engineer_id, ingest_payload)
+        log_ingest_event(db, engineer_id, "session", ingest_payload.session_id, None, "ok")
+
+        # Anomaly detection
+        try:
+            from primer.common.models import Engineer
+            from primer.server.services.alerting_service import (
+                detect_anomalies,
+                send_alert_notifications,
+            )
+
+            engineer = db.query(Engineer).filter(Engineer.id == engineer_id).first()
+            team_id = engineer.team_id if engineer else None
+            _alerts, alert_snapshots = detect_anomalies(
+                db, team_id=team_id, engineer_id=engineer_id
+            )
+        except Exception:
+            logger.exception("Anomaly detection failed during async ingest")
+            alert_snapshots = []
+
+        # Auto-extract facets if enabled and not already provided
+        if (
+            app_settings.facet_extraction_enabled
+            and app_settings.anthropic_api_key
+            and ingest_payload.messages
+            and not ingest_payload.facets
+        ):
+            from primer.server.services.background_job_service import (
+                JOB_TYPE_FACET_EXTRACTION,
+                enqueue_background_job,
+            )
+
+            enqueue_background_job(
+                db,
+                job_type=JOB_TYPE_FACET_EXTRACTION,
+                payload={"session_id": ingest_payload.session_id},
+                created_by_engineer_id=engineer_id,
+            )
+
+        db.commit()
+
+        if alert_snapshots:
+            send_alert_notifications(alert_snapshots)
+
+        logger.info(
+            "Async ingest %s session %s",
+            "created" if created else "updated",
+            ingest_payload.session_id,
+        )
+    except Exception as e:
+        db.rollback()
+        log_ingest_event(
+            db, engineer_id, "session", ingest_payload.session_id, None, "error", str(e)
+        )
+        db.commit()
+        raise
