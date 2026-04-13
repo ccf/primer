@@ -1,11 +1,13 @@
-"""SessionEnd hook entrypoint for AI coding agents.
+"""Session capture hook entrypoint for AI coding agents.
 
 Reads session info from stdin, extracts metadata from the transcript,
-and POSTs it to the Primer server.
+and POSTs it to the Primer server.  Registered on both SessionEnd and
+PreCompact events so that long-running sessions are captured incrementally
+(each compaction triggers an upsert) rather than only at exit.
 
 Usage:
-    This script is invoked by an agent's SessionEnd hook.
-    stdin receives JSON: {"session_id": "...", "transcript_path": "...", "cwd": "..."}
+    This script is invoked by an agent's SessionEnd or PreCompact hook.
+    stdin receives JSON with session_id, transcript_path, cwd, hook_event_name.
 
     --agent flag selects the extractor (default: claude for backward compatibility).
 """
@@ -79,6 +81,7 @@ def main() -> None:
     session_id = hook_input.get("session_id", "")
     transcript_path = hook_input.get("transcript_path", "")
     cwd = hook_input.get("cwd", "")
+    hook_event = hook_input.get("hook_event_name", "SessionEnd")
 
     if not session_id:
         logger.error("No session_id in hook input")
@@ -139,7 +142,7 @@ def main() -> None:
             timeout=10.0,
         )
         if resp.status_code == 200:
-            logger.info(f"Session {session_id} ingested successfully ({agent_type})")
+            logger.info(f"Session {session_id} ingested successfully ({agent_type}, {hook_event})")
         else:
             logger.error(f"Ingest failed ({resp.status_code}): {resp.text}")
     except httpx.RequestError as e:
