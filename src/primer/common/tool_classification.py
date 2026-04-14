@@ -173,3 +173,73 @@ def compute_leverage_score(
     }
 
     return score, breakdown
+
+
+def compute_harness_maturity_score(
+    tool_counts: dict[str, int],
+    cache_hit_rate: float | None = None,
+    model_token_counts: dict[str, int] | None = None,
+    model_tier_counts: dict[str, int] | None = None,
+    delegation_count: int = 0,
+    total_sessions: int = 1,
+    permission_mode_counts: dict[str, int] | None = None,
+) -> tuple[float, dict[str, float]]:
+    """Compute a 0-100 harness maturity score across five dimensions.
+
+    Extends the leverage score with two new harness-specific dimensions:
+    - Context Hygiene (20%): subagent delegation ratio as a proxy for
+      context scoping discipline
+    - Boundary Design (20%): permission mode sophistication — engineers
+      who use plan/auto modes show more intentional boundary config
+
+    The original three dimensions are re-weighted to 20% each (from 33%).
+    Model strategy bonus is preserved.
+
+    Returns (score, breakdown) with all factor values.
+    """
+    # Get the base leverage breakdown for the first three dimensions
+    _, base = compute_leverage_score(
+        tool_counts, cache_hit_rate, model_token_counts, model_tier_counts
+    )
+    if not base:
+        return 0.0, {}
+
+    tool_mastery = base.get("tool_mastery", 0.0)
+    orchestration_depth = base.get("orchestration_depth", 0.0)
+    cache_efficiency = base.get("cache_efficiency", 0.0)
+    model_strategy_bonus_points = base.get("model_strategy_bonus_points", 0.0)
+
+    # --- Context Hygiene (20%) ---
+    # Delegation ratio: what fraction of sessions used subagent delegation?
+    # Higher ratio = better context scoping discipline.
+    delegation_ratio = min(delegation_count / max(total_sessions, 1), 1.0)
+    context_hygiene = delegation_ratio
+
+    # --- Boundary Design (20%) ---
+    # Engineers who intentionally choose permission modes (plan, auto,
+    # bypassPermissions) over the default show more harness sophistication.
+    pmc = permission_mode_counts or {}
+    total_mode_sessions = sum(pmc.values()) or 1
+    intentional_modes = sum(
+        count for mode, count in pmc.items() if mode and mode not in ("default", "", "null")
+    )
+    boundary_design = min(intentional_modes / total_mode_sessions, 1.0)
+
+    base_score = (
+        20.0 * tool_mastery
+        + 20.0 * orchestration_depth
+        + 20.0 * cache_efficiency
+        + 20.0 * context_hygiene
+        + 20.0 * boundary_design
+    )
+    score = round(min(base_score + model_strategy_bonus_points, 100.0), 1)
+
+    breakdown = {
+        **base,
+        "context_hygiene": round(context_hygiene, 3),
+        "delegation_ratio": round(delegation_ratio, 3),
+        "boundary_design": round(boundary_design, 3),
+        "intentional_mode_ratio": round(intentional_modes / total_mode_sessions, 3),
+    }
+
+    return score, breakdown

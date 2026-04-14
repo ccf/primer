@@ -2251,6 +2251,26 @@ class LeverageBreakdown(BaseModel):
     efficiency: float = 0.0
     model_strategy: float = 0.0
     model_strategy_bonus_points: float = 0.0
+    # Harness maturity extensions
+    context_hygiene: float = 0.0
+    delegation_ratio: float = 0.0
+    boundary_design: float = 0.0
+    intentional_mode_ratio: float = 0.0
+
+
+class DeadweightItemResponse(BaseModel):
+    identifier: str
+    customization_type: str
+    reason: str  # "unused", "no_outcome_lift", "zero_invocations"
+    configured_sessions: int
+    invocation_count: int
+    success_rate_with: float | None = None
+    success_rate_without: float | None = None
+
+
+class DeadweightResponse(BaseModel):
+    items: list[DeadweightItemResponse]
+    total_customizations_analyzed: int = 0
 
 
 class EngineerLeverageProfile(BaseModel):
