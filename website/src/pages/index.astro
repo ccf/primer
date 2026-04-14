@@ -8,41 +8,41 @@ const captures = ["Claude Code", "Cursor", "Codex CLI", "Gemini CLI"];
 const chapters = [
   {
     num: "Chapter II",
-    title: "Fingerprint how work <em>actually</em> gets done.",
-    body: "Primer turns noisy sessions into workflow archetypes and fingerprints, then shows which patterns lead to cleaner reviews, stronger merge rates, and better follow-through. It is less a dashboard than a ledger of how your team thinks.",
+    title: "Measure how your harness <em>shapes</em> outcomes.",
+    body: "Primer turns noisy sessions into harness pattern signatures, then shows which tool designs, caching strategies, and orchestration depths lead to cleaner reviews, stronger merge rates, and better follow-through. It is less a dashboard than a ledger of how your team's harness actually performs.",
     bullets: [
-      "Compare workflow archetypes by merge rate, review load, findings, and time to merge.",
-      "See which workflows create quality without overspending.",
-      "Move from raw transcripts to durable workflow evidence.",
+      "Compare harness configurations by merge rate, review load, and cost efficiency.",
+      "See which tool designs and context strategies create quality without overspending.",
+      "Move from usage tracking to harness-level evidence.",
     ],
     plate: "screenshots/readme-quality-dark.png",
-    caption: "Plate I. Quality clustered by workflow archetype.",
+    caption: "Plate I. Quality clustered by harness pattern.",
     layout: "right",
   },
   {
     num: "Chapter III",
-    title: "See cost through the <em>lens</em> of successful workflows.",
-    body: "FinOps becomes useful only when it stops treating model spend as the whole story. Primer shows which workflows are efficient, which are expensive but justified, and where teams are overspending without better outcomes.",
+    title: "See cost through the <em>lens</em> of harness effectiveness.",
+    body: "FinOps becomes useful only when it stops treating model spend as the whole story. Primer shows which harness configurations are efficient, which are expensive but justified, and where caching, boundary design, or orchestration choices are creating unnecessary cost.",
     bullets: [
-      "Break down spend by workflow archetype and fingerprint.",
-      "Tie cost to successful outcomes instead of raw activity.",
-      "Spot when model choice and workflow shape drift apart.",
+      "Break down spend by harness pattern and caching strategy.",
+      "Tie cost to effective harness configurations, not raw activity.",
+      "Spot when boundary design and permission modes create unnecessary friction costs.",
     ],
     plate: "screenshots/readme-finops-dark.png",
-    caption: "Plate II. Spend grouped by archetype, not by model.",
+    caption: "Plate II. Spend grouped by harness pattern, not by model.",
     layout: "left",
   },
   {
     num: "Chapter IV",
-    title: "Turn bright spots into <em>exemplars</em> your team can copy.",
-    body: "Primer surfaces reusable prompts, skills, commands, templates, and exemplar sessions so teams can standardize what is already working inside the org — coaching with evidence, not generic enablement advice.",
+    title: "Turn effective patterns into <em>standards</em> your team can copy.",
+    body: "Primer surfaces the harness configurations behind your best outcomes — tool compositions, MCP stacks, skill setups, caching strategies, and orchestration patterns — so teams can standardize what is already working, not guess at best practices.",
     bullets: [
-      "Promote strong sessions into bright spots and exemplar libraries.",
-      "Find underused high-value assets worth spreading to other teams.",
-      "Coach with evidence instead of generic enablement advice.",
+      "Promote effective harness configurations into reusable templates.",
+      "Find underused tool designs and context strategies worth spreading.",
+      "Coach with harness evidence instead of generic enablement advice.",
     ],
     plate: "screenshots/readme-growth-dark.png",
-    caption: "Plate III. A bright spot promoted into an exemplar.",
+    caption: "Plate III. An effective pattern promoted into a standard.",
     layout: "right",
   },
 ];
@@ -63,15 +63,15 @@ const slugify = (s: string) =>
 const faqs = [
   {
     q: "What is Primer?",
-    a: "Primer is an open-source workflow intelligence platform for agentic engineering teams. It captures session data from Claude Code, Cursor, Codex CLI, and Gemini CLI and turns it into workflow fingerprints, cost and quality proof, exemplar libraries, and measurable experiments — so you can decide which AI coding patterns actually work in your org.",
+    a: "Primer is an open-source agent harness intelligence platform. It captures session data from Claude Code, Cursor, Codex CLI, and Gemini CLI and measures how your agent harness — tool design, context management, caching, orchestration, and permission boundaries — determines outcome quality. It turns that data into harness effectiveness scores, exemplar configurations, coaching, and measurable experiments.",
   },
   {
-    q: "Which AI coding tools does Primer support?",
-    a: "Primer supports Claude Code, Cursor, Codex CLI, and Gemini CLI today. The capture layer is a pluggable extractor registry, so additional agents can be added without changing the analytics pipeline.",
+    q: "What do you mean by 'agent harness'?",
+    a: "The agent harness is everything around the model: which tools are available, how context is managed (subagents, compaction, memory), caching strategy, orchestration depth, and permission boundaries. Research shows that harness design determines outcome quality more than model capability alone. Primer measures each of these dimensions.",
   },
   {
     q: "How is this different from generic AI usage tracking?",
-    a: "Most tools count tokens, sessions, or accepted suggestions. Primer ties workflow patterns to outcomes — PR merge rate, review comments, post-merge quality, friction recovery, and cost per successful change — so you can compare what high performers do differently from struggling engineers and standardize the patterns that work.",
+    a: "Most tools count tokens, sessions, or accepted suggestions. Primer measures how your harness configuration determines outcomes — which tool compositions produce cleaner merges, which caching strategies reduce cost without sacrificing quality, which orchestration patterns correlate with faster follow-through. It lets you standardize what actually works.",
   },
   {
     q: "Is Primer self-hosted?",
@@ -89,10 +89,10 @@ const structuredData = [
     "@type": "SoftwareApplication",
     name: "Primer",
     applicationCategory: "DeveloperApplication",
-    applicationSubCategory: "Engineering Analytics",
+    applicationSubCategory: "Agent Harness Intelligence",
     operatingSystem: "Linux, macOS, Windows",
     description:
-      "Open-source workflow intelligence for agentic engineering. Captures sessions from Claude Code, Cursor, Codex CLI, and Gemini CLI and turns them into workflow fingerprints, quality attribution, cost proof, exemplars, and experiments.",
+      "Open-source agent harness intelligence for engineering teams. Measures how your agent harness — tool design, context management, caching, orchestration, and permission boundaries — determines outcome quality across Claude Code, Cursor, Codex CLI, and Gemini CLI.",
     url: "https://useprimer.dev",
     sameAs: ["https://github.com/ccf/primer"],
     license: "https://opensource.org/licenses/MIT",
@@ -120,8 +120,8 @@ const structuredData = [
 ---
 
 <BaseLayout
-  title="Primer — Workflow Intelligence for Agentic Engineering"
-  description="See which AI workflows actually work. Primer turns session telemetry into workflow intelligence, cost and quality proof, exemplars, and experiments for agentic engineering teams."
+  title="Primer — Agent Harness Intelligence for Engineering Teams"
+  description="See which agent harness patterns actually work. Primer measures how tool design, context management, caching, orchestration, and permission boundaries determine outcome quality for agentic engineering teams."
   structuredData={structuredData}
   forceLight
 >
@@ -131,13 +131,13 @@ const structuredData = [
       <div class="eyebrow reveal" style="--delay: 0ms"><span>Chapter I &nbsp;·&nbsp; The Primer</span></div>
 
       <h1 class="hero-title reveal" style="--delay: 80ms">
-        See which<br>
-        AI workflows<br>
+        See which agent<br>
+        harness patterns<br>
         <em>actually work.</em>
       </h1>
 
       <p class="hero-lede has-dropcap reveal" style="--delay: 180ms">
-        Primer reads the working notes of your engineering team — every session with Claude Code, Cursor, Codex and Gemini — and quietly turns that telemetry into fingerprints, quality attribution, cost proof, exemplars, and measurable experiments.
+        Primer reads the working notes of your engineering team — every session with Claude Code, Cursor, Codex and Gemini — and measures how your agent harness determines outcome quality. Tool design, context management, caching, orchestration, permission boundaries: it turns each dimension into evidence your team can act on.
       </p>
 
       <div class="hero-actions reveal" style="--delay: 260ms">
@@ -248,7 +248,7 @@ const structuredData = [
     <div class="pullquote-inner">
       <div class="pullquote-mark">&ldquo;</div>
       <q>
-        Knowing which engineers ship more is easy. Knowing <em>how</em> they think, which patterns matter, and which assets to copy across the org — that is the question Primer is written to answer.
+        Knowing which engineers ship more is easy. Knowing which harness patterns — tool designs, caching strategies, context boundaries — <em>compound</em> their effectiveness, and which are dead weight, is the question Primer is written to answer.
       </q>
       <div class="pullquote-attrib">— From the Primer field guide</div>
     </div>
