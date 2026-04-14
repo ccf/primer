@@ -1,6 +1,6 @@
 # Product Flow
 
-Primer is no longer a passive analytics dashboard. It is a closed-loop workflow intelligence
+Primer is no longer a passive analytics dashboard. It is a closed-loop harness intelligence
 product for agentic engineering teams:
 
 1. Capture what happened in AI-assisted work.

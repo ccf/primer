@@ -2,7 +2,7 @@
 
 ## System Overview
 
-Primer is a multi-surface workflow intelligence platform for agentic engineering:
+Primer is a multi-surface harness intelligence platform for agentic engineering:
 
 ```
 ┌──────────────────────────────┐
