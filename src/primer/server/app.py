@@ -22,6 +22,7 @@ from primer.server.routers import (
     engineers,
     explorer,
     finops,
+    harness,
     health,
     ingest,
     interventions,
@@ -187,6 +188,7 @@ def create_app() -> FastAPI:
     app.include_router(webhooks.router)
     app.include_router(explorer.router)
     app.include_router(finops.router)
+    app.include_router(harness.router)
 
     if settings.demo_mode:
         # Keep the demo instance out of search indexes. Pairs with the
