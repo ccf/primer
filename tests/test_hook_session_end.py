@@ -83,16 +83,54 @@ def test_main_missing_session_id(monkeypatch):
     assert exc_info.value.code == 1
 
 
-def test_main_rejects_cursor_agent_flag(monkeypatch):
+@patch("primer.hook.session_end.httpx.post")
+@patch("primer.hook.session_end.get_extractor_for")
+def test_main_cursor_agent_accepted(mock_get_extractor, mock_post, monkeypatch):
+    """Cursor is a supported agent — verify the hook processes it successfully."""
     monkeypatch.setenv("PRIMER_API_KEY", "test-key")
-    monkeypatch.setattr("sys.stdin", _make_stdin({"session_id": "cursor-1"}))
+    monkeypatch.setenv("PRIMER_SERVER_URL", "http://test:8000")
+    monkeypatch.setattr(
+        "sys.stdin",
+        _make_stdin({"session_id": "cursor-1", "transcript_path": "", "cwd": "/workspace"}),
+    )
     monkeypatch.setattr("sys.argv", ["session_end", "--agent", "cursor"])
+
+    mock_get_extractor.return_value = None
+    mock_post.return_value = MagicMock(status_code=202)
 
     from primer.hook.session_end import main
 
-    with pytest.raises(SystemExit) as exc_info:
-        main()
-    assert exc_info.value.code == 2
+    main()
+
+    mock_post.assert_called_once()
+    call_json = mock_post.call_args.kwargs["json"]
+    assert call_json["agent_type"] == "cursor"
+    assert call_json["session_id"] == "cursor-1"
+
+
+def test_main_cursor_billing_mode_api_key(monkeypatch):
+    """Cursor billing mode detects OPENAI_API_KEY."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    from primer.hook.session_end import _detect_billing_mode
+
+    assert _detect_billing_mode("cursor") == "api_key"
+
+
+def test_main_cursor_billing_mode_anthropic_key(monkeypatch):
+    """Cursor billing mode also detects ANTHROPIC_API_KEY (Cursor supports both)."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    from primer.hook.session_end import _detect_billing_mode
+
+    assert _detect_billing_mode("cursor") == "api_key"
+
+
+def test_main_cursor_billing_mode_subscription(monkeypatch):
+    """Without API keys, Cursor defaults to subscription."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    from primer.hook.session_end import _detect_billing_mode
+
+    assert _detect_billing_mode("cursor") == "subscription"
 
 
 @patch("primer.hook.session_end.httpx.post")
