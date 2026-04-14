@@ -49,6 +49,40 @@ _FRICTION_FIXES: dict[str, str] = {
 }
 
 
+def _build_deadweight_section(
+    db: Session,
+    *,
+    engineer_id: str | None = None,
+    team_id: str | None = None,
+) -> CoachingSection:
+    """Build a 'What you can stop doing' section from dead weight detection."""
+    try:
+        from primer.server.services.deadweight_service import detect_deadweight
+
+        items_found = detect_deadweight(
+            db, engineer_id=engineer_id, team_id=team_id, min_sessions=3
+        )
+    except Exception:
+        return CoachingSection(title="What you can stop doing", items=[])
+
+    items = []
+    for dw in items_found[:3]:
+        if dw.reason == "zero_invocations":
+            items.append(
+                f"**{dw.identifier}** ({dw.customization_type}) is configured in "
+                f"{dw.configured_sessions} sessions but never invoked. "
+                f"Consider removing it to reduce context overhead."
+            )
+        elif dw.reason == "no_outcome_lift":
+            items.append(
+                f"**{dw.identifier}** ({dw.customization_type}) doesn't improve outcomes — "
+                f"success rate with: {dw.success_rate_with:.0%}, "
+                f"baseline: {dw.success_rate_without:.0%}. "
+                f"Consider whether it's still needed."
+            )
+    return CoachingSection(title="What you can stop doing", items=items)
+
+
 def _build_friction_section(friction_data) -> CoachingSection:
     items = []
     # Sort by count descending, take top 3
@@ -142,13 +176,20 @@ def get_coaching_brief(
         None,
     )
 
+    sections = [
+        _build_friction_section(friction),
+        _build_skills_section(profile, tips),
+        _build_recommendations(tips, config),
+    ]
+
+    # Subtractive coaching: "What you can stop doing"
+    deadweight_section = _build_deadweight_section(db, engineer_id=engineer_id, team_id=team_id)
+    if deadweight_section.items:
+        sections.append(deadweight_section)
+
     return CoachingBrief(
         status_summary=_build_status(overview, profile),
-        sections=[
-            _build_friction_section(friction),
-            _build_skills_section(profile, tips),
-            _build_recommendations(tips, config),
-        ],
+        sections=sections,
         sessions_analyzed=overview.total_sessions,
         generated_at=now.isoformat(),
     )
