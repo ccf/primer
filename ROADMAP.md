@@ -232,8 +232,8 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 
 ## Website & Positioning
 
-- [x] [P1] Reposition the website around workflow intelligence for agentic engineering
-- [x] [P1] Showcase workflow cost, quality, compare mode, and exemplar sessions as the core proof points
+- [x] [P1] Reposition the website around harness intelligence for agentic engineering
+- [x] [P1] Showcase harness effectiveness, cost attribution, quality, and exemplar sessions as the core proof points
 
 ## Interventions & Experimentation
 

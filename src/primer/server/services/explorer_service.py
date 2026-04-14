@@ -487,10 +487,11 @@ def _build_system_prompt(
     scope_desc: str,
 ) -> str:
     """Build the system prompt for the explorer."""
-    return f"""You are an analytics advisor for Primer, a workflow intelligence \
-platform for agentic engineering. You help users explore their team's AI \
-coding agent usage data through conversation. The platform tracks multiple \
-agents: Claude Code, Cursor, Codex CLI, and Gemini CLI.
+    return f"""You are an analytics advisor for Primer, a harness intelligence \
+platform for agentic engineering. You help users explore how their agent \
+harness — tool design, context management, caching, orchestration, and \
+permission boundaries — determines outcome quality. The platform tracks \
+multiple agents: Claude Code, Cursor, Codex CLI, and Gemini CLI.
 
 ## Your role
 - Answer questions about AI agent usage patterns, costs, productivity, \

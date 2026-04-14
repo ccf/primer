@@ -19,7 +19,7 @@ from primer.mcp.tools import (
     primer_team_overview,
 )
 
-mcp = FastMCP("primer", instructions="Primer: Claude Code usage insights for your team")
+mcp = FastMCP("primer", instructions="Primer: agent harness intelligence for your team")
 
 
 @mcp.tool()

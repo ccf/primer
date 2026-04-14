@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "primer"
 version = "0.2.0"
-description = "Aggregate Claude Code usage insights across an engineering organization"
+description = "Agent harness intelligence — measure what makes your AI coding tools effective"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.0",

@@ -8,11 +8,12 @@ hide:
 
 # Primer
 
-**Workflow intelligence for agentic engineering.**
+**Agent harness intelligence for engineering teams.**
 
-Primer captures work across Claude Code, Cursor, Codex CLI, and Gemini CLI, then turns that
-telemetry into workflow fingerprints, quality attribution, cost proof, exemplars, and experiments
-your team can standardize.
+Primer captures work across Claude Code, Cursor, Codex CLI, and Gemini CLI, then measures how
+your agent harness — tool design, context management, caching, orchestration, and permission
+boundaries — determines outcome quality. It turns that telemetry into harness effectiveness
+scores, quality attribution, cost proof, exemplars, and experiments your team can standardize.
 
 <div class="primer-buttons">
   <a href="getting-started/" class="primary">Get Started</a>
@@ -26,9 +27,9 @@ your team can standardize.
 <div class="primer-features" markdown>
 
 <div class="feature" markdown>
-### Workflow Intelligence
-Fingerprint sessions into repeatable workflows and see which patterns are tied to better merge
-rates, fewer review findings, and lower cost per success.
+### Harness Intelligence
+Measure how your agent harness shapes outcomes — which tool designs, context strategies, and
+caching patterns are tied to better merge rates, fewer review findings, and lower cost per success.
 </div>
 
 <div class="feature" markdown>

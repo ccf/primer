@@ -39,13 +39,14 @@
 
 Your team adopted AI coding tools. Now you need to know what to standardize.
 
-Primer is an open-source workflow intelligence platform for agentic engineering. It captures
+Primer is an open-source agent harness intelligence platform for engineering teams. It captures
 session data from [Claude Code](https://docs.anthropic.com/en/docs/claude-code),
 [Codex CLI](https://github.com/openai/codex),
-[Gemini CLI](https://github.com/google-gemini/gemini-cli), and Cursor, then turns that telemetry
-into workflow fingerprints, quality attribution, cost proof, exemplar sessions, project playbook
-templates, post-merge outcomes, coaching, and experiments. Self-hosted. Privacy-first. Your data
-never leaves your network.
+[Gemini CLI](https://github.com/google-gemini/gemini-cli), and Cursor, then measures how your
+agent harness — tool design, context management, caching, orchestration, and permission
+boundaries — determines outcome quality. It turns that telemetry into harness effectiveness
+scores, quality attribution, cost proof, exemplar sessions, coaching, and experiments.
+Self-hosted. Privacy-first. Your data never leaves your network.
 
 ## Questions Primer Answers
 
@@ -76,9 +77,10 @@ never leaves your network.
 
 ## What Makes This Different
 
-**Workflow intelligence, not just usage tracking.** Primer links workflow fingerprint to quality,
-cost, reusable assets, and interventions so you can decide which patterns should be standardized
-across the org.
+**Harness intelligence, not just usage tracking.** Primer measures how your agent harness
+configuration — tool design, caching strategy, orchestration depth, context management, and
+permission boundaries — determines outcome quality. It links harness patterns to merge rates,
+review quality, cost, and reusable assets so you can decide which configurations to standardize.
 
 **Friction analysis, not just error counting.** Primer doesn't just count failures. It classifies
 *why* sessions fail, what engineers tried next, and which recoveries actually worked. You learn

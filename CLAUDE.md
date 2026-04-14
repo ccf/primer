@@ -1,6 +1,6 @@
 # Primer
 
-AI engineering intelligence platform for agentic teams.
+Agent harness intelligence platform — measures how tool design, context management, caching, orchestration, and permission boundaries determine outcome quality for agentic engineering teams.
 
 ## Key Paths
 
@@ -157,7 +157,7 @@ cd frontend && npx tsc -b --noEmit  # Type check
 - **GitHub Integration**: App-based PR/commit fetching, AI readiness scoring (CLAUDE.md, AGENTS.md detection)
 - **Review Findings**: Extensible parser registry (`@register_parser` decorator) for automated review bot comments (BugBot); fetches issue comments, PR review comments, and review bodies; upsert with unique constraint deduplication
 - **FinOps**: Cache savings via per-model pricing deltas, cost modeling (API vs subscription tiers), linear regression forecasting, budget burn-rate tracking
-- **Workflow Intelligence**: Derived workflow profiles, project workflow fingerprints, workflow playbooks, and workflow-based quality attribution
+- **Harness Intelligence**: Derived workflow profiles, project workflow fingerprints, workflow playbooks, harness maturity scoring, dead weight detection, and harness-based quality attribution
 
 ## Conventions
 
