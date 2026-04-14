@@ -111,6 +111,7 @@ def test_main_cursor_agent_accepted(mock_get_extractor, mock_post, monkeypatch):
 def test_main_cursor_billing_mode_api_key(monkeypatch):
     """Cursor billing mode detects OPENAI_API_KEY."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     from primer.hook.session_end import _detect_billing_mode
 
     assert _detect_billing_mode("cursor") == "api_key"
@@ -118,6 +119,7 @@ def test_main_cursor_billing_mode_api_key(monkeypatch):
 
 def test_main_cursor_billing_mode_anthropic_key(monkeypatch):
     """Cursor billing mode also detects ANTHROPIC_API_KEY (Cursor supports both)."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
     from primer.hook.session_end import _detect_billing_mode
 
