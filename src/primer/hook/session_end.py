@@ -30,12 +30,14 @@ logger = logging.getLogger(__name__)
 # Maps CLI agent names to extractor registry keys
 AGENT_MAP: dict[str, str] = {
     "claude": "claude_code",
+    "cursor": "cursor",
     "gemini": "gemini_cli",
 }
 
 # Environment variables used to detect billing mode per agent
 BILLING_ENV_KEYS: dict[str, list[str]] = {
     "claude": ["ANTHROPIC_API_KEY"],
+    "cursor": ["OPENAI_API_KEY", "ANTHROPIC_API_KEY"],
     "gemini": ["GOOGLE_API_KEY", "GEMINI_API_KEY"],
 }
 
