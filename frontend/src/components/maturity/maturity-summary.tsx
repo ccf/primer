@@ -11,9 +11,9 @@ export function MaturitySummary({ data }: MaturitySummaryProps) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
       <StatCard
-        label="Avg Leverage Score"
+        label="Harness Maturity"
         value={data.avg_leverage_score.toFixed(1)}
-        subtitle="0-100 composite score"
+        subtitle="Tool design, caching, orchestration, context, boundaries"
         icon={Sparkles}
       />
       <StatCard

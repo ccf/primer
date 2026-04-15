@@ -70,13 +70,13 @@ export function DeepDiveCards({ teamId, startDate, endDate }: DeepDiveCardsProps
         <DeepDiveCard
           to="/maturity"
           icon={TrendingUp}
-          title="AI Maturity"
+          title="Harness Health"
           iconColor="text-blue-600 dark:text-blue-400"
           iconBg="bg-blue-500/10"
           metrics={[
             { label: "Adoption", value: prod ? `${prod.adoption_rate.toFixed(0)}%` : "-" },
             {
-              label: "Avg Leverage",
+              label: "Harness Maturity",
               value:
                 maturity?.avg_leverage_score != null
                   ? maturity.avg_leverage_score.toFixed(1)
