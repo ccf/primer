@@ -1832,6 +1832,26 @@ export interface LeverageBreakdown {
   efficiency: number
   model_strategy: number
   model_strategy_bonus_points: number
+  // Harness maturity extensions
+  context_hygiene: number
+  delegation_ratio: number
+  boundary_design: number
+  intentional_mode_ratio: number
+}
+
+export interface DeadweightItem {
+  identifier: string
+  customization_type: string
+  reason: "zero_invocations" | "no_outcome_lift"
+  configured_sessions: number
+  invocation_count: number
+  success_rate_with: number | null
+  success_rate_without: number | null
+}
+
+export interface DeadweightResponse {
+  items: DeadweightItem[]
+  total_customizations_analyzed: number
 }
 
 export interface EngineerLeverageProfile {

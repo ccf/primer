@@ -54,8 +54,8 @@ export function MaturityPage({ teamId, dateRange }: MaturityPageProps) {
     <div className="space-y-6">
       <PageHeader
         icon={TrendingUp}
-        title="AI Maturity"
-        description="Adoption, leverage, and tool proficiency"
+        title="Harness Intelligence"
+        description="How your agent harness drives outcomes"
       />
 
       <PageTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
