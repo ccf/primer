@@ -351,9 +351,7 @@ def get_maturity_analytics(
     # 2a. Pre-compute per-engineer harness dimensions
     # Delegation counts (context hygiene proxy)
     eng_delegation_counts: dict[str, int] = {}
-    eng_session_counts: dict[str, int] = {}
-    for _sid, (eid, _) in session_engineer.items():
-        eng_session_counts[eid] = eng_session_counts.get(eid, 0) + 1
+    # eng_session_counts already computed at line ~274 via DB query
     delegation_rows = (
         db.query(
             SessionModel.engineer_id,
