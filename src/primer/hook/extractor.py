@@ -7,12 +7,13 @@ backward-compatible aliases.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import subprocess
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -501,7 +502,13 @@ class ClaudeCodeExtractor:
         return Path.home() / ".claude"
 
     def discover_sessions(self) -> list:
-        """Discover Claude Code sessions from ~/.claude/usage-data/session-meta/."""
+        """Discover Claude Code sessions from ~/.claude/usage-data/session-meta/.
+
+        Uses session-meta JSON files as the primary discovery source. If a JSONL
+        transcript exists, it's used for richer extraction; otherwise the meta
+        JSON itself provides enough data (tool counts, tokens, duration, etc.)
+        for a meaningful session ingest.
+        """
         from primer.mcp.reader import LocalSession
 
         data_dir = self.get_data_dir()
@@ -523,15 +530,17 @@ class ClaudeCodeExtractor:
 
             project_path = meta.get("project_path")
             transcript_path = self._find_transcript(projects_dir, session_id, project_path)
-            if not transcript_path:
-                continue
+
+            # Use the JSONL transcript if available, otherwise fall back to
+            # the session-meta JSON which has enough data for ingestion.
+            effective_path = str(transcript_path) if transcript_path else str(meta_file)
 
             facets_path = facets_dir / f"{session_id}.json"
             has_facets = facets_path.exists()
             results.append(
                 LocalSession(
                     session_id=session_id,
-                    transcript_path=str(transcript_path),
+                    transcript_path=effective_path,
                     facets_path=str(facets_path) if has_facets else None,
                     has_facets=has_facets,
                     project_path=project_path,
@@ -541,7 +550,62 @@ class ClaudeCodeExtractor:
         return results
 
     def extract(self, transcript_path: str) -> SessionMetadata:
+        path = Path(transcript_path)
+        # Session-meta JSON files (fallback when JSONL transcript is unavailable)
+        if path.suffix == ".json" and path.parent.name == "session-meta":
+            return self._extract_from_session_meta(path)
         return extract_from_jsonl(transcript_path)
+
+    @staticmethod
+    def _extract_from_session_meta(meta_path: Path) -> SessionMetadata:
+        """Build SessionMetadata from a session-meta JSON file.
+
+        Claude Code writes these alongside each session with tool counts,
+        token usage, duration, and other summary stats — enough for a
+        meaningful ingest even without the full transcript.
+        """
+        try:
+            with open(meta_path) as f:
+                meta = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return SessionMetadata()
+
+        started_at = None
+        if meta.get("start_time"):
+            with contextlib.suppress(ValueError, TypeError):
+                started_at = datetime.fromisoformat(meta["start_time"].replace("Z", "+00:00"))
+
+        duration_minutes = meta.get("duration_minutes")
+        duration_seconds = duration_minutes * 60.0 if duration_minutes else None
+
+        ended_at = None
+        if started_at and duration_seconds:
+            ended_at = started_at + timedelta(seconds=duration_seconds)
+
+        tool_counts = meta.get("tool_counts", {})
+        tool_call_count = sum(tool_counts.values()) if tool_counts else 0
+
+        sm = SessionMetadata(
+            session_id=meta.get("session_id", meta_path.stem),
+            project_path=meta.get("project_path", ""),
+            project_name=Path(meta.get("project_path", "")).name
+            if meta.get("project_path")
+            else "",
+            agent_type="claude_code",
+            started_at=started_at,
+            ended_at=ended_at,
+            duration_seconds=duration_seconds,
+            message_count=meta.get("user_message_count", 0)
+            + meta.get("assistant_message_count", 0),
+            user_message_count=meta.get("user_message_count", 0),
+            assistant_message_count=meta.get("assistant_message_count", 0),
+            tool_call_count=tool_call_count,
+            tool_counts=tool_counts,
+            input_tokens=meta.get("input_tokens", 0),
+            output_tokens=meta.get("output_tokens", 0),
+            first_prompt=meta.get("first_prompt", ""),
+        )
+        return sm
 
     @staticmethod
     def _find_transcript(
