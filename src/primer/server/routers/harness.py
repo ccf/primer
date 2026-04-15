@@ -32,8 +32,13 @@ def get_deadweight(
         resolved_engineer_id = auth.engineer_id
         resolved_team_id = None
     elif auth.role == "team_lead":
-        if engineer_id and engineer_id != auth.engineer_id:
-            raise HTTPException(status_code=403, detail="Cannot view another team's data")
+        if engineer_id:
+            from primer.common.models import Engineer
+
+            eng = db.query(Engineer).filter(Engineer.id == engineer_id).first()
+            if not eng or eng.team_id != auth.team_id:
+                raise HTTPException(status_code=403, detail="Engineer is not on your team")
+            resolved_engineer_id = engineer_id
         resolved_team_id = auth.team_id
     # admin: no restrictions
 
