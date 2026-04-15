@@ -85,7 +85,7 @@ export function AdminPerformanceTab({
             icon={GitPullRequest}
           />
           <StatCard
-            label="Avg Leverage"
+            label="Harness Maturity"
             value={maturity.avg_leverage_score.toFixed(1)}
             subtitle={formatPercent(maturity.orchestration_adoption_rate)}
             icon={TrendingUp}

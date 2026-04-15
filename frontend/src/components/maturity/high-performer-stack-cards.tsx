@@ -68,7 +68,7 @@ export function HighPerformerStackCards({
               </div>
               <div className="rounded-2xl border border-border/60 bg-muted/30 p-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Avg Leverage
+                  Harness Maturity
                 </p>
                 <p className="mt-1 font-display text-2xl">{stack.avg_leverage_score.toFixed(1)}</p>
               </div>
