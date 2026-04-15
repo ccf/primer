@@ -48,7 +48,6 @@ from primer.common.tool_classification import (
     CATEGORIES,
     classify_tool,
     classify_tools,
-    compute_harness_maturity_score,
     compute_leverage_score,
 )
 from primer.server.services.agent_team_service import classify_agent_team_from_edges
@@ -374,7 +373,9 @@ def get_maturity_analytics(
         .all()
     )
     for eid, mode, count in perm_rows:
-        eng_permission_modes.setdefault(eid, {})[mode or "default"] = int(count)
+        key = mode or "default"
+        modes = eng_permission_modes.setdefault(eid, {})
+        modes[key] = modes.get(key, 0) + int(count)
 
     # 2. Per-engineer leverage + effectiveness profiles
     engineer_profiles: list[EngineerLeverageProfile] = []
@@ -400,18 +401,18 @@ def get_maturity_analytics(
         score, breakdown = compute_leverage_score(
             dict(tools), cache_rate, model_tokens or None, model_tier_tokens or None
         )
-        # Compute the 5-factor harness maturity score (superset of leverage)
-        _harness_score, harness_breakdown = compute_harness_maturity_score(
-            dict(tools),
-            cache_rate,
-            model_tokens or None,
-            model_tier_tokens or None,
-            delegation_count=eng_delegation_counts.get(eid, 0),
-            total_sessions=eng_session_counts.get(eid, 1),
-            permission_mode_counts=eng_permission_modes.get(eid),
-        )
-        # Merge harness-specific fields into the leverage breakdown
-        breakdown.update({k: v for k, v in harness_breakdown.items() if k not in breakdown})
+        # Compute harness-specific dimensions inline (avoids redundant
+        # leverage score re-computation inside compute_harness_maturity_score)
+        total_eng_sessions = max(eng_session_counts.get(eid, 1), 1)
+        delegation_ratio = min(eng_delegation_counts.get(eid, 0) / total_eng_sessions, 1.0)
+        pmc = eng_permission_modes.get(eid, {})
+        total_mode_sessions = sum(pmc.values()) or 1
+        intentional_modes = sum(c for m, c in pmc.items() if m and m not in ("default", "", "null"))
+        boundary_design = min(intentional_modes / total_mode_sessions, 1.0)
+        breakdown["context_hygiene"] = round(delegation_ratio, 3)
+        breakdown["delegation_ratio"] = round(delegation_ratio, 3)
+        breakdown["boundary_design"] = round(boundary_design, 3)
+        breakdown["intentional_mode_ratio"] = round(intentional_modes / total_mode_sessions, 3)
         all_leverage_scores.append(score)
         all_model_diversities.append(breakdown.get("model_diversity", 0.0))
 
