@@ -45,7 +45,7 @@ def detect_deadweight(
     team_id: str | None = None,
     engineer_id: str | None = None,
     min_sessions: int = 5,
-) -> list[DeadweightItem]:
+) -> tuple[list[DeadweightItem], int]:
     """Find customizations that are configured but add no measurable value.
 
     Flags:
@@ -54,6 +54,8 @@ def detect_deadweight(
 
     Requires at least `min_sessions` with the customization to avoid
     flagging rarely-seen items on insufficient data.
+
+    Returns (flagged_items, total_customizations_analyzed).
     """
     from primer.common.models import Engineer
 
@@ -65,7 +67,7 @@ def detect_deadweight(
         base_q = base_q.join(Engineer).filter(Engineer.team_id == team_id)
     session_ids = base_q.subquery()
 
-    # Get all customizations across matching sessions
+    # Get all customizations across matching sessions (with min_sessions threshold)
     customization_rows = (
         db.query(
             SessionCustomization.identifier,
@@ -79,21 +81,9 @@ def detect_deadweight(
         .all()
     )
 
+    total_analyzed = len(customization_rows)
     if not customization_rows:
-        return []
-
-    # Pre-compute overall success rate for comparison
-    all_outcomes = (
-        db.query(SessionFacets.outcome)
-        .filter(
-            SessionFacets.session_id.in_(db.query(session_ids.c.id)),
-            SessionFacets.outcome.isnot(None),
-        )
-        .all()
-    )
-    total_with_outcome = len(all_outcomes)
-    total_success = sum(1 for (o,) in all_outcomes if is_success_outcome(o))
-    baseline_success_rate = total_success / total_with_outcome if total_with_outcome else None
+        return [], 0
 
     items: list[DeadweightItem] = []
 
@@ -103,23 +93,7 @@ def detect_deadweight(
         session_count = int(row.session_count)
         total_invocations = int(row.total_invocations or 0)
 
-        # Flag 1: zero invocations
-        if total_invocations == 0:
-            items.append(
-                DeadweightItem(
-                    identifier=identifier,
-                    customization_type=ctype,
-                    reason="zero_invocations",
-                    configured_sessions=session_count,
-                    invocation_count=0,
-                    success_rate_with=None,
-                    success_rate_without=baseline_success_rate,
-                )
-            )
-            continue
-
-        # Flag 2: no outcome lift
-        # Get success rate for sessions WITH this customization
+        # Sessions WITH this customization
         sessions_with = (
             db.query(SessionCustomization.session_id)
             .filter(
@@ -129,6 +103,40 @@ def detect_deadweight(
             )
             .subquery()
         )
+
+        # Flag 1: zero invocations
+        if total_invocations == 0:
+            # Compute true counterfactual: success rate for sessions WITHOUT
+            outcomes_without = (
+                db.query(SessionFacets.outcome)
+                .filter(
+                    SessionFacets.session_id.in_(db.query(session_ids.c.id)),
+                    ~SessionFacets.session_id.in_(db.query(sessions_with.c.session_id)),
+                    SessionFacets.outcome.isnot(None),
+                )
+                .all()
+            )
+            count_without = len(outcomes_without)
+            success_without = sum(1 for (o,) in outcomes_without if is_success_outcome(o))
+            rate_without = success_without / count_without if count_without else None
+
+            items.append(
+                DeadweightItem(
+                    identifier=identifier,
+                    customization_type=ctype,
+                    reason="zero_invocations",
+                    configured_sessions=session_count,
+                    invocation_count=0,
+                    success_rate_with=None,
+                    success_rate_without=round(rate_without, 3)
+                    if rate_without is not None
+                    else None,
+                )
+            )
+            continue
+
+        # Flag 2: no outcome lift
+        # Success rate for sessions WITH this customization
         outcomes_with = (
             db.query(SessionFacets.outcome)
             .filter(
@@ -141,11 +149,21 @@ def detect_deadweight(
         success_with = sum(1 for (o,) in outcomes_with if is_success_outcome(o))
         rate_with = success_with / count_with if count_with >= min_sessions else None
 
-        if (
-            rate_with is not None
-            and baseline_success_rate is not None
-            and rate_with <= baseline_success_rate
-        ):
+        # True counterfactual: success rate for sessions WITHOUT this customization
+        outcomes_without = (
+            db.query(SessionFacets.outcome)
+            .filter(
+                SessionFacets.session_id.in_(db.query(session_ids.c.id)),
+                ~SessionFacets.session_id.in_(db.query(sessions_with.c.session_id)),
+                SessionFacets.outcome.isnot(None),
+            )
+            .all()
+        )
+        count_without = len(outcomes_without)
+        success_without = sum(1 for (o,) in outcomes_without if is_success_outcome(o))
+        rate_without = success_without / count_without if count_without >= min_sessions else None
+
+        if rate_with is not None and rate_without is not None and rate_with <= rate_without:
             items.append(
                 DeadweightItem(
                     identifier=identifier,
@@ -154,8 +172,8 @@ def detect_deadweight(
                     configured_sessions=session_count,
                     invocation_count=total_invocations,
                     success_rate_with=round(rate_with, 3),
-                    success_rate_without=round(baseline_success_rate, 3),
+                    success_rate_without=round(rate_without, 3),
                 )
             )
 
-    return sorted(items, key=lambda x: x.configured_sessions, reverse=True)
+    return sorted(items, key=lambda x: x.configured_sessions, reverse=True), total_analyzed
