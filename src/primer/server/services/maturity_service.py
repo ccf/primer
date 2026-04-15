@@ -48,6 +48,7 @@ from primer.common.tool_classification import (
     CATEGORIES,
     classify_tool,
     classify_tools,
+    compute_harness_maturity_score,
     compute_leverage_score,
 )
 from primer.server.services.agent_team_service import classify_agent_team_from_edges
@@ -347,6 +348,36 @@ def get_maturity_analytics(
         else:
             eng_cost_per_success[eid] = None
 
+    # 2a. Pre-compute per-engineer harness dimensions
+    # Delegation counts (context hygiene proxy)
+    eng_delegation_counts: dict[str, int] = {}
+    eng_session_counts: dict[str, int] = {}
+    for _sid, (eid, _) in session_engineer.items():
+        eng_session_counts[eid] = eng_session_counts.get(eid, 0) + 1
+    delegation_rows = (
+        db.query(
+            SessionModel.engineer_id,
+            func.sum(SessionWorkflowProfile.delegation_count).label("total_delegations"),
+        )
+        .join(SessionWorkflowProfile, SessionWorkflowProfile.session_id == SessionModel.id)
+        .filter(SessionModel.id.in_(db.query(session_id_subq.c.id)))
+        .group_by(SessionModel.engineer_id)
+        .all()
+    )
+    for row in delegation_rows:
+        eng_delegation_counts[row.engineer_id] = int(row.total_delegations or 0)
+
+    # Permission mode distribution (boundary design proxy)
+    eng_permission_modes: dict[str, dict[str, int]] = {}
+    perm_rows = (
+        db.query(SessionModel.engineer_id, SessionModel.permission_mode, func.count())
+        .filter(SessionModel.id.in_(db.query(session_id_subq.c.id)))
+        .group_by(SessionModel.engineer_id, SessionModel.permission_mode)
+        .all()
+    )
+    for eid, mode, count in perm_rows:
+        eng_permission_modes.setdefault(eid, {})[mode or "default"] = int(count)
+
     # 2. Per-engineer leverage + effectiveness profiles
     engineer_profiles: list[EngineerLeverageProfile] = []
     engineers_using_orchestration = 0
@@ -371,6 +402,18 @@ def get_maturity_analytics(
         score, breakdown = compute_leverage_score(
             dict(tools), cache_rate, model_tokens or None, model_tier_tokens or None
         )
+        # Compute the 5-factor harness maturity score (superset of leverage)
+        _harness_score, harness_breakdown = compute_harness_maturity_score(
+            dict(tools),
+            cache_rate,
+            model_tokens or None,
+            model_tier_tokens or None,
+            delegation_count=eng_delegation_counts.get(eid, 0),
+            total_sessions=eng_session_counts.get(eid, 1),
+            permission_mode_counts=eng_permission_modes.get(eid),
+        )
+        # Merge harness-specific fields into the leverage breakdown
+        breakdown.update({k: v for k, v in harness_breakdown.items() if k not in breakdown})
         all_leverage_scores.append(score)
         all_model_diversities.append(breakdown.get("model_diversity", 0.0))
 

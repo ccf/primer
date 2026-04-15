@@ -59,7 +59,7 @@ def _build_deadweight_section(
     try:
         from primer.server.services.deadweight_service import detect_deadweight
 
-        items_found = detect_deadweight(
+        items_found, _ = detect_deadweight(
             db, engineer_id=engineer_id, team_id=team_id, min_sessions=3
         )
     except Exception:

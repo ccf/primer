@@ -1,11 +1,11 @@
 """Harness intelligence endpoints."""
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from primer.common.database import get_db
 from primer.common.schemas import DeadweightResponse
-from primer.server.deps import get_auth_context
+from primer.server.deps import AuthContext, get_auth_context
 
 router = APIRouter(prefix="/api/v1/harness", tags=["harness"])
 
@@ -16,7 +16,7 @@ def get_deadweight(
     engineer_id: str | None = Query(default=None),
     min_sessions: int = Query(default=5, ge=1),
     db: Session = Depends(get_db),
-    auth=Depends(get_auth_context),
+    auth: AuthContext = Depends(get_auth_context),
 ):
     """Find customizations that are configured but add no measurable value.
 
@@ -25,10 +25,22 @@ def get_deadweight(
     """
     from primer.server.services.deadweight_service import detect_deadweight
 
-    items = detect_deadweight(
+    # Scope enforcement: engineers see own data, team leads see team, admins see all
+    resolved_engineer_id = engineer_id
+    resolved_team_id = team_id
+    if auth.role == "engineer":
+        resolved_engineer_id = auth.engineer_id
+        resolved_team_id = None
+    elif auth.role == "team_lead":
+        if engineer_id and engineer_id != auth.engineer_id:
+            raise HTTPException(status_code=403, detail="Cannot view another team's data")
+        resolved_team_id = auth.team_id
+    # admin: no restrictions
+
+    items, total_analyzed = detect_deadweight(
         db,
-        team_id=team_id,
-        engineer_id=engineer_id,
+        team_id=resolved_team_id,
+        engineer_id=resolved_engineer_id,
         min_sessions=min_sessions,
     )
     return DeadweightResponse(
@@ -44,5 +56,5 @@ def get_deadweight(
             }
             for item in items
         ],
-        total_customizations_analyzed=len(items),
+        total_customizations_analyzed=total_analyzed,
     )
