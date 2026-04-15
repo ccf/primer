@@ -1,6 +1,6 @@
 # Primer Roadmap
 
-Primer is building the intelligence layer for agentic engineering: capture how engineers use AI tools, understand which workflows actually improve outcomes, and turn that data into coaching, enablement, and operational decisions.
+Primer is the harness intelligence layer for agentic engineering. Research and industry evidence converge on a single insight: outcome quality is determined more by the agent harness — tool design, context management, caching, orchestration, and permission boundaries — than by model capability alone. Primer captures session telemetry across agents, decomposes it into harness dimensions, and measures which configurations actually improve outcomes. It turns that data into harness attribution, coaching, enablement, and operational decisions.
 
 This roadmap is organized in two layers:
 
@@ -15,56 +15,62 @@ Items marked with `[x]` are shipped. Items marked with `[ ]` are planned. Planne
 
 ## What Primer Should Help Teams Answer
 
-- How are engineers actually using agentic tools across workflows, projects, and repositories?
-- Which behaviors correlate with better outcomes: higher success rates, better PR quality, faster reviews, lower friction, and lower cost?
-- Which engineers, teams, and projects are getting outsized value from AI, and why?
-- Where are the systemic blockers: tool failures, poor repo readiness, prompt hygiene, context overload, or weak delegation patterns?
-- What should each engineer, team lead, or platform owner do next to improve results?
+- **Harness effectiveness**: Which harness configurations (tool designs, caching strategies, context management, orchestration patterns, permission boundaries) correlate with better outcomes?
+- **Harness attribution**: When a session succeeds or fails, which harness components contributed? What's the per-step compound reliability?
+- **Harness evolution**: How have harness configurations changed over time, and did those changes improve outcomes?
+- **Harnessability**: Are codebases and teams structurally ready for effective agent harnesses (documentation quality, typing, module boundaries, data governance)?
+- **Dead weight**: Which harness configurations are outdated compensations for older model limitations that now bottleneck performance?
+- **Individual effectiveness**: What should each engineer change about their harness setup to improve outcomes?
 
 ## Product Goals
 
-- Measure real engineering impact, not just usage.
-- Make the semantic layer trustworthy enough for leaders to act on.
-- Improve each engineer's effectiveness, not only their activity.
-- Make project and repository readiness a first-class product surface.
-- Close the loop from insight to intervention, not just reporting.
-- Bring recommendations into the engineer workflow, not only after the fact.
+- Measure harness effectiveness, not just usage — decompose outcomes to the harness component level.
+- Build the "code coverage for harnesses" that the industry is asking for (per-component reliability, compound failure math).
+- Track longitudinal harness evolution so teams can see how configuration changes correlate with outcome changes over time.
+- Make harnessability scoring a first-class product surface (documentation quality, context freshness, guide/sensor coverage).
+- Close the loop from harness insight to intervention — including subtractive coaching ("what can you stop doing?").
+- Bring harness intelligence into the engineer workflow via MCP sidecar, not only after the fact.
 
 ## Strategic Themes
 
+### P0: Harness Attribution and Compound Reliability
+
+Primer's moat is decomposing outcomes to the harness component level. Per-tool success rates, compound reliability math (10 steps at 99% = 90.4% end-to-end), and harness configuration fingerprinting from session telemetry. This is the "code coverage for harnesses" that the industry is asking for.
+
 ### P0: Measurement Integrity
 
-Primer's moat depends on trustworthy semantics. We need a clean, consistent taxonomy for outcomes, goals, friction, and success, plus reprocessing and coverage tooling so every downstream metric is credible.
+Trustworthy semantics remain foundational. Clean taxonomy for outcomes, goals, friction, and success, plus reprocessing and coverage tooling so every downstream metric is credible.
 
-### P0: Engineer Impact and Quality Attribution
+### P0: Harness Evolution Tracking
 
-The platform should prove which agentic behaviors lead to better engineering outcomes. That means connecting sessions, workflows, and tool choices to PR quality, review findings, merge speed, and post-merge stability.
+Longitudinal correlation of harness configuration changes with outcome changes over time. LangChain rewrote their harness 4x in one year; Vercel removed 80% of tools and improved. No tool tracks this — Primer's team-level time-series data is uniquely positioned.
 
-### P0: Project Intelligence
+### P1: Harnessability Scoring
 
-Projects should become a first-class lens alongside engineers and teams. Every repo should have a clear view of readiness, friction, workflow patterns, quality, cost, and recommended enablement actions.
+Measure whether codebases and teams have the structural properties (documentation quality, context freshness, module boundaries, guide/sensor coverage) that make agent harnesses effective. Extends existing project readiness into a full harnessability assessment.
 
 ### P1: Closed-Loop Coaching and Experimentation
 
-Recommendations should become assignable, measurable interventions. Primer should help teams run training, tooling, and workflow experiments and track whether they actually moved outcomes.
+Recommendations should become assignable, measurable interventions — including subtractive coaching ("what can you stop doing?"). Dead weight detection identifies harness configurations that are outdated compensations for older model limitations.
 
 ### P1: In-Workflow Guidance
 
-The most valuable insights should show up during the session, not only in dashboards. Primer should evolve from post-hoc analytics to proactive coaching and live session support.
+The most valuable insights should show up during the session via MCP sidecar: harness health scores, context quality warnings, dead weight alerts, and configuration recommendations.
 
-### P1: Operational Scale and Enterprise Readiness
+### P2: Operational Scale and Enterprise Readiness
 
-As usage grows, the platform needs stronger derived data pipelines, performance optimization, durable background jobs, enterprise identity, and observability.
+Derived data pipelines, performance optimization, durable background jobs, enterprise identity, and observability.
 
 ## Near-Term Priorities
 
-- `P0` Unify facet taxonomy and backfill existing data so success and outcome metrics are trustworthy.
-- `P0` Build an effectiveness and quality attribution layer that connects workflows to code outcomes.
-- `P0` Launch a true project intelligence workspace instead of hiding project insights inside other pages.
-- `P0` Turn static recommendations into a measurable intervention workflow.
-- `P1` Add Cursor as the next first-class captured session source, with parity checks before it participates in cross-agent analytics.
-- `P1` Add workflow fingerprints, exemplar sessions, and playbooks that capture how high performers actually work.
-- `P1` Bring key recommendations into the MCP sidecar and live session flow.
+- `P0` Per-tool success rate tracking with compound reliability computation — decompose session outcomes to the tool/step level.
+- `P0` Harness configuration fingerprinting — extract and catalog the actual harness configuration (tools, context files, permissions, customizations) from session telemetry.
+- `P0` Context quality scoring — measure AGENTS.md freshness, token efficiency, and guide/sensor coverage per project.
+- `P1` Harness evolution timeline — before/after correlation of configuration changes with outcome changes.
+- `P1` Harnessability scoring per project — documentation quality, typing strength, module boundaries, data governance readiness.
+- `P1` Paragon's 4-dimension evaluation — tool correctness, tool usage accuracy, task completion, task efficiency.
+- `P1` Semantic search over sessions via pgvector — exemplar discovery and cross-engineer pattern matching.
+- `P2` Automated harness optimization suggestions — evolve coaching to recommend specific harness configuration changes.
 
 ## Detailed Roadmap
 
@@ -162,7 +168,7 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] [P1] Cross-project comparison: which repos are easiest or hardest to use AI effectively in
 - [x] [P2] Project playbook templates for greenfield, legacy, high-compliance, and test-poor repos
 
-## AI Maturity
+## Harness Intelligence
 
 - [x] Tool leverage scoring (0-100 composite per engineer)
 - [x] Tool category classification (core, search, orchestration, skill, MCP)
@@ -171,6 +177,10 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] Tool adoption rates and trend charts
 - [x] Engineer tool proficiency table
 - [x] Daily leverage trend tracking
+- [x] [P0] 5-factor harness maturity score: tool design, orchestration, caching, context hygiene, boundary design
+- [x] [P0] Dead weight detection: flag zero-invocation and no-outcome-lift customizations
+- [x] [P0] Subtractive coaching: "what you can stop doing" section in coaching briefs
+- [x] [P0] `GET /api/v1/harness/deadweight` endpoint with auth-scoped access
 - [x] [P1] Model diversity factor in leverage scoring
 - [x] [P1] Agent team detection for coordinated multi-agent orchestration
 - [x] [P1] Session customization snapshot: capture enabled MCP servers, subagents, skills, commands, and templates alongside what was actually invoked
@@ -181,7 +191,15 @@ As usage grows, the platform needs stronger derived data pipelines, performance 
 - [x] [P1] Outcome attribution for customizations: which MCPs, skills, commands, and subagents improve workflow, quality, cost, and friction outcomes
 - [x] [P1] Cross-team tooling landscape: overlap, reuse, and local best-of-breed tools
 - [x] [P1] High-performer agent stack analysis: which combinations of MCPs, skills, commands, and subagents differentiate top performers
+- [ ] [P0] Per-tool success rate tracking with compound reliability computation (10 steps at 99% = 90.4% end-to-end)
+- [ ] [P0] Harness configuration fingerprinting from session telemetry (tools, context files, permissions, customizations)
+- [ ] [P1] Context quality scoring: AGENTS.md freshness, token efficiency, guide/sensor coverage
+- [ ] [P1] Harness evolution timeline: before/after correlation of configuration changes with outcome changes
+- [ ] [P1] Harnessability scoring per project: documentation quality, typing strength, module boundaries
+- [ ] [P1] Paragon's 4-dimension evaluation: tool correctness, tool usage accuracy, task completion, task efficiency
 - [ ] [P2] Prompt, skill, and template maturity scoring
+- [ ] [P2] Automated harness optimization suggestions
+- [ ] [P2] Dead weight dashboard tab with per-customization detail and removal actions
 
 ## Code Quality
 

@@ -68,6 +68,7 @@ Agent harness intelligence platform — measures how tool design, context manage
 | `explorer.py` | SSE streaming conversational data explorer |
 | `admin.py` | System stats, audit logs, engineer/team/alert management |
 | `finops.py` | Cache analytics, cost modeling, forecasting, budget CRUD |
+| `harness.py` | Harness intelligence: dead weight detection endpoint |
 | `interventions.py` | Recommendation-to-intervention workflow and effectiveness reporting |
 
 ### Services
@@ -97,6 +98,7 @@ Agent harness intelligence platform — measures how tool design, context manage
 | `audit_service.py` | Audit log recording for admin actions |
 | `slack_service.py` | Slack webhook posting |
 | `finops_service.py` | Cache analytics, cost modeling (API vs subscription), forecasting (linear regression), budget tracking |
+| `deadweight_service.py` | Dead weight detection: zero-invocation and no-outcome-lift customization flagging |
 
 ## Commands
 
@@ -157,7 +159,9 @@ cd frontend && npx tsc -b --noEmit  # Type check
 - **GitHub Integration**: App-based PR/commit fetching, AI readiness scoring (CLAUDE.md, AGENTS.md detection)
 - **Review Findings**: Extensible parser registry (`@register_parser` decorator) for automated review bot comments (BugBot); fetches issue comments, PR review comments, and review bodies; upsert with unique constraint deduplication
 - **FinOps**: Cache savings via per-model pricing deltas, cost modeling (API vs subscription tiers), linear regression forecasting, budget burn-rate tracking
-- **Harness Intelligence**: Derived workflow profiles, project workflow fingerprints, workflow playbooks, harness maturity scoring, dead weight detection, and harness-based quality attribution
+- **Harness Intelligence**: 5-factor harness maturity score (tool design, orchestration, caching, context hygiene, boundary design), dead weight detection for zero-invocation and no-lift customizations, subtractive coaching ("what you can stop doing"), `GET /api/v1/harness/deadweight` endpoint, derived workflow profiles, project workflow fingerprints, workflow playbooks, and harness-based quality attribution
+- **Async Ingest**: Session ingest enqueues a `session_ingest` background job and returns 202 immediately; the worker processes upsert + anomaly detection + facet extraction asynchronously
+- **PreCompact Hooks**: Sessions are captured incrementally on context compaction (not only at session end) via the PreCompact hook event
 
 ## Conventions
 
