@@ -48,6 +48,8 @@ const structuredData = [
     headline: title,
     description,
     inLanguage: "en",
+    dateModified: new Date().toISOString().split("T")[0],
+    author: { "@type": "Organization", name: "Primer", url: siteOrigin },
     isPartOf: { "@type": "WebSite", name: "Primer Documentation", url: `${siteOrigin}/docs/` },
     mainEntityOfPage: { "@type": "WebPage", "@id": pageUrl },
     publisher: {
