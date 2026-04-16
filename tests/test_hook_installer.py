@@ -33,14 +33,25 @@ def test_install_creates_hook(tmp_path):
     assert "installed" in msg.lower()
 
     data = json.loads(settings_path.read_text())
+
+    # SessionEnd: one matcher-wrapped entry whose inner hook runs our command
     hooks = data["hooks"]["SessionEnd"]
     assert len(hooks) == 1
-    assert hooks[0]["command"] == HOOK_COMMAND
+    assert hooks[0]["matcher"] == ""
+    inner = hooks[0]["hooks"]
+    assert len(inner) == 1
+    assert inner[0]["type"] == "command"
+    assert inner[0]["command"] == HOOK_COMMAND
+    # Timeout is in seconds per Claude Code schema
+    assert inner[0]["timeout"] == 30
 
-    # PreCompact should also be registered
+    # PreCompact mirrors SessionEnd
     pre_compact = data["hooks"]["PreCompact"]
     assert len(pre_compact) == 1
-    assert pre_compact[0]["command"] == HOOK_COMMAND
+    assert pre_compact[0]["matcher"] == ""
+    assert pre_compact[0]["hooks"][0]["type"] == "command"
+    assert pre_compact[0]["hooks"][0]["command"] == HOOK_COMMAND
+    assert pre_compact[0]["hooks"][0]["timeout"] == 30
 
 
 def test_install_idempotent(tmp_path):
@@ -110,6 +121,65 @@ def test_status_missing_file(tmp_path):
     settings_path = tmp_path / "nonexistent.json"
     installed, _msg = status(path=settings_path)
     assert not installed
+
+
+def test_status_detects_legacy_flat_format(tmp_path):
+    """Earlier versions of the installer wrote a flat `{command, timeout}` entry
+    directly at the event level. Status must still detect those installs."""
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    "SessionEnd": [{"command": HOOK_COMMAND, "timeout": 10000}],
+                    "PreCompact": [{"command": HOOK_COMMAND, "timeout": 10000}],
+                }
+            }
+        )
+    )
+    installed, _msg = status(path=settings_path)
+    assert installed
+
+
+def test_uninstall_removes_legacy_flat_format(tmp_path):
+    """Uninstall should clean up hooks written by earlier installer versions."""
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    "SessionEnd": [{"command": HOOK_COMMAND, "timeout": 10000}],
+                    "PreCompact": [{"command": HOOK_COMMAND, "timeout": 10000}],
+                }
+            }
+        )
+    )
+    ok, msg = uninstall(path=settings_path)
+    assert ok
+    assert "removed" in msg.lower()
+
+    data = json.loads(settings_path.read_text())
+    assert data["hooks"]["SessionEnd"] == []
+    assert data["hooks"]["PreCompact"] == []
+
+
+def test_install_migrates_legacy_flat_format(tmp_path):
+    """If a legacy flat hook is present, install is idempotent (treats it as
+    already installed) — callers can uninstall + reinstall to migrate."""
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    "SessionEnd": [{"command": HOOK_COMMAND, "timeout": 10000}],
+                    "PreCompact": [{"command": HOOK_COMMAND, "timeout": 10000}],
+                }
+            }
+        )
+    )
+    ok, msg = install(path=settings_path)
+    assert ok
+    assert "already" in msg.lower()
 
 
 # ---------------------------------------------------------------------------

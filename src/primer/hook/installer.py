@@ -94,17 +94,63 @@ def _save_settings(settings: dict, path: Path) -> None:
 
 # ---------------------------------------------------------------------------
 # Claude Code format helpers
+#
+# Claude Code uses a matcher-wrapped hook structure:
+#   {
+#     "EVENT_NAME": [
+#       {
+#         "matcher": "",
+#         "hooks": [
+#           {"type": "command", "command": "...", "timeout": 30}
+#         ]
+#       }
+#     ]
+#   }
+#
+# Timeouts are specified in SECONDS (not milliseconds).
+#
+# Detection also handles a legacy flat format that earlier versions of this
+# installer wrote (`{"command": ..., "timeout": ...}` directly at the event
+# level) so reinstall / uninstall can migrate existing users.
 # ---------------------------------------------------------------------------
 
+_CLAUDE_HOOK_TIMEOUT_SECONDS = 30
 
-def _find_hook_claude(session_end_hooks: list, command: str) -> bool:
-    """Check if the Primer hook is in a Claude-format hook list."""
-    for hook in session_end_hooks:
-        if isinstance(hook, dict) and hook.get("command") == command:
+
+def _find_hook_claude(event_hooks: list, command: str) -> bool:
+    """Check if the Primer hook is present in a Claude event hook list.
+
+    Detects both the current matcher-wrapped format and the legacy flat format
+    written by earlier versions of this installer.
+    """
+    for entry in event_hooks:
+        # Legacy flat format: {"command": cmd, ...}
+        if isinstance(entry, dict) and entry.get("command") == command:
             return True
-        if isinstance(hook, str) and hook == command:
+        if isinstance(entry, str) and entry == command:
             return True
+        # Current matcher-wrapped format: {"matcher": ..., "hooks": [{"command": cmd}]}
+        if isinstance(entry, dict):
+            inner_hooks = entry.get("hooks", [])
+            if isinstance(inner_hooks, list):
+                for inner in inner_hooks:
+                    if isinstance(inner, dict) and inner.get("command") == command:
+                        return True
     return False
+
+
+def _new_claude_hook_entry(command: str) -> dict:
+    """Build a matcher-wrapped hook entry in Claude Code's expected schema."""
+    return {
+        "matcher": "",
+        "hooks": [
+            {
+                "type": "command",
+                "command": command,
+                "timeout": _CLAUDE_HOOK_TIMEOUT_SECONDS,
+            }
+        ],
+    }
 
 
 def _install_claude(settings: dict, config: AgentHookConfig) -> bool:
@@ -119,40 +165,83 @@ def _install_claude(settings: dict, config: AgentHookConfig) -> bool:
     already_end = False
     already_compact = False
 
-    # SessionEnd
     session_end_hooks = hooks.setdefault("SessionEnd", [])
     if _find_hook_claude(session_end_hooks, config.hook_command):
         already_end = True
     else:
-        session_end_hooks.append({"command": config.hook_command, "timeout": 10000})
+        session_end_hooks.append(_new_claude_hook_entry(config.hook_command))
 
-    # PreCompact — same command, shorter timeout (non-blocking, best-effort)
     pre_compact_hooks = hooks.setdefault("PreCompact", [])
     if _find_hook_claude(pre_compact_hooks, config.hook_command):
         already_compact = True
     else:
-        pre_compact_hooks.append({"command": config.hook_command, "timeout": 10000})
+        pre_compact_hooks.append(_new_claude_hook_entry(config.hook_command))
 
     return already_end and already_compact
 
 
+def _entry_matches_command(entry: object, command: str) -> bool:
+    """True if a hook list entry (any supported format) references `command`."""
+    if isinstance(entry, str):
+        return entry == command
+    if not isinstance(entry, dict):
+        return False
+    # Legacy flat format
+    if entry.get("command") == command:
+        return True
+    # Matcher-wrapped format — entry matches if any inner hook targets the command
+    inner_hooks = entry.get("hooks", [])
+    if isinstance(inner_hooks, list):
+        for inner in inner_hooks:
+            if isinstance(inner, dict) and inner.get("command") == command:
+                return True
+    return False
+
+
+def _strip_command_from_matcher_entry(entry: dict, command: str) -> dict | None:
+    """Remove the command from a matcher-wrapped entry, returning a cleaned
+    entry or None if no inner hooks remain."""
+    inner_hooks = entry.get("hooks", [])
+    if not isinstance(inner_hooks, list):
+        return entry
+    remaining = [
+        h for h in inner_hooks if not (isinstance(h, dict) and h.get("command") == command)
+    ]
+    if not remaining:
+        return None
+    cleaned = dict(entry)
+    cleaned["hooks"] = remaining
+    return cleaned
+
+
 def _uninstall_claude(settings: dict, config: AgentHookConfig) -> bool:
-    """Remove the Primer hook from Claude Code settings. Returns True if found."""
+    """Remove the Primer hook from Claude Code settings. Returns True if found.
+
+    Handles both the current matcher-wrapped format and the legacy flat format.
+    """
     hooks = settings.get("hooks", {})
     found = False
 
     for event in ("SessionEnd", "PreCompact"):
         event_hooks = hooks.get(event, [])
-        if _find_hook_claude(event_hooks, config.hook_command):
-            found = True
-            hooks[event] = [
-                h
-                for h in event_hooks
-                if not (
-                    (isinstance(h, dict) and h.get("command") == config.hook_command)
-                    or (isinstance(h, str) and h == config.hook_command)
-                )
-            ]
+        if not _find_hook_claude(event_hooks, config.hook_command):
+            continue
+        found = True
+        new_list: list = []
+        for entry in event_hooks:
+            # Legacy flat: drop entirely if it matches
+            if isinstance(entry, str) and entry == config.hook_command:
+                continue
+            if isinstance(entry, dict) and entry.get("command") == config.hook_command:
+                continue
+            # Matcher-wrapped: strip our command; keep entry only if it still has hooks
+            if isinstance(entry, dict) and entry.get("hooks") is not None:
+                cleaned = _strip_command_from_matcher_entry(entry, config.hook_command)
+                if cleaned is not None:
+                    new_list.append(cleaned)
+                continue
+            new_list.append(entry)
+        hooks[event] = new_list
 
     return found
 
