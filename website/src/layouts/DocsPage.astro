@@ -48,7 +48,9 @@ const structuredData = [
     headline: title,
     description,
     inLanguage: "en",
-    dateModified: new Date().toISOString().split("T")[0],
+    // Omit dateModified — using build date would claim every page was modified
+    // on every deploy, which Google penalizes as artificial freshness inflation.
+    // TODO: derive from git last-commit date per file when Astro supports it.
     author: { "@type": "Organization", name: "Primer", url: siteOrigin },
     isPartOf: { "@type": "WebSite", name: "Primer Documentation", url: `${siteOrigin}/docs/` },
     mainEntityOfPage: { "@type": "WebPage", "@id": pageUrl },
