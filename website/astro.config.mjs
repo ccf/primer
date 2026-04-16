@@ -15,6 +15,7 @@ export default defineConfig({
       changefreq: "weekly",
       priority: 0.7,
       lastmod: new Date(),
+      filter: (page) => !page.includes("/blog"),
     }),
     inline(),
   ],

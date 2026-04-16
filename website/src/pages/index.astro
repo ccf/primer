@@ -18,6 +18,7 @@ const chapters = [
     plate: "screenshots/readme-quality-dark.png",
     caption: "Plate I. Quality clustered by harness pattern.",
     layout: "right",
+    docLink: { href: `${base}docs/server/`, label: "Read: Server & Intelligence Model" },
   },
   {
     num: "Chapter III",
@@ -31,6 +32,7 @@ const chapters = [
     plate: "screenshots/readme-finops-dark.png",
     caption: "Plate II. Spend grouped by harness pattern, not by model.",
     layout: "left",
+    docLink: { href: `${base}docs/finops/`, label: "Read: FinOps & Cost Management" },
   },
   {
     num: "Chapter IV",
@@ -44,6 +46,7 @@ const chapters = [
     plate: "screenshots/readme-growth-dark.png",
     caption: "Plate III. An effective pattern promoted into a standard.",
     layout: "right",
+    docLink: { href: `${base}docs/hooks/`, label: "Read: Hooks & Capture" },
   },
 ];
 
@@ -178,6 +181,9 @@ const structuredData = [
             <ul class="chapter-bullets">
               {chapter.bullets.map((b) => <li>{b}</li>)}
             </ul>
+            {chapter.docLink && (
+              <a href={chapter.docLink.href} class="chapter-doc-link">{chapter.docLink.label} →</a>
+            )}
           </div>
           <figure class="chapter-plate">
             <div class="chapter-plate-frame">
@@ -452,6 +458,22 @@ const structuredData = [
     position: absolute;
     left: 0;
     color: var(--color-accent);
+  }
+
+  .chapter-doc-link {
+    display: inline-block;
+    margin-top: 16px;
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--color-ink-muted);
+    text-decoration: none;
+    border-bottom: 1px solid var(--color-rule);
+    padding-bottom: 2px;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .chapter-doc-link:hover {
+    color: var(--color-accent);
+    border-color: var(--color-accent);
   }
 
   .chapter-plate { margin: 0; }
