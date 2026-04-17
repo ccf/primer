@@ -182,6 +182,63 @@ def test_install_migrates_legacy_flat_format(tmp_path):
     assert "already" in msg.lower()
 
 
+def test_uninstall_preserves_third_party_entry_with_empty_hooks(tmp_path):
+    """A third-party matcher-wrapped entry whose `hooks` array is empty must
+    survive uninstall untouched. Only entries that actually contained the
+    primer command may be stripped or dropped."""
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    "SessionEnd": [
+                        {"matcher": "Bash", "hooks": []},  # third-party, already empty
+                    ]
+                }
+            }
+        )
+    )
+    # Install our hook alongside the third-party one
+    install(path=settings_path)
+    data = json.loads(settings_path.read_text())
+    assert len(data["hooks"]["SessionEnd"]) == 2  # third-party + primer
+
+    # Uninstall should remove the primer entry but preserve the third-party one
+    uninstall(path=settings_path)
+    data = json.loads(settings_path.read_text())
+    assert {"matcher": "Bash", "hooks": []} in data["hooks"]["SessionEnd"]
+
+
+def test_uninstall_preserves_third_party_sibling_hooks(tmp_path):
+    """When our command sits in a matcher entry alongside a third-party hook,
+    stripping should leave the third-party hook in place."""
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    "SessionEnd": [
+                        {
+                            "matcher": "",
+                            "hooks": [
+                                {"type": "command", "command": HOOK_COMMAND, "timeout": 30},
+                                {"type": "command", "command": "echo bye"},
+                            ],
+                        }
+                    ]
+                }
+            }
+        )
+    )
+    uninstall(path=settings_path)
+    data = json.loads(settings_path.read_text())
+    entries = data["hooks"]["SessionEnd"]
+    assert len(entries) == 1
+    assert entries[0]["matcher"] == ""
+    assert len(entries[0]["hooks"]) == 1
+    assert entries[0]["hooks"][0]["command"] == "echo bye"
+
+
 # ---------------------------------------------------------------------------
 # Gemini CLI tests
 # ---------------------------------------------------------------------------

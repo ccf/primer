@@ -180,66 +180,46 @@ def _install_claude(settings: dict, config: AgentHookConfig) -> bool:
     return already_end and already_compact
 
 
-def _entry_matches_command(entry: object, command: str) -> bool:
-    """True if a hook list entry (any supported format) references `command`."""
-    if isinstance(entry, str):
-        return entry == command
-    if not isinstance(entry, dict):
-        return False
-    # Legacy flat format
-    if entry.get("command") == command:
-        return True
-    # Matcher-wrapped format — entry matches if any inner hook targets the command
-    inner_hooks = entry.get("hooks", [])
-    if isinstance(inner_hooks, list):
-        for inner in inner_hooks:
-            if isinstance(inner, dict) and inner.get("command") == command:
-                return True
-    return False
-
-
-def _strip_command_from_matcher_entry(entry: dict, command: str) -> dict | None:
-    """Remove the command from a matcher-wrapped entry, returning a cleaned
-    entry or None if no inner hooks remain."""
-    inner_hooks = entry.get("hooks", [])
-    if not isinstance(inner_hooks, list):
-        return entry
-    remaining = [
-        h for h in inner_hooks if not (isinstance(h, dict) and h.get("command") == command)
-    ]
-    if not remaining:
-        return None
-    cleaned = dict(entry)
-    cleaned["hooks"] = remaining
-    return cleaned
-
-
 def _uninstall_claude(settings: dict, config: AgentHookConfig) -> bool:
     """Remove the Primer hook from Claude Code settings. Returns True if found.
 
     Handles both the current matcher-wrapped format and the legacy flat format.
+    Third-party entries are left untouched — including matcher entries whose
+    `hooks` array is already empty, which would otherwise be collapsed to None.
     """
     hooks = settings.get("hooks", {})
+    command = config.hook_command
     found = False
 
     for event in ("SessionEnd", "PreCompact"):
         event_hooks = hooks.get(event, [])
-        if not _find_hook_claude(event_hooks, config.hook_command):
+        if not _find_hook_claude(event_hooks, command):
             continue
         found = True
         new_list: list = []
         for entry in event_hooks:
             # Legacy flat: drop entirely if it matches
-            if isinstance(entry, str) and entry == config.hook_command:
+            if isinstance(entry, str) and entry == command:
                 continue
-            if isinstance(entry, dict) and entry.get("command") == config.hook_command:
+            if isinstance(entry, dict) and entry.get("command") == command:
                 continue
-            # Matcher-wrapped: strip our command; keep entry only if it still has hooks
-            if isinstance(entry, dict) and entry.get("hooks") is not None:
-                cleaned = _strip_command_from_matcher_entry(entry, config.hook_command)
-                if cleaned is not None:
-                    new_list.append(cleaned)
-                continue
+            # Matcher-wrapped: strip our command only if this entry contains
+            # it. Third-party entries pass through unchanged — including ones
+            # that happen to have an empty `hooks` array already.
+            if isinstance(entry, dict) and isinstance(entry.get("hooks"), list):
+                inner = entry["hooks"]
+                if any(isinstance(h, dict) and h.get("command") == command for h in inner):
+                    remaining = [
+                        h
+                        for h in inner
+                        if not (isinstance(h, dict) and h.get("command") == command)
+                    ]
+                    if remaining:
+                        cleaned = dict(entry)
+                        cleaned["hooks"] = remaining
+                        new_list.append(cleaned)
+                    # else: entry held only our command → drop it
+                    continue
             new_list.append(entry)
         hooks[event] = new_list
 
