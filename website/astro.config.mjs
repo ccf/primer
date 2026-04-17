@@ -18,12 +18,15 @@ export default defineConfig({
       filter: (page) => !page.includes("/blog"),
     }),
     inline({
-      Critters: {
+      // @playform/inline wraps the `beasties` library, so the config
+      // key is "Beasties" (not "Critters"). An unrecognized key is
+      // silently ignored — which is how the initial fix missed its
+      // target and docs pages kept rendering unstyled with the
+      // default "media" preload strategy.
+      Beasties: {
         // "swap" converts deferred links to preloads that swap to
-        // rel="stylesheet" once loaded — preserving inline critical CSS
-        // so pages don't render unstyled while waiting for the full
-        // stylesheet. The default "media" strategy was causing some
-        // pages (docs/server) to render with zero CSS.
+        // rel="stylesheet" once loaded, while still inlining critical
+        // CSS so the page renders styled on first paint.
         preload: "swap",
       },
     }),
