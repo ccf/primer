@@ -1,17 +1,20 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="brand/logo-wordmark-light.svg">
-    <source media="(prefers-color-scheme: light)" srcset="brand/logo-wordmark.svg">
-    <img src="brand/logo-wordmark.svg" alt="Primer" width="280">
-  </picture>
+  <a href="https://useprimer.dev">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="brand/logo-wordmark-light.svg">
+      <source media="(prefers-color-scheme: light)" srcset="brand/logo-wordmark.svg">
+      <img src="brand/logo-wordmark.svg" alt="Primer" width="280">
+    </picture>
+  </a>
 </p>
 
 <p align="center">
-  <b>See which AI workflows actually work.</b>
+  <b>See which agent harness patterns actually work.</b>
 </p>
 
 <p align="center">
-  <a href="https://demo.useprimer.dev"><b>🎮 Try the Live Demo</b></a> &middot;
+  <a href="https://useprimer.dev"><b>🌐 Website</b></a> &middot;
+  <a href="https://demo.useprimer.dev"><b>🎮 Live Demo</b></a> &middot;
   <a href="https://useprimer.dev/docs/installation/">Get Started</a> &middot;
   <a href="https://useprimer.dev/docs/">Docs</a> &middot;
   <a href="ROADMAP.md">Roadmap</a> &middot;
