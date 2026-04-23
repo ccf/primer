@@ -35,10 +35,12 @@ export function ToolchainReliabilityTable({ rows }: ToolchainReliabilityTablePro
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="pb-2 font-medium">Surface</th>
                 <th className="pb-2 text-right font-medium">Sessions</th>
+                <th className="pb-2 text-right font-medium">Calls</th>
                 <th className="pb-2 text-right font-medium">Friction</th>
                 <th className="pb-2 text-right font-medium">Failures</th>
                 <th className="pb-2 text-right font-medium">Recovery</th>
                 <th className="pb-2 text-right font-medium">Success</th>
+                <th className="pb-2 text-right font-medium">Compound</th>
                 <th className="pb-2 font-medium">Top Frictions</th>
               </tr>
             </thead>
@@ -67,6 +69,14 @@ export function ToolchainReliabilityTable({ rows }: ToolchainReliabilityTablePro
                       <p>{row.session_count}</p>
                       <p className="text-xs text-muted-foreground">
                         {row.engineer_count} engineers
+                      </p>
+                    </div>
+                  </td>
+                  <td className="py-2 text-right">
+                    <div>
+                      <p>{row.total_call_count}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {row.avg_calls_per_session.toFixed(1)} / session
                       </p>
                     </div>
                   </td>
@@ -102,6 +112,12 @@ export function ToolchainReliabilityTable({ rows }: ToolchainReliabilityTablePro
                       <p className="text-xs text-muted-foreground">
                         {formatPercent(row.abandonment_rate)} abandoned
                       </p>
+                    </div>
+                  </td>
+                  <td className="py-2 text-right">
+                    <div>
+                      <p>{formatPercent(row.compound_reliability_rate)}</p>
+                      <p className="text-xs text-muted-foreground">chain estimate</p>
                     </div>
                   </td>
                   <td className="py-2">

@@ -2375,12 +2375,15 @@ class ToolchainReliabilityEntry(BaseModel):
     source_classification: CustomizationSourceClassification | None = None
     session_count: int
     engineer_count: int
+    total_call_count: int = 0
+    avg_calls_per_session: float = 0.0
     friction_session_count: int
     friction_session_rate: float | None = None
     failure_session_count: int
     failure_session_rate: float | None = None
     recovery_rate: float | None = None
     success_rate: float | None = None
+    compound_reliability_rate: float | None = None
     abandonment_rate: float | None = None
     avg_recovery_steps: float | None = None
     top_friction_types: list[str] = []

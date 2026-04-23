@@ -20,12 +20,15 @@ describe("ToolchainReliabilityTable", () => {
             source_classification: "marketplace",
             session_count: 4,
             engineer_count: 2,
+            total_call_count: 12,
+            avg_calls_per_session: 3,
             friction_session_count: 2,
             friction_session_rate: 0.5,
             failure_session_count: 1,
             failure_session_rate: 0.25,
             recovery_rate: 0.5,
             success_rate: 0.75,
+            compound_reliability_rate: 0.422,
             abandonment_rate: 0.25,
             avg_recovery_steps: 2.5,
             top_friction_types: ["tool_error", "timeout"],
@@ -37,7 +40,11 @@ describe("ToolchainReliabilityTable", () => {
     expect(screen.getByText("github")).toBeInTheDocument()
     expect(screen.getByText("Mcp")).toBeInTheDocument()
     expect(screen.getByText("Marketplace")).toBeInTheDocument()
+    expect(screen.getByText("12")).toBeInTheDocument()
+    expect(screen.getByText("3.0 / session")).toBeInTheDocument()
     expect(screen.getAllByText("50%")).toHaveLength(2)
+    expect(screen.getByText("42%")).toBeInTheDocument()
+    expect(screen.getByText("chain estimate")).toBeInTheDocument()
     expect(screen.getByText("25%")).toBeInTheDocument()
     expect(screen.getByText("25% abandoned")).toBeInTheDocument()
     expect(screen.getByText("2.5 steps")).toBeInTheDocument()

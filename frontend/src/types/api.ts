@@ -1956,12 +1956,15 @@ export interface ToolchainReliabilityEntry {
   source_classification: CustomizationSourceClassification | null
   session_count: number
   engineer_count: number
+  total_call_count: number
+  avg_calls_per_session: number
   friction_session_count: number
   friction_session_rate: number | null
   failure_session_count: number
   failure_session_rate: number | null
   recovery_rate: number | null
   success_rate: number | null
+  compound_reliability_rate: number | null
   abandonment_rate: number | null
   avg_recovery_steps: number | null
   top_friction_types: string[]
