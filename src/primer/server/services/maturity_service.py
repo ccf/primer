@@ -707,6 +707,7 @@ def get_maturity_analytics(
                 "recovery_steps": [],
                 "success_sessions": set(),
                 "friction_type_counts": Counter(),
+                "total_call_count": 0,
             },
         )
 
@@ -741,6 +742,7 @@ def get_maturity_analytics(
                 continue
             bucket = _ensure_reliability_bucket("built_in_tool", tool_name, "built_in", "built_in")
             bucket["sessions"].add(sid)
+            bucket["total_call_count"] += call_count
             if sid in session_metrics:
                 session_metric = session_metrics[sid]
                 engineer_id_for_session = session_metric["engineer_id"]
@@ -850,11 +852,21 @@ def get_maturity_analytics(
         )
         reliability_bucket["sessions"].add(session_id)
         reliability_bucket["engineers"].add(engineer_id)
+        reliability_bucket["total_call_count"] += invocation_count or 0
         _apply_session_reliability_metrics(
             reliability_bucket,
             session_id,
             session_metrics.get(session_id),
         )
+
+    def _compound_reliability_rate(bucket: dict) -> float | None:
+        if not bucket["sessions"]:
+            return None
+        success_rate = len(bucket["success_sessions"]) / len(bucket["sessions"])
+        avg_calls = bucket["total_call_count"] / len(bucket["sessions"])
+        if avg_calls <= 0:
+            return None
+        return round(success_rate**avg_calls, 3)
 
     customization_breakdown = [
         CustomizationUsage(
@@ -933,6 +945,12 @@ def get_maturity_analytics(
             source_classification=bucket["source_classification"],
             session_count=len(bucket["sessions"]),
             engineer_count=len(bucket["engineers"]),
+            total_call_count=bucket["total_call_count"],
+            avg_calls_per_session=(
+                round(bucket["total_call_count"] / len(bucket["sessions"]), 1)
+                if bucket["sessions"]
+                else 0.0
+            ),
             friction_session_count=len(bucket["friction_sessions"]),
             friction_session_rate=(
                 round(len(bucket["friction_sessions"]) / len(bucket["sessions"]), 3)
@@ -958,6 +976,7 @@ def get_maturity_analytics(
                 if bucket["sessions"]
                 else None
             ),
+            compound_reliability_rate=_compound_reliability_rate(bucket),
             abandonment_rate=(
                 round(len(bucket["abandoned_sessions"]) / len(bucket["sessions"]), 3)
                 if bucket["sessions"]

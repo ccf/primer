@@ -478,6 +478,12 @@ def test_maturity_builds_toolchain_reliability_view(
 
     db_session.add_all(
         [
+            ToolUsage(session_id=s1.id, tool_name="Bash", call_count=2),
+            ToolUsage(session_id=s2.id, tool_name="Bash", call_count=2),
+        ]
+    )
+    db_session.add_all(
+        [
             SessionFacets(
                 session_id=s1.id,
                 outcome="success",
@@ -530,17 +536,28 @@ def test_maturity_builds_toolchain_reliability_view(
     assert github["failure_session_rate"] == 1.0
     assert github["recovery_rate"] == 1.0
     assert github["success_rate"] == 1.0
+    assert github["total_call_count"] == 3
+    assert github["avg_calls_per_session"] == 3.0
+    assert github["compound_reliability_rate"] == 1.0
     assert github["abandonment_rate"] == 0.0
     assert github["top_friction_types"] == ["tool_error", "timeout"]
 
     read_tool = reliability_rows[("built_in_tool", "Read")]
     assert read_tool["session_count"] == 2
     assert read_tool["engineer_count"] == 2
+    assert read_tool["total_call_count"] == 30
+    assert read_tool["avg_calls_per_session"] == 15.0
     assert read_tool["friction_session_rate"] == 1.0
     assert read_tool["failure_session_rate"] == 0.5
     assert read_tool["recovery_rate"] == 0.5
     assert read_tool["success_rate"] == 0.5
+    assert read_tool["compound_reliability_rate"] == 0.0
     assert read_tool["abandonment_rate"] == 0.5
+
+    bash_tool = reliability_rows[("built_in_tool", "Bash")]
+    assert bash_tool["success_rate"] == 0.5
+    assert bash_tool["avg_calls_per_session"] == 2.0
+    assert bash_tool["compound_reliability_rate"] == 0.25
 
 
 def test_maturity_builds_delegation_patterns(
@@ -654,6 +671,8 @@ def test_maturity_toolchain_reliability_deduplicates_duplicate_tool_rows(
         if row["surface_type"] == "built_in_tool" and row["identifier"] == "Read"
     )
     assert read_tool["session_count"] == 2
+    assert read_tool["total_call_count"] == 37
+    assert read_tool["avg_calls_per_session"] == 18.5
     assert read_tool["friction_session_count"] == 2
     assert read_tool["avg_recovery_steps"] == 2.0
 
