@@ -1073,7 +1073,7 @@ def get_maturity_analytics(
                 "leverage_scores": [],
                 "tool_counts": [],
                 "customization_counts": [],
-                "context_signal_count": 0,
+                "context_signal_counts": [],
                 "tools": Counter(),
                 "customizations": Counter(),
                 "signals": Counter(),
@@ -1090,7 +1090,7 @@ def get_maturity_analytics(
                 bucket["success_sessions"].add(row.id)
         bucket["tool_counts"].append(len(tool_names))
         bucket["customization_counts"].append(len(customization_names))
-        bucket["context_signal_count"] += context_count
+        bucket["context_signal_counts"].append(context_count)
         bucket["tools"].update(tool_names)
         bucket["customizations"].update(customization_names)
         bucket["signals"].update(
@@ -1148,7 +1148,11 @@ def get_maturity_analytics(
             )
             if bucket["customization_counts"]
             else 0,
-            context_signal_count=bucket["context_signal_count"],
+            context_signal_count=round(
+                sum(bucket["context_signal_counts"]) / len(bucket["context_signal_counts"])
+            )
+            if bucket["context_signal_counts"]
+            else 0,
             top_tools=[tool for tool, _count in bucket["tools"].most_common(5)],
             top_customizations=[
                 customization for customization, _count in bucket["customizations"].most_common(5)
