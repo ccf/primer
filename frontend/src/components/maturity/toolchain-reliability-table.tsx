@@ -117,7 +117,7 @@ export function ToolchainReliabilityTable({ rows }: ToolchainReliabilityTablePro
                   <td className="py-2 text-right">
                     <div>
                       <p>{formatPercent(row.compound_reliability_rate)}</p>
-                      <p className="text-xs text-muted-foreground">chain estimate</p>
+                      <p className="text-xs text-muted-foreground">10-step chain</p>
                     </div>
                   </td>
                   <td className="py-2">

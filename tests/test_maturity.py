@@ -551,13 +551,13 @@ def test_maturity_builds_toolchain_reliability_view(
     assert read_tool["failure_session_rate"] == 0.5
     assert read_tool["recovery_rate"] == 0.5
     assert read_tool["success_rate"] == 0.5
-    assert read_tool["compound_reliability_rate"] == 0.0
+    assert read_tool["compound_reliability_rate"] == 0.63
     assert read_tool["abandonment_rate"] == 0.5
 
     bash_tool = reliability_rows[("built_in_tool", "Bash")]
     assert bash_tool["success_rate"] == 0.5
     assert bash_tool["avg_calls_per_session"] == 2.0
-    assert bash_tool["compound_reliability_rate"] == 0.25
+    assert bash_tool["compound_reliability_rate"] == 0.031
 
 
 def test_maturity_builds_delegation_patterns(
