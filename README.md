@@ -139,7 +139,7 @@ curl -fsSL https://useprimer.dev/install.sh | sh
 **Or install manually:**
 
 ```bash
-pip install primer            # Install
+pip install useprimer            # Install (Python module is `primer`)
 primer init                      # Initialize database and config
 primer server start              # Start API + dashboard
 primer hook install              # Register the SessionEnd hook
