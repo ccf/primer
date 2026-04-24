@@ -574,9 +574,19 @@ def test_maturity_builds_harness_configuration_fingerprints(
             "context_usage": {"reference_count": 3},
         }
     }
-    s2.permission_mode = "default"
+    s2.agent_type = "cursor"
+    s2.permission_mode = "manual"
+    s2.source_metadata = {
+        "native_telemetry": {
+            "context_usage": {"reference_count": 1},
+        }
+    }
     db_session.add_all(
         [
+            ToolUsage(session_id=s1.id, tool_name="Write", call_count=1),
+            ToolUsage(session_id=s2.id, tool_name="Glob", call_count=1),
+            ToolUsage(session_id=s2.id, tool_name="Task:explore", call_count=1),
+            ToolUsage(session_id=s2.id, tool_name="Skill:commit", call_count=1),
             SessionFacets(session_id=s1.id, outcome="success"),
             SessionFacets(session_id=s2.id, outcome="failure"),
             SessionCustomization(
@@ -587,6 +597,15 @@ def test_maturity_builds_harness_configuration_fingerprints(
                 provenance="user_local",
                 source_classification="marketplace",
                 invocation_count=2,
+            ),
+            SessionCustomization(
+                session_id=s2.id,
+                customization_type="mcp",
+                state="invoked",
+                identifier="github",
+                provenance="user_local",
+                source_classification="marketplace",
+                invocation_count=1,
             ),
         ]
     )
@@ -601,13 +620,13 @@ def test_maturity_builds_harness_configuration_fingerprints(
         for row in data["harness_configuration_fingerprints"]
         if row["agent_type"] == "cursor" and row["permission_mode"] == "manual"
     )
-    assert fingerprint["session_count"] == 1
-    assert fingerprint["engineer_count"] == 1
-    assert fingerprint["success_rate"] == 1.0
-    assert fingerprint["compound_reliability_rate"] == 1.0
-    assert fingerprint["tool_count"] == 4
+    assert fingerprint["session_count"] == 2
+    assert fingerprint["engineer_count"] == 2
+    assert fingerprint["success_rate"] == 0.5
+    assert fingerprint["compound_reliability_rate"] == 0.25
+    assert fingerprint["tool_count"] == 5
     assert fingerprint["customization_count"] == 1
-    assert fingerprint["context_signal_count"] == 3
+    assert fingerprint["context_signal_count"] == 2
     assert fingerprint["top_customizations"] == ["github"]
     assert "Read" in fingerprint["top_tools"]
     assert fingerprint["signals"] == ["agent:cursor", "permission:manual", "context"]
