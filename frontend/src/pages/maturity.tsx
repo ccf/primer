@@ -18,6 +18,7 @@ import { TeamCustomizationLandscapeTable } from "@/components/maturity/team-cust
 import { LeverageScoreTable } from "@/components/maturity/leverage-score-table"
 import { LeverageTrendChart } from "@/components/maturity/leverage-trend-chart"
 import { EffectivenessScatter } from "@/components/maturity/effectiveness-scatter"
+import { ContextQualityTable } from "@/components/maturity/context-quality-table"
 import { ProjectReadinessTable } from "@/components/maturity/project-readiness-table"
 import { ToolAdoptionSummary } from "@/components/tools/tool-adoption-summary"
 import { ToolAdoptionChart } from "@/components/tools/tool-adoption-chart"
@@ -151,7 +152,10 @@ export function MaturityPage({ teamId, dateRange }: MaturityPageProps) {
       )}
 
       {data && activeTab === "projects" && (
-        <ProjectReadinessTable data={data.project_readiness} />
+        <div className="space-y-6">
+          <ContextQualityTable rows={data.context_quality} />
+          <ProjectReadinessTable data={data.project_readiness} />
+        </div>
       )}
     </div>
   )

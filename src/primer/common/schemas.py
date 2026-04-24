@@ -2454,6 +2454,26 @@ class ProjectReadinessEntry(BaseModel):
     session_count: int
 
 
+class ContextQualityEntry(BaseModel):
+    repository: str
+    session_count: int
+    context_quality_score: float
+    guide_coverage_score: float
+    guide_freshness_score: float
+    token_efficiency_score: float
+    sensor_coverage_score: float
+    cache_hit_rate: float | None = None
+    avg_input_tokens: float | None = None
+    context_usage_coverage_pct: float
+    tool_coverage_pct: float
+    model_coverage_pct: float
+    facet_coverage_pct: float
+    has_claude_md: bool
+    has_agents_md: bool
+    readiness_checked_at: datetime | None = None
+    top_gaps: list[str] = Field(default_factory=list)
+
+
 class MaturityAnalyticsResponse(BaseModel):
     tool_categories: ToolCategoryBreakdown
     engineer_profiles: list[EngineerLeverageProfile]
@@ -2469,6 +2489,7 @@ class MaturityAnalyticsResponse(BaseModel):
     agent_team_modes: list[AgentTeamModeSummary] = []
     customization_outcomes: list[CustomizationOutcomeAttribution] = []
     project_readiness: list[ProjectReadinessEntry]
+    context_quality: list[ContextQualityEntry] = Field(default_factory=list)
     sessions_analyzed: int
     avg_leverage_score: float
     avg_effectiveness_score: float | None = None

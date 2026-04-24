@@ -94,6 +94,7 @@ def test_maturity_empty(client, admin_headers):
     assert data["daily_leverage"] == []
     assert data["agent_skill_breakdown"] == []
     assert data["harness_configuration_fingerprints"] == []
+    assert data["context_quality"] == []
 
 
 def test_get_maturity_analytics_uses_cached_payload(monkeypatch, db_session):
@@ -632,6 +633,73 @@ def test_maturity_builds_harness_configuration_fingerprints(
     assert fingerprint["signals"] == ["agent:cursor", "permission:manual", "context"]
     assert fingerprint["fingerprint_id"]
     assert fingerprint["avg_leverage_score"] > 0
+
+
+def test_maturity_builds_context_quality_scores(
+    client, admin_headers, seeded_maturity_data, db_session
+):
+    now = datetime.now(tz=UTC)
+    s1 = seeded_maturity_data["s1"]
+    s2 = seeded_maturity_data["s2"]
+    repo = GitRepository(
+        full_name=f"acme/context-{uuid.uuid4().hex[:8]}",
+        has_claude_md=True,
+        has_agents_md=False,
+        has_claude_dir=True,
+        ai_readiness_score=80.0,
+        ai_readiness_checked_at=now - timedelta(days=7),
+    )
+    db_session.add(repo)
+    db_session.flush()
+
+    s1.repository_id = repo.id
+    s1.input_tokens = 1000
+    s1.cache_read_tokens = 3000
+    s1.source_metadata = {
+        "native_telemetry": {
+            "context_usage": {"reference_count": 2},
+        }
+    }
+    s2.repository_id = repo.id
+    s2.input_tokens = 3000
+    s2.cache_read_tokens = 1000
+    db_session.add_all(
+        [
+            SessionFacets(session_id=s1.id, outcome="success"),
+            ModelUsage(
+                session_id=s1.id,
+                model_name="claude-sonnet-4-5-20250929",
+                input_tokens=1000,
+                output_tokens=500,
+                cache_read_tokens=3000,
+                cache_creation_tokens=0,
+            ),
+        ]
+    )
+    db_session.flush()
+
+    response = client.get("/api/v1/analytics/maturity", headers=admin_headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    quality = next(row for row in data["context_quality"] if row["repository"] == repo.full_name)
+    assert quality["session_count"] == 2
+    assert quality["guide_coverage_score"] == 80.0
+    assert quality["guide_freshness_score"] == 100.0
+    assert quality["cache_hit_rate"] == 0.5
+    assert quality["avg_input_tokens"] == 2000.0
+    assert quality["token_efficiency_score"] == 100.0
+    assert quality["context_usage_coverage_pct"] == 50.0
+    assert quality["tool_coverage_pct"] == 100.0
+    assert quality["model_coverage_pct"] == 50.0
+    assert quality["facet_coverage_pct"] == 50.0
+    assert quality["sensor_coverage_score"] == 62.5
+    assert quality["context_quality_score"] == 82.8
+    assert quality["top_gaps"] == [
+        "Add AGENTS.md",
+        "Complete model telemetry",
+        "Complete outcome facets",
+    ]
 
 
 def test_maturity_builds_delegation_patterns(

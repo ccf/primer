@@ -2035,6 +2035,26 @@ export interface ProjectReadinessEntry {
   session_count: number
 }
 
+export interface ContextQualityEntry {
+  repository: string
+  session_count: number
+  context_quality_score: number
+  guide_coverage_score: number
+  guide_freshness_score: number
+  token_efficiency_score: number
+  sensor_coverage_score: number
+  cache_hit_rate: number | null
+  avg_input_tokens: number | null
+  context_usage_coverage_pct: number
+  tool_coverage_pct: number
+  model_coverage_pct: number
+  facet_coverage_pct: number
+  has_claude_md: boolean
+  has_agents_md: boolean
+  readiness_checked_at: string | null
+  top_gaps: string[]
+}
+
 export interface MaturityAnalyticsResponse {
   tool_categories: ToolCategoryBreakdown
   engineer_profiles: EngineerLeverageProfile[]
@@ -2050,6 +2070,7 @@ export interface MaturityAnalyticsResponse {
   agent_team_modes: AgentTeamModeSummary[]
   customization_outcomes: CustomizationOutcomeAttribution[]
   project_readiness: ProjectReadinessEntry[]
+  context_quality: ContextQualityEntry[]
   sessions_analyzed: number
   avg_leverage_score: number
   avg_effectiveness_score: number | null
