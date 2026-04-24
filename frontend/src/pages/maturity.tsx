@@ -10,6 +10,7 @@ import { AgentTeamModeTable } from "@/components/maturity/agent-team-mode-table"
 import { DelegationPatternTable } from "@/components/maturity/delegation-pattern-table"
 import { CustomizationBreakdownTable } from "@/components/maturity/customization-breakdown-table"
 import { CustomizationStateFunnelTable } from "@/components/maturity/customization-state-funnel-table"
+import { HarnessFingerprintTable } from "@/components/maturity/harness-fingerprint-table"
 import { ToolchainReliabilityTable } from "@/components/maturity/toolchain-reliability-table"
 import { HighPerformerStackCards } from "@/components/maturity/high-performer-stack-cards"
 import { CustomizationOutcomeTable } from "@/components/maturity/customization-outcome-table"
@@ -104,6 +105,7 @@ export function MaturityPage({ teamId, dateRange }: MaturityPageProps) {
             <CustomizationStateFunnelTable rows={data.customization_state_funnel} />
             <ToolchainReliabilityTable rows={data.toolchain_reliability} />
           </div>
+          <HarnessFingerprintTable rows={data.harness_configuration_fingerprints} />
           <TeamCustomizationLandscapeTable data={data.team_customization_landscape} />
           <CustomizationOutcomeTable rows={data.customization_outcomes} />
 

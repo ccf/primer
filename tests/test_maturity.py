@@ -93,6 +93,7 @@ def test_maturity_empty(client, admin_headers):
     assert data["engineer_profiles"] == []
     assert data["daily_leverage"] == []
     assert data["agent_skill_breakdown"] == []
+    assert data["harness_configuration_fingerprints"] == []
 
 
 def test_get_maturity_analytics_uses_cached_payload(monkeypatch, db_session):
@@ -558,6 +559,60 @@ def test_maturity_builds_toolchain_reliability_view(
     assert bash_tool["success_rate"] == 0.5
     assert bash_tool["avg_calls_per_session"] == 2.0
     assert bash_tool["compound_reliability_rate"] == 0.031
+
+
+def test_maturity_builds_harness_configuration_fingerprints(
+    client, admin_headers, seeded_maturity_data, db_session
+):
+    s1 = seeded_maturity_data["s1"]
+    s2 = seeded_maturity_data["s2"]
+
+    s1.agent_type = "cursor"
+    s1.permission_mode = "manual"
+    s1.source_metadata = {
+        "native_telemetry": {
+            "context_usage": {"reference_count": 3},
+        }
+    }
+    s2.permission_mode = "default"
+    db_session.add_all(
+        [
+            SessionFacets(session_id=s1.id, outcome="success"),
+            SessionFacets(session_id=s2.id, outcome="failure"),
+            SessionCustomization(
+                session_id=s1.id,
+                customization_type="mcp",
+                state="invoked",
+                identifier="github",
+                provenance="user_local",
+                source_classification="marketplace",
+                invocation_count=2,
+            ),
+        ]
+    )
+    db_session.flush()
+
+    response = client.get("/api/v1/analytics/maturity", headers=admin_headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    fingerprint = next(
+        row
+        for row in data["harness_configuration_fingerprints"]
+        if row["agent_type"] == "cursor" and row["permission_mode"] == "manual"
+    )
+    assert fingerprint["session_count"] == 1
+    assert fingerprint["engineer_count"] == 1
+    assert fingerprint["success_rate"] == 1.0
+    assert fingerprint["compound_reliability_rate"] == 1.0
+    assert fingerprint["tool_count"] == 4
+    assert fingerprint["customization_count"] == 1
+    assert fingerprint["context_signal_count"] == 3
+    assert fingerprint["top_customizations"] == ["github"]
+    assert "Read" in fingerprint["top_tools"]
+    assert fingerprint["signals"] == ["agent:cursor", "permission:manual", "context"]
+    assert fingerprint["fingerprint_id"]
+    assert fingerprint["avg_leverage_score"] > 0
 
 
 def test_maturity_builds_delegation_patterns(
