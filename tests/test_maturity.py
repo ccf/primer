@@ -652,6 +652,17 @@ def test_maturity_builds_context_quality_scores(
     db_session.add(repo)
     db_session.flush()
 
+    low_repo = GitRepository(
+        full_name=f"acme/context-low-{uuid.uuid4().hex[:8]}",
+        has_claude_md=False,
+        has_agents_md=False,
+        has_claude_dir=False,
+        ai_readiness_score=10.0,
+        ai_readiness_checked_at=now - timedelta(days=120),
+    )
+    db_session.add(low_repo)
+    db_session.flush()
+
     s1.repository_id = repo.id
     s1.input_tokens = 1000
     s1.cache_read_tokens = 3000
@@ -663,8 +674,17 @@ def test_maturity_builds_context_quality_scores(
     s2.repository_id = repo.id
     s2.input_tokens = 3000
     s2.cache_read_tokens = 1000
+    low_session = Session(
+        id=str(uuid.uuid4()),
+        engineer_id=seeded_maturity_data["eng2"].id,
+        repository_id=low_repo.id,
+        started_at=now - timedelta(hours=6),
+        input_tokens=120_000,
+        cache_read_tokens=0,
+    )
     db_session.add_all(
         [
+            low_session,
             SessionFacets(session_id=s1.id, outcome="success"),
             ModelUsage(
                 session_id=s1.id,
@@ -682,6 +702,8 @@ def test_maturity_builds_context_quality_scores(
 
     assert response.status_code == 200
     data = response.json()
+    assert data["context_quality"][0]["repository"] == repo.full_name
+    assert data["context_quality"][-1]["repository"] == low_repo.full_name
     quality = next(row for row in data["context_quality"] if row["repository"] == repo.full_name)
     assert quality["session_count"] == 2
     assert quality["guide_coverage_score"] == 80.0

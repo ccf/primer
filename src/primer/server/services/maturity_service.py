@@ -1703,7 +1703,7 @@ def get_maturity_analytics(
                     )
                 )
     project_readiness.sort(key=lambda p: p.ai_readiness_score, reverse=True)
-    context_quality.sort(key=lambda row: (row.context_quality_score, -row.session_count))
+    context_quality.sort(key=lambda row: (-row.context_quality_score, -row.session_count))
 
     # Aggregate metrics
     avg_leverage = (
