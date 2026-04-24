@@ -17,7 +17,7 @@ from primer.cli.commands.sync_cmd import sync
 
 
 @click.group()
-@click.version_option(package_name="primer")
+@click.version_option(package_name="useprimer")
 def cli() -> None:
     """Primer — Claude Code usage insights for your team."""
     from primer.cli.config import load_config_into_env
