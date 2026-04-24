@@ -28,7 +28,7 @@ describe("ToolchainReliabilityTable", () => {
             failure_session_rate: 0.25,
             recovery_rate: 0.5,
             success_rate: 0.75,
-            compound_reliability_rate: 0.422,
+            compound_reliability_rate: 0.904,
             abandonment_rate: 0.25,
             avg_recovery_steps: 2.5,
             top_friction_types: ["tool_error", "timeout"],
@@ -43,8 +43,8 @@ describe("ToolchainReliabilityTable", () => {
     expect(screen.getByText("12")).toBeInTheDocument()
     expect(screen.getByText("3.0 / session")).toBeInTheDocument()
     expect(screen.getAllByText("50%")).toHaveLength(2)
-    expect(screen.getByText("42%")).toBeInTheDocument()
-    expect(screen.getByText("chain estimate")).toBeInTheDocument()
+    expect(screen.getByText("90%")).toBeInTheDocument()
+    expect(screen.getByText("10-step chain")).toBeInTheDocument()
     expect(screen.getByText("25%")).toBeInTheDocument()
     expect(screen.getByText("25% abandoned")).toBeInTheDocument()
     expect(screen.getByText("2.5 steps")).toBeInTheDocument()

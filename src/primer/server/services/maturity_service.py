@@ -57,6 +57,7 @@ from primer.server.services.delegation_graph_service import extract_session_dele
 from primer.server.services.effectiveness_service import build_effectiveness_score
 
 _RELIABILITY_FAILURE_FRICTION_TYPES = frozenset({"tool_error", "exec_error", "timeout"})
+_COMPOUND_RELIABILITY_CHAIN_LENGTH = 10
 
 
 def get_maturity_analytics(
@@ -866,7 +867,8 @@ def get_maturity_analytics(
         avg_calls = bucket["total_call_count"] / len(bucket["sessions"])
         if avg_calls <= 0:
             return None
-        return round(success_rate**avg_calls, 3)
+        per_call_rate = success_rate ** (1.0 / avg_calls)
+        return round(per_call_rate**_COMPOUND_RELIABILITY_CHAIN_LENGTH, 3)
 
     customization_breakdown = [
         CustomizationUsage(
