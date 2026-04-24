@@ -28,6 +28,7 @@ describe("MaturitySummary", () => {
           agent_team_modes: [],
           customization_outcomes: [],
           project_readiness: [],
+          context_quality: [],
         }}
       />,
     )
