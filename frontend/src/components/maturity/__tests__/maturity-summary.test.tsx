@@ -23,6 +23,7 @@ describe("MaturitySummary", () => {
           team_customization_landscape: [],
           customization_state_funnel: [],
           toolchain_reliability: [],
+          harness_configuration_fingerprints: [],
           delegation_patterns: [],
           agent_team_modes: [],
           customization_outcomes: [],

@@ -1970,6 +1970,24 @@ export interface ToolchainReliabilityEntry {
   top_friction_types: string[]
 }
 
+export interface HarnessConfigurationFingerprint {
+  fingerprint_id: string
+  label: string
+  agent_type: string
+  permission_mode: string
+  session_count: number
+  engineer_count: number
+  success_rate: number | null
+  avg_leverage_score: number
+  compound_reliability_rate: number | null
+  tool_count: number
+  customization_count: number
+  context_signal_count: number
+  top_tools: string[]
+  top_customizations: string[]
+  signals: string[]
+}
+
 export interface DelegationPatternSummary {
   target_node: string
   edge_type: DelegationEdgeType
@@ -2027,6 +2045,7 @@ export interface MaturityAnalyticsResponse {
   team_customization_landscape: TeamCustomizationLandscape[]
   customization_state_funnel: CustomizationStateFunnel[]
   toolchain_reliability: ToolchainReliabilityEntry[]
+  harness_configuration_fingerprints: HarnessConfigurationFingerprint[]
   delegation_patterns: DelegationPatternSummary[]
   agent_team_modes: AgentTeamModeSummary[]
   customization_outcomes: CustomizationOutcomeAttribution[]

@@ -2389,6 +2389,24 @@ class ToolchainReliabilityEntry(BaseModel):
     top_friction_types: list[str] = []
 
 
+class HarnessConfigurationFingerprint(BaseModel):
+    fingerprint_id: str
+    label: str
+    agent_type: str
+    permission_mode: str
+    session_count: int
+    engineer_count: int
+    success_rate: float | None = None
+    avg_leverage_score: float
+    compound_reliability_rate: float | None = None
+    tool_count: int
+    customization_count: int
+    context_signal_count: int = 0
+    top_tools: list[str] = []
+    top_customizations: list[str] = []
+    signals: list[str] = []
+
+
 class DelegationPatternSummary(BaseModel):
     target_node: str
     edge_type: DelegationEdgeType
@@ -2446,6 +2464,7 @@ class MaturityAnalyticsResponse(BaseModel):
     team_customization_landscape: list[TeamCustomizationLandscape] = []
     customization_state_funnel: list[CustomizationStateFunnel] = []
     toolchain_reliability: list[ToolchainReliabilityEntry] = []
+    harness_configuration_fingerprints: list[HarnessConfigurationFingerprint] = []
     delegation_patterns: list[DelegationPatternSummary] = []
     agent_team_modes: list[AgentTeamModeSummary] = []
     customization_outcomes: list[CustomizationOutcomeAttribution] = []

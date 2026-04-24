@@ -2,7 +2,7 @@
 
 from collections import Counter, defaultdict
 from datetime import datetime
-from hashlib import md5
+from hashlib import md5, sha256
 from statistics import median
 
 from sqlalchemy import func
@@ -35,6 +35,7 @@ from primer.common.schemas import (
     DailyLeverageEntry,
     DelegationPatternSummary,
     EngineerLeverageProfile,
+    HarnessConfigurationFingerprint,
     HighPerformerStack,
     LeverageBreakdown,
     MaturityAnalyticsResponse,
@@ -763,6 +764,8 @@ def get_maturity_analytics(
     engineer_customization_projects: dict[str, dict[tuple[str, str, str, str], Counter[str]]] = (
         defaultdict(lambda: defaultdict(Counter))
     )
+    session_customization_fingerprint_parts: dict[str, set[str]] = defaultdict(set)
+    session_customization_labels: dict[str, set[str]] = defaultdict(set)
     team_customizations: dict[str, Counter[tuple[str, str, str, str]]] = defaultdict(Counter)
     team_customization_engineers: dict[str, set[str]] = defaultdict(set)
     engineers_using_explicit_customizations: set[str] = set()
@@ -811,6 +814,10 @@ def get_maturity_analytics(
             )
             state_bucket[f"{state}_sessions"].add(session_id)
             state_bucket[f"{state}_engineers"].add(engineer_id)
+            session_customization_fingerprint_parts[session_id].add(
+                f"{customization_type}:{identifier}:{state}:{provenance}:{source_classification}"
+            )
+            session_customization_labels[session_id].add(identifier)
 
         if state != "invoked" or not is_explicit_customization_provenance(provenance):
             continue
@@ -1007,6 +1014,160 @@ def get_maturity_analytics(
 
     total_engineers = len(all_engineer_ids)
     profile_by_engineer_id = {profile.engineer_id: profile for profile in engineer_profiles}
+
+    source_metadata_rows = (
+        db.query(
+            SessionModel.id,
+            SessionModel.agent_type,
+            SessionModel.permission_mode,
+            SessionModel.source_metadata,
+        )
+        .filter(SessionModel.id.in_(db.query(session_id_subq.c.id)))
+        .all()
+    )
+    session_source_metadata = {row.id: row.source_metadata or {} for row in source_metadata_rows}
+
+    def _context_signal_count(source_metadata: object) -> int:
+        if not isinstance(source_metadata, dict):
+            return 0
+        native_telemetry = source_metadata.get("native_telemetry")
+        if not isinstance(native_telemetry, dict):
+            return 0
+        context_usage = native_telemetry.get("context_usage")
+        if isinstance(context_usage, dict):
+            reference_count = context_usage.get("reference_count")
+            if isinstance(reference_count, int | float):
+                return max(int(reference_count), 0)
+        return 0
+
+    harness_fingerprint_data: dict[str, dict] = {}
+    for row in source_metadata_rows:
+        tools = per_session.get(row.id, {})
+        if not tools and row.id not in session_customization_fingerprint_parts:
+            continue
+        tool_names = tuple(sorted(tool_name for tool_name, count in tools.items() if count > 0))
+        customization_parts = tuple(
+            sorted(session_customization_fingerprint_parts.get(row.id, set()))
+        )
+        customization_names = tuple(sorted(session_customization_labels.get(row.id, set())))
+        permission_mode = row.permission_mode or "default"
+        context_count = _context_signal_count(session_source_metadata.get(row.id, {}))
+        context_bucket = "context:present" if context_count > 0 else "context:none"
+        raw_parts = [
+            f"agent:{row.agent_type}",
+            f"permission:{permission_mode}",
+            *[f"tool:{tool}" for tool in tool_names],
+            *[f"customization:{customization}" for customization in customization_parts],
+            context_bucket,
+        ]
+        fingerprint_id = sha256("|".join(raw_parts).encode()).hexdigest()[:16]
+        bucket = harness_fingerprint_data.setdefault(
+            fingerprint_id,
+            {
+                "fingerprint_id": fingerprint_id,
+                "agent_type": row.agent_type,
+                "permission_mode": permission_mode,
+                "sessions": set(),
+                "engineers": set(),
+                "success_sessions": set(),
+                "leverage_scores": [],
+                "tool_counts": [],
+                "customization_counts": [],
+                "context_signal_count": 0,
+                "tools": Counter(),
+                "customizations": Counter(),
+                "signals": Counter(),
+            },
+        )
+        bucket["sessions"].add(row.id)
+        session_metric = session_metrics.get(row.id)
+        if session_metric is not None:
+            engineer_id_for_session = session_metric["engineer_id"]
+            if engineer_id_for_session:
+                bucket["engineers"].add(engineer_id_for_session)
+            outcome = session_metric["outcome"]
+            if outcome and is_success_outcome(outcome):
+                bucket["success_sessions"].add(row.id)
+        bucket["tool_counts"].append(len(tool_names))
+        bucket["customization_counts"].append(len(customization_names))
+        bucket["context_signal_count"] += context_count
+        bucket["tools"].update(tool_names)
+        bucket["customizations"].update(customization_names)
+        bucket["signals"].update(
+            [
+                f"agent:{row.agent_type}",
+                f"permission:{permission_mode}",
+                "context" if context_count > 0 else "no_context",
+            ]
+        )
+        if row.id in session_engineer:
+            engineer_id_for_session = session_engineer[row.id][0]
+            profile = profile_by_engineer_id.get(engineer_id_for_session)
+            if profile is not None:
+                bucket["leverage_scores"].append(profile.leverage_score)
+
+    def _fingerprint_compound_rate(bucket: dict) -> float | None:
+        if not bucket["sessions"]:
+            return None
+        avg_steps = (
+            sum(bucket["tool_counts"]) / len(bucket["tool_counts"]) if bucket["tool_counts"] else 0
+        )
+        if avg_steps <= 0:
+            return None
+        success_rate = len(bucket["success_sessions"]) / len(bucket["sessions"])
+        per_step_rate = success_rate ** (1.0 / avg_steps)
+        return round(per_step_rate**_COMPOUND_RELIABILITY_CHAIN_LENGTH, 3)
+
+    harness_configuration_fingerprints = [
+        HarnessConfigurationFingerprint(
+            fingerprint_id=bucket["fingerprint_id"],
+            label=(
+                f"{bucket['agent_type']} / {bucket['permission_mode']} / "
+                f"{round(sum(bucket['tool_counts']) / len(bucket['tool_counts']), 1)} tools"
+            ),
+            agent_type=bucket["agent_type"],
+            permission_mode=bucket["permission_mode"],
+            session_count=len(bucket["sessions"]),
+            engineer_count=len(bucket["engineers"]),
+            success_rate=(
+                round(len(bucket["success_sessions"]) / len(bucket["sessions"]), 3)
+                if bucket["sessions"]
+                else None
+            ),
+            avg_leverage_score=(
+                round(sum(bucket["leverage_scores"]) / len(bucket["leverage_scores"]), 1)
+                if bucket["leverage_scores"]
+                else 0.0
+            ),
+            compound_reliability_rate=_fingerprint_compound_rate(bucket),
+            tool_count=round(sum(bucket["tool_counts"]) / len(bucket["tool_counts"]))
+            if bucket["tool_counts"]
+            else 0,
+            customization_count=round(
+                sum(bucket["customization_counts"]) / len(bucket["customization_counts"])
+            )
+            if bucket["customization_counts"]
+            else 0,
+            context_signal_count=bucket["context_signal_count"],
+            top_tools=[tool for tool, _count in bucket["tools"].most_common(5)],
+            top_customizations=[
+                customization for customization, _count in bucket["customizations"].most_common(5)
+            ],
+            signals=[signal for signal, _count in bucket["signals"].most_common(5)],
+        )
+        for bucket in sorted(
+            harness_fingerprint_data.values(),
+            key=lambda item: (
+                -len(item["sessions"]),
+                -(
+                    sum(item["leverage_scores"]) / len(item["leverage_scores"])
+                    if item["leverage_scores"]
+                    else 0.0
+                ),
+                item["fingerprint_id"],
+            ),
+        )
+    ][:25]
 
     def _avg(values: list[float | None]) -> float | None:
         present = [value for value in values if value is not None]
@@ -1390,6 +1551,7 @@ def get_maturity_analytics(
         team_customization_landscape=team_customization_landscape,
         customization_state_funnel=customization_state_funnel,
         toolchain_reliability=toolchain_reliability,
+        harness_configuration_fingerprints=harness_configuration_fingerprints,
         delegation_patterns=delegation_patterns,
         agent_team_modes=agent_team_modes,
         customization_outcomes=customization_outcomes,

@@ -192,7 +192,7 @@ Derived data pipelines, performance optimization, durable background jobs, enter
 - [x] [P1] Cross-team tooling landscape: overlap, reuse, and local best-of-breed tools
 - [x] [P1] High-performer agent stack analysis: which combinations of MCPs, skills, commands, and subagents differentiate top performers
 - [x] [P0] Per-tool success rate tracking with compound reliability computation (10 steps at 99% = 90.4% end-to-end)
-- [ ] [P0] Harness configuration fingerprinting from session telemetry (tools, context files, permissions, customizations)
+- [x] [P0] Harness configuration fingerprinting from session telemetry (tools, context files, permissions, customizations)
 - [ ] [P1] Context quality scoring: AGENTS.md freshness, token efficiency, guide/sensor coverage
 - [ ] [P1] Harness evolution timeline: before/after correlation of configuration changes with outcome changes
 - [ ] [P1] Harnessability scoring per project: documentation quality, typing strength, module boundaries
