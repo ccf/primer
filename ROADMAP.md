@@ -20,7 +20,7 @@ Items marked with `[x]` are shipped. Items marked with `[ ]` are planned. Planne
 - **Harness evolution**: How have harness configurations changed over time, and did those changes improve outcomes?
 - **Harnessability**: Are codebases and teams structurally ready for effective agent harnesses (documentation quality, typing, module boundaries, data governance)?
 - **Dead weight**: Which harness configurations are outdated compensations for older model limitations that now bottleneck performance?
-- **Individual effectiveness**: What should each engineer change about their harness setup to improve outcomes?
+- **Environment effectiveness**: Where is the project context failing the engineer, and what harness or repository changes will unblock them?
 
 ## Product Goals
 
@@ -28,49 +28,52 @@ Items marked with `[x]` are shipped. Items marked with `[ ]` are planned. Planne
 - Build the "code coverage for harnesses" that the industry is asking for (per-component reliability, compound failure math).
 - Track longitudinal harness evolution so teams can see how configuration changes correlate with outcome changes over time.
 - Make harnessability scoring a first-class product surface (documentation quality, context freshness, guide/sensor coverage).
-- Close the loop from harness insight to intervention — including subtractive coaching ("what can you stop doing?").
+- Position Primer as the engineer's ally—proving when a codebase is not "AI-ready" rather than focusing on engineer inefficiency or surveillance.
+- Close the loop from harness insight to auto-remediation — where Primer acts as an agent itself to fix broken repository context.
 - Bring harness intelligence into the engineer workflow via MCP sidecar, not only after the fact.
 
 ## Strategic Themes
 
-### P0: Harness Attribution and Compound Reliability
+### P0: Enterprise Security & Trust
+Telemetry capture cannot mean IP leakage. Primer must implement robust secret, PII, and IP scrubbing at the capture layer before any data is persisted, alongside transcript cold storage strategies for scale. Security teams must trust Primer by default.
 
+### P0: Harness Attribution and Compound Reliability
 Primer's moat is decomposing outcomes to the harness component level. Per-tool success rates, compound reliability math (10 steps at 99% = 90.4% end-to-end), and harness configuration fingerprinting from session telemetry. This is the "code coverage for harnesses" that the industry is asking for.
 
 ### P0: Measurement Integrity
-
 Trustworthy semantics remain foundational. Clean taxonomy for outcomes, goals, friction, and success, plus reprocessing and coverage tooling so every downstream metric is credible.
 
 ### P0: Harness Evolution Tracking
-
 Longitudinal correlation of harness configuration changes with outcome changes over time. LangChain rewrote their harness 4x in one year; Vercel removed 80% of tools and improved. No tool tracks this — Primer's team-level time-series data is uniquely positioned.
 
 ### P1: Harnessability Scoring
-
 Measure whether codebases and teams have the structural properties (documentation quality, context freshness, module boundaries, guide/sensor coverage) that make agent harnesses effective. Extends existing project readiness into a full harnessability assessment.
 
-### P1: Closed-Loop Coaching and Experimentation
-
-Recommendations should become assignable, measurable interventions — including subtractive coaching ("what can you stop doing?"). Dead weight detection identifies harness configurations that are outdated compensations for older model limitations.
+### P1: Closed-Loop Enablement and Auto-Remediation
+Recommendations should become measurable interventions, shifting away from "engineer coaching" and toward "environment fixing." Primer should begin acting as an agent itself, automatically opening PRs to update outdated AGENTS.md or remove dead-weight MCP tools.
 
 ### P1: In-Workflow Guidance
-
 The most valuable insights should show up during the session via MCP sidecar: harness health scores, context quality warnings, dead weight alerts, and configuration recommendations.
 
-### P2: Operational Scale and Enterprise Readiness
+### P2: Harness Simulation & Backtesting
+If an organization changes permission boundaries or MCP tools, they should know if it works. Primer will enable "backtesting"—running past failed sessions through new harness configurations to mathematically prove the change improves outcomes.
 
+### P2: Operational Scale and Enterprise Readiness
 Derived data pipelines, performance optimization, durable background jobs, enterprise identity, and observability.
 
 ## Near-Term Priorities
 
+- `P0` Local secret, PII, and IP redaction pipeline at the capture layer before database insertion.
 - `P0` Per-tool success rate tracking with compound reliability computation — decompose session outcomes to the tool/step level.
 - `P0` Harness configuration fingerprinting — extract and catalog the actual harness configuration (tools, context files, permissions, customizations) from session telemetry.
 - `P0` Context quality scoring — measure AGENTS.md freshness, token efficiency, and guide/sensor coverage per project.
 - `P1` Harness evolution timeline — before/after correlation of configuration changes with outcome changes.
 - `P1` Harnessability scoring per project — documentation quality, typing strength, module boundaries, data governance readiness.
+- `P1` Issue tracker integration (Linear/Jira) to connect session success to ticket-to-merge cycle time.
 - `P1` Paragon's 4-dimension evaluation — tool correctness, tool usage accuracy, task completion, task efficiency.
 - `P1` Semantic search over sessions via pgvector — exemplar discovery and cross-engineer pattern matching.
-- `P2` Automated harness optimization suggestions — evolve coaching to recommend specific harness configuration changes.
+- `P2` Primer-as-Agent auto-remediation — Primer automatically generates PRs for environment fixes.
+- `P2` Harness backtesting — simulate past sessions against new configurations.
 
 ## Detailed Roadmap
 
@@ -87,6 +90,8 @@ Derived data pipelines, performance optimization, durable background jobs, enter
 - [x] [P1] Recovery-path tracking: detect whether engineers recover after friction or abandon the attempt
 - [x] [P1] Derived analytics tables and materialized rollups for heavy longitudinal queries
 - [x] Source-quality dashboard by agent type, including capture coverage and telemetry completeness for Cursor
+- [ ] [P0] Secret, PII, and IP redaction pipeline at the capture layer (e.g., Presidio integration) before persistence
+- [ ] [P2] Transcript cold storage and blob offloading (S3/GCS) to keep the operational database fast
 - [ ] [P2] Data-quality anomaly detection for broken ingestion, sparse transcripts, or stale integrations
 
 ## Session Intelligence
@@ -108,6 +113,8 @@ Derived data pipelines, performance optimization, durable background jobs, enter
 - [x] [P1] Cursor-specific workflow fingerprinting and session archetype mapping
 - [x] [P1] Session archetype detection: debugging, feature delivery, refactor, migration, docs, investigation
 - [x] [P1] Delegation graph capture for multi-agent and subagent workflows
+- [ ] [P1] Issue Tracker Integration (Jira/Linear) to correlate AI session efficiency with actual business sprint velocity
+- [ ] [P1] Copilot Integration Strategy: explore telemetry extraction for Copilot Chat alongside current CLI agents
 - [x] [P2] Exemplar session library for high-value workflows and onboarding examples
 - [x] [P2] Skill, command, and template reuse analytics by workflow and outcome
 - [x] [P2] Prompt reuse analytics by workflow and outcome
@@ -126,7 +133,9 @@ Derived data pipelines, performance optimization, durable background jobs, enter
 - [x] [P1] Friction recovery analysis: what engineers tried after failure and which recoveries worked
 - [ ] [P2] Real-time friction detection for in-session intervention
 
-## Engineer Intelligence
+## Developer Enablement & Analytics
+
+*Note: We are explicitly shifting our product vernacular and UI away from "Engineer Coaching/Surveillance" toward "Harness & Project Enablement" to ensure Primer acts as a developer ally. Legacy views will be reframed to highlight repo enablement.*
 
 - [x] Engineer leaderboard with multi-dimensional ranking
 - [x] Personal trajectory dashboard with weekly sparklines
@@ -191,13 +200,14 @@ Derived data pipelines, performance optimization, durable background jobs, enter
 - [x] [P1] Outcome attribution for customizations: which MCPs, skills, commands, and subagents improve workflow, quality, cost, and friction outcomes
 - [x] [P1] Cross-team tooling landscape: overlap, reuse, and local best-of-breed tools
 - [x] [P1] High-performer agent stack analysis: which combinations of MCPs, skills, commands, and subagents differentiate top performers
-- [x] [P0] Per-tool success rate tracking with compound reliability computation (10 steps at 99% = 90.4% end-to-end)
-- [x] [P0] Harness configuration fingerprinting from session telemetry (tools, context files, permissions, customizations)
-- [x] [P1] Context quality scoring: AGENTS.md freshness, token efficiency, guide/sensor coverage
+- [ ] [P0] Per-tool success rate tracking with compound reliability computation (10 steps at 99% = 90.4% end-to-end)
+- [ ] [P0] Harness configuration fingerprinting from session telemetry (tools, context files, permissions, customizations)
+- [ ] [P1] Context quality scoring: AGENTS.md freshness, token efficiency, guide/sensor coverage
 - [ ] [P1] Harness evolution timeline: before/after correlation of configuration changes with outcome changes
 - [ ] [P1] Harnessability scoring per project: documentation quality, typing strength, module boundaries
 - [ ] [P1] Paragon's 4-dimension evaluation: tool correctness, tool usage accuracy, task completion, task efficiency
 - [ ] [P2] Prompt, skill, and template maturity scoring
+- [ ] [P2] Harness Simulation & Backtesting: Run past failed sessions through proposed harness configs to validate improvements before deployment.
 - [ ] [P2] Automated harness optimization suggestions
 - [ ] [P2] Dead weight dashboard tab with per-customization detail and removal actions
 
@@ -259,6 +269,7 @@ Derived data pipelines, performance optimization, durable background jobs, enter
 - [x] [P0] Before-and-after measurement for coaching, tooling, or repo changes
 - [x] [P1] Experimentation layer for training rollouts, tool changes, and enablement playbooks
 - [x] [P1] Intervention effectiveness reporting by team, project, and engineer cohort
+- [ ] [P1] Primer-as-Agent Auto-Remediation: Automatically generate pull requests to fix outdated context (e.g., AGENTS.md) or dead-weight tools
 - [x] [P2] Auto-generated next-step plans from alerts, narratives, and project findings
 
 ## Real-Time Engineer Experience
