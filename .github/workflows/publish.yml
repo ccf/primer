@@ -109,9 +109,17 @@ jobs:
 
   publish-pypi:
     # Only tag pushes (or an explicit dispatch with target=pypi) reach prod.
+    # `always()` + explicit result checks let this run when publish-testpypi is
+    # skipped (target=pypi dispatch) while still gating on build success and a
+    # green TestPyPI rehearsal on tag pushes.
     if: |
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi')
+      always() &&
+      needs.build.result == 'success' &&
+      (needs.publish-testpypi.result == 'success' || needs.publish-testpypi.result == 'skipped') &&
+      (
+        github.event_name == 'push' ||
+        (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi')
+      )
     needs: [build, publish-testpypi]
     runs-on: ubuntu-latest
     environment:
