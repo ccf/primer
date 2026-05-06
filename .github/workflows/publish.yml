@@ -1,0 +1,127 @@
+name: Publish to PyPI
+
+# Triggered when a vX.Y.Z tag is pushed. The job builds the wheel + sdist
+# and uploads them to PyPI using trusted publishing (OIDC) — no PyPI tokens
+# stored as repo secrets, no credentials on developer laptops.
+#
+# Requirements (one-time setup on the PyPI side):
+#   1. https://pypi.org/manage/account/publishing/ — add a trusted publisher
+#      with: PyPI project = useprimer, GitHub owner = ccf, repo = primer,
+#      workflow filename = publish.yml, environment = pypi
+#   2. https://test.pypi.org/manage/account/publishing/ — same setup with
+#      environment = testpypi
+#   3. In this repo: Settings → Environments → create "pypi" and "testpypi"
+#      (no protection rules required, but adding manual approval on "pypi"
+#      is a good idea)
+#
+# Versioning:
+#   The job uses the GitHub tag (e.g. refs/tags/v0.2.1 → 0.2.1) as the
+#   release version. pyproject.toml's version field must match before
+#   tagging — CI will fail loudly if they diverge.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Where to publish"
+        required: true
+        type: choice
+        default: testpypi
+        options:
+          - testpypi
+          - pypi
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        run: python -m pip install --upgrade build twine
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            ref="${GITHUB_REF#refs/tags/v}"
+          else
+            ref=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          fi
+          echo "version=$ref" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: $ref"
+
+      - name: Verify pyproject version matches tag
+        if: github.event_name == 'push'
+        run: |
+          tag_version="${GITHUB_REF#refs/tags/v}"
+          py_version=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          if [[ "$tag_version" != "$py_version" ]]; then
+            echo "::error::Tag v$tag_version does not match pyproject.toml version $py_version"
+            exit 1
+          fi
+
+      - name: Build sdist + wheel
+        run: python -m build
+
+      - name: Verify metadata
+        run: python -m twine check --strict dist/*
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: dist
+          path: dist/
+          retention-days: 14
+
+  publish-testpypi:
+    # Tag pushes always rehearse on TestPyPI; manual dispatches honor the input.
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi')
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/useprimer/${{ needs.build.outputs.version }}/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+
+  publish-pypi:
+    # Only tag pushes (or an explicit dispatch with target=pypi) reach prod.
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi')
+    needs: [build, publish-testpypi]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/useprimer/${{ needs.build.outputs.version }}/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
