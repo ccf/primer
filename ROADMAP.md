@@ -49,6 +49,9 @@ Longitudinal correlation of harness configuration changes with outcome changes o
 ### P1: Harnessability Scoring
 Measure whether codebases and teams have the structural properties (documentation quality, context freshness, module boundaries, guide/sensor coverage) that make agent harnesses effective. Extends existing project readiness into a full harnessability assessment.
 
+### P1: Synthesized Memory System ("Dreaming")
+Move Primer from an analytics tool to an active participant. Implement asynchronous background jobs that process and distill sessions into 'Project Facts,' 'Harness Limitations,' and 'Implicit Workflows.' Introduce dynamic context injection to prevent repeated team mistakes by supplying active agents with historical learnings.
+
 ### P1: Closed-Loop Enablement and Auto-Remediation
 Recommendations should become measurable interventions, shifting away from "engineer coaching" and toward "environment fixing." Primer should begin acting as an agent itself, automatically opening PRs to update outdated AGENTS.md or remove dead-weight MCP tools.
 
@@ -67,12 +70,16 @@ Derived data pipelines, performance optimization, durable background jobs, enter
 - `P0` Per-tool success rate tracking with compound reliability computation — decompose session outcomes to the tool/step level.
 - `P0` Harness configuration fingerprinting — extract and catalog the actual harness configuration (tools, context files, permissions, customizations) from session telemetry.
 - `P0` Context quality scoring — measure AGENTS.md freshness, token efficiency, and guide/sensor coverage per project.
+- `P1` Background 'Dream' Worker — Batch-process sessions and use LLMs to extract project facts and harness limitations into a vector-indexed long-term memory layer.
+- `P1` Dynamic MCP Context Injection — Inject 'Mental Models' and learned project facts directly into an agent's system prompt at the start of a session.
 - `P1` Harness evolution timeline — before/after correlation of configuration changes with outcome changes.
 - `P1` Harnessability scoring per project — documentation quality, typing strength, module boundaries, data governance readiness.
 - `P1` Issue tracker integration (Linear/Jira) to connect session success to ticket-to-merge cycle time.
 - `P1` Paragon's 4-dimension evaluation — tool correctness, tool usage accuracy, task completion, task efficiency.
 - `P1` Semantic search over sessions via pgvector — exemplar discovery and cross-engineer pattern matching.
 - `P2` Primer-as-Agent auto-remediation — Primer automatically generates PRs for environment fixes.
+- `P2` Primer Auto-Docs — Synthesize learned team rules into automatic PRs for `AGENTS.md` and `.claude.json`.
+- `P2` Epistemic Explorer (The Oracle) — Query the synthesized memory layer directly via natural language.
 - `P2` Harness backtesting — simulate past sessions against new configurations.
 
 ## Detailed Roadmap
@@ -255,6 +262,8 @@ Derived data pipelines, performance optimization, durable background jobs, enter
 - [x] AI-powered recommendations panel
 - [x] [P1] Saved explorer prompts and reusable report cards
 - [x] [P1] Compare mode for engineer, team, project, and time-period analysis
+- [ ] [P1] Background 'Dream' Worker: Asynchronous reflection pipeline to distill daily sessions into vector-indexed long-term memory (Project Facts, Harness Rules).
+- [ ] [P2] Epistemic Explorer (The Oracle): Upgrade Conversational Explorer to query the synthesized memory layer instead of just raw telemetry.
 - [x] [P2] Weekly manager review packs that combine quality, friction, growth, and cost
 - [x] [P2] Recommendation narratives that explain why a workflow is likely to help
 
@@ -270,6 +279,7 @@ Derived data pipelines, performance optimization, durable background jobs, enter
 - [x] [P1] Experimentation layer for training rollouts, tool changes, and enablement playbooks
 - [x] [P1] Intervention effectiveness reporting by team, project, and engineer cohort
 - [ ] [P1] Primer-as-Agent Auto-Remediation: Automatically generate pull requests to fix outdated context (e.g., AGENTS.md) or dead-weight tools
+- [ ] [P2] Primer Auto-Docs: Automatically write and PR rules to AGENTS.md based on synthesized team memory.
 - [x] [P2] Auto-generated next-step plans from alerts, narratives, and project findings
 
 ## Real-Time Engineer Experience
@@ -277,6 +287,7 @@ Derived data pipelines, performance optimization, durable background jobs, enter
 - [x] MCP sidecar with on-demand stats, friction reports, and recommendations
 - [x] [P0] Proactive coaching skill that activates at session start with contextual suggestions
 - [x] [P0] Live session signals that stream friction, satisfaction, and risk as work happens
+- [ ] [P1] Dynamic MCP Context Injection: Surface 'Mental Models' and historical project facts to agents immediately at session start.
 - [x] [P1] In-session workflow nudges based on project playbooks and prior failures
 - [x] [P1] Daily and weekly personal recaps inside the sidecar
 - [ ] [P2] Lightweight session planning prompts before complex work begins
