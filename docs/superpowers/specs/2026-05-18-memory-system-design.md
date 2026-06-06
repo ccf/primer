@@ -1,6 +1,9 @@
 # Project Memory System — Design Spec
 
-**Status:** Draft for review
+**Status:** SUPERSEDED by `2026-05-18-hive-mind-memory-design.md` (v2). The pivot to
+project-scoped shared memory ("hive mind") made the live memory store the source of
+truth and demoted auto-PRs to a crystallization export surface. Most pipeline
+components survive in v2 in reframed form; see v2 §2 for the decision log.
 **Date:** 2026-05-18
 **Roadmap link:** ROADMAP.md `P1 Background 'Dream' Worker` + `P2 Primer Auto-Docs`
 
