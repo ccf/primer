@@ -71,7 +71,10 @@ DETECTORS: tuple[Detector, ...] = (
     ),
     Detector(
         "email",
-        re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
+        # Negative lookahead spares scp-style git remotes (git@host:org/repo.git)
+        # from being mistaken for an email address in free text — a real email
+        # is never immediately followed by `:<path-with-slash>`.
+        re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b(?!:\S*/)"),
     ),
 )
 
@@ -117,18 +120,20 @@ def build_extra_detectors(raw_json: str) -> tuple[Detector, ...]:
         return ()
 
 
-_URL_USERINFO_CREDENTIALS = re.compile(r"(?<=://)[^\s/@]*:[^\s/@]+@")
+_URL_USERINFO_CREDENTIALS = re.compile(r"(?i)(https?://)[^\s/@]+@")
 
 
 def scrub_url_credentials(url: str) -> tuple[str, int]:
-    """Remove user:password userinfo from a URL, keeping it valid and resolvable.
+    """Remove userinfo (user:password OR token-only) from http(s) URLs.
 
     Removal (not tokenization) so downstream URL parsing — e.g. repository
-    identity resolution from git remotes — keeps working. scp-style remotes
-    (git@host:path) have no scheme and are untouched; bare-user ssh URLs
-    (ssh://git@host/...) carry no password and are untouched.
+    identity resolution from git remotes — keeps working. Only http(s) is
+    scrubbed: ssh:// carries a required login (git@) that is not a secret, and
+    scp-style remotes (git@host:path) have no scheme. Token-only HTTPS userinfo
+    (https://<token>@host) — the most common authenticated git remote — is
+    covered, where a colon-requiring rule would have leaked it.
     """
-    return _URL_USERINFO_CREDENTIALS.subn("", url)
+    return _URL_USERINFO_CREDENTIALS.subn(r"\1", url)
 
 
 # Whitelist of payload locations that carry free text. Everything else

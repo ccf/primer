@@ -86,6 +86,19 @@ def test_email_detector():
     assert "[REDACTED:email]" in redacted
 
 
+def test_email_rule_spares_scp_remote_in_text():
+    text = "clone git@github.com:acme/widgets.git to start"
+    redacted, counts = redact_text(text)
+    assert "email" not in counts
+    assert "git@github.com:acme/widgets.git" in redacted
+
+
+def test_email_still_redacted_before_colon_without_path():
+    # a real email followed by a colon (no scp path) must still redact
+    _redacted, counts = redact_text("ping alice@example.com: urgent")
+    assert counts.get("email") == 1
+
+
 def test_disabled_detector_does_not_fire():
     text = "contact alice@example.com"
     redacted, counts = redact_text(text, disabled=frozenset({"email"}))
@@ -245,6 +258,21 @@ def test_scrub_url_credentials_leaves_scp_and_ssh_remotes():
         cleaned, n = scrub_url_credentials(url)
         assert cleaned == url
         assert n == 0
+
+
+def test_scrub_url_credentials_strips_token_only_https():
+    cleaned, n = scrub_url_credentials(
+        "https://ghp_abcdefghijklmnopqrstuvwxyz012345@github.com/o/r.git"
+    )
+    assert cleaned == "https://github.com/o/r.git"
+    assert n == 1
+
+
+def test_scrub_url_credentials_idempotent():
+    once, _ = scrub_url_credentials("https://tok@github.com/o/r.git")
+    twice, _ = scrub_url_credentials(once)
+    assert once == "https://github.com/o/r.git"
+    assert twice == once
 
 
 def test_walker_scrubs_git_remote_url():
