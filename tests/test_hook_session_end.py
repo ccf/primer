@@ -526,3 +526,75 @@ def test_main_redaction_can_be_disabled_by_env(
 
     sent = mock_post.call_args.kwargs["json"]
     assert "sk-ant-api03" in sent["first_prompt"]
+
+
+@patch("primer.hook.session_end.redact_ingest_dict")
+@patch("primer.hook.session_end.httpx.post")
+@patch("primer.hook.session_end.load_facets")
+@patch("primer.hook.session_end.get_extractor_for")
+def test_main_redaction_failure_strips_content_but_posts_metrics(
+    mock_get_extractor, mock_facets, mock_post, mock_redact, monkeypatch
+):
+    monkeypatch.delenv("PRIMER_API_KEY", raising=False)
+    monkeypatch.setenv("PRIMER_DEVICE_TOKEN", "device-123")
+    monkeypatch.delenv("PRIMER_REDACTION_ENABLED", raising=False)
+    monkeypatch.setattr(
+        "sys.stdin",
+        _make_stdin({"session_id": "sess-fail", "transcript_path": "/t/x.jsonl"}),
+    )
+    monkeypatch.setattr("sys.argv", ["session_end"])
+
+    mock_redact.side_effect = RuntimeError("boom")
+    meta = SessionMetadata(
+        session_id="",
+        first_prompt="key sk-ant-api03-AbCdEf123456789012345",
+        message_count=7,
+        messages=[{"ordinal": 0, "role": "human", "content_text": "secret stuff"}],
+    )
+    mock_extractor = MagicMock()
+    mock_extractor.extract.return_value = meta
+    mock_get_extractor.return_value = mock_extractor
+    mock_facets.return_value = None
+    mock_resp = MagicMock()
+    mock_resp.status_code = 202
+    mock_post.return_value = mock_resp
+
+    from primer.hook.session_end import main
+
+    main()
+
+    sent = mock_post.call_args.kwargs["json"]
+    assert "first_prompt" not in sent
+    assert "messages" not in sent
+    assert sent["message_count"] == 7
+    assert sent["session_id"] == "sess-fail"
+
+
+@patch("primer.hook.session_end.httpx.post")
+@patch("primer.hook.session_end.load_facets")
+@patch("primer.hook.session_end.get_extractor_for")
+def test_main_redaction_disabled_by_off(mock_get_extractor, mock_facets, mock_post, monkeypatch):
+    monkeypatch.delenv("PRIMER_API_KEY", raising=False)
+    monkeypatch.setenv("PRIMER_DEVICE_TOKEN", "device-123")
+    monkeypatch.setenv("PRIMER_REDACTION_ENABLED", "OFF")
+    monkeypatch.setattr(
+        "sys.stdin",
+        _make_stdin({"session_id": "sess-off", "transcript_path": "/t/x.jsonl"}),
+    )
+    monkeypatch.setattr("sys.argv", ["session_end"])
+
+    meta = SessionMetadata(session_id="", first_prompt="key sk-ant-api03-AbCdEf123456789012345")
+    mock_extractor = MagicMock()
+    mock_extractor.extract.return_value = meta
+    mock_get_extractor.return_value = mock_extractor
+    mock_facets.return_value = None
+    mock_resp = MagicMock()
+    mock_resp.status_code = 202
+    mock_post.return_value = mock_resp
+
+    from primer.hook.session_end import main
+
+    main()
+
+    sent = mock_post.call_args.kwargs["json"]
+    assert "sk-ant-api03" in sent["first_prompt"]

@@ -136,10 +136,24 @@ def main() -> None:
 
     # Redact secrets/PII client-side before anything leaves this machine.
     # Controlled by PRIMER_REDACTION_ENABLED (default: on).
-    if os.environ.get("PRIMER_REDACTION_ENABLED", "true").lower() not in ("0", "false", "no"):
-        payload, redaction_counts = redact_ingest_dict(payload)
-        if redaction_counts:
-            logger.info(f"Redacted {sum(redaction_counts.values())} sensitive value(s)")
+    redaction_setting = os.environ.get("PRIMER_REDACTION_ENABLED", "true").lower()
+    if redaction_setting not in ("0", "false", "no", "off"):
+        try:
+            payload, redaction_counts = redact_ingest_dict(payload)
+            if redaction_counts:
+                logger.info(f"Redacted {sum(redaction_counts.values())} sensitive value(s)")
+        except Exception as exc:
+            # Fail closed on content: drop text-bearing fields, keep metrics.
+            for field in (
+                "first_prompt",
+                "summary",
+                "messages",
+                "commits",
+                "source_metadata",
+                "facets",
+            ):
+                payload.pop(field, None)
+            logger.warning(f"Redaction failed ({exc}); stripped text fields from payload")
 
     try:
         resp = httpx.post(
