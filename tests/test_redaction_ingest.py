@@ -3,7 +3,7 @@
 import uuid
 
 from primer.common.config import settings
-from primer.common.models import BackgroundJob, SessionMessage
+from primer.common.models import BackgroundJob, GitRepository, SessionMessage
 from primer.common.models import Session as SessionModel
 
 
@@ -112,3 +112,62 @@ def test_redaction_failure_strips_content_not_500(
         .all()
     )
     assert msgs == []
+
+
+def test_redaction_failure_scrubs_git_remote_url(
+    client, engineer_with_key, db_session, monkeypatch
+):
+    import primer.server.routers.ingest as ingest_module
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("redaction exploded")
+
+    monkeypatch.setattr(ingest_module, "redact_ingest_dict", _boom)
+    _engineer, api_key = engineer_with_key
+    payload = _secret_session_payload(api_key)
+    payload["git_remote_url"] = "https://user:t0ps3cret@github.com/acme/x.git"
+
+    r = client.post("/api/v1/ingest/session", json=payload)
+    assert r.status_code == 200
+
+    session = db_session.query(SessionModel).filter(SessionModel.id == payload["session_id"]).one()
+    assert session.first_prompt is None
+    # git_remote_url is not stored on the session row; it is parsed into a
+    # GitRepository.full_name via parse_repo_full_name. The fail-closed path
+    # scrubs the credential URL down to a clean form that still parses to the
+    # same owner/repo, so repository linking is preserved and no credential
+    # flows downstream.
+    assert session.repository_id is not None
+    repo = db_session.query(GitRepository).filter(GitRepository.id == session.repository_id).one()
+    assert repo.full_name == "acme/x"
+    assert "t0ps3cret" not in str(session.__dict__)
+
+
+def test_redaction_failure_scrubs_git_remote_url_in_async_job(
+    client, engineer_with_key, db_session, monkeypatch
+):
+    """On redaction failure the enqueued job payload must not carry URL creds."""
+    monkeypatch.setattr(settings, "background_jobs_enabled", True)
+    import primer.server.routers.ingest as ingest_module
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("redaction exploded")
+
+    monkeypatch.setattr(ingest_module, "redact_ingest_dict", _boom)
+    _engineer, api_key = engineer_with_key
+    payload = _secret_session_payload(api_key)
+    payload["git_remote_url"] = "https://user:t0ps3cret@github.com/acme/x.git"
+
+    r = client.post("/api/v1/ingest/session", json=payload)
+    assert r.status_code == 202
+
+    job = (
+        db_session.query(BackgroundJob)
+        .filter(BackgroundJob.job_type == "session_ingest")
+        .order_by(BackgroundJob.enqueued_at.desc())
+        .first()
+    )
+    assert job is not None
+    serialized = str(job.payload)
+    assert "t0ps3cret" not in serialized
+    assert "https://github.com/acme/x.git" in serialized

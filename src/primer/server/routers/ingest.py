@@ -11,6 +11,7 @@ from primer.common.redaction import (
     build_disabled_set,
     build_extra_detectors,
     redact_ingest_dict,
+    scrub_url_credentials,
 )
 from primer.common.schemas import (
     BulkIngestPayload,
@@ -91,7 +92,17 @@ def _apply_redaction(payload: SessionIngestPayload) -> SessionIngestPayload:
             exc_info=True,
         )
         # model_copy(update=...) bypasses validators; all six fields are Optional.
-        return payload.model_copy(update=dict.fromkeys(_TEXT_BEARING_FIELDS))
+        stripped = payload.model_copy(update=dict.fromkeys(_TEXT_BEARING_FIELDS))
+        # git_remote_url isn't text-bearing, but HTTPS remotes can carry
+        # user:token credentials. Attempt the one-regex targeted scrub (almost
+        # certainly not what crashed); if even that fails, drop the field.
+        if stripped.git_remote_url:
+            try:
+                cleaned, _ = scrub_url_credentials(stripped.git_remote_url)
+                stripped = stripped.model_copy(update={"git_remote_url": cleaned})
+            except Exception:
+                stripped = stripped.model_copy(update={"git_remote_url": None})
+        return stripped
 
 
 @router.post("/session", response_model=IngestResponse)

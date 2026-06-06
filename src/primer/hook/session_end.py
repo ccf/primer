@@ -21,7 +21,12 @@ import sys
 import httpx
 
 from primer.common.auth_headers import build_engineer_auth_headers
-from primer.common.redaction import build_disabled_set, build_extra_detectors, redact_ingest_dict
+from primer.common.redaction import (
+    build_disabled_set,
+    build_extra_detectors,
+    redact_ingest_dict,
+    scrub_url_credentials,
+)
 from primer.hook.extractor import SessionMetadata, capture_git_info, load_facets
 from primer.hook.extractor_registry import get_extractor_for
 
@@ -159,6 +164,13 @@ def main() -> None:
                 "facets",
             ):
                 payload.pop(field, None)
+            # git_remote_url can embed user:token creds. Attempt the one-regex
+            # targeted scrub; if even that fails, drop the field entirely.
+            if payload.get("git_remote_url"):
+                try:
+                    payload["git_remote_url"], _ = scrub_url_credentials(payload["git_remote_url"])
+                except Exception:
+                    payload.pop("git_remote_url", None)
             logger.warning(f"Redaction failed ({exc}); stripped text fields from payload")
 
     try:
