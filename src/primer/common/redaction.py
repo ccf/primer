@@ -16,6 +16,7 @@ import re
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
+from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ DETECTORS: tuple[Detector, ...] = (
     Detector(
         "private-key-block",
         re.compile(
-            r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----",
+            r"-----BEGIN [A-Z ]*PRIVATE KEY-----.{0,65536}?-----END [A-Z ]*PRIVATE KEY-----",
             re.DOTALL,
         ),
     ),
@@ -93,11 +94,13 @@ def redact_text(
     return text, dict(counts)
 
 
+@lru_cache(maxsize=8)
 def build_disabled_set(csv: str) -> frozenset[str]:
     """Parse a comma-separated detector-name list from config."""
     return frozenset(name.strip() for name in csv.split(",") if name.strip())
 
 
+@lru_cache(maxsize=8)
 def build_extra_detectors(raw_json: str) -> tuple[Detector, ...]:
     """Parse extra detectors from a JSON config string.
 

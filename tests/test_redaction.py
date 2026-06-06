@@ -186,3 +186,29 @@ def test_redact_ingest_dict_handles_missing_fields():
     redacted, counts = redact_ingest_dict({"session_id": "s", "messages": None})
     assert redacted["session_id"] == "s"
     assert sum(counts.values()) == 0
+
+
+def test_env_assignment_ignores_short_values():
+    _, counts = redact_text("retry_token: abc12")
+    assert "env-assignment" not in counts
+
+
+def test_env_assignment_yaml_colon_fires_by_design():
+    # Over-redaction is the safe failure mode: YAML transcripts carry real
+    # secrets (docker-compose, k8s), so `key: value` syntax is in scope even
+    # though it can mask innocent flag names.
+    _, counts = redact_text("api_token: my-feature-flag-key-prod")
+    assert counts.get("env-assignment") == 1
+
+
+def test_short_sk_prefix_not_matched():
+    text = "the sk-learn package and sk-proj-short ids"
+    redacted, counts = redact_text(text)
+    assert "openai-key" not in counts
+    assert redacted == text
+
+
+def test_unterminated_private_key_block_does_not_hang():
+    text = "-----BEGIN RSA PRIVATE KEY-----\n" + ("x" * 100_000)
+    _redacted, counts = redact_text(text)
+    assert "private-key-block" not in counts
