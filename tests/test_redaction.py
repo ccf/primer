@@ -197,6 +197,37 @@ def test_redact_ingest_dict_scrubs_all_text_fields():
     assert sum(counts.values()) >= 7
 
 
+def test_redact_ingest_dict_scrubs_arbitrary_tool_dict_keys():
+    # Non-Claude extractors may emit tool dicts with keys beyond input_preview/
+    # output_preview; the walker must redact every string value, not a whitelist.
+    payload = {
+        "session_id": "s",
+        "messages": [
+            {
+                "ordinal": 0,
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "name": "Bash",
+                        "command": "curl -H 'auth: ghp_abcdefghijklmnopqrstuvwxyz0123456789AB'",
+                        "args": {"env": "AWS key AKIAIOSFODNN7EXAMPLE"},
+                    }
+                ],
+                "tool_results": [
+                    {"name": "Bash", "stdout": "leaked sk-ant-api03-AbCdEf123456789012"}
+                ],
+            }
+        ],
+    }
+    redacted, counts = redact_ingest_dict(payload)
+    assert "ghp_" not in str(redacted)
+    assert "AKIAIOSFODNN7EXAMPLE" not in str(redacted)
+    assert "sk-ant-api03" not in str(redacted)
+    # structure preserved (tool name is not a secret, stays intact)
+    assert redacted["messages"][0]["tool_calls"][0]["name"] == "Bash"
+    assert sum(counts.values()) >= 3
+
+
 def test_redact_ingest_dict_never_touches_api_key_or_structure():
     payload = _payload_with_secrets()
     redacted, _ = redact_ingest_dict(payload)

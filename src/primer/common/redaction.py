@@ -14,7 +14,6 @@ import json
 import logging
 import re
 from collections import Counter
-from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -171,18 +170,6 @@ def _redact_nested(
     return node
 
 
-def _redact_preview_items(
-    items: Iterable[dict] | None,
-    key: str,
-    counts: Counter[str],
-    disabled: frozenset[str],
-    extra: tuple[Detector, ...],
-) -> None:
-    for item in items or ():
-        if isinstance(item, dict) and item.get(key):
-            item[key] = _redact_value(item[key], counts, disabled, extra)
-
-
 def redact_ingest_dict(
     payload: dict,
     disabled: frozenset[str] = frozenset(),
@@ -214,10 +201,12 @@ def redact_ingest_dict(
             message["content_text"] = _redact_value(
                 message["content_text"], counts, disabled, extra
             )
-        _redact_preview_items(message.get("tool_calls"), "input_preview", counts, disabled, extra)
-        _redact_preview_items(
-            message.get("tool_results"), "output_preview", counts, disabled, extra
-        )
+        # tool_calls / tool_results are polymorphic dicts (the shape varies per
+        # agent extractor — Claude emits name+input_preview, others may add keys),
+        # so recurse over every string value rather than whitelisting preview keys.
+        for tool_field in ("tool_calls", "tool_results"):
+            if message.get(tool_field):
+                message[tool_field] = _redact_nested(message[tool_field], counts, disabled, extra)
 
     for commit in result.get("commits") or ():
         if not isinstance(commit, dict):
