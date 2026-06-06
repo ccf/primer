@@ -49,25 +49,49 @@ def _authenticate_ingest_engineer(
     raise HTTPException(status_code=401, detail="Authentication required")
 
 
+_TEXT_BEARING_FIELDS = (
+    "first_prompt",
+    "summary",
+    "messages",
+    "commits",
+    "source_metadata",
+    "facets",
+)
+
+
 def _apply_redaction(payload: SessionIngestPayload) -> SessionIngestPayload:
-    """Redact text-bearing fields before any persistence (incl. job queue)."""
+    """Redact text-bearing fields before any persistence (incl. job queue).
+
+    On any redaction failure: fail closed on content, open on metrics —
+    strip the text-bearing fields and persist the structural telemetry,
+    never an unredacted payload and never a 500.
+    """
     if not settings.redaction_enabled:
         return payload
-    raw = payload.model_dump(mode="json")
-    api_key = raw.pop("api_key", None)  # auth credential — exclude from the walk
-    redacted, counts = redact_ingest_dict(
-        raw,
-        disabled=build_disabled_set(settings.redaction_disabled_detectors),
-        extra=build_extra_detectors(settings.redaction_extra_patterns),
-    )
-    redacted["api_key"] = api_key
-    if counts:
-        logger.info(
-            "Redacted %d sensitive value(s) in session %s",
-            sum(counts.values()),
-            payload.session_id,
+    try:
+        raw = payload.model_dump(mode="json")
+        api_key = raw.pop("api_key", None)  # auth credential — exclude from the walk
+        redacted, counts = redact_ingest_dict(
+            raw,
+            disabled=build_disabled_set(settings.redaction_disabled_detectors),
+            extra=build_extra_detectors(settings.redaction_extra_patterns),
         )
-    return SessionIngestPayload(**redacted)
+        redacted["api_key"] = api_key
+        if counts:
+            logger.info(
+                "Redacted %d sensitive value(s) in session %s",
+                sum(counts.values()),
+                payload.session_id,
+            )
+        return SessionIngestPayload(**redacted)
+    except Exception:
+        logger.error(
+            "Redaction failed for session %s — stripping text content from payload",
+            payload.session_id,
+            exc_info=True,
+        )
+        # model_copy(update=...) bypasses validators; all six fields are Optional.
+        return payload.model_copy(update=dict.fromkeys(_TEXT_BEARING_FIELDS))
 
 
 @router.post("/session", response_model=IngestResponse)
@@ -169,6 +193,8 @@ def ingest_bulk(
     )
     results = []
     for session_payload in payload.sessions:
+        # Redact before any persistence. If an async path is ever added to bulk,
+        # _apply_redaction must still run before enqueue_background_job.
         session_payload = _apply_redaction(session_payload)
         try:
             created = upsert_session(db, engineer.id, session_payload)

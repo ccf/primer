@@ -85,3 +85,30 @@ def test_redaction_disabled_passes_through(client, engineer_with_key, db_session
 
     session = db_session.query(SessionModel).filter(SessionModel.id == payload["session_id"]).one()
     assert "sk-ant-api03" in session.first_prompt
+
+
+def test_redaction_failure_strips_content_not_500(
+    client, engineer_with_key, db_session, monkeypatch
+):
+    """A redaction crash must not 500 or persist unredacted text."""
+    import primer.server.routers.ingest as ingest_module
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("redaction exploded")
+
+    monkeypatch.setattr(ingest_module, "redact_ingest_dict", _boom)
+    _engineer, api_key = engineer_with_key
+    payload = _secret_session_payload(api_key)
+
+    r = client.post("/api/v1/ingest/session", json=payload)
+    assert r.status_code == 200
+
+    session = db_session.query(SessionModel).filter(SessionModel.id == payload["session_id"]).one()
+    assert session.first_prompt is None
+    assert session.message_count == 1  # metrics survive
+    msgs = (
+        db_session.query(SessionMessage)
+        .filter(SessionMessage.session_id == payload["session_id"])
+        .all()
+    )
+    assert msgs == []
