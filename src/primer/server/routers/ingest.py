@@ -7,6 +7,11 @@ from sqlalchemy.orm import Session
 from primer.common.config import settings
 from primer.common.database import get_db
 from primer.common.models import Session as SessionModel
+from primer.common.redaction import (
+    build_disabled_set,
+    build_extra_detectors,
+    redact_ingest_dict,
+)
 from primer.common.schemas import (
     BulkIngestPayload,
     BulkIngestResponse,
@@ -44,6 +49,27 @@ def _authenticate_ingest_engineer(
     raise HTTPException(status_code=401, detail="Authentication required")
 
 
+def _apply_redaction(payload: SessionIngestPayload) -> SessionIngestPayload:
+    """Redact text-bearing fields before any persistence (incl. job queue)."""
+    if not settings.redaction_enabled:
+        return payload
+    raw = payload.model_dump(mode="json")
+    api_key = raw.pop("api_key", None)  # auth credential — exclude from the walk
+    redacted, counts = redact_ingest_dict(
+        raw,
+        disabled=build_disabled_set(settings.redaction_disabled_detectors),
+        extra=build_extra_detectors(settings.redaction_extra_patterns),
+    )
+    redacted["api_key"] = api_key
+    if counts:
+        logger.info(
+            "Redacted %d sensitive value(s) in session %s",
+            sum(counts.values()),
+            payload.session_id,
+        )
+    return SessionIngestPayload(**redacted)
+
+
 @router.post("/session", response_model=IngestResponse)
 @limiter.limit(settings.rate_limit_ingest)
 def ingest_session(
@@ -58,6 +84,7 @@ def ingest_session(
         api_key=payload.api_key,
         device_token=x_device_token,
     )
+    payload = _apply_redaction(payload)
 
     # ── Async path: enqueue the heavy work and return immediately ──
     if settings.background_jobs_enabled:
@@ -142,6 +169,7 @@ def ingest_bulk(
     )
     results = []
     for session_payload in payload.sessions:
+        session_payload = _apply_redaction(session_payload)
         try:
             created = upsert_session(db, engineer.id, session_payload)
             log_ingest_event(db, engineer.id, "bulk", session_payload.session_id, None, "ok")
