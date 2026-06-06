@@ -93,6 +93,11 @@ class PrimerSettings(BaseSettings):
     facet_extraction_enabled: bool = False
     facet_extraction_model: str = "claude-haiku-4-5-20251001"
 
+    # Redaction (secret/PII scrubbing at capture and ingest)
+    redaction_enabled: bool = True
+    redaction_disabled_detectors: str = ""  # comma-separated detector names
+    redaction_extra_patterns: str = ""  # JSON: [{"name": ..., "pattern": ...}]
+
     # Durable background jobs
     background_jobs_enabled: bool = True
     background_job_poll_seconds: int = 15
