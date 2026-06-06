@@ -194,8 +194,16 @@ def redact_ingest_dict(
         )
 
     for commit in result.get("commits") or ():
-        if isinstance(commit, dict) and commit.get("message"):
+        if not isinstance(commit, dict):
+            continue
+        if commit.get("message"):
             commit["message"] = _redact_value(commit["message"], counts, disabled, extra)
+        # Commit author emails are PII (and can belong to third parties — the
+        # hook's git-log window can capture teammates' commits). The email
+        # detector handles them; orgs wanting attribution can disable it via
+        # PRIMER_REDACTION_DISABLED_DETECTORS=email.
+        if commit.get("author_email"):
+            commit["author_email"] = _redact_value(commit["author_email"], counts, disabled, extra)
 
     for field in _RECURSIVE_DICT_FIELDS:
         if result.get(field):

@@ -152,7 +152,13 @@ def _payload_with_secrets() -> dict:
                 ],
             },
         ],
-        "commits": [{"sha": "abc123", "message": "fix: rotate AKIAIOSFODNN7EXAMPLE key"}],
+        "commits": [
+            {
+                "sha": "abc123",
+                "message": "fix: rotate AKIAIOSFODNN7EXAMPLE key",
+                "author_email": "teammate@example.com",
+            }
+        ],
         "source_metadata": {"nested": {"note": "key sk-ant-api03-XyZ9876543210abcdef"}},
         "facets": {"goal_categories": ["uses sk-proj-AbCdEf1234567890AbCdEf12 key"]},
     }
@@ -167,6 +173,7 @@ def test_redact_ingest_dict_scrubs_all_text_fields():
     assert "AKIAIOSFODNN7EXAMPLE" not in str(redacted)
     assert "xoxb-" not in str(redacted)
     assert "sk-proj-" not in str(redacted)
+    assert "teammate@example.com" not in str(redacted)
     assert sum(counts.values()) >= 7
 
 
@@ -186,6 +193,12 @@ def test_redact_ingest_dict_handles_missing_fields():
     redacted, counts = redact_ingest_dict({"session_id": "s", "messages": None})
     assert redacted["session_id"] == "s"
     assert sum(counts.values()) == 0
+
+
+def test_commit_author_email_respects_disabled_email_detector():
+    payload = _payload_with_secrets()
+    redacted, _ = redact_ingest_dict(payload, disabled=frozenset({"email"}))
+    assert redacted["commits"][0]["author_email"] == "teammate@example.com"
 
 
 def test_env_assignment_ignores_short_values():
