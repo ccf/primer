@@ -21,6 +21,7 @@ import sys
 import httpx
 
 from primer.common.auth_headers import build_engineer_auth_headers
+from primer.common.redaction import redact_ingest_dict
 from primer.hook.extractor import SessionMetadata, capture_git_info, load_facets
 from primer.hook.extractor_registry import get_extractor_for
 
@@ -132,6 +133,13 @@ def main() -> None:
 
     # Build and send payload
     payload = meta.to_ingest_payload(api_key=api_key or None, facets=facets)
+
+    # Redact secrets/PII client-side before anything leaves this machine.
+    # Controlled by PRIMER_REDACTION_ENABLED (default: on).
+    if os.environ.get("PRIMER_REDACTION_ENABLED", "true").lower() not in ("0", "false", "no"):
+        payload, redaction_counts = redact_ingest_dict(payload)
+        if redaction_counts:
+            logger.info(f"Redacted {sum(redaction_counts.values())} sensitive value(s)")
 
     try:
         resp = httpx.post(
