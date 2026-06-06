@@ -21,7 +21,7 @@ import sys
 import httpx
 
 from primer.common.auth_headers import build_engineer_auth_headers
-from primer.common.redaction import redact_ingest_dict
+from primer.common.redaction import build_disabled_set, build_extra_detectors, redact_ingest_dict
 from primer.hook.extractor import SessionMetadata, capture_git_info, load_facets
 from primer.hook.extractor_registry import get_extractor_for
 
@@ -139,7 +139,13 @@ def main() -> None:
     redaction_setting = os.environ.get("PRIMER_REDACTION_ENABLED", "true").lower()
     if redaction_setting not in ("0", "false", "no", "off"):
         try:
-            payload, redaction_counts = redact_ingest_dict(payload)
+            payload, redaction_counts = redact_ingest_dict(
+                payload,
+                disabled=build_disabled_set(
+                    os.environ.get("PRIMER_REDACTION_DISABLED_DETECTORS", "")
+                ),
+                extra=build_extra_detectors(os.environ.get("PRIMER_REDACTION_EXTRA_PATTERNS", "")),
+            )
             if redaction_counts:
                 logger.info(f"Redacted {sum(redaction_counts.values())} sensitive value(s)")
         except Exception as exc:

@@ -7,6 +7,7 @@ from primer.common.redaction import (
     build_extra_detectors,
     redact_ingest_dict,
     redact_text,
+    scrub_url_credentials,
 )
 
 
@@ -231,3 +232,29 @@ def test_unterminated_private_key_block_does_not_hang():
     text = "-----BEGIN RSA PRIVATE KEY-----\n" + ("x" * 100_000)
     _redacted, counts = redact_text(text)
     assert "private-key-block" not in counts
+
+
+def test_scrub_url_credentials_removes_userinfo():
+    cleaned, n = scrub_url_credentials("https://user:tok3nv4lue@github.com/org/repo.git")
+    assert cleaned == "https://github.com/org/repo.git"
+    assert n == 1
+
+
+def test_scrub_url_credentials_leaves_scp_and_ssh_remotes():
+    for url in ("git@github.com:org/repo.git", "ssh://git@github.com/org/repo.git"):
+        cleaned, n = scrub_url_credentials(url)
+        assert cleaned == url
+        assert n == 0
+
+
+def test_walker_scrubs_git_remote_url():
+    payload = {"session_id": "s", "git_remote_url": "https://u:p4ssw0rd@github.com/o/r.git"}
+    redacted, counts = redact_ingest_dict(payload)
+    assert redacted["git_remote_url"] == "https://github.com/o/r.git"
+    assert counts.get("url-credentials") == 1
+
+
+def test_walker_preserves_scp_style_remote():
+    payload = {"session_id": "s", "git_remote_url": "git@github.com:o/r.git"}
+    redacted, _counts = redact_ingest_dict(payload)
+    assert redacted["git_remote_url"] == "git@github.com:o/r.git"

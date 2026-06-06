@@ -117,6 +117,20 @@ def build_extra_detectors(raw_json: str) -> tuple[Detector, ...]:
         return ()
 
 
+_URL_USERINFO_CREDENTIALS = re.compile(r"(?<=://)[^\s/@]*:[^\s/@]+@")
+
+
+def scrub_url_credentials(url: str) -> tuple[str, int]:
+    """Remove user:password userinfo from a URL, keeping it valid and resolvable.
+
+    Removal (not tokenization) so downstream URL parsing — e.g. repository
+    identity resolution from git remotes — keeps working. scp-style remotes
+    (git@host:path) have no scheme and are untouched; bare-user ssh URLs
+    (ssh://git@host/...) carry no password and are untouched.
+    """
+    return _URL_USERINFO_CREDENTIALS.subn("", url)
+
+
 # Whitelist of payload locations that carry free text. Everything else
 # (ids, counts, timestamps, api_key) is structural and never touched.
 _TOP_LEVEL_TEXT_FIELDS = ("first_prompt", "summary")
@@ -180,6 +194,13 @@ def redact_ingest_dict(
     for field in _TOP_LEVEL_TEXT_FIELDS:
         if result.get(field):
             result[field] = _redact_value(result[field], counts, disabled, extra)
+
+    # git_remote_url gets targeted credential removal only — the full detector
+    # walk would let the email detector corrupt scp-style remotes (git@host:path).
+    if result.get("git_remote_url"):
+        result["git_remote_url"], n = scrub_url_credentials(result["git_remote_url"])
+        if n:
+            counts["url-credentials"] += n
 
     for message in result.get("messages") or ():
         if not isinstance(message, dict):
