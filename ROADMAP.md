@@ -66,7 +66,6 @@ Derived data pipelines, performance optimization, durable background jobs, enter
 
 ## Near-Term Priorities
 
-- `P0` Local secret, PII, and IP redaction pipeline at the capture layer before database insertion.
 - `P0` Per-tool success rate tracking with compound reliability computation — decompose session outcomes to the tool/step level.
 - `P0` Harness configuration fingerprinting — extract and catalog the actual harness configuration (tools, context files, permissions, customizations) from session telemetry.
 - `P0` Context quality scoring — measure AGENTS.md freshness, token efficiency, and guide/sensor coverage per project.
@@ -97,7 +96,7 @@ Derived data pipelines, performance optimization, durable background jobs, enter
 - [x] [P1] Recovery-path tracking: detect whether engineers recover after friction or abandon the attempt
 - [x] [P1] Derived analytics tables and materialized rollups for heavy longitudinal queries
 - [x] Source-quality dashboard by agent type, including capture coverage and telemetry completeness for Cursor
-- [ ] [P0] Secret, PII, and IP redaction pipeline at the capture layer (e.g., Presidio integration) before persistence
+- [x] [P0] Secret, PII, and IP redaction pipeline at the capture layer (e.g., Presidio integration) before persistence (IP-address detector deferred; secrets + email shipped)
 - [ ] [P2] Transcript cold storage and blob offloading (S3/GCS) to keep the operational database fast
 - [ ] [P2] Data-quality anomaly detection for broken ingestion, sparse transcripts, or stale integrations
 
