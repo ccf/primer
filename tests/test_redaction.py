@@ -29,11 +29,17 @@ def test_none_and_empty_are_safe():
     assert redact_text("") == ("", {})
 
 
+# Assembled at runtime with `+` so the Slack-shaped literal never appears
+# contiguously in source. GitHub push protection (and other secret scanners)
+# match the assembled form; implicit adjacent-literal concatenation is NOT
+# safe here because ruff-format rejoins adjacent literals into one.
+FAKE_SLACK_TOKEN = "xoxb-" + "123456789012-abcdefghijklmnop"
+
 SECRET_CASES = [
     ("github-token", "token ghp_abcdefghijklmnopqrstuvwxyz0123456789AB done"),
     ("github-token", "fine-grained github_pat_11ABCDEFG0_abcdefghijklmnopqrst"),
     ("aws-access-key", "creds AKIAIOSFODNN7EXAMPLE in env"),
-    ("slack-token", "slack xoxb-" "123456789012-abcdefghijklmnop here"),
+    ("slack-token", f"slack {FAKE_SLACK_TOKEN} here"),
     ("openai-key", "openai sk-proj-AbCdEf1234567890AbCdEf12 set"),
     ("jwt", "auth eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.SflKxwRJSMeKKF2QT4fwpM"),
     (
@@ -130,7 +136,7 @@ def _payload_with_secrets() -> dict:
         "api_key": "sk-ant-this-is-the-auth-key-not-content",
         "agent_type": "claude_code",
         "first_prompt": "set ANTHROPIC_API_KEY=sk-ant-api03-AbCdEf123456789012345",
-        "summary": "Configured slack xoxb-" "123456789012-abcdefghijklmnop webhook",
+        "summary": f"Configured slack {FAKE_SLACK_TOKEN} webhook",
         "message_count": 2,
         "messages": [
             {
