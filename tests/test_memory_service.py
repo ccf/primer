@@ -11,7 +11,11 @@ from primer.common.models import (
     MemoryEvidence,
     MemoryScope,
 )
-from primer.server.services.memory_service import memory_capture_active
+from primer.server.services.memory_service import (
+    create_sketch,
+    get_or_create_project_scope,
+    memory_capture_active,
+)
 
 
 def test_memory_disabled_by_default():
@@ -89,3 +93,139 @@ def test_memory_entry_unique_hash_per_scope(db_session):
     )
     with pytest.raises(sqlalchemy.exc.IntegrityError):
         db_session.flush()
+
+
+def _repo_and_scope(db_session, full_name="acme/svc"):
+    repo = GitRepository(full_name=full_name)
+    db_session.add(repo)
+    db_session.flush()
+    return repo
+
+
+def _engineer(db_session, email="m@x.io"):
+    from primer.common.models import Engineer
+
+    eng = Engineer(name="Mem", email=email)
+    db_session.add(eng)
+    db_session.flush()
+    return eng
+
+
+def test_get_or_create_project_scope_idempotent(db_session):
+    repo = _repo_and_scope(db_session)
+    s1 = get_or_create_project_scope(db_session, repo.id)
+    s2 = get_or_create_project_scope(db_session, repo.id)
+    assert s1.id == s2.id
+    assert s1.kind == "project"
+    assert s1.name == "acme/svc"
+
+
+def test_create_sketch_persists_card_with_evidence_and_event(db_session):
+    repo = _repo_and_scope(db_session)
+    eng = _engineer(db_session)
+    scope = get_or_create_project_scope(db_session, repo.id)
+
+    entry = create_sketch(
+        db_session,
+        scope=scope,
+        card={
+            "kind": "project_fact",
+            "title": "Tests use SQLite",
+            "body": "Tests use SQLite in-memory; Postgres is CI-only.",
+            "concepts": ["testing"],
+            "files": ["tests/conftest.py"],
+        },
+        origin="passive_extraction",
+        engineer_id=eng.id,
+        session_id=None,
+        citation={"excerpt": "conftest creates sqlite engine"},
+    )
+    assert entry is not None
+    assert entry.status == "sketch"
+    assert entry.origin == "passive_extraction"
+    assert entry.created_by_engineer_id == eng.id
+    assert len(entry.content_hash) == 64
+    assert entry.evidence[0].evidence_kind == "transcript_citation"
+    assert entry.evidence[0].engineer_id == eng.id
+    assert entry.events[0].event_kind == "sketch_created"
+
+
+def test_create_sketch_exact_duplicate_accretes_evidence(db_session):
+    repo = _repo_and_scope(db_session)
+    eng1 = _engineer(db_session, "a@x.io")
+    eng2 = _engineer(db_session, "b@x.io")
+    scope = get_or_create_project_scope(db_session, repo.id)
+    card = {"kind": "project_fact", "title": "T", "body": "Same body."}
+
+    first = create_sketch(
+        db_session,
+        scope=scope,
+        card=card,
+        origin="passive_extraction",
+        engineer_id=eng1.id,
+        session_id=None,
+        citation={"excerpt": "x"},
+    )
+    second = create_sketch(
+        db_session,
+        scope=scope,
+        card=card,
+        origin="passive_extraction",
+        engineer_id=eng2.id,
+        session_id=None,
+        citation={"excerpt": "y"},
+    )
+    assert second.id == first.id  # no new entry
+    assert len(first.evidence) == 2  # evidence accreted
+
+
+def test_create_sketch_skips_rejected_duplicates(db_session):
+    repo = _repo_and_scope(db_session)
+    eng = _engineer(db_session)
+    scope = get_or_create_project_scope(db_session, repo.id)
+    card = {"kind": "project_fact", "title": "T", "body": "Rejected body."}
+
+    first = create_sketch(
+        db_session,
+        scope=scope,
+        card=card,
+        origin="passive_extraction",
+        engineer_id=eng.id,
+        session_id=None,
+        citation={"excerpt": "x"},
+    )
+    first.status = "rejected"
+    db_session.flush()
+
+    result = create_sketch(
+        db_session,
+        scope=scope,
+        card=card,
+        origin="passive_extraction",
+        engineer_id=eng.id,
+        session_id=None,
+        citation={"excerpt": "y"},
+    )
+    assert result is None  # sticky rejection: dropped silently
+    assert len(first.evidence) == 1
+
+
+def test_create_sketch_respects_paused_scope(db_session):
+    repo = _repo_and_scope(db_session)
+    eng = _engineer(db_session)
+    scope = get_or_create_project_scope(db_session, repo.id)
+    from datetime import datetime
+
+    scope.memory_paused_at = datetime(2026, 1, 1)
+    db_session.flush()
+
+    result = create_sketch(
+        db_session,
+        scope=scope,
+        card={"kind": "project_fact", "title": "T", "body": "B."},
+        origin="passive_extraction",
+        engineer_id=eng.id,
+        session_id=None,
+        citation={"excerpt": "x"},
+    )
+    assert result is None
