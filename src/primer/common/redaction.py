@@ -135,10 +135,27 @@ def scrub_url_credentials(url: str) -> tuple[str, int]:
     return _URL_USERINFO_CREDENTIALS.subn(r"\1", url)
 
 
-# Whitelist of payload locations that carry free text. Everything else
-# (ids, counts, timestamps, api_key) is structural and never touched.
-_TOP_LEVEL_TEXT_FIELDS = ("first_prompt", "summary")
-_RECURSIVE_DICT_FIELDS = ("source_metadata", "facets")
+# TOP-LEVEL payload keys whose values pass through untouched. This is a DENYLIST
+# over an otherwise redact-everything walk, so a new payload field is redacted by
+# default — a forgotten field over-redacts (the safe direction, caught by
+# analytics tests) rather than leaking (the whitelist design's silent-gap mode).
+#
+# Applied ONLY at the top level (see redact_ingest_dict). Nested structures —
+# source_metadata, facets, tool dicts, customization details — are redacted with
+# NO key exceptions, so a secret hiding under a structural-looking key name
+# (e.g. details={"api_key": "sk-..."}) is still scrubbed.
+#
+# Two reasons a key is here:
+#   1. Correctness-critical — redacting it breaks the system:
+#        - api_key: the auth credential; it is sk-ant-shaped and WOULD be
+#          matched by a detector, destroying authentication.
+#        - git_remote_url: redacted separately via a targeted credential scrub,
+#          because the full detector walk would let the email rule corrupt
+#          scp-style remotes (git@host:path).
+#   2. session_id: the analytics primary key, kept verbatim for cross-session
+#      joins even under custom extra-patterns (a real id never matches a built-in
+#      detector, so this is belt-and-suspenders / intent documentation).
+_NEVER_REDACT_TOP_LEVEL_KEYS = frozenset({"api_key", "git_remote_url", "session_id"})
 
 
 def _redact_value(
@@ -154,19 +171,20 @@ def _redact_value(
     return redacted
 
 
-def _redact_nested(
+def _redact_tree(
     node: object,
     counts: Counter[str],
     disabled: frozenset[str],
     extra: tuple[Detector, ...],
 ) -> object:
-    """Recursively redact every string value in a dict/list structure."""
+    """Recursively redact every string value in a dict/list structure, with no
+    key exceptions. Key-name skipping happens only at the payload top level."""
     if isinstance(node, str):
         return _redact_value(node, counts, disabled, extra)
     if isinstance(node, dict):
-        return {k: _redact_nested(v, counts, disabled, extra) for k, v in node.items()}
+        return {k: _redact_tree(v, counts, disabled, extra) for k, v in node.items()}
     if isinstance(node, list):
-        return [_redact_nested(item, counts, disabled, extra) for item in node]
+        return [_redact_tree(item, counts, disabled, extra) for item in node]
     return node
 
 
@@ -175,69 +193,28 @@ def redact_ingest_dict(
     disabled: frozenset[str] = frozenset(),
     extra: tuple[Detector, ...] = (),
 ) -> tuple[dict, dict[str, int]]:
-    """Redact the text-bearing fields of a session ingest payload dict.
+    """Redact every free-text value in a session ingest payload.
 
-    Returns a deep-copied, redacted payload and counts by detector. The input
-    is never mutated. Only whitelisted free-text fields are touched.
+    Redact-everything-except-structural: every string value is scrubbed except
+    the small ``_NEVER_REDACT_TOP_LEVEL_KEYS`` set, which is honored ONLY at the
+    top level. Nested structures are redacted with no exceptions, so a secret
+    under a structural-looking nested key is still caught. New payload fields are
+    covered automatically. Returns a deep-copied, redacted payload and counts by
+    detector; the input is never mutated.
     """
     result = copy.deepcopy(payload)
     counts: Counter[str] = Counter()
 
-    for field in _TOP_LEVEL_TEXT_FIELDS:
-        if result.get(field):
-            result[field] = _redact_value(result[field], counts, disabled, extra)
-
-    # git_remote_url gets targeted credential removal only — the full detector
-    # walk would let the email detector corrupt scp-style remotes (git@host:path).
+    # git_remote_url gets targeted credential removal (it is skipped by the
+    # top-level walk below). The full detector walk would let the email rule
+    # corrupt scp-style remotes (git@host:path).
     if result.get("git_remote_url"):
         result["git_remote_url"], n = scrub_url_credentials(result["git_remote_url"])
         if n:
             counts["url-credentials"] += n
 
-    for message in result.get("messages") or ():
-        if not isinstance(message, dict):
-            continue
-        if message.get("content_text"):
-            message["content_text"] = _redact_value(
-                message["content_text"], counts, disabled, extra
-            )
-        # tool_calls / tool_results are polymorphic dicts (the shape varies per
-        # agent extractor — Claude emits name+input_preview, others may add keys),
-        # so recurse over every string value rather than whitelisting preview keys.
-        for tool_field in ("tool_calls", "tool_results"):
-            if message.get(tool_field):
-                message[tool_field] = _redact_nested(message[tool_field], counts, disabled, extra)
-
-    for commit in result.get("commits") or ():
-        if not isinstance(commit, dict):
-            continue
-        if commit.get("message"):
-            commit["message"] = _redact_value(commit["message"], counts, disabled, extra)
-        # Commit author emails are PII (and can belong to third parties — the
-        # hook's git-log window can capture teammates' commits). The email
-        # detector handles them; orgs wanting attribution can disable it via
-        # PRIMER_REDACTION_DISABLED_DETECTORS=email.
-        if commit.get("author_email"):
-            commit["author_email"] = _redact_value(commit["author_email"], counts, disabled, extra)
-
-    for customization in result.get("customizations") or ():
-        if not isinstance(customization, dict):
-            continue
-        # `details` is an open-ended dict (e.g. MCP server config) that can carry
-        # secrets in env/args; `source_path` can embed credentials. Structural
-        # fields (identifier, display_name, type, state) are left intact — they
-        # are analytics join keys, not free text.
-        if customization.get("source_path"):
-            customization["source_path"] = _redact_value(
-                customization["source_path"], counts, disabled, extra
-            )
-        if customization.get("details"):
-            customization["details"] = _redact_nested(
-                customization["details"], counts, disabled, extra
-            )
-
-    for field in _RECURSIVE_DICT_FIELDS:
-        if result.get(field):
-            result[field] = _redact_nested(result[field], counts, disabled, extra)
-
-    return result, dict(counts)
+    redacted = {
+        k: (v if k in _NEVER_REDACT_TOP_LEVEL_KEYS else _redact_tree(v, counts, disabled, extra))
+        for k, v in result.items()
+    }
+    return redacted, dict(counts)
