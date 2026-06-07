@@ -109,12 +109,7 @@ def create_sketch(
         .first()
     )
     if existing is not None:
-        if existing.status == "rejected":
-            return None, False
-        if existing.status in _DEDUP_BLOCKING_STATUSES:
-            _attach_evidence(db, existing, engineer_id, session_id, citation, evidence_kind)
-            return existing, False
-        return None, False  # retired: only manual un-retire reopens (spec §7)
+        return _apply_dedup_policy(db, existing, engineer_id, session_id, citation, evidence_kind)
 
     entry = MemoryEntry(
         scope_id=scope.id,
@@ -127,12 +122,43 @@ def create_sketch(
         origin=origin,
         created_by_engineer_id=engineer_id,
     )
-    db.add(entry)
-    db.flush()
+    try:
+        # Savepoint so a concurrent insert of the same (scope_id, content_hash)
+        # raises IntegrityError here without poisoning the outer transaction.
+        with db.begin_nested():
+            db.add(entry)
+    except IntegrityError:
+        # A parallel writer won the race; accrete onto the entry it created.
+        winner = (
+            db.query(MemoryEntry)
+            .filter(MemoryEntry.scope_id == scope.id, MemoryEntry.content_hash == content_hash)
+            .one()
+        )
+        return _apply_dedup_policy(db, winner, engineer_id, session_id, citation, evidence_kind)
+
     _attach_evidence(db, entry, engineer_id, session_id, citation, evidence_kind)
     db.add(MemoryEvent(memory_id=entry.id, event_kind="sketch_created", actor="system"))
     db.flush()
     return entry, True
+
+
+def _apply_dedup_policy(
+    db: Session,
+    existing: MemoryEntry,
+    engineer_id: str | None,
+    session_id: str | None,
+    citation: dict | None,
+    evidence_kind: str,
+) -> tuple[MemoryEntry | None, bool]:
+    """Dedup policy for an entry that already holds this (scope_id, content_hash):
+    rejected → dropped; an injectable/blocking status → accrete evidence;
+    retired → dropped (only manual un-retire reopens, spec §7)."""
+    if existing.status == "rejected":
+        return None, False
+    if existing.status in _DEDUP_BLOCKING_STATUSES:
+        _attach_evidence(db, existing, engineer_id, session_id, citation, evidence_kind)
+        return existing, False
+    return None, False
 
 
 def _attach_evidence(

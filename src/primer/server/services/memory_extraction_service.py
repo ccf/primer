@@ -14,7 +14,7 @@ import httpx
 
 from primer.common.config import settings
 from primer.common.database import SessionLocal
-from primer.common.models import Engineer, MemoryScope, SessionMessage
+from primer.common.models import Engineer, MemoryEvidence, MemoryScope, SessionMessage
 from primer.common.models import Session as SessionModel
 from primer.server.services.memory_service import (
     create_sketch,
@@ -148,8 +148,6 @@ def backfill_memory(repository_id: str | None = None, limit: int | None = None) 
     re-runs are cheap/idempotent — but a session that only has an explicit
     `remember` (explicit_remember evidence) is still eligible for passive
     backfill, since the two channels are complementary."""
-    from primer.common.models import MemoryEvidence
-
     if not memory_capture_active() or not settings.anthropic_api_key:
         return {"processed": 0, "skipped": "memory_inactive"}
     bound = limit or settings.memory_backfill_max_sessions
@@ -209,6 +207,22 @@ def extract_memory_for_session(session_id: str) -> str:
             db.query(MemoryScope).filter(MemoryScope.repository_id == session.repository_id).first()
         )
         if existing_scope is not None and existing_scope.memory_paused_at is not None:
+            return "skipped"
+        # Idempotency: skip if this session was already passively extracted
+        # (carries a transcript_citation evidence row). The post-ingest path
+        # fires on every ingest — PreCompact and SessionEnd — plus job retries,
+        # and _build_transcript is capped at the first MAX_TRANSCRIPT_CHARS, so
+        # re-extraction would re-process identical content for no new result.
+        # Matches backfill_memory's exclusion (keeps the two paths consistent).
+        already_extracted = (
+            db.query(MemoryEvidence.id)
+            .filter(
+                MemoryEvidence.session_id == session_id,
+                MemoryEvidence.evidence_kind == "transcript_citation",
+            )
+            .first()
+        )
+        if already_extracted is not None:
             return "skipped"
         transcript = _build_transcript(db, session_id)
         engineer = db.query(Engineer).filter(Engineer.id == session.engineer_id).first()
