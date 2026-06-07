@@ -63,7 +63,11 @@ def get_or_create_project_scope(db: Session, repository_id: str) -> MemoryScope:
                 enqueue_background_job,
             )
 
-            enqueue_background_job(db, job_type=JOB_TYPE_MEMORY_BACKFILL, payload={})
+            enqueue_background_job(
+                db,
+                job_type=JOB_TYPE_MEMORY_BACKFILL,
+                payload={"repository_id": repository_id},
+            )
         return scope
     except IntegrityError:
         return db.query(MemoryScope).filter(MemoryScope.repository_id == repository_id).one()

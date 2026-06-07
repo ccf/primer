@@ -139,10 +139,12 @@ def _call_extraction_api(transcript: str) -> list[dict]:
     return _parse_cards_response(text)
 
 
-def backfill_memory(limit: int | None = None) -> dict:
-    """Cold-start backfill (spec §5): run the per-session extractor over the
-    existing corpus, newest-first, bounded. Mirrors backfill_facets. Sessions
-    already carrying memory evidence are excluded via a NOT EXISTS check."""
+def backfill_memory(repository_id: str | None = None, limit: int | None = None) -> dict:
+    """Cold-start backfill (spec §5): run the per-session extractor over existing
+    sessions, newest-first, bounded. When repository_id is given (the cold-start
+    path on scope creation) it is scoped to that repo, so onboarding N projects
+    does N bounded passes instead of N global ones. Sessions already carrying
+    memory evidence are excluded so re-runs are cheap/idempotent."""
     from primer.common.models import MemoryEvidence
 
     if not memory_capture_active() or not settings.anthropic_api_key:
@@ -151,14 +153,15 @@ def backfill_memory(limit: int | None = None) -> dict:
     db = SessionLocal()
     try:
         seen = db.query(MemoryEvidence.session_id).filter(MemoryEvidence.session_id.isnot(None))
+        q = db.query(SessionModel.id).filter(
+            SessionModel.repository_id.isnot(None),
+            SessionModel.tool_call_count >= settings.memory_extraction_min_substance,
+            ~SessionModel.id.in_(seen),
+        )
+        if repository_id is not None:
+            q = q.filter(SessionModel.repository_id == repository_id)
         sessions = (
-            db.query(SessionModel.id)
-            .filter(
-                SessionModel.repository_id.isnot(None),
-                SessionModel.tool_call_count >= settings.memory_extraction_min_substance,
-                ~SessionModel.id.in_(seen),
-            )
-            .order_by(SessionModel.started_at.desc())
+            q.order_by(SessionModel.started_at.desc().nulls_last(), SessionModel.id.desc())
             .limit(bound)
             .all()
         )
@@ -170,7 +173,12 @@ def backfill_memory(limit: int | None = None) -> dict:
     for session_id in ids:
         if extract_memory_for_session(session_id) == "done":
             processed += 1
-    logger.info("Memory backfill: %d/%d sessions produced sketches", processed, len(ids))
+    logger.info(
+        "Memory backfill (repo=%s): %d/%d sessions produced sketches",
+        repository_id or "all",
+        processed,
+        len(ids),
+    )
     return {"processed": processed, "candidates": len(ids)}
 
 
