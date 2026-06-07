@@ -163,6 +163,12 @@ def upgrade() -> None:
         ["memory_id", "independent"],
         unique=False,
     )
+    op.create_index(
+        "ix_memory_evidence_session_kind",
+        "memory_evidence",
+        ["session_id", "evidence_kind"],
+        unique=False,
+    )
     op.create_table(
         "memory_injections",
         sa.Column("id", sa.String(length=36), nullable=False),
@@ -215,6 +221,7 @@ def downgrade() -> None:
     op.drop_index("ix_memory_injections_memory_time", table_name="memory_injections")
     op.drop_index("ix_memory_injections_engineer_time", table_name="memory_injections")
     op.drop_table("memory_injections")
+    op.drop_index("ix_memory_evidence_session_kind", table_name="memory_evidence")
     op.drop_index("ix_memory_evidence_memory_independent", table_name="memory_evidence")
     op.drop_table("memory_evidence")
     op.drop_index("ix_memory_events_memory_time", table_name="memory_events")

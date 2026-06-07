@@ -791,7 +791,12 @@ class MemoryEntry(Base):
 
 class MemoryEvidence(Base):
     __tablename__ = "memory_evidence"
-    __table_args__ = (Index("ix_memory_evidence_memory_independent", "memory_id", "independent"),)
+    __table_args__ = (
+        Index("ix_memory_evidence_memory_independent", "memory_id", "independent"),
+        # Serves the remember rate-limit count and backfill's "already extracted"
+        # exclusion, both of which filter by (session_id, evidence_kind).
+        Index("ix_memory_evidence_session_kind", "session_id", "evidence_kind"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     memory_id: Mapped[str] = mapped_column(ForeignKey("memory_entries.id"), nullable=False)
