@@ -80,14 +80,15 @@ def _scrub_identity(text: str, engineer_names: list[str]) -> str:
     from primer.common.redaction import redact_text
 
     scrubbed, _ = redact_text(text, disabled=frozenset())  # email detector strips emails
-    # Machine-specific path prefixes -> repo-relative tails
-    scrubbed = re.sub(
-        r"(?:/Users/|/home/)[^\s/]+(?:/[^\s/]+)*?/(?=src/|tests/|docs/)", "", scrubbed
-    )
-    scrubbed = re.sub(r"(?:/Users/|/home/)[^\s]*", "[path]", scrubbed)
+    # Strip the machine-specific home-dir prefix (/Users/<name>/ or
+    # /home/<name>/) — removing the username (PII) while keeping the path tail
+    # actionable. Non-home absolute paths (/etc, /srv) are not user-specific.
+    scrubbed = re.sub(r"(?:/Users/|/home/)[^/\s]+/?", "", scrubbed)
     for name in engineer_names:
         if name and len(name) > 2:
-            scrubbed = re.sub(rf"\b{re.escape(name)}\b", "an engineer", scrubbed)
+            scrubbed = re.sub(
+                rf"\b{re.escape(name)}\b", "an engineer", scrubbed, flags=re.IGNORECASE
+            )
     return scrubbed
 
 
@@ -143,6 +144,8 @@ def extract_memory_for_session(session_id: str) -> str:
     'done' | 'skipped' | 'failed' (mirrors facet extraction semantics)."""
     if not memory_capture_active() or not settings.anthropic_api_key:
         return "skipped"
+
+    # Phase 1: read eligibility + transcript, then release the connection.
     db = SessionLocal()
     try:
         session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
@@ -154,17 +157,27 @@ def extract_memory_for_session(session_id: str) -> str:
         if scope.memory_paused_at is not None:
             return "skipped"
         transcript = _build_transcript(db, session_id)
-        if not transcript:
-            return "skipped"
         engineer = db.query(Engineer).filter(Engineer.id == session.engineer_id).first()
         names = [engineer.name] if engineer and engineer.name else []
-        db.close()  # release connection during the LLM call (backfill gotcha)
+        engineer_id = session.engineer_id
+        repository_id = session.repository_id
+    finally:
+        db.close()
 
+    if not transcript:
+        return "skipped"
+
+    # Phase 2: LLM call with no db connection held.
+    try:
         cards = _call_extraction_api(transcript)
+    except Exception:
+        logger.exception("Memory extraction API call failed for session %s", session_id)
+        return "failed"
 
-        db = SessionLocal()
-        session = db.query(SessionModel).filter(SessionModel.id == session_id).one()
-        scope = get_or_create_project_scope(db, session.repository_id)
+    # Phase 3: persist with a fresh session.
+    db = SessionLocal()
+    try:
+        scope = get_or_create_project_scope(db, repository_id)
         created = 0
         for card in cards[: settings.memory_sketch_cap_per_session]:
             card["title"] = _scrub_identity(card.get("title", ""), names)
@@ -174,7 +187,7 @@ def extract_memory_for_session(session_id: str) -> str:
                 scope=scope,
                 card=card,
                 origin="passive_extraction",
-                engineer_id=session.engineer_id,
+                engineer_id=engineer_id,
                 session_id=session_id,
                 citation={"source": "passive_extraction"},
             )
@@ -185,7 +198,7 @@ def extract_memory_for_session(session_id: str) -> str:
         return "done"
     except Exception:
         db.rollback()
-        logger.exception("Memory extraction failed for session %s", session_id)
+        logger.exception("Memory extraction persistence failed for session %s", session_id)
         return "failed"
     finally:
         db.close()
