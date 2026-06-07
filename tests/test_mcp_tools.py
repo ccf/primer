@@ -529,3 +529,76 @@ def test_primer_manager_review_pack_requires_auth(monkeypatch):
 
     result = primer_manager_review_pack()
     assert "Error" in result
+
+
+# --- primer_remember ---
+
+
+@patch("primer.mcp.tools.httpx.post")
+def test_primer_remember_posts_to_server(mock_post):
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"status": "sketch_created", "memory_id": "m-1"}
+    mock_post.return_value = mock_resp
+
+    from primer.mcp.tools import primer_remember
+
+    out = primer_remember(
+        session_id="s-1", text="The staging DB resets nightly.", kind="project_fact"
+    )
+    assert "/api/v1/memories/remember" in mock_post.call_args.args[0]
+    assert mock_post.call_args.kwargs["json"]["session_id"] == "s-1"
+    assert "Remembered" in out or "sketch_created" in out
+
+
+@patch("primer.mcp.tools.httpx.post")
+def test_primer_remember_rate_limited(mock_post):
+    mock_resp = MagicMock()
+    mock_resp.status_code = 429
+    mock_post.return_value = mock_resp
+
+    from primer.mcp.tools import primer_remember
+
+    out = primer_remember(session_id="s-2", text="Another fact here.", kind="project_fact")
+    assert "limit" in out.lower() or "429" in out
+
+
+@patch("primer.mcp.tools.httpx.post")
+def test_primer_remember_memory_disabled(mock_post):
+    mock_resp = MagicMock()
+    mock_resp.status_code = 409
+    mock_post.return_value = mock_resp
+
+    from primer.mcp.tools import primer_remember
+
+    out = primer_remember(
+        session_id="s-3", text="A project fact about the build.", kind="project_fact"
+    )
+    assert "not enabled" in out.lower() or "409" in out
+
+
+@patch("primer.mcp.tools.httpx.post")
+def test_primer_remember_evidence_accreted(mock_post):
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"status": "evidence_accreted", "memory_id": "m-2"}
+    mock_post.return_value = mock_resp
+
+    from primer.mcp.tools import primer_remember
+
+    out = primer_remember(
+        session_id="s-4", text="Already known fact about the project.", kind="project_fact"
+    )
+    assert "corroborat" in out.lower() or "already known" in out.lower()
+
+
+def test_primer_remember_no_auth(monkeypatch):
+    monkeypatch.setattr("primer.mcp.tools.API_KEY", "")
+    monkeypatch.setattr("primer.mcp.tools.DEVICE_TOKEN", "")
+
+    from primer.mcp.tools import primer_remember
+
+    out = primer_remember(
+        session_id="s-5", text="Some fact about the project.", kind="project_fact"
+    )
+    assert "auth" in out.lower() or "Error" in out
