@@ -250,6 +250,15 @@ def extract_memory_for_session(session_id: str) -> str:
         for card in cards[: settings.memory_sketch_cap_per_session]:
             card["title"] = _scrub_identity(card.get("title", ""), names)
             card["body"] = _scrub_identity(card.get("body", ""), names)
+            # Scrub LLM-supplied file paths too: strips home-dir/username prefixes
+            # while keeping the repo-relative tail (memory is shown to others).
+            raw_files = card.get("files") or []
+            if isinstance(raw_files, list):
+                card["files"] = [
+                    _scrub_identity(f, names) for f in raw_files if isinstance(f, str)
+                ] or None
+            else:
+                card["files"] = None
             entry, _ = create_sketch(
                 db,
                 scope=scope,
