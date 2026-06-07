@@ -228,6 +228,28 @@ def test_redact_ingest_dict_scrubs_arbitrary_tool_dict_keys():
     assert sum(counts.values()) >= 3
 
 
+def test_redact_ingest_dict_scrubs_customization_details_and_path():
+    # MCP customization `details` can carry secrets (env/args); `source_path`
+    # can embed credentials. Structural identifier must survive (analytics key).
+    payload = {
+        "session_id": "s",
+        "customizations": [
+            {
+                "customization_type": "mcp_server",
+                "state": "active",
+                "identifier": "filesystem",
+                "source_path": "cfg with ghp_abcdefghijklmnopqrstuvwxyz0123456789AB",
+                "details": {"env": {"API_KEY": "sk-ant-api03-AbCdEf123456789012345"}},
+            }
+        ],
+    }
+    redacted, counts = redact_ingest_dict(payload)
+    assert "ghp_" not in str(redacted)
+    assert "sk-ant-api03" not in str(redacted)
+    assert redacted["customizations"][0]["identifier"] == "filesystem"  # preserved
+    assert sum(counts.values()) >= 2
+
+
 def test_redact_ingest_dict_never_touches_api_key_or_structure():
     payload = _payload_with_secrets()
     redacted, _ = redact_ingest_dict(payload)

@@ -220,6 +220,22 @@ def redact_ingest_dict(
         if commit.get("author_email"):
             commit["author_email"] = _redact_value(commit["author_email"], counts, disabled, extra)
 
+    for customization in result.get("customizations") or ():
+        if not isinstance(customization, dict):
+            continue
+        # `details` is an open-ended dict (e.g. MCP server config) that can carry
+        # secrets in env/args; `source_path` can embed credentials. Structural
+        # fields (identifier, display_name, type, state) are left intact — they
+        # are analytics join keys, not free text.
+        if customization.get("source_path"):
+            customization["source_path"] = _redact_value(
+                customization["source_path"], counts, disabled, extra
+            )
+        if customization.get("details"):
+            customization["details"] = _redact_nested(
+                customization["details"], counts, disabled, extra
+            )
+
     for field in _RECURSIVE_DICT_FIELDS:
         if result.get(field):
             result[field] = _redact_nested(result[field], counts, disabled, extra)
