@@ -710,3 +710,132 @@ class Intervention(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )
+
+
+class MemoryScope(Base):
+    """The unit memory belongs to. v1.0 creates `kind=project` only;
+    `group`/`org` are reserved for v1.1 (spec §4)."""
+
+    __tablename__ = "memory_scopes"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    kind: Mapped[str] = mapped_column(String(20), nullable=False, server_default="project")
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    repository_id: Mapped[str | None] = mapped_column(
+        ForeignKey("git_repositories.id"), nullable=True, unique=True
+    )
+    last_consolidation_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    memory_paused_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    entries: Mapped[list["MemoryEntry"]] = relationship(back_populates="scope")
+
+
+class MemoryEntry(Base):
+    """A memory card. status: sketch / active / validated / decaying /
+    retired / rejected. Enum membership enforced at the application layer
+    per repo convention (plain String columns)."""
+
+    __tablename__ = "memory_entries"
+    __table_args__ = (
+        UniqueConstraint("scope_id", "content_hash", name="uq_memory_entry_scope_hash"),
+        Index("ix_memory_entries_scope_status", "scope_id", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    scope_id: Mapped[str] = mapped_column(ForeignKey("memory_scopes.id"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(30), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    concepts: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    files: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="sketch")
+    confidence_score: Mapped[float] = mapped_column(Float, nullable=False, server_default="0.0")
+    corroboration_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    judge_critique: Mapped[str | None] = mapped_column(Text, nullable=True)
+    origin: Mapped[str] = mapped_column(
+        String(30), nullable=False, server_default="passive_extraction"
+    )
+    created_by_engineer_id: Mapped[str | None] = mapped_column(
+        ForeignKey("engineers.id"), nullable=True
+    )
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    activation_baseline: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    activation_observation: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    token_cost: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    efficiency_estimate: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    export_status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="none")
+    export_pr_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    export_cooldown_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    superseded_by_id: Mapped[str | None] = mapped_column(
+        ForeignKey("memory_entries.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    scope: Mapped[MemoryScope] = relationship(back_populates="entries")
+    evidence: Mapped[list["MemoryEvidence"]] = relationship(
+        back_populates="entry", cascade="all, delete-orphan"
+    )
+    events: Mapped[list["MemoryEvent"]] = relationship(
+        back_populates="entry", cascade="all, delete-orphan"
+    )
+
+
+class MemoryEvidence(Base):
+    __tablename__ = "memory_evidence"
+    __table_args__ = (Index("ix_memory_evidence_memory_independent", "memory_id", "independent"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    memory_id: Mapped[str] = mapped_column(ForeignKey("memory_entries.id"), nullable=False)
+    evidence_kind: Mapped[str] = mapped_column(String(30), nullable=False)
+    session_id: Mapped[str | None] = mapped_column(ForeignKey("sessions.id"), nullable=True)
+    engineer_id: Mapped[str | None] = mapped_column(ForeignKey("engineers.id"), nullable=True)
+    independent: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("1"))
+    payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    entry: Mapped[MemoryEntry] = relationship(back_populates="evidence")
+
+
+class MemoryInjection(Base):
+    """One row per memory served to a session (read path, Plan 2c) —
+    created now so the schema lands in one migration."""
+
+    __tablename__ = "memory_injections"
+    __table_args__ = (
+        Index("ix_memory_injections_memory_time", "memory_id", "injected_at"),
+        Index("ix_memory_injections_engineer_time", "engineer_id", "injected_at"),
+        Index("ix_memory_injections_session", "session_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    memory_id: Mapped[str] = mapped_column(ForeignKey("memory_entries.id"), nullable=False)
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), nullable=False)
+    engineer_id: Mapped[str] = mapped_column(ForeignKey("engineers.id"), nullable=False)
+    surface: Mapped[str] = mapped_column(String(20), nullable=False)
+    token_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    injected_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class MemoryEvent(Base):
+    """Append-only audit trail (spec §4 memory_event)."""
+
+    __tablename__ = "memory_events"
+    __table_args__ = (Index("ix_memory_events_memory_time", "memory_id", "occurred_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    memory_id: Mapped[str] = mapped_column(ForeignKey("memory_entries.id"), nullable=False)
+    event_kind: Mapped[str] = mapped_column(String(40), nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    actor: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    entry: Mapped[MemoryEntry] = relationship(back_populates="events")
