@@ -431,6 +431,22 @@ def process_session_ingest_job(db: Session, payload: dict[str, Any]) -> None:
                 created_by_engineer_id=engineer_id,
             )
 
+        # Memory extraction follows facet extraction (spec §5: passive write path).
+        from primer.server.services.memory_service import memory_capture_active
+
+        if memory_capture_active() and app_settings.anthropic_api_key:
+            from primer.server.services.background_job_service import (
+                JOB_TYPE_MEMORY_EXTRACTION,
+                enqueue_background_job,
+            )
+
+            enqueue_background_job(
+                db,
+                job_type=JOB_TYPE_MEMORY_EXTRACTION,
+                payload={"session_id": ingest_payload.session_id},
+                created_by_engineer_id=engineer_id,
+            )
+
         db.commit()
 
         logger.info(

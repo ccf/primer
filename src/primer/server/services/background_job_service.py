@@ -26,6 +26,8 @@ JOB_STATUS_FAILED = "failed"
 JOB_TYPE_SESSION_INGEST = "session_ingest"
 JOB_TYPE_FACET_EXTRACTION = "facet_extract_session"
 JOB_TYPE_FACET_BACKFILL = "facet_backfill"
+JOB_TYPE_MEMORY_EXTRACTION = "memory_extract_session"
+JOB_TYPE_MEMORY_BACKFILL = "memory_backfill"
 JOB_TYPE_NARRATIVE_REFRESH_ALL = "narrative_refresh_all"
 JOB_TYPE_DAILY_ANALYTICS_ROLLUP_REFRESH = "daily_analytics_rollup_refresh"
 
@@ -354,6 +356,22 @@ def _run_job(db: Session | None, job_type: str, payload: dict[str, Any]) -> None
         from primer.server.services.facet_extraction_service import backfill_facets
 
         backfill_facets(limit=int(payload.get("limit", 50)))
+        return
+
+    if job_type == JOB_TYPE_MEMORY_EXTRACTION:
+        from primer.server.services.memory_extraction_service import (
+            extract_memory_for_session,
+        )
+
+        result = extract_memory_for_session(payload["session_id"])
+        if result == "failed":
+            raise RuntimeError(f"Memory extraction failed for session {payload['session_id']}")
+        return
+
+    if job_type == JOB_TYPE_MEMORY_BACKFILL:
+        from primer.server.services.memory_extraction_service import backfill_memory
+
+        backfill_memory(limit=int(payload.get("limit", settings.memory_backfill_max_sessions)))
         return
 
     if job_type == JOB_TYPE_NARRATIVE_REFRESH_ALL:
