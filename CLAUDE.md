@@ -12,6 +12,7 @@ Agent harness intelligence platform — measures how tool design, context manage
 | `src/primer/common/models.py` | SQLAlchemy 2.0 models (Team, Engineer, Session, ModelUsage, ToolUsage, SessionFacets, Alert, AlertConfig, AuditLog, Budget, PullRequest, ReviewFinding, NarrativeCache, etc.) |
 | `src/primer/common/schemas.py` | 100+ Pydantic v2 DTOs for all API request/response types |
 | `src/primer/common/pricing.py` | Model pricing config + cost estimation (longest-prefix match) |
+| `src/primer/common/redaction.py` | Secret/PII redaction: named regex detectors + ingest-payload walker, applied in the hook (client-side) and ingest router (server-side) |
 | `src/primer/common/config.py` | `pydantic-settings` with `PRIMER_` env prefix |
 | `src/primer/common/database.py` | SQLAlchemy engine + session factory |
 | `src/primer/server/app.py` | FastAPI app with 15 routers, CORS, rate limiting, lifespan hooks |
@@ -151,6 +152,7 @@ cd frontend && npx tsc -b --noEmit  # Type check
 - **Pricing**: `src/primer/common/pricing.py` — longest-prefix match on model name, falls back to Sonnet 4 pricing
 - **Theming**: CSS custom properties in `index.css`, `.dark` class toggle, localStorage-persisted preference
 - **Rate Limiting**: slowapi middleware with per-route limits; key function uses API key prefix or client IP
+- **Redaction**: `src/primer/common/redaction.py` — whitelist walker over ingest payload text fields; runs client-side in the hook (`PRIMER_REDACTION_ENABLED`) and server-side in the ingest router before persistence (including the `background_jobs` table); configurable via `PRIMER_REDACTION_DISABLED_DETECTORS` / `PRIMER_REDACTION_EXTRA_PATTERNS`; on redaction failure both layers fail closed on content (strip text fields) and open on metrics
 - **Alert Thresholds**: `AlertConfig` model with team > global > config defaults priority chain
 - **Audit Trail**: `AuditLog` model records admin mutations with actor, action, resource, details, IP
 - **Narrative Cache**: `NarrativeCache` model with TTL-based expiry and optional auto-refresh via lifespan task

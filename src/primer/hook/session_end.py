@@ -21,6 +21,12 @@ import sys
 import httpx
 
 from primer.common.auth_headers import build_engineer_auth_headers
+from primer.common.redaction import (
+    build_disabled_set,
+    build_extra_detectors,
+    redact_ingest_dict,
+    scrub_url_credentials,
+)
 from primer.hook.extractor import SessionMetadata, capture_git_info, load_facets
 from primer.hook.extractor_registry import get_extractor_for
 
@@ -132,6 +138,41 @@ def main() -> None:
 
     # Build and send payload
     payload = meta.to_ingest_payload(api_key=api_key or None, facets=facets)
+
+    # Redact secrets/PII client-side before anything leaves this machine.
+    # Controlled by PRIMER_REDACTION_ENABLED (default: on).
+    redaction_setting = os.environ.get("PRIMER_REDACTION_ENABLED", "true").lower()
+    if redaction_setting not in ("0", "false", "no", "off"):
+        try:
+            payload, redaction_counts = redact_ingest_dict(
+                payload,
+                disabled=build_disabled_set(
+                    os.environ.get("PRIMER_REDACTION_DISABLED_DETECTORS", "")
+                ),
+                extra=build_extra_detectors(os.environ.get("PRIMER_REDACTION_EXTRA_PATTERNS", "")),
+            )
+            if redaction_counts:
+                logger.info(f"Redacted {sum(redaction_counts.values())} sensitive value(s)")
+        except Exception as exc:
+            # Fail closed on content: drop text-bearing fields, keep metrics.
+            for field in (
+                "first_prompt",
+                "summary",
+                "messages",
+                "commits",
+                "source_metadata",
+                "facets",
+                "customizations",
+            ):
+                payload.pop(field, None)
+            # git_remote_url can embed user:token creds. Attempt the one-regex
+            # targeted scrub; if even that fails, drop the field entirely.
+            if payload.get("git_remote_url"):
+                try:
+                    payload["git_remote_url"], _ = scrub_url_credentials(payload["git_remote_url"])
+                except Exception:
+                    payload.pop("git_remote_url", None)
+            logger.warning(f"Redaction failed ({exc}); stripped text fields from payload")
 
     try:
         resp = httpx.post(
