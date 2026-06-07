@@ -602,3 +602,15 @@ def test_primer_remember_no_auth(monkeypatch):
         session_id="s-5", text="Some fact about the project.", kind="project_fact"
     )
     assert "auth" in out.lower() or "Error" in out
+
+
+@patch("primer.mcp.tools.httpx.post")
+def test_primer_remember_connection_error(mock_post):
+    mock_post.side_effect = httpx.RequestError("connection failed")
+
+    from primer.mcp.tools import primer_remember
+
+    out = primer_remember(
+        session_id="s-6", text="A fact that never reaches the server.", kind="project_fact"
+    )
+    assert "Error connecting" in out

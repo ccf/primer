@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -2771,7 +2771,7 @@ class RememberRequest(BaseModel):
     kind: Literal["project_fact", "anti_pattern", "tool_pointer", "harness_config", "procedure"] = (
         "project_fact"
     )
-    files: list[str] | None = None
+    files: list[Annotated[str, Field(max_length=500)]] | None = Field(default=None, max_length=50)
 
 
 class RememberResponse(BaseModel):

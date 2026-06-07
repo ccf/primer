@@ -225,7 +225,7 @@ def extract_memory_for_session(session_id: str) -> str:
         for card in cards[: settings.memory_sketch_cap_per_session]:
             card["title"] = _scrub_identity(card.get("title", ""), names)
             card["body"] = _scrub_identity(card.get("body", ""), names)
-            entry = create_sketch(
+            entry, _ = create_sketch(
                 db,
                 scope=scope,
                 card=card,

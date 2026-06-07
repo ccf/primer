@@ -340,12 +340,15 @@ def primer_remember(
     """Submit an explicit memory for this project (quarantined until validated)."""
     if not _has_engineer_auth():
         return "Primer auth not configured (set PRIMER_DEVICE_TOKEN or PRIMER_API_KEY)."
-    resp = httpx.post(
-        f"{SERVER_URL}/api/v1/memories/remember",
-        json={"session_id": session_id, "text": text, "kind": kind, "files": files},
-        headers=_engineer_headers(),
-        timeout=10.0,
-    )
+    try:
+        resp = httpx.post(
+            f"{SERVER_URL}/api/v1/memories/remember",
+            json={"session_id": session_id, "text": text, "kind": kind, "files": files},
+            headers=_engineer_headers(),
+            timeout=10.0,
+        )
+    except httpx.RequestError as e:
+        return f"Error connecting to server: {e}"
     if resp.status_code == 429:
         return "Per-session remember limit reached — consolidate your notes into fewer memories."
     if resp.status_code == 409:
