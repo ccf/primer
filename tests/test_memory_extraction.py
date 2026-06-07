@@ -148,6 +148,54 @@ def test_extract_memory_for_session_end_to_end(db_session, monkeypatch):
     assert entries[0].evidence[0].session_id == "mem-rich-1"
 
 
+def test_extract_memory_scrubs_card_file_paths(db_session, monkeypatch):
+    # Passive extraction must scrub identity-bearing paths in the card `files`
+    # field (not just title/body) before persisting.
+    monkeypatch.setattr(_settings, "memory_enabled", True)
+    monkeypatch.setattr(_settings, "redaction_enabled", True)
+    monkeypatch.setattr(_settings, "anthropic_api_key", "test-key")
+    _seed_rich_session(db_session)
+    db_session.close = MagicMock()
+    db_session.commit = MagicMock()
+
+    api_response = {
+        "content": [
+            {
+                "type": "text",
+                "text": _json.dumps(
+                    [
+                        {
+                            "kind": "project_fact",
+                            "title": "config lives under src",
+                            "body": "The build config is checked in.",
+                            "concepts": ["build"],
+                            "files": ["/Users/casey/git/api/src/config.py"],
+                        }
+                    ]
+                ),
+            }
+        ]
+    }
+    mock_resp = MagicMock(status_code=200)
+    mock_resp.json.return_value = api_response
+
+    svc = "primer.server.services.memory_extraction_service"
+    with (
+        patch(f"{svc}.SessionLocal", return_value=db_session),
+        patch.object(memory_extraction_service.httpx.Client, "post", return_value=mock_resp),
+    ):
+        result = memory_extraction_service.extract_memory_for_session("mem-rich-1")
+
+    assert result == "done"
+    from primer.common.models import MemoryEntry
+
+    entry = db_session.query(MemoryEntry).one()
+    # username/home prefix stripped (PII gone), path tail preserved
+    assert entry.files == ["git/api/src/config.py"]
+    assert "casey" not in str(entry.files)
+    assert "/Users/" not in str(entry.files)
+
+
 def test_extract_skips_when_memory_disabled(db_session, monkeypatch):
     monkeypatch.setattr(_settings, "memory_enabled", False)
     assert memory_extraction_service.extract_memory_for_session("whatever") == "skipped"

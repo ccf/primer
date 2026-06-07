@@ -42,6 +42,10 @@ def test_ingest_enqueues_memory_extraction(client, engineer_with_key, db_session
     monkeypatch.setattr(settings, "background_jobs_enabled", True)
     monkeypatch.setattr(settings, "memory_enabled", True)
     monkeypatch.setattr(settings, "redaction_enabled", True)
+    # The enqueue guard also requires an Anthropic key (no point extracting with
+    # no LLM to call). Set it explicitly so the test doesn't depend on ambient
+    # config — CI has no key, which is why this silently passed only locally.
+    monkeypatch.setattr(settings, "anthropic_api_key", "test-key")
     _engineer, api_key = engineer_with_key
 
     r = client.post(
