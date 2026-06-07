@@ -98,6 +98,17 @@ class PrimerSettings(BaseSettings):
     redaction_disabled_detectors: str = ""  # comma-separated detector names
     redaction_extra_patterns: str = ""  # JSON: [{"name": ..., "pattern": ...}]
 
+    # Memory system (hive mind) — Plan 2a: write path
+    memory_enabled: bool = False
+    memory_extraction_model: str = ""  # empty -> falls back to facet_extraction_model
+    memory_extraction_min_substance: int = 5  # min tool calls before extraction runs
+    memory_max_cards_per_session: int = 5
+    memory_sketch_cap_per_session: int = 10
+    memory_sketch_cap_per_engineer_daily: int = 50
+    memory_remember_per_session: int = 5
+    memory_backfill_max_sessions: int = 200
+    memory_dedup_similarity: float = 0.85  # used by consolidation (Plan 2b)
+
     # Durable background jobs
     background_jobs_enabled: bool = True
     background_job_poll_seconds: int = 15
