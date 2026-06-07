@@ -268,6 +268,46 @@ def test_redact_ingest_dict_handles_missing_fields():
     assert sum(counts.values()) == 0
 
 
+def test_walker_redacts_unknown_future_fields_by_default():
+    # The denylist inversion's core property: a field the walker has never been
+    # told about is redacted automatically, rather than leaking. This is the
+    # regression guard against the old whitelist's silent-gap failure mode.
+    payload = {
+        "session_id": "s",
+        "some_future_field": "leaked sk-ant-api03-AbCdEf123456789012345",
+        "nested_future": {"deep": [{"k": "token ghp_abcdefghijklmnopqrstuvwxyz0123456789AB"}]},
+    }
+    redacted, counts = redact_ingest_dict(payload)
+    assert "sk-ant-api03" not in str(redacted)
+    assert "ghp_" not in str(redacted)
+    assert sum(counts.values()) >= 2
+
+
+def test_walker_preserves_structural_join_keys():
+    # session_id / identifier / content_hash must survive verbatim even when
+    # their values could superficially resemble a token, so analytics joins and
+    # dead-weight attribution keep working.
+    payload = {
+        "session_id": "550e8400-e29b-41d4-a716-446655440000",
+        "messages": [{"ordinal": 0, "role": "assistant", "content_text": "hi"}],
+        "customizations": [
+            {"customization_type": "skill", "state": "invoked", "identifier": "code-reviewer"}
+        ],
+    }
+    redacted, _ = redact_ingest_dict(payload)
+    assert redacted["session_id"] == "550e8400-e29b-41d4-a716-446655440000"
+    assert redacted["customizations"][0]["identifier"] == "code-reviewer"
+    assert redacted["messages"][0]["role"] == "assistant"
+
+
+def test_walker_never_redacts_api_key_even_without_router_pop():
+    # api_key is sk-ant-shaped and WOULD match a detector; the walker itself must
+    # protect it (the hook path calls redact_ingest_dict without popping it).
+    payload = {"session_id": "s", "api_key": "sk-ant-realauthkey-AbCdEf123456789012345"}
+    redacted, _ = redact_ingest_dict(payload)
+    assert redacted["api_key"] == "sk-ant-realauthkey-AbCdEf123456789012345"
+
+
 def test_commit_author_email_respects_disabled_email_detector():
     payload = _payload_with_secrets()
     redacted, _ = redact_ingest_dict(payload, disabled=frozenset({"email"}))
