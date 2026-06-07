@@ -15,6 +15,7 @@ from primer.server.services.memory_service import (
     create_sketch,
     get_or_create_project_scope,
     memory_capture_active,
+    scrub_identity,
 )
 
 logger = logging.getLogger(__name__)
@@ -63,11 +64,19 @@ def remember(
     if existing >= settings.memory_remember_per_session:
         raise HTTPException(status_code=429, detail="Per-session remember limit reached")
 
+    # Redact secrets, then identity-scrub names/paths — same two-layer treatment
+    # passive extraction applies, so explicit and passive memories are equally
+    # identity-clean for cross-engineer display (spec §10).
     disabled = build_disabled_set(settings.redaction_disabled_detectors)
     extra = build_extra_detectors(settings.redaction_extra_patterns)
+    names = [engineer.name] if engineer.name else []
     text, _ = redact_text(payload.text, disabled=disabled, extra=extra)
+    text = scrub_identity(text, names)
     redacted_files = (
-        [redact_text(f, disabled=disabled, extra=extra)[0] for f in payload.files]
+        [
+            scrub_identity(redact_text(f, disabled=disabled, extra=extra)[0], names)
+            for f in payload.files
+        ]
         if payload.files
         else None
     )

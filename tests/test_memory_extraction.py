@@ -4,9 +4,9 @@ import json
 
 from primer.server.services.memory_extraction_service import (
     _parse_cards_response,
-    _scrub_identity,
     session_has_substance,
 )
+from primer.server.services.memory_service import scrub_identity
 
 
 def test_parse_cards_response_valid():
@@ -36,7 +36,7 @@ def test_parse_cards_response_garbage_returns_empty():
 
 def test_scrub_identity_removes_names_and_paths():
     body = "Alice fixed this in /Users/alice/git/svc/config/x.py per alice@example.com"
-    scrubbed = _scrub_identity(body, engineer_names=["Alice"])
+    scrubbed = scrub_identity(body, engineer_names=["Alice"])
     assert "Alice" not in scrubbed
     assert "alice@example.com" not in scrubbed
     assert "/Users/alice" not in scrubbed
@@ -44,7 +44,7 @@ def test_scrub_identity_removes_names_and_paths():
 
 
 def test_scrub_identity_case_insensitive_names():
-    scrubbed = _scrub_identity("casey and CASEY both broke it", engineer_names=["Casey"])
+    scrubbed = scrub_identity("casey and CASEY both broke it", engineer_names=["Casey"])
     assert "casey" not in scrubbed.lower().replace("an engineer", "")
 
 
