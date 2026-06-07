@@ -162,6 +162,7 @@ def main() -> None:
                 "commits",
                 "source_metadata",
                 "facets",
+                "customizations",
             ):
                 payload.pop(field, None)
             # git_remote_url can embed user:token creds. Attempt the one-regex

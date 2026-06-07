@@ -50,6 +50,9 @@ def _authenticate_ingest_engineer(
     raise HTTPException(status_code=401, detail="Authentication required")
 
 
+# Fields that can carry sensitive content and are dropped wholesale if redaction
+# itself fails (fail closed on content, open on metrics). git_remote_url is
+# handled separately (targeted scrub, see _apply_redaction).
 _TEXT_BEARING_FIELDS = (
     "first_prompt",
     "summary",
@@ -57,6 +60,7 @@ _TEXT_BEARING_FIELDS = (
     "commits",
     "source_metadata",
     "facets",
+    "customizations",
 )
 
 

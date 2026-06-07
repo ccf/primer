@@ -114,6 +114,42 @@ def test_redaction_failure_strips_content_not_500(
     assert msgs == []
 
 
+def test_redaction_failure_drops_secret_customizations(
+    client, engineer_with_key, db_session, monkeypatch
+):
+    """A redaction crash must not persist secret-bearing customizations."""
+    import primer.server.routers.ingest as ingest_module
+    from primer.common.models import SessionCustomization
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("redaction exploded")
+
+    monkeypatch.setattr(ingest_module, "redact_ingest_dict", _boom)
+    _engineer, api_key = engineer_with_key
+    payload = _secret_session_payload(api_key)
+    payload["customizations"] = [
+        {
+            "customization_type": "mcp",
+            "state": "invoked",
+            "identifier": "filesystem",
+            "source_path": "cfg ghp_abcdefghijklmnopqrstuvwxyz0123456789AB",
+            "details": {"env": {"API_KEY": "sk-ant-api03-AbCdEf123456789012345"}},
+        }
+    ]
+
+    r = client.post("/api/v1/ingest/session", json=payload)
+    assert r.status_code == 200
+
+    rows = (
+        db_session.query(SessionCustomization)
+        .filter(SessionCustomization.session_id == payload["session_id"])
+        .all()
+    )
+    blob = str([(c.source_path, c.details) for c in rows])
+    assert "ghp_" not in blob
+    assert "sk-ant-api03" not in blob
+
+
 def test_redaction_failure_scrubs_git_remote_url(
     client, engineer_with_key, db_session, monkeypatch
 ):

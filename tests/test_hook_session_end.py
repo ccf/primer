@@ -550,6 +550,14 @@ def test_main_redaction_failure_strips_content_but_posts_metrics(
         first_prompt="key sk-ant-api03-AbCdEf123456789012345",
         message_count=7,
         messages=[{"ordinal": 0, "role": "human", "content_text": "secret stuff"}],
+        customizations=[
+            {
+                "customization_type": "mcp",
+                "state": "invoked",
+                "identifier": "filesystem",
+                "details": {"env": {"API_KEY": "sk-ant-api03-AbCdEf123456789012345"}},
+            }
+        ],
     )
     mock_extractor = MagicMock()
     mock_extractor.extract.return_value = meta
@@ -566,6 +574,7 @@ def test_main_redaction_failure_strips_content_but_posts_metrics(
     sent = mock_post.call_args.kwargs["json"]
     assert "first_prompt" not in sent
     assert "messages" not in sent
+    assert "customizations" not in sent  # secret-bearing customizations dropped
     assert sent["message_count"] == 7
     assert sent["session_id"] == "sess-fail"
 
