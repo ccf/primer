@@ -58,3 +58,91 @@ def test_session_has_substance_thresholds(db_session, monkeypatch):
     db_session.flush()
     assert session_has_substance(thin) is False
     assert session_has_substance(rich) is True
+
+
+# --- Integration tests (mocked Anthropic) ---
+
+import json as _json  # noqa: E402
+from unittest.mock import MagicMock, patch  # noqa: E402
+
+from primer.common.config import settings as _settings  # noqa: E402
+from primer.common.models import GitRepository, SessionMessage  # noqa: E402
+from primer.server.services import memory_extraction_service  # noqa: E402
+
+
+def _seed_rich_session(db_session):
+    from primer.common.models import Engineer
+    from primer.common.models import Session as SessionModel
+
+    eng = Engineer(name="Casey", email="c@x.io")
+    repo = GitRepository(full_name="acme/api")
+    db_session.add_all([eng, repo])
+    db_session.flush()
+    sess = SessionModel(
+        id="mem-rich-1", engineer_id=eng.id, repository_id=repo.id, tool_call_count=12
+    )
+    db_session.add(sess)
+    db_session.add(
+        SessionMessage(
+            session_id="mem-rich-1",
+            ordinal=0,
+            role="human",
+            content_text="run alembic upgrade head before make build",
+        )
+    )
+    db_session.flush()
+    return eng, repo, sess
+
+
+def test_extract_memory_for_session_end_to_end(db_session, monkeypatch):
+    monkeypatch.setattr(_settings, "memory_enabled", True)
+    monkeypatch.setattr(_settings, "redaction_enabled", True)
+    monkeypatch.setattr(_settings, "anthropic_api_key", "test-key")
+    _seed_rich_session(db_session)
+    # Patch SessionLocal to return the test session instead of opening a new one.
+    # Neutralize close/commit so the test transaction stays intact (mirrors
+    # the established pattern in tests/test_facet_extraction.py).
+    db_session.close = MagicMock()
+    db_session.commit = MagicMock()
+
+    api_response = {
+        "content": [
+            {
+                "type": "text",
+                "text": _json.dumps(
+                    [
+                        {
+                            "kind": "anti_pattern",
+                            "title": "Casey says: run migrations before build",
+                            "body": "Don't run make build without alembic upgrade head first.",
+                            "concepts": ["build"],
+                            "files": [],
+                        }
+                    ]
+                ),
+            }
+        ]
+    }
+    mock_resp = MagicMock(status_code=200)
+    mock_resp.json.return_value = api_response
+
+    svc = "primer.server.services.memory_extraction_service"
+    with (
+        patch(f"{svc}.SessionLocal", return_value=db_session),
+        patch.object(memory_extraction_service.httpx.Client, "post", return_value=mock_resp),
+    ):
+        result = memory_extraction_service.extract_memory_for_session("mem-rich-1")
+
+    assert result == "done"
+    from primer.common.models import MemoryEntry
+
+    entries = db_session.query(MemoryEntry).all()
+    assert len(entries) == 1
+    assert entries[0].status == "sketch"
+    assert "Casey" not in entries[0].title  # identity scrubbed
+    assert entries[0].evidence[0].session_id == "mem-rich-1"
+
+
+def test_extract_skips_when_memory_disabled(db_session, monkeypatch):
+    monkeypatch.setattr(_settings, "memory_enabled", False)
+    assert memory_extraction_service.extract_memory_for_session("whatever") == "skipped"
