@@ -35,12 +35,17 @@ def test_parse_cards_response_garbage_returns_empty():
 
 
 def test_scrub_identity_removes_names_and_paths():
-    body = "Alice fixed this in /Users/alice/git/svc/src/x.py per alice@example.com"
+    body = "Alice fixed this in /Users/alice/git/svc/config/x.py per alice@example.com"
     scrubbed = _scrub_identity(body, engineer_names=["Alice"])
     assert "Alice" not in scrubbed
     assert "alice@example.com" not in scrubbed
     assert "/Users/alice" not in scrubbed
-    assert "src/x.py" in scrubbed  # repo-relative tail survives
+    assert "config/x.py" in scrubbed  # non-src tail survives, username stripped
+
+
+def test_scrub_identity_case_insensitive_names():
+    scrubbed = _scrub_identity("casey and CASEY both broke it", engineer_names=["Casey"])
+    assert "casey" not in scrubbed.lower().replace("an engineer", "")
 
 
 def test_session_has_substance_thresholds(db_session, monkeypatch):
@@ -146,3 +151,34 @@ def test_extract_memory_for_session_end_to_end(db_session, monkeypatch):
 def test_extract_skips_when_memory_disabled(db_session, monkeypatch):
     monkeypatch.setattr(_settings, "memory_enabled", False)
     assert memory_extraction_service.extract_memory_for_session("whatever") == "skipped"
+
+
+def test_extract_memory_returns_failed_on_api_error(db_session, monkeypatch):
+    import primer.server.services.memory_extraction_service as mes
+    from primer.common.config import settings as _s
+    from primer.common.models import Engineer, GitRepository, MemoryEntry, SessionMessage
+    from primer.common.models import Session as SessionModel
+
+    monkeypatch.setattr(_s, "memory_enabled", True)
+    monkeypatch.setattr(_s, "redaction_enabled", True)
+    monkeypatch.setattr(_s, "anthropic_api_key", "k")
+    eng = Engineer(name="D", email="d@x.io")
+    repo = GitRepository(full_name="acme/f")
+    db_session.add_all([eng, repo])
+    db_session.flush()
+    db_session.add(
+        SessionModel(id="fail-1", engineer_id=eng.id, repository_id=repo.id, tool_call_count=10)
+    )
+    db_session.add(
+        SessionMessage(session_id="fail-1", ordinal=0, role="human", content_text="do x")
+    )
+    db_session.commit()
+    monkeypatch.setattr(mes, "SessionLocal", lambda: db_session)
+    monkeypatch.setattr(db_session, "close", lambda: None)
+
+    def _boom(*a, **k):
+        raise RuntimeError("api down")
+
+    monkeypatch.setattr(mes, "_call_extraction_api", _boom)
+    assert mes.extract_memory_for_session("fail-1") == "failed"
+    assert db_session.query(MemoryEntry).count() == 0
