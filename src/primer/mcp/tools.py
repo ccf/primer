@@ -334,6 +334,30 @@ def primer_personal_recaps(period: str = "both") -> str:
         return f"Error connecting to server: {e}"
 
 
+def primer_remember(
+    session_id: str, text: str, kind: str = "project_fact", files: list[str] | None = None
+) -> str:
+    """Submit an explicit memory for this project (quarantined until validated)."""
+    if not _has_engineer_auth():
+        return "Primer auth not configured (set PRIMER_DEVICE_TOKEN or PRIMER_API_KEY)."
+    resp = httpx.post(
+        f"{SERVER_URL}/api/v1/memories/remember",
+        json={"session_id": session_id, "text": text, "kind": kind, "files": files},
+        headers=_engineer_headers(),
+        timeout=10.0,
+    )
+    if resp.status_code == 429:
+        return "Per-session remember limit reached — consolidate your notes into fewer memories."
+    if resp.status_code == 409:
+        return "Memory capture is not enabled on this Primer server."
+    if resp.status_code != 200:
+        return f"Remember failed ({resp.status_code})."
+    data = resp.json()
+    if data["status"] == "evidence_accreted":
+        return "Already known — your observation was added as corroborating evidence."
+    return "Remembered (quarantined as a sketch until the consolidation engine validates it)."
+
+
 def primer_manager_review_pack(team_id: str | None = None, days: int = 7) -> str:
     """Get a weekly manager review pack combining quality, friction, growth, and cost."""
     if not _has_engineer_auth() and not ADMIN_API_KEY:

@@ -14,6 +14,7 @@ from primer.mcp.tools import (
     primer_my_stats,
     primer_personal_recaps,
     primer_recommendations,
+    primer_remember,
     primer_session_start_coaching,
     primer_sync,
     primer_team_overview,
@@ -142,6 +143,25 @@ def personal_recaps(period: str = "both") -> str:
 def manager_review_pack(team_id: str | None = None, days: int = 7) -> str:
     """Get a weekly manager review pack for a team or the whole org."""
     return primer_manager_review_pack(team_id=team_id, days=days)
+
+
+@mcp.tool()
+def remember(
+    session_id: str,
+    text: str,
+    kind: str = "project_fact",
+    files: list[str] | None = None,
+) -> str:
+    """Save a durable project fact/anti-pattern/pointer to the team's shared memory.
+
+    Use when you learn something any engineer on this project would want in a
+    future session (build quirks, environment gotchas, which module to use).
+    The memory is quarantined until Primer's consolidation engine validates it.
+
+    session_id: the current session's ID (required — used to scope the memory
+    to the correct project and enforce the per-session write limit).
+    """
+    return primer_remember(session_id=session_id, text=text, kind=kind, files=files)
 
 
 if __name__ == "__main__":
