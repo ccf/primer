@@ -55,6 +55,15 @@ def get_or_create_project_scope(db: Session, repository_id: str) -> MemoryScope:
         with db.begin_nested():
             scope = MemoryScope(kind="project", name=repo.full_name, repository_id=repository_id)
             db.add(scope)
+        # Cold start (spec §5): the first time a project scope exists, queue a
+        # one-time backfill over its history so memory is useful in week one.
+        if memory_capture_active():
+            from primer.server.services.background_job_service import (
+                JOB_TYPE_MEMORY_BACKFILL,
+                enqueue_background_job,
+            )
+
+            enqueue_background_job(db, job_type=JOB_TYPE_MEMORY_BACKFILL, payload={})
         return scope
     except IntegrityError:
         return db.query(MemoryScope).filter(MemoryScope.repository_id == repository_id).one()

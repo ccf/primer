@@ -139,6 +139,41 @@ def _call_extraction_api(transcript: str) -> list[dict]:
     return _parse_cards_response(text)
 
 
+def backfill_memory(limit: int | None = None) -> dict:
+    """Cold-start backfill (spec §5): run the per-session extractor over the
+    existing corpus, newest-first, bounded. Mirrors backfill_facets. Sessions
+    already carrying memory evidence are excluded via a NOT EXISTS check."""
+    from primer.common.models import MemoryEvidence
+
+    if not memory_capture_active() or not settings.anthropic_api_key:
+        return {"processed": 0, "skipped": "memory_inactive"}
+    bound = limit or settings.memory_backfill_max_sessions
+    db = SessionLocal()
+    try:
+        seen = db.query(MemoryEvidence.session_id).filter(MemoryEvidence.session_id.isnot(None))
+        sessions = (
+            db.query(SessionModel.id)
+            .filter(
+                SessionModel.repository_id.isnot(None),
+                SessionModel.tool_call_count >= settings.memory_extraction_min_substance,
+                ~SessionModel.id.in_(seen),
+            )
+            .order_by(SessionModel.started_at.desc())
+            .limit(bound)
+            .all()
+        )
+        ids = [row.id for row in sessions]
+    finally:
+        db.close()
+
+    processed = 0
+    for session_id in ids:
+        if extract_memory_for_session(session_id) == "done":
+            processed += 1
+    logger.info("Memory backfill: %d/%d sessions produced sketches", processed, len(ids))
+    return {"processed": processed, "candidates": len(ids)}
+
+
 def extract_memory_for_session(session_id: str) -> str:
     """Job handler: extract memory cards for one session. Returns
     'done' | 'skipped' | 'failed' (mirrors facet extraction semantics)."""
