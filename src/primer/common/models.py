@@ -798,7 +798,10 @@ class MemoryEvidence(Base):
     evidence_kind: Mapped[str] = mapped_column(String(30), nullable=False)
     session_id: Mapped[str | None] = mapped_column(ForeignKey("sessions.id"), nullable=True)
     engineer_id: Mapped[str | None] = mapped_column(ForeignKey("engineers.id"), nullable=True)
-    independent: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("1"))
+    # Plain "1" (not text("1")): renders as DEFAULT '1', which PostgreSQL accepts
+    # for a bool column; text("1") would emit DEFAULT 1 and fail on PG. Matches
+    # the codebase convention (Engineer.is_active).
+    independent: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="1")
     payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 

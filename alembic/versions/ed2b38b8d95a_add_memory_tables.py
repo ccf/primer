@@ -135,7 +135,7 @@ def upgrade() -> None:
         sa.Column("evidence_kind", sa.String(length=30), nullable=False),
         sa.Column("session_id", sa.String(length=36), nullable=True),
         sa.Column("engineer_id", sa.String(length=36), nullable=True),
-        sa.Column("independent", sa.Boolean(), server_default=sa.text("1"), nullable=False),
+        sa.Column("independent", sa.Boolean(), server_default="1", nullable=False),
         sa.Column("payload", sa.JSON(), nullable=True),
         sa.Column(
             "created_at",
