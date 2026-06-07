@@ -12,6 +12,7 @@ from primer.common.models import (
     MemoryScope,
 )
 from primer.server.services.memory_service import (
+    canonical_content_hash,
     create_sketch,
     get_or_create_project_scope,
     memory_capture_active,
@@ -180,6 +181,60 @@ def test_create_sketch_exact_duplicate_accretes_evidence(db_session):
     assert second_created is False  # accretion, not a fresh create
     assert second.id == first.id  # no new entry
     assert len(first.evidence) == 2  # evidence accreted
+
+
+def test_create_sketch_handles_concurrent_insert_race(db_session, monkeypatch):
+    # Simulate a parallel writer landing the same (scope_id, content_hash) row
+    # between this caller's dedup read (which sees nothing) and its insert (which
+    # then collides on the unique constraint). create_sketch must catch
+    # IntegrityError, fetch the winner, and accrete — not raise.
+    import contextlib
+
+    from sqlalchemy.exc import IntegrityError
+
+    repo = _repo_and_scope(db_session)
+    eng = _engineer(db_session, "race@x.io")
+    scope = get_or_create_project_scope(db_session, repo.id)
+    body = "Raced body."
+    content_hash = canonical_content_hash(body)
+
+    @contextlib.contextmanager
+    def _racing_begin_nested():
+        # The parallel writer's row lands now (after our dedup read), then the
+        # savepoint flush raises the unique violation.
+        db_session.add(
+            MemoryEntry(
+                scope_id=scope.id,
+                kind="project_fact",
+                title="T",
+                body=body,
+                content_hash=content_hash,
+            )
+        )
+        db_session.flush()
+        raise IntegrityError("insert", {}, Exception("UNIQUE constraint failed"))
+        yield  # unreachable; makes this a valid generator for @contextmanager
+
+    monkeypatch.setattr(db_session, "begin_nested", _racing_begin_nested)
+    entry, created = create_sketch(
+        db_session,
+        scope=scope,
+        card={"kind": "project_fact", "title": "T", "body": body},
+        origin="passive_extraction",
+        engineer_id=eng.id,
+        session_id=None,
+        citation={"excerpt": "z"},
+    )
+    assert created is False  # lost the race -> accreted onto the winner
+    assert entry is not None
+    assert entry.content_hash == content_hash
+    monkeypatch.undo()  # restore real begin_nested before the count query
+    assert (
+        db_session.query(MemoryEntry)
+        .filter(MemoryEntry.scope_id == scope.id, MemoryEntry.content_hash == content_hash)
+        .count()
+        == 1  # exactly one entry; no duplicate
+    )
 
 
 def test_create_sketch_skips_rejected_duplicates(db_session):

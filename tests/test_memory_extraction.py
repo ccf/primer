@@ -153,6 +153,50 @@ def test_extract_skips_when_memory_disabled(db_session, monkeypatch):
     assert memory_extraction_service.extract_memory_for_session("whatever") == "skipped"
 
 
+def test_extract_is_idempotent_for_already_extracted_session(db_session, monkeypatch):
+    # A session already carrying transcript_citation evidence is skipped without
+    # an LLM call — the post-ingest path fires on every ingest + retries, so this
+    # prevents redundant extraction of identical (capped) transcript content.
+    from primer.common.models import MemoryEntry, MemoryEvidence, MemoryScope
+
+    monkeypatch.setattr(_settings, "memory_enabled", True)
+    monkeypatch.setattr(_settings, "redaction_enabled", True)
+    monkeypatch.setattr(_settings, "anthropic_api_key", "test-key")
+    _eng, repo, _sess = _seed_rich_session(db_session)
+    scope = MemoryScope(kind="project", name="acme/api", repository_id=repo.id)
+    db_session.add(scope)
+    db_session.flush()
+    entry = MemoryEntry(
+        scope_id=scope.id, kind="project_fact", title="t", body="b", content_hash="h"
+    )
+    db_session.add(entry)
+    db_session.flush()
+    db_session.add(
+        MemoryEvidence(
+            memory_id=entry.id, evidence_kind="transcript_citation", session_id="mem-rich-1"
+        )
+    )
+    db_session.commit()
+
+    api_called = []
+    with (
+        patch(
+            "primer.server.services.memory_extraction_service.SessionLocal",
+            return_value=db_session,
+        ),
+        patch.object(
+            memory_extraction_service.httpx.Client,
+            "post",
+            side_effect=lambda *a, **k: api_called.append(1),
+        ),
+    ):
+        db_session.close = MagicMock()
+        result = memory_extraction_service.extract_memory_for_session("mem-rich-1")
+
+    assert result == "skipped"
+    assert api_called == []  # no LLM call made
+
+
 def test_extract_memory_returns_failed_on_api_error(db_session, monkeypatch):
     import primer.server.services.memory_extraction_service as mes
     from primer.common.config import settings as _s
