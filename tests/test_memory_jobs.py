@@ -106,3 +106,65 @@ def test_ingest_does_not_enqueue_when_memory_disabled(
         .all()
     )
     assert mem_jobs == []
+
+
+def test_backfill_memory_processes_newest_first_with_limit(db_session, monkeypatch):
+    from datetime import datetime
+
+    import primer.server.services.memory_extraction_service as mes
+    from primer.common.models import Engineer, GitRepository
+    from primer.common.models import Session as SessionModel
+
+    monkeypatch.setattr(settings, "memory_enabled", True)
+    monkeypatch.setattr(settings, "redaction_enabled", True)
+    monkeypatch.setattr(settings, "anthropic_api_key", "k")
+    eng = Engineer(name="B", email="b@x.io")
+    repo = GitRepository(full_name="acme/bf")
+    db_session.add_all([eng, repo])
+    db_session.flush()
+    for i in range(4):
+        db_session.add(
+            SessionModel(
+                id=f"bf-{i}",
+                engineer_id=eng.id,
+                repository_id=repo.id,
+                tool_call_count=10,
+                started_at=datetime(2026, 5, 1 + i),
+            )
+        )
+    db_session.commit()
+
+    processed = []
+    monkeypatch.setattr(mes, "SessionLocal", lambda: db_session)
+    monkeypatch.setattr(db_session, "close", lambda: None)
+    monkeypatch.setattr(
+        mes, "extract_memory_for_session", lambda sid: processed.append(sid) or "done"
+    )
+
+    result = mes.backfill_memory(limit=2)
+    assert result["processed"] == 2
+    assert processed == ["bf-3", "bf-2"]  # newest-first
+
+
+def test_backfill_skips_sessions_without_repository(db_session, monkeypatch):
+    import primer.server.services.memory_extraction_service as mes
+    from primer.common.models import Engineer
+    from primer.common.models import Session as SessionModel
+
+    monkeypatch.setattr(settings, "memory_enabled", True)
+    monkeypatch.setattr(settings, "redaction_enabled", True)
+    monkeypatch.setattr(settings, "anthropic_api_key", "k")
+    eng = Engineer(name="C", email="cc@x.io")
+    db_session.add(eng)
+    db_session.flush()
+    db_session.add(SessionModel(id="norepo-1", engineer_id=eng.id, tool_call_count=10))
+    db_session.commit()
+
+    monkeypatch.setattr(mes, "SessionLocal", lambda: db_session)
+    monkeypatch.setattr(db_session, "close", lambda: None)
+    called = []
+    monkeypatch.setattr(mes, "extract_memory_for_session", lambda sid: called.append(sid))
+
+    result = mes.backfill_memory(limit=10)
+    assert result["processed"] == 0
+    assert called == []
