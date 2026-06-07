@@ -308,6 +308,33 @@ def test_walker_never_redacts_api_key_even_without_router_pop():
     assert redacted["api_key"] == "sk-ant-realauthkey-AbCdEf123456789012345"
 
 
+def test_walker_skip_is_top_level_only_nested_structural_keys_redacted():
+    # A secret hiding under a structural-looking key name inside a nested
+    # structure must still be redacted — the skip-list is top-level only.
+    payload = {
+        "session_id": "top-level-pk-survives",
+        "api_key": "sk-ant-realauthkey-AbCdEf123456789012345",  # top-level: survives
+        "source_metadata": {"session_id": "leaked sk-ant-api03-AbCdEf123456789012345"},
+        "customizations": [
+            {
+                "customization_type": "mcp",
+                "state": "invoked",
+                "identifier": "filesystem",
+                "details": {"api_key": "sk-ant-api03-XyZ9876543210abcdef"},
+            }
+        ],
+    }
+    redacted, counts = redact_ingest_dict(payload)
+    # top-level structural fields pass through
+    assert redacted["session_id"] == "top-level-pk-survives"
+    assert redacted["api_key"] == "sk-ant-realauthkey-AbCdEf123456789012345"
+    assert redacted["customizations"][0]["identifier"] == "filesystem"
+    # but the same key names nested in free content are redacted
+    assert "sk-ant-api03" not in str(redacted["source_metadata"])
+    assert "sk-ant-api03" not in str(redacted["customizations"][0]["details"])
+    assert sum(counts.values()) >= 2
+
+
 def test_commit_author_email_respects_disabled_email_detector():
     payload = _payload_with_secrets()
     redacted, _ = redact_ingest_dict(payload, disabled=frozenset({"email"}))

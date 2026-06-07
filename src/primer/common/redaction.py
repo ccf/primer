@@ -135,11 +135,15 @@ def scrub_url_credentials(url: str) -> tuple[str, int]:
     return _URL_USERINFO_CREDENTIALS.subn(r"\1", url)
 
 
-# Keys whose values pass through the recursive walk untouched. Deliberately
-# small: this is a DENYLIST over an otherwise redact-everything walk, so a new
-# payload field is redacted by default — a forgotten field over-redacts (the
-# safe direction, caught by analytics tests) rather than leaking (a silent
-# security hole, the failure mode of the previous whitelist design).
+# TOP-LEVEL payload keys whose values pass through untouched. This is a DENYLIST
+# over an otherwise redact-everything walk, so a new payload field is redacted by
+# default — a forgotten field over-redacts (the safe direction, caught by
+# analytics tests) rather than leaking (the whitelist design's silent-gap mode).
+#
+# Applied ONLY at the top level (see redact_ingest_dict). Nested structures —
+# source_metadata, facets, tool dicts, customization details — are redacted with
+# NO key exceptions, so a secret hiding under a structural-looking key name
+# (e.g. details={"api_key": "sk-..."}) is still scrubbed.
 #
 # Two reasons a key is here:
 #   1. Correctness-critical — redacting it breaks the system:
@@ -148,17 +152,10 @@ def scrub_url_credentials(url: str) -> tuple[str, int]:
 #        - git_remote_url: redacted separately via a targeted credential scrub,
 #          because the full detector walk would let the email rule corrupt
 #          scp-style remotes (git@host:path).
-#   2. Analytics join keys that must survive verbatim so cross-session joins and
-#      dead-weight attribution keep working even under custom extra-patterns.
-_NEVER_REDACT_KEYS = frozenset(
-    {
-        "api_key",
-        "git_remote_url",
-        "session_id",
-        "identifier",
-        "content_hash",
-    }
-)
+#   2. session_id: the analytics primary key, kept verbatim for cross-session
+#      joins even under custom extra-patterns (a real id never matches a built-in
+#      detector, so this is belt-and-suspenders / intent documentation).
+_NEVER_REDACT_TOP_LEVEL_KEYS = frozenset({"api_key", "git_remote_url", "session_id"})
 
 
 def _redact_value(
@@ -180,15 +177,12 @@ def _redact_tree(
     disabled: frozenset[str],
     extra: tuple[Detector, ...],
 ) -> object:
-    """Recursively redact every string value in a dict/list structure, except
-    values whose key is in ``_NEVER_REDACT_KEYS`` (checked at every level)."""
+    """Recursively redact every string value in a dict/list structure, with no
+    key exceptions. Key-name skipping happens only at the payload top level."""
     if isinstance(node, str):
         return _redact_value(node, counts, disabled, extra)
     if isinstance(node, dict):
-        return {
-            k: (v if k in _NEVER_REDACT_KEYS else _redact_tree(v, counts, disabled, extra))
-            for k, v in node.items()
-        }
+        return {k: _redact_tree(v, counts, disabled, extra) for k, v in node.items()}
     if isinstance(node, list):
         return [_redact_tree(item, counts, disabled, extra) for item in node]
     return node
@@ -201,23 +195,26 @@ def redact_ingest_dict(
 ) -> tuple[dict, dict[str, int]]:
     """Redact every free-text value in a session ingest payload.
 
-    Redact-everything-except-structural: a recursive walk scrubs all string
-    values, skipping only the small ``_NEVER_REDACT_KEYS`` set (auth credential,
-    analytics join keys, and git_remote_url which gets a targeted scrub below).
-    New payload fields are therefore covered automatically. Returns a
-    deep-copied, redacted payload and counts by detector; the input is never
-    mutated.
+    Redact-everything-except-structural: every string value is scrubbed except
+    the small ``_NEVER_REDACT_TOP_LEVEL_KEYS`` set, which is honored ONLY at the
+    top level. Nested structures are redacted with no exceptions, so a secret
+    under a structural-looking nested key is still caught. New payload fields are
+    covered automatically. Returns a deep-copied, redacted payload and counts by
+    detector; the input is never mutated.
     """
     result = copy.deepcopy(payload)
     counts: Counter[str] = Counter()
 
-    # git_remote_url gets targeted credential removal (it is in the skip set, so
-    # the generic walk leaves it alone). The full detector walk would let the
-    # email rule corrupt scp-style remotes (git@host:path).
+    # git_remote_url gets targeted credential removal (it is skipped by the
+    # top-level walk below). The full detector walk would let the email rule
+    # corrupt scp-style remotes (git@host:path).
     if result.get("git_remote_url"):
         result["git_remote_url"], n = scrub_url_credentials(result["git_remote_url"])
         if n:
             counts["url-credentials"] += n
 
-    result = _redact_tree(result, counts, disabled, extra)
-    return result, dict(counts)
+    redacted = {
+        k: (v if k in _NEVER_REDACT_TOP_LEVEL_KEYS else _redact_tree(v, counts, disabled, extra))
+        for k, v in result.items()
+    }
+    return redacted, dict(counts)
