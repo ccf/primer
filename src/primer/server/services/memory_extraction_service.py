@@ -14,7 +14,7 @@ import httpx
 
 from primer.common.config import settings
 from primer.common.database import SessionLocal
-from primer.common.models import Engineer, SessionMessage
+from primer.common.models import Engineer, MemoryScope, SessionMessage
 from primer.common.models import Session as SessionModel
 from primer.server.services.memory_service import (
     create_sketch,
@@ -143,8 +143,11 @@ def backfill_memory(repository_id: str | None = None, limit: int | None = None) 
     """Cold-start backfill (spec §5): run the per-session extractor over existing
     sessions, newest-first, bounded. When repository_id is given (the cold-start
     path on scope creation) it is scoped to that repo, so onboarding N projects
-    does N bounded passes instead of N global ones. Sessions already carrying
-    memory evidence are excluded so re-runs are cheap/idempotent."""
+    does N bounded passes instead of N global ones. Sessions already PASSIVELY
+    extracted (those carrying a transcript_citation evidence row) are excluded so
+    re-runs are cheap/idempotent — but a session that only has an explicit
+    `remember` (explicit_remember evidence) is still eligible for passive
+    backfill, since the two channels are complementary."""
     from primer.common.models import MemoryEvidence
 
     if not memory_capture_active() or not settings.anthropic_api_key:
@@ -152,7 +155,10 @@ def backfill_memory(repository_id: str | None = None, limit: int | None = None) 
     bound = limit or settings.memory_backfill_max_sessions
     db = SessionLocal()
     try:
-        seen = db.query(MemoryEvidence.session_id).filter(MemoryEvidence.session_id.isnot(None))
+        seen = db.query(MemoryEvidence.session_id).filter(
+            MemoryEvidence.session_id.isnot(None),
+            MemoryEvidence.evidence_kind == "transcript_citation",
+        )
         q = db.query(SessionModel.id).filter(
             SessionModel.repository_id.isnot(None),
             SessionModel.tool_call_count >= settings.memory_extraction_min_substance,
@@ -189,6 +195,9 @@ def extract_memory_for_session(session_id: str) -> str:
         return "skipped"
 
     # Phase 1: read eligibility + transcript, then release the connection.
+    # Scope is looked up read-only here (not get-or-created) so this phase's
+    # rollback-on-close never churns a freshly-created scope + backfill job;
+    # creation is deferred to Phase 3, which commits.
     db = SessionLocal()
     try:
         session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
@@ -196,8 +205,10 @@ def extract_memory_for_session(session_id: str) -> str:
             return "skipped"
         if not session_has_substance(session):
             return "skipped"
-        scope = get_or_create_project_scope(db, session.repository_id)
-        if scope.memory_paused_at is not None:
+        existing_scope = (
+            db.query(MemoryScope).filter(MemoryScope.repository_id == session.repository_id).first()
+        )
+        if existing_scope is not None and existing_scope.memory_paused_at is not None:
             return "skipped"
         transcript = _build_transcript(db, session_id)
         engineer = db.query(Engineer).filter(Engineer.id == session.engineer_id).first()

@@ -176,6 +176,65 @@ def test_backfill_memory_scoped_to_repository(db_session, monkeypatch):
     assert processed == ["a-1"]  # only repo_a's session, not b-1
 
 
+def test_backfill_excludes_passively_extracted_but_includes_remember_only(db_session, monkeypatch):
+    # A session already passively extracted (transcript_citation evidence) is
+    # excluded; a session with only an explicit remember (explicit_remember
+    # evidence) is still eligible for passive backfill — the two are complementary.
+    import primer.server.services.memory_extraction_service as mes
+    from primer.common.models import (
+        Engineer,
+        GitRepository,
+        MemoryEntry,
+        MemoryEvidence,
+        MemoryScope,
+    )
+    from primer.common.models import Session as SessionModel
+
+    monkeypatch.setattr(settings, "memory_enabled", True)
+    monkeypatch.setattr(settings, "redaction_enabled", True)
+    monkeypatch.setattr(settings, "anthropic_api_key", "k")
+    eng = Engineer(name="R", email="rr@x.io")
+    repo = GitRepository(full_name="acme/c")
+    db_session.add_all([eng, repo])
+    db_session.flush()
+    scope = MemoryScope(kind="project", name="acme/c", repository_id=repo.id)
+    db_session.add(scope)
+    db_session.flush()
+    # passively-extracted session -> has transcript_citation evidence
+    db_session.add(
+        SessionModel(id="passive-1", engineer_id=eng.id, repository_id=repo.id, tool_call_count=10)
+    )
+    # remember-only session -> has only explicit_remember evidence
+    db_session.add(
+        SessionModel(id="remember-1", engineer_id=eng.id, repository_id=repo.id, tool_call_count=10)
+    )
+    entry = MemoryEntry(
+        scope_id=scope.id, kind="project_fact", title="t", body="b", content_hash="h"
+    )
+    db_session.add(entry)
+    db_session.flush()
+    db_session.add(
+        MemoryEvidence(
+            memory_id=entry.id, evidence_kind="transcript_citation", session_id="passive-1"
+        )
+    )
+    db_session.add(
+        MemoryEvidence(
+            memory_id=entry.id, evidence_kind="explicit_remember", session_id="remember-1"
+        )
+    )
+    db_session.commit()
+
+    processed = []
+    monkeypatch.setattr(mes, "SessionLocal", lambda: db_session)
+    monkeypatch.setattr(db_session, "close", lambda: None)
+    monkeypatch.setattr(
+        mes, "extract_memory_for_session", lambda sid: processed.append(sid) or "done"
+    )
+    mes.backfill_memory(repository_id=repo.id, limit=10)
+    assert processed == ["remember-1"]  # passive-1 excluded, remember-1 still eligible
+
+
 def test_backfill_skips_sessions_without_repository(db_session, monkeypatch):
     import primer.server.services.memory_extraction_service as mes
     from primer.common.models import Engineer
