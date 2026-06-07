@@ -71,6 +71,7 @@ Agent harness intelligence platform — measures how tool design, context manage
 | `finops.py` | Cache analytics, cost modeling, forecasting, budget CRUD |
 | `harness.py` | Harness intelligence: dead weight detection endpoint |
 | `interventions.py` | Recommendation-to-intervention workflow and effectiveness reporting |
+| `memories.py` | Memory write path: explicit `remember` endpoint (rate-limited per session) |
 
 ### Services
 
@@ -100,6 +101,8 @@ Agent harness intelligence platform — measures how tool design, context manage
 | `slack_service.py` | Slack webhook posting |
 | `finops_service.py` | Cache analytics, cost modeling (API vs subscription), forecasting (linear regression), budget tracking |
 | `deadweight_service.py` | Dead weight detection: zero-invocation and no-outcome-lift customization flagging |
+| `memory_service.py` | Hive-mind memory store: project scopes, sketch persistence, sticky dedup, flood control |
+| `memory_extraction_service.py` | Passive LLM memory-card extraction (post-facet job) + cold-start backfill |
 
 ## Commands
 
@@ -164,6 +167,7 @@ cd frontend && npx tsc -b --noEmit  # Type check
 - **Harness Intelligence**: 5-factor harness maturity score (tool design, orchestration, caching, context hygiene, boundary design), dead weight detection for zero-invocation and no-lift customizations, subtractive coaching ("what you can stop doing"), `GET /api/v1/harness/deadweight` endpoint, derived workflow profiles, project workflow fingerprints, workflow playbooks, and harness-based quality attribution
 - **Async Ingest**: Session ingest enqueues a `session_ingest` background job and returns 202 immediately; the worker processes upsert + anomaly detection + facet extraction asynchronously
 - **PreCompact Hooks**: Sessions are captured incrementally on context compaction (not only at session end) via the PreCompact hook event
+- **Memory (hive mind)**: project-scoped shared memory behind `PRIMER_MEMORY_ENABLED` (requires redaction); write path only in Plan 2a — passive extraction job after facets + `remember` MCP tool; all writes quarantined as `sketch` until the consolidation engine (Plan 2b) promotes them
 
 ## Conventions
 
