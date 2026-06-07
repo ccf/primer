@@ -16,6 +16,7 @@ from primer.common.config import settings
 from primer.common.database import SessionLocal
 from primer.common.models import Engineer, MemoryEvidence, MemoryScope, SessionMessage
 from primer.common.models import Session as SessionModel
+from primer.common.redaction import build_extra_detectors
 from primer.server.services.memory_service import (
     create_sketch,
     get_or_create_project_scope,
@@ -225,16 +226,18 @@ def extract_memory_for_session(session_id: str) -> str:
     db = SessionLocal()
     try:
         scope = get_or_create_project_scope(db, repository_id)
+        # Org custom patterns apply to memory cards too (same as the remember path).
+        extra = build_extra_detectors(settings.redaction_extra_patterns)
         created = 0
         for card in cards[: settings.memory_sketch_cap_per_session]:
-            card["title"] = scrub_identity(card.get("title", ""), names)
-            card["body"] = scrub_identity(card.get("body", ""), names)
+            card["title"] = scrub_identity(card.get("title", ""), names, extra=extra)
+            card["body"] = scrub_identity(card.get("body", ""), names, extra=extra)
             # Scrub LLM-supplied file paths too: strips home-dir/username prefixes
             # while keeping the repo-relative tail (memory is shown to others).
             raw_files = card.get("files") or []
             if isinstance(raw_files, list):
                 card["files"] = [
-                    scrub_identity(f, names) for f in raw_files if isinstance(f, str)
+                    scrub_identity(f, names, extra=extra) for f in raw_files if isinstance(f, str)
                 ] or None
             else:
                 card["files"] = None

@@ -144,6 +144,26 @@ def test_remember_redacts_files(client, engineer_with_key, db_session):
     assert all("ghp_" not in f for f in entry.files)
 
 
+def test_remember_applies_org_extra_patterns(client, engineer_with_key, db_session, monkeypatch):
+    # The org's custom PRIMER_REDACTION_EXTRA_PATTERNS must apply to memory too.
+    monkeypatch.setattr(
+        settings,
+        "redaction_extra_patterns",
+        '[{"name": "emp-id", "pattern": "EMP-[0-9]{6}"}]',
+    )
+    engineer, api_key = engineer_with_key
+    _seed_session(db_session, engineer, "rem-extra")
+    r = client.post(
+        "/api/v1/memories/remember",
+        json={"session_id": "rem-extra", "text": "Ask badge EMP-123456 about the deploy keys."},
+        headers={"x-api-key": api_key},
+    )
+    assert r.status_code == 200
+    entry = db_session.query(MemoryEntry).one()
+    assert "EMP-123456" not in entry.body
+    assert "[REDACTED:emp-id]" in entry.body
+
+
 def test_remember_scrubs_engineer_identity(client, engineer_with_key, db_session):
     # The explicit path must also strip engineer names + home-dir/username path
     # prefixes (not just secrets), matching passive extraction (spec §10).
