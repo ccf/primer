@@ -592,6 +592,21 @@ def test_primer_remember_evidence_accreted(mock_post):
     assert "corroborat" in out.lower() or "already known" in out.lower()
 
 
+@patch("primer.mcp.tools.httpx.post")
+def test_primer_remember_dropped_is_not_reported_as_remembered(mock_post):
+    # status="dropped" (rejected dup / daily cap) must not say "Remembered".
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"status": "dropped", "memory_id": None}
+    mock_post.return_value = mock_resp
+
+    from primer.mcp.tools import primer_remember
+
+    out = primer_remember(session_id="s-5", text="A fact that gets dropped here.")
+    assert "not stored" in out.lower()
+    assert "remembered" not in out.lower()
+
+
 def test_primer_remember_no_auth(monkeypatch):
     monkeypatch.setattr("primer.mcp.tools.API_KEY", "")
     monkeypatch.setattr("primer.mcp.tools.DEVICE_TOKEN", "")

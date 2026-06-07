@@ -355,9 +355,14 @@ def primer_remember(
         return "Memory capture is not enabled on this Primer server."
     if resp.status_code != 200:
         return f"Remember failed ({resp.status_code})."
-    data = resp.json()
-    if data["status"] == "evidence_accreted":
+    status = resp.json().get("status")
+    if status == "evidence_accreted":
         return "Already known — your observation was added as corroborating evidence."
+    if status == "dropped":
+        return (
+            "Not stored — a similar memory was previously rejected, or you've hit today's "
+            "memory limit."
+        )
     return "Remembered (quarantined as a sketch until the consolidation engine validates it)."
 
 

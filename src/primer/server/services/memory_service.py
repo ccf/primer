@@ -34,14 +34,17 @@ MEMORY_KINDS = ("project_fact", "anti_pattern", "tool_pointer", "harness_config"
 _DEDUP_BLOCKING_STATUSES = ("sketch", "active", "validated", "decaying", "rejected")
 
 
-def scrub_identity(text: str, engineer_names: list[str]) -> str:
-    """Strip engineer names, emails, and machine-specific path prefixes from text.
+def scrub_identity(text: str, engineer_names: list[str], extra: tuple = ()) -> str:
+    """Strip secrets, engineer names, emails, and machine path prefixes from text.
 
-    Belt-and-suspenders for identity-clean memory: bodies/titles/files are shown
-    to other engineers (spec §10). Applied by BOTH write paths — passive
-    extraction and the explicit `remember` endpoint.
+    The single redaction entry point for BOTH write paths (passive extraction
+    and the explicit `remember` endpoint), so they can't drift. `extra` carries
+    the org's custom `PRIMER_REDACTION_EXTRA_PATTERNS` so memory honors org
+    policy. `disabled` is deliberately NOT honored here (always frozenset):
+    memory bodies are shown cross-engineer and must stay identity-clean
+    regardless of the org's capture-layer attribution-disable choice (spec §10).
     """
-    scrubbed, _ = redact_text(text, disabled=frozenset())  # email detector strips emails
+    scrubbed, _ = redact_text(text, disabled=frozenset(), extra=extra)
     # Strip the machine-specific home-dir prefix (/Users/<name>/ or /home/<name>/)
     # — removing the username (PII) while keeping the path tail actionable.
     scrubbed = re.sub(r"(?:/Users/|/home/)[^/\s]+/?", "", scrubbed)

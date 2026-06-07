@@ -9,7 +9,7 @@ from primer.common.config import settings
 from primer.common.database import get_db
 from primer.common.models import MemoryEvidence
 from primer.common.models import Session as SessionModel
-from primer.common.redaction import build_disabled_set, build_extra_detectors, redact_text
+from primer.common.redaction import build_extra_detectors
 from primer.common.schemas import RememberRequest, RememberResponse
 from primer.server.services.memory_service import (
     create_sketch,
@@ -64,21 +64,14 @@ def remember(
     if existing >= settings.memory_remember_per_session:
         raise HTTPException(status_code=429, detail="Per-session remember limit reached")
 
-    # Redact secrets, then identity-scrub names/paths — same two-layer treatment
-    # passive extraction applies, so explicit and passive memories are equally
-    # identity-clean for cross-engineer display (spec §10).
-    disabled = build_disabled_set(settings.redaction_disabled_detectors)
+    # scrub_identity does secret redaction + identity scrub in one pass — the
+    # same treatment passive extraction applies, so explicit and passive
+    # memories are equally clean for cross-engineer display (spec §10).
     extra = build_extra_detectors(settings.redaction_extra_patterns)
     names = [engineer.name] if engineer.name else []
-    text, _ = redact_text(payload.text, disabled=disabled, extra=extra)
-    text = scrub_identity(text, names)
+    text = scrub_identity(payload.text, names, extra=extra)
     redacted_files = (
-        [
-            scrub_identity(redact_text(f, disabled=disabled, extra=extra)[0], names)
-            for f in payload.files
-        ]
-        if payload.files
-        else None
+        [scrub_identity(f, names, extra=extra) for f in payload.files] if payload.files else None
     )
     scope = get_or_create_project_scope(db, session.repository_id)
     entry, created = create_sketch(
