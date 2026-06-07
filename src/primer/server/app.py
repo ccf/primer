@@ -26,6 +26,7 @@ from primer.server.routers import (
     health,
     ingest,
     interventions,
+    memories,
     notifications,
     sessions,
     teams,
@@ -189,6 +190,7 @@ def create_app() -> FastAPI:
     app.include_router(explorer.router)
     app.include_router(finops.router)
     app.include_router(harness.router)
+    app.include_router(memories.router)
 
     if settings.demo_mode:
         # Keep the demo instance out of search indexes. Pairs with the

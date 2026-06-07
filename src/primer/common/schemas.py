@@ -2760,3 +2760,20 @@ class BudgetStatus(BaseModel):
     status: str  # "on_track" | "warning" | "over_budget"
 
     model_config = {"from_attributes": True}
+
+
+# --- Memory (hive mind) ---
+
+
+class RememberRequest(BaseModel):
+    session_id: str
+    text: str = Field(min_length=10, max_length=2000)
+    kind: Literal["project_fact", "anti_pattern", "tool_pointer", "harness_config", "procedure"] = (
+        "project_fact"
+    )
+    files: list[str] | None = None
+
+
+class RememberResponse(BaseModel):
+    status: Literal["sketch_created", "evidence_accreted", "dropped"]
+    memory_id: str | None = None
