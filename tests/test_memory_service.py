@@ -125,7 +125,7 @@ def test_create_sketch_persists_card_with_evidence_and_event(db_session):
     eng = _engineer(db_session)
     scope = get_or_create_project_scope(db_session, repo.id)
 
-    entry = create_sketch(
+    entry, created = create_sketch(
         db_session,
         scope=scope,
         card={
@@ -141,6 +141,7 @@ def test_create_sketch_persists_card_with_evidence_and_event(db_session):
         citation={"excerpt": "conftest creates sqlite engine"},
     )
     assert entry is not None
+    assert created is True
     assert entry.status == "sketch"
     assert entry.origin == "passive_extraction"
     assert entry.created_by_engineer_id == eng.id
@@ -157,7 +158,7 @@ def test_create_sketch_exact_duplicate_accretes_evidence(db_session):
     scope = get_or_create_project_scope(db_session, repo.id)
     card = {"kind": "project_fact", "title": "T", "body": "Same body."}
 
-    first = create_sketch(
+    first, first_created = create_sketch(
         db_session,
         scope=scope,
         card=card,
@@ -166,7 +167,7 @@ def test_create_sketch_exact_duplicate_accretes_evidence(db_session):
         session_id=None,
         citation={"excerpt": "x"},
     )
-    second = create_sketch(
+    second, second_created = create_sketch(
         db_session,
         scope=scope,
         card=card,
@@ -175,6 +176,8 @@ def test_create_sketch_exact_duplicate_accretes_evidence(db_session):
         session_id=None,
         citation={"excerpt": "y"},
     )
+    assert first_created is True
+    assert second_created is False  # accretion, not a fresh create
     assert second.id == first.id  # no new entry
     assert len(first.evidence) == 2  # evidence accreted
 
@@ -185,7 +188,7 @@ def test_create_sketch_skips_rejected_duplicates(db_session):
     scope = get_or_create_project_scope(db_session, repo.id)
     card = {"kind": "project_fact", "title": "T", "body": "Rejected body."}
 
-    first = create_sketch(
+    first, _ = create_sketch(
         db_session,
         scope=scope,
         card=card,
@@ -197,7 +200,7 @@ def test_create_sketch_skips_rejected_duplicates(db_session):
     first.status = "rejected"
     db_session.flush()
 
-    result = create_sketch(
+    result, created = create_sketch(
         db_session,
         scope=scope,
         card=card,
@@ -207,6 +210,7 @@ def test_create_sketch_skips_rejected_duplicates(db_session):
         citation={"excerpt": "y"},
     )
     assert result is None  # sticky rejection: dropped silently
+    assert created is False
     assert len(first.evidence) == 1
 
 
@@ -219,7 +223,7 @@ def test_create_sketch_respects_paused_scope(db_session):
     scope.memory_paused_at = datetime(2026, 1, 1)
     db_session.flush()
 
-    result = create_sketch(
+    result, created = create_sketch(
         db_session,
         scope=scope,
         card={"kind": "project_fact", "title": "T", "body": "B."},
@@ -229,3 +233,23 @@ def test_create_sketch_respects_paused_scope(db_session):
         citation={"excerpt": "x"},
     )
     assert result is None
+    assert created is False
+
+
+def test_create_sketch_honors_evidence_kind(db_session):
+    repo = _repo_and_scope(db_session)
+    eng = _engineer(db_session)
+    scope = get_or_create_project_scope(db_session, repo.id)
+
+    entry, created = create_sketch(
+        db_session,
+        scope=scope,
+        card={"kind": "project_fact", "title": "T", "body": "Explicit body."},
+        origin="remember_tool",
+        engineer_id=eng.id,
+        session_id=None,
+        citation=None,
+        evidence_kind="explicit_remember",
+    )
+    assert created is True
+    assert entry.evidence[0].evidence_kind == "explicit_remember"

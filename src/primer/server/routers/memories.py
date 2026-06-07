@@ -32,8 +32,10 @@ def remember(
     """Explicit memory write from an in-flight session (spec §5).
 
     Quarantined like all writes: the sketch goes through the same
-    consolidation/judge gates as passive extraction. Rate limit is
-    handler-enforced per session (slowapi cannot key on session_id).
+    consolidation/judge gates as passive extraction. The per-session limit is
+    a best-effort soft cap — the count-then-write is not atomic under
+    concurrent requests, which is acceptable because entries are quarantined
+    and the cap is advisory.
     """
     from primer.server.routers.ingest import _authenticate_ingest_engineer
 
@@ -61,27 +63,28 @@ def remember(
     if existing >= settings.memory_remember_per_session:
         raise HTTPException(status_code=429, detail="Per-session remember limit reached")
 
-    text, _ = redact_text(
-        payload.text,
-        disabled=build_disabled_set(settings.redaction_disabled_detectors),
-        extra=build_extra_detectors(settings.redaction_extra_patterns),
+    disabled = build_disabled_set(settings.redaction_disabled_detectors)
+    extra = build_extra_detectors(settings.redaction_extra_patterns)
+    text, _ = redact_text(payload.text, disabled=disabled, extra=extra)
+    redacted_files = (
+        [redact_text(f, disabled=disabled, extra=extra)[0] for f in payload.files]
+        if payload.files
+        else None
     )
     scope = get_or_create_project_scope(db, session.repository_id)
-    entry = create_sketch(
+    entry, created = create_sketch(
         db,
         scope=scope,
-        card={"kind": payload.kind, "title": text[:120], "body": text, "files": payload.files},
+        card={"kind": payload.kind, "title": text[:120], "body": text, "files": redacted_files},
         origin="remember_tool",
         engineer_id=engineer.id,
         session_id=payload.session_id,
         citation=None,
+        evidence_kind="explicit_remember",
     )
-    if entry is None:
-        db.commit()
-        return RememberResponse(status="dropped")
-    # remember-origin evidence is explicit intent, not a transcript citation
-    ev = entry.evidence[-1]
-    ev.evidence_kind = "explicit_remember"
     db.commit()
-    status = "sketch_created" if entry.origin == "remember_tool" else "evidence_accreted"
-    return RememberResponse(status=status, memory_id=entry.id)
+    if entry is None:
+        return RememberResponse(status="dropped")
+    return RememberResponse(
+        status="sketch_created" if created else "evidence_accreted", memory_id=entry.id
+    )

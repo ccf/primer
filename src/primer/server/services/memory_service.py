@@ -82,23 +82,25 @@ def create_sketch(
     engineer_id: str | None,
     session_id: str | None,
     citation: dict | None,
-) -> MemoryEntry | None:
+    evidence_kind: str = "transcript_citation",
+) -> tuple["MemoryEntry | None", bool]:
     """Persist a candidate memory card as a quarantined sketch.
 
     Dedup semantics (spec §5): an exact content-hash match on a
     non-retired entry accretes evidence onto the existing entry instead of
     creating a new one — unless the existing entry is `rejected`, in which
     case the card is dropped silently (sticky rejection).
-    Returns the entry evidence landed on, or None if dropped.
+    Returns (entry, created_new): (entry, True) on fresh create,
+    (existing, False) on evidence accretion, (None, False) when dropped.
     """
     if scope.memory_paused_at is not None:
-        return None
+        return None, False
 
     body = (card.get("body") or "").strip()
     title = (card.get("title") or "").strip()[:200]
     kind = card.get("kind") or "project_fact"
     if not body or not title or kind not in MEMORY_KINDS:
-        return None
+        return None, False
 
     content_hash = canonical_content_hash(body)
     existing = (
@@ -108,11 +110,11 @@ def create_sketch(
     )
     if existing is not None:
         if existing.status == "rejected":
-            return None
+            return None, False
         if existing.status in _DEDUP_BLOCKING_STATUSES:
-            _attach_evidence(db, existing, engineer_id, session_id, citation)
-            return existing
-        return None  # retired: only manual un-retire reopens (spec §7)
+            _attach_evidence(db, existing, engineer_id, session_id, citation, evidence_kind)
+            return existing, False
+        return None, False  # retired: only manual un-retire reopens (spec §7)
 
     entry = MemoryEntry(
         scope_id=scope.id,
@@ -127,10 +129,10 @@ def create_sketch(
     )
     db.add(entry)
     db.flush()
-    _attach_evidence(db, entry, engineer_id, session_id, citation)
+    _attach_evidence(db, entry, engineer_id, session_id, citation, evidence_kind)
     db.add(MemoryEvent(memory_id=entry.id, event_kind="sketch_created", actor="system"))
     db.flush()
-    return entry
+    return entry, True
 
 
 def _attach_evidence(
@@ -139,11 +141,12 @@ def _attach_evidence(
     engineer_id: str | None,
     session_id: str | None,
     citation: dict | None,
+    evidence_kind: str = "transcript_citation",
 ) -> None:
     db.add(
         MemoryEvidence(
             memory_id=entry.id,
-            evidence_kind="transcript_citation",
+            evidence_kind=evidence_kind,
             session_id=session_id,
             engineer_id=engineer_id,
             payload=citation,

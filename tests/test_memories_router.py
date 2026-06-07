@@ -101,3 +101,44 @@ def test_remember_redacts_text(client, engineer_with_key, db_session):
     assert r.status_code == 200
     entry = db_session.query(MemoryEntry).one()
     assert "sk-ant-api03" not in entry.body
+
+
+def test_remember_same_text_twice_accretes(client, engineer_with_key, db_session):
+    engineer, api_key = engineer_with_key
+    _seed_session(db_session, engineer, "rem-accrete")
+    text = "The build cache lives under .cache and is safe to delete."
+
+    r1 = client.post(
+        "/api/v1/memories/remember",
+        json={"session_id": "rem-accrete", "text": text},
+        headers={"x-api-key": api_key},
+    )
+    assert r1.status_code == 200
+    assert r1.json()["status"] == "sketch_created"
+
+    r2 = client.post(
+        "/api/v1/memories/remember",
+        json={"session_id": "rem-accrete", "text": text},
+        headers={"x-api-key": api_key},
+    )
+    assert r2.status_code == 200
+    assert r2.json()["status"] == "evidence_accreted"
+    assert db_session.query(MemoryEntry).count() == 1
+
+
+def test_remember_redacts_files(client, engineer_with_key, db_session):
+    engineer, api_key = engineer_with_key
+    _seed_session(db_session, engineer, "rem-files")
+    r = client.post(
+        "/api/v1/memories/remember",
+        json={
+            "session_id": "rem-files",
+            "text": "Store the deploy token in the secrets config.",
+            "files": ["cfg ghp_abcdefghijklmnopqrstuvwxyz0123456789AB"],
+        },
+        headers={"x-api-key": api_key},
+    )
+    assert r.status_code == 200
+    entry = db_session.query(MemoryEntry).one()
+    assert entry.files is not None
+    assert all("ghp_" not in f for f in entry.files)
