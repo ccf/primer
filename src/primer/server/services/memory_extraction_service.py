@@ -20,6 +20,7 @@ from primer.server.services.memory_service import (
     create_sketch,
     get_or_create_project_scope,
     memory_capture_active,
+    scrub_identity,
 )
 
 logger = logging.getLogger(__name__)
@@ -68,28 +69,6 @@ def _parse_cards_response(text: str) -> list[dict]:
         return []
     cards = [c for c in data if isinstance(c, dict) and c.get("title") and c.get("body")]
     return cards[: settings.memory_max_cards_per_session]
-
-
-def _scrub_identity(text: str, engineer_names: list[str]) -> str:
-    """Strip engineer names, emails, and machine-specific path prefixes from card text.
-
-    Belt-and-suspenders alongside the prompt instruction and the redaction
-    pipeline (which already ran at capture): memory bodies must be
-    identity-clean because they are shown to other engineers (spec §10).
-    """
-    from primer.common.redaction import redact_text
-
-    scrubbed, _ = redact_text(text, disabled=frozenset())  # email detector strips emails
-    # Strip the machine-specific home-dir prefix (/Users/<name>/ or
-    # /home/<name>/) — removing the username (PII) while keeping the path tail
-    # actionable. Non-home absolute paths (/etc, /srv) are not user-specific.
-    scrubbed = re.sub(r"(?:/Users/|/home/)[^/\s]+/?", "", scrubbed)
-    for name in engineer_names:
-        if name and len(name) > 2:
-            scrubbed = re.sub(
-                rf"\b{re.escape(name)}\b", "an engineer", scrubbed, flags=re.IGNORECASE
-            )
-    return scrubbed
 
 
 def _build_transcript(db, session_id: str) -> str:
@@ -248,14 +227,14 @@ def extract_memory_for_session(session_id: str) -> str:
         scope = get_or_create_project_scope(db, repository_id)
         created = 0
         for card in cards[: settings.memory_sketch_cap_per_session]:
-            card["title"] = _scrub_identity(card.get("title", ""), names)
-            card["body"] = _scrub_identity(card.get("body", ""), names)
+            card["title"] = scrub_identity(card.get("title", ""), names)
+            card["body"] = scrub_identity(card.get("body", ""), names)
             # Scrub LLM-supplied file paths too: strips home-dir/username prefixes
             # while keeping the repo-relative tail (memory is shown to others).
             raw_files = card.get("files") or []
             if isinstance(raw_files, list):
                 card["files"] = [
-                    _scrub_identity(f, names) for f in raw_files if isinstance(f, str)
+                    scrub_identity(f, names) for f in raw_files if isinstance(f, str)
                 ] or None
             else:
                 card["files"] = None

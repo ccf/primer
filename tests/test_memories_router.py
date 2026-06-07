@@ -142,3 +142,23 @@ def test_remember_redacts_files(client, engineer_with_key, db_session):
     entry = db_session.query(MemoryEntry).one()
     assert entry.files is not None
     assert all("ghp_" not in f for f in entry.files)
+
+
+def test_remember_scrubs_engineer_identity(client, engineer_with_key, db_session):
+    # The explicit path must also strip engineer names + home-dir/username path
+    # prefixes (not just secrets), matching passive extraction (spec §10).
+    engineer, api_key = engineer_with_key  # fixture name: "Test Engineer"
+    _seed_session(db_session, engineer, "rem-scrub")
+    r = client.post(
+        "/api/v1/memories/remember",
+        json={
+            "session_id": "rem-scrub",
+            "text": "Test Engineer found the config at /Users/dev/proj/src/app.py is loaded early.",
+        },
+        headers={"x-api-key": api_key},
+    )
+    assert r.status_code == 200
+    entry = db_session.query(MemoryEntry).one()
+    assert "Test Engineer" not in entry.body  # name scrubbed
+    assert "/Users/dev" not in entry.body  # home-dir/username prefix scrubbed
+    assert "src/app.py" in entry.body  # repo-relative tail preserved

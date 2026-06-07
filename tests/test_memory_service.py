@@ -121,6 +121,35 @@ def test_get_or_create_project_scope_idempotent(db_session):
     assert s1.name == "acme/svc"
 
 
+def test_create_sketch_enforces_daily_engineer_cap(db_session, monkeypatch):
+    # Flood-control backstop: an engineer can't create more than the daily cap
+    # of NEW sketches; accretion onto existing entries is exempt.
+    monkeypatch.setattr(settings, "memory_sketch_cap_per_engineer_daily", 2)
+    repo = _repo_and_scope(db_session)
+    eng = _engineer(db_session, "cap@x.io")
+    scope = get_or_create_project_scope(db_session, repo.id)
+
+    made = []
+    for i in range(3):
+        entry, created = create_sketch(
+            db_session,
+            scope=scope,
+            card={"kind": "project_fact", "title": f"T{i}", "body": f"Distinct body {i}."},
+            origin="passive_extraction",
+            engineer_id=eng.id,
+            session_id=None,
+            citation={"excerpt": "x"},
+        )
+        made.append((entry, created))
+    assert made[0][1] is True
+    assert made[1][1] is True
+    assert made[2] == (None, False)  # third is dropped by the cap
+    assert (
+        db_session.query(MemoryEntry).filter(MemoryEntry.created_by_engineer_id == eng.id).count()
+        == 2
+    )
+
+
 def test_create_sketch_persists_card_with_evidence_and_event(db_session):
     repo = _repo_and_scope(db_session)
     eng = _engineer(db_session)

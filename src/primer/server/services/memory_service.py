@@ -8,7 +8,10 @@ The write path persists quarantined `sketch` entries only; promotion to
 
 import hashlib
 import logging
+import re
+from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -20,6 +23,7 @@ from primer.common.models import (
     MemoryEvidence,
     MemoryScope,
 )
+from primer.common.redaction import redact_text
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +32,44 @@ MEMORY_KINDS = ("project_fact", "anti_pattern", "tool_pointer", "harness_config"
 # Statuses that block re-proposal of identical content (spec §7: only
 # `retired` reopens the door, and it does so via manual un-retire).
 _DEDUP_BLOCKING_STATUSES = ("sketch", "active", "validated", "decaying", "rejected")
+
+
+def scrub_identity(text: str, engineer_names: list[str]) -> str:
+    """Strip engineer names, emails, and machine-specific path prefixes from text.
+
+    Belt-and-suspenders for identity-clean memory: bodies/titles/files are shown
+    to other engineers (spec §10). Applied by BOTH write paths — passive
+    extraction and the explicit `remember` endpoint.
+    """
+    scrubbed, _ = redact_text(text, disabled=frozenset())  # email detector strips emails
+    # Strip the machine-specific home-dir prefix (/Users/<name>/ or /home/<name>/)
+    # — removing the username (PII) while keeping the path tail actionable.
+    scrubbed = re.sub(r"(?:/Users/|/home/)[^/\s]+/?", "", scrubbed)
+    for name in engineer_names:
+        if name and len(name) > 2:
+            scrubbed = re.sub(
+                rf"\b{re.escape(name)}\b", "an engineer", scrubbed, flags=re.IGNORECASE
+            )
+    return scrubbed
+
+
+def _engineer_at_daily_cap(db: Session, engineer_id: str | None) -> bool:
+    """Flood-control backstop: True if this engineer has already created
+    `memory_sketch_cap_per_engineer_daily` sketches in the last 24h (rolling
+    window, dialect-agnostic). Counts only entries this engineer authored."""
+    if engineer_id is None:
+        return False
+    cutoff = datetime.now(UTC) - timedelta(hours=24)
+    count = (
+        db.query(func.count(MemoryEntry.id))
+        .filter(
+            MemoryEntry.created_by_engineer_id == engineer_id,
+            MemoryEntry.created_at >= cutoff,
+        )
+        .scalar()
+        or 0
+    )
+    return count >= settings.memory_sketch_cap_per_engineer_daily
 
 
 def memory_capture_active() -> bool:
@@ -110,6 +152,11 @@ def create_sketch(
     )
     if existing is not None:
         return _apply_dedup_policy(db, existing, engineer_id, session_id, citation, evidence_kind)
+
+    # Flood-control backstop on NEW creations only (accretion above is exempt).
+    if _engineer_at_daily_cap(db, engineer_id):
+        logger.info("Engineer %s at daily sketch cap; dropping new sketch", engineer_id)
+        return None, False
 
     entry = MemoryEntry(
         scope_id=scope.id,
