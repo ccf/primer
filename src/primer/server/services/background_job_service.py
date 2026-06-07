@@ -371,7 +371,10 @@ def _run_job(db: Session | None, job_type: str, payload: dict[str, Any]) -> None
     if job_type == JOB_TYPE_MEMORY_BACKFILL:
         from primer.server.services.memory_extraction_service import backfill_memory
 
-        backfill_memory(limit=int(payload.get("limit", settings.memory_backfill_max_sessions)))
+        backfill_memory(
+            repository_id=payload.get("repository_id"),
+            limit=int(payload["limit"]) if payload.get("limit") else None,
+        )
         return
 
     if job_type == JOB_TYPE_NARRATIVE_REFRESH_ALL:

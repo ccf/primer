@@ -146,6 +146,36 @@ def test_backfill_memory_processes_newest_first_with_limit(db_session, monkeypat
     assert processed == ["bf-3", "bf-2"]  # newest-first
 
 
+def test_backfill_memory_scoped_to_repository(db_session, monkeypatch):
+    import primer.server.services.memory_extraction_service as mes
+    from primer.common.models import Engineer, GitRepository
+    from primer.common.models import Session as SessionModel
+
+    monkeypatch.setattr(settings, "memory_enabled", True)
+    monkeypatch.setattr(settings, "redaction_enabled", True)
+    monkeypatch.setattr(settings, "anthropic_api_key", "k")
+    eng = Engineer(name="R", email="r@x.io")
+    repo_a = GitRepository(full_name="acme/a")
+    repo_b = GitRepository(full_name="acme/b")
+    db_session.add_all([eng, repo_a, repo_b])
+    db_session.flush()
+    db_session.add(
+        SessionModel(id="a-1", engineer_id=eng.id, repository_id=repo_a.id, tool_call_count=10)
+    )
+    db_session.add(
+        SessionModel(id="b-1", engineer_id=eng.id, repository_id=repo_b.id, tool_call_count=10)
+    )
+    db_session.commit()
+    processed = []
+    monkeypatch.setattr(mes, "SessionLocal", lambda: db_session)
+    monkeypatch.setattr(db_session, "close", lambda: None)
+    monkeypatch.setattr(
+        mes, "extract_memory_for_session", lambda sid: processed.append(sid) or "done"
+    )
+    mes.backfill_memory(repository_id=repo_a.id, limit=10)
+    assert processed == ["a-1"]  # only repo_a's session, not b-1
+
+
 def test_backfill_skips_sessions_without_repository(db_session, monkeypatch):
     import primer.server.services.memory_extraction_service as mes
     from primer.common.models import Engineer
