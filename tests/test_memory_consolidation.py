@@ -6,8 +6,10 @@ from primer.server.services import memory_embedding_service as emb
 from primer.server.services.memory_consolidation_service import (
     _cosine,
     _jaccard,
+    _parse_judge_response,
     cluster_similar,
     compute_corroboration,
+    judge_sketch,
     merge_sketches_in_scope,
 )
 
@@ -237,3 +239,90 @@ def test_corroboration_counts_distinct_independent_engineers(db_session):
     n = compute_corroboration(db_session, entry)
     assert n == 2  # e1 + e2 distinct independent; the exposed row ignored
     assert entry.corroboration_count == 2
+
+
+def test_parse_judge_response():
+    assert _parse_judge_response('ok: {"accept": true, "rationale": "specific"}') == {
+        "accept": True,
+        "rationale": "specific",
+    }
+    assert _parse_judge_response("garbage") is None
+
+
+def test_judge_promotes_or_rejects(db_session, monkeypatch):
+    import primer.server.services.memory_consolidation_service as cons
+    from primer.common.models import Engineer, GitRepository, MemoryScope
+    from primer.server.services.memory_service import create_sketch
+
+    repo = GitRepository(full_name="acme/judge")
+    eng = Engineer(name="J", email="j@x.io")
+    db_session.add_all([repo, eng])
+    db_session.flush()
+    scope = MemoryScope(kind="project", name="judge", repository_id=repo.id)
+    db_session.add(scope)
+    db_session.flush()
+    entry, _ = create_sketch(
+        db_session,
+        scope=scope,
+        card={"kind": "anti_pattern", "title": "t", "body": "Don't skip migrations before build."},
+        origin="passive_extraction",
+        engineer_id=eng.id,
+        session_id=None,
+        citation={"x": 1},
+    )
+
+    monkeypatch.setattr(
+        cons, "_call_judge_api", lambda prompt: {"accept": True, "rationale": "good"}
+    )
+    promoted = judge_sketch(db_session, entry)
+    assert promoted is True
+    assert entry.status == "active"
+    assert entry.activated_at is not None
+    assert entry.activation_baseline is not None
+    assert entry.judge_critique == "good"
+    assert (
+        db_session.query(MemoryEvent).filter(MemoryEvent.event_kind == "promoted_to_active").count()
+        == 1
+    )
+
+    entry2, _ = create_sketch(
+        db_session,
+        scope=scope,
+        card={"kind": "project_fact", "title": "t2", "body": "Write good code always."},
+        origin="passive_extraction",
+        engineer_id=eng.id,
+        session_id=None,
+        citation={"x": 1},
+    )
+    monkeypatch.setattr(
+        cons, "_call_judge_api", lambda prompt: {"accept": False, "rationale": "trivial"}
+    )
+    assert judge_sketch(db_session, entry2) is False
+    assert entry2.status == "rejected"
+    assert entry2.judge_critique == "trivial"
+
+
+def test_judge_api_failure_leaves_sketch_unchanged(db_session, monkeypatch):
+    import primer.server.services.memory_consolidation_service as cons
+    from primer.common.models import Engineer, GitRepository, MemoryScope
+    from primer.server.services.memory_service import create_sketch
+
+    repo = GitRepository(full_name="acme/jfail")
+    eng = Engineer(name="J", email="jf@x.io")
+    db_session.add_all([repo, eng])
+    db_session.flush()
+    scope = MemoryScope(kind="project", name="jfail", repository_id=repo.id)
+    db_session.add(scope)
+    db_session.flush()
+    entry, _ = create_sketch(
+        db_session,
+        scope=scope,
+        card={"kind": "project_fact", "title": "t", "body": "A real durable project fact."},
+        origin="passive_extraction",
+        engineer_id=eng.id,
+        session_id=None,
+        citation={"x": 1},
+    )
+    monkeypatch.setattr(cons, "_call_judge_api", lambda prompt: None)  # API error
+    assert judge_sketch(db_session, entry) is False
+    assert entry.status == "sketch"  # unchanged — retried next pass
