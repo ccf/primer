@@ -481,7 +481,7 @@ Aligned existing work: async ingest + background jobs (incl. recurring-job and b
 
 ## 17. Open questions for implementation planning
 
-1. Embedding model choice and dimensionality (1024 assumed; postgres deployments only)
+1. ~~Embedding model choice and dimensionality (1024 assumed; postgres deployments only)~~ **DECIDED (Plan 2b):** local `sentence-transformers` BGE (`BAAI/bge-small-en-v1.5`, **384-dim**, not 1024) — no API key, no per-token cost, fully on-prem (privacy-first). Embeddings generated in the consolidation pass (2b), postgres-only; SQLite installs use a keyword-Jaccard merge fallback with no vector column.
 2. Exact extraction and judge prompt texts — iterate against real session data before freezing golden evals
 3. Bundle rendering format for `session_start_coaching` — markdown block that all four harnesses digest well
 4. Cohort-matching method for the observational diagnostics (start with simple cohort baselines; propensity-style matching later)
