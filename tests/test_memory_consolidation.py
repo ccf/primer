@@ -3,6 +3,10 @@
 from primer.common.config import settings
 from primer.common.models import MemoryEntry, MemoryEvent, MemoryEvidence
 from primer.server.services import memory_embedding_service as emb
+from primer.server.services.background_job_service import (
+    JOB_TYPE_MEMORY_CONSOLIDATION,
+    _run_job,
+)
 from primer.server.services.memory_consolidation_service import (
     _cosine,
     _jaccard,
@@ -584,3 +588,31 @@ def test_xact_lock_uses_transaction_scoped_function(db_session, monkeypatch):
     import primer.server.services.memory_consolidation_service as cons
 
     assert not hasattr(cons, "_release_scope_lock")
+
+
+def test_consolidation_constant_and_dispatch(monkeypatch):
+    assert JOB_TYPE_MEMORY_CONSOLIDATION == "memory_consolidation"
+    called = {}
+    import primer.server.services.memory_consolidation_service as cons
+
+    monkeypatch.setattr(
+        cons, "run_memory_consolidation_pass", lambda db: called.setdefault("ran", True)
+    )
+    _run_job(None, JOB_TYPE_MEMORY_CONSOLIDATION, {})
+    assert called["ran"] is True
+
+
+def test_ensure_recurring_registers_consolidation(db_session, monkeypatch):
+    from primer.common.models import BackgroundJob
+    from primer.server.services.background_job_service import ensure_recurring_jobs
+
+    monkeypatch.setattr(settings, "memory_enabled", True)
+    monkeypatch.setattr(settings, "memory_consolidation_enabled", True)
+    ensure_recurring_jobs(db_session)
+    db_session.flush()
+    jobs = (
+        db_session.query(BackgroundJob)
+        .filter(BackgroundJob.job_type == JOB_TYPE_MEMORY_CONSOLIDATION)
+        .all()
+    )
+    assert len(jobs) == 1
