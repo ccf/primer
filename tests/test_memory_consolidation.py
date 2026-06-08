@@ -2,6 +2,12 @@
 
 from primer.common.config import settings
 from primer.common.models import MemoryEntry
+from primer.server.services import memory_embedding_service as emb
+from primer.server.services.memory_consolidation_service import (
+    _cosine,
+    _jaccard,
+    cluster_similar,
+)
 
 
 def test_consolidation_settings_present():
@@ -49,9 +55,6 @@ def test_memory_entry_has_embedding_and_supersede_relationship(db_session):
     assert len(original.embedding) == 384
 
 
-from primer.server.services import memory_embedding_service as emb  # noqa: E402
-
-
 def test_embed_texts_returns_vectors(monkeypatch):
     # Mock the model so CI never downloads sentence-transformers weights.
     class _FakeModel:
@@ -68,13 +71,6 @@ def test_embed_texts_returns_vectors(monkeypatch):
 def test_embeddings_unavailable_returns_none(monkeypatch):
     monkeypatch.setattr(emb, "embeddings_available", lambda: False)
     assert emb.embed_texts(["x"]) is None
-
-
-from primer.server.services.memory_consolidation_service import (  # noqa: E402
-    _cosine,
-    _jaccard,
-    cluster_similar,
-)
 
 
 def test_cosine_and_jaccard():
@@ -95,3 +91,15 @@ def test_cluster_similar_groups_by_threshold():
     # a and b cluster; c alone
     assert ["a", "b"] in [sorted(g) for g in clusters]
     assert ["c"] in [sorted(g) for g in clusters]
+
+
+def test_cluster_similar_is_transitive_regardless_of_order():
+    # a~b and b~c each cluster (cos ~0.71), but a~c is 0 (orthogonal). True
+    # single-link must still group all three transitively via b — even when the
+    # bridging item (b) is visited last, which defeats a single-pass absorb.
+    a = [1.0, 1.0, 0.0]
+    b = [0.0, 1.0, 0.0]  # ~a and ~c
+    c = [0.0, 1.0, 1.0]
+    items = [("a", a, "x"), ("c", c, "z"), ("b", b, "y")]  # bridge 'b' last
+    clusters = cluster_similar(items, threshold=0.7)
+    assert [sorted(g) for g in clusters] == [["a", "b", "c"]]
