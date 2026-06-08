@@ -7,6 +7,12 @@ import logging
 import math
 import re
 
+from sqlalchemy.orm import Session
+
+from primer.common.config import settings
+from primer.common.models import MemoryEntry, MemoryEvent, MemoryEvidence, MemoryScope
+from primer.server.services import memory_embedding_service as emb
+
 logger = logging.getLogger(__name__)
 
 
@@ -68,3 +74,69 @@ def cluster_similar(items: list[tuple], threshold: float) -> list[list[str]]:
             unassigned = rest
         clusters.append([it[0] for it in group])
     return clusters
+
+
+def _embed_entries(db: Session, entries: list[MemoryEntry]) -> None:
+    """Populate `embedding` for entries missing it (postgres only)."""
+    if not emb.embeddings_available():
+        return
+    missing = [e for e in entries if e.embedding is None]
+    if not missing:
+        return
+    vectors = emb.embed_texts([f"{e.title}\n{e.body}" for e in missing])
+    if vectors is None:
+        return
+    for entry, vec in zip(missing, vectors, strict=False):
+        entry.embedding = vec
+    db.flush()
+
+
+def merge_sketches_in_scope(db: Session, scope: MemoryScope, threshold: float | None = None) -> int:
+    """Step 1 (spec §7): collapse near-duplicate sketches in a scope into one
+    canonical entry, reparenting evidence and marking the losers superseded.
+    Returns the number of entries merged away."""
+    thr = threshold if threshold is not None else settings.memory_dedup_similarity
+    sketches = (
+        db.query(MemoryEntry)
+        .filter(MemoryEntry.scope_id == scope.id, MemoryEntry.status == "sketch")
+        .all()
+    )
+    if len(sketches) < 2:
+        return 0
+    _embed_entries(db, sketches)
+    by_id = {e.id: e for e in sketches}
+    items = [(e.id, e.embedding, e.body) for e in sketches]
+    clusters = cluster_similar(items, thr)
+
+    merged = 0
+    for group in clusters:
+        if len(group) < 2:
+            continue
+        # canonical = oldest (stable); others fold into it as tombstones
+        members = sorted((by_id[i] for i in group), key=lambda e: e.created_at)
+        canonical, losers = members[0], members[1:]
+        for loser in losers:
+            db.query(MemoryEvidence).filter(MemoryEvidence.memory_id == loser.id).update(
+                {MemoryEvidence.memory_id: canonical.id}
+            )
+            # Tombstone WITHOUT marking `rejected`. `rejected` is the judge's
+            # sticky-block status, and content_hash is UNIQUE per scope — leaving
+            # the loser on a rejected/retired row with its REAL hash would (a)
+            # silently drop a future legitimate rediscovery of that exact body (the
+            # (scope_id, content_hash) dedup lookup would find this row), and (b)
+            # collide on the UNIQUE constraint. So RELEASE the real hash (namespace
+            # it) and use terminal `retired` (NOT in _DEDUP_BLOCKING_STATUSES).
+            loser.content_hash = f"merged:{loser.id}"
+            loser.superseded_by_id = canonical.id
+            loser.status = "retired"
+            db.add(
+                MemoryEvent(
+                    memory_id=canonical.id,
+                    event_kind="merged_into",
+                    actor="system",
+                    payload={"from": loser.id},
+                )
+            )
+            merged += 1
+    db.flush()
+    return merged
