@@ -115,12 +115,14 @@ def merge_sketches_in_scope(db: Session, scope: MemoryScope, threshold: float | 
     for group in clusters:
         if len(group) < 2:
             continue
-        # canonical = oldest (stable); others fold into it as tombstones
-        members = sorted((by_id[i] for i in group), key=lambda e: e.created_at)
+        # canonical = oldest (stable); others fold into it as tombstones. The
+        # (created_at, id) tiebreak keeps the survivor deterministic when a batch
+        # of sketches shares an identical transaction-start created_at (postgres).
+        members = sorted((by_id[i] for i in group), key=lambda e: (e.created_at, e.id))
         canonical, losers = members[0], members[1:]
         for loser in losers:
             db.query(MemoryEvidence).filter(MemoryEvidence.memory_id == loser.id).update(
-                {MemoryEvidence.memory_id: canonical.id}
+                {MemoryEvidence.memory_id: canonical.id}, synchronize_session="fetch"
             )
             # Tombstone WITHOUT marking `rejected`. `rejected` is the judge's
             # sticky-block status, and content_hash is UNIQUE per scope — leaving
@@ -141,6 +143,12 @@ def merge_sketches_in_scope(db: Session, scope: MemoryScope, threshold: float | 
                 )
             )
             merged += 1
+        # The bulk UPDATE above syncs the scalar memory_id but not the cached
+        # `.evidence` relationship collections; expire them so any later read
+        # (orchestrator, 2c read-path) reloads the reparented rows.
+        db.expire(canonical, ["evidence"])
+        for loser in losers:
+            db.expire(loser, ["evidence"])
     db.flush()
     return merged
 
@@ -184,39 +192,49 @@ Respond with ONLY a JSON object: {"accept": true|false, "rationale": "<one sente
 
 
 def _parse_judge_response(text: str) -> dict | None:
-    match = re.search(r"\{[\s\S]*\}", text)
-    if not match:
-        return None
-    try:
-        data = json.loads(match.group())
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(data.get("accept"), bool):
-        return None
-    return {"accept": data["accept"], "rationale": str(data.get("rationale", ""))[:500]}
+    decoder = json.JSONDecoder()
+    for idx, ch in enumerate(text):
+        if ch != "{":
+            continue
+        try:
+            data, _ = decoder.raw_decode(text[idx:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, dict) and isinstance(data.get("accept"), bool):
+            return {"accept": data["accept"], "rationale": str(data.get("rationale", ""))[:500]}
+    return None
 
 
 def _call_judge_api(prompt: str) -> dict | None:
-    with httpx.Client(timeout=30.0) as client:
-        resp = client.post(
-            ANTHROPIC_API_URL,
-            json={
-                "model": settings.memory_judge_model,
-                "max_tokens": settings.memory_judge_max_tokens,
-                "messages": [{"role": "user", "content": prompt}],
-            },
-            headers={
-                "x-api-key": settings.anthropic_api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-        )
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            resp = client.post(
+                ANTHROPIC_API_URL,
+                json={
+                    "model": settings.memory_judge_model,
+                    "max_tokens": settings.memory_judge_max_tokens,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+                headers={
+                    "x-api-key": settings.anthropic_api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+            )
         if resp.status_code != 200:
             logger.error("Judge API error %d: %s", resp.status_code, resp.text[:300])
             return None
         result = resp.json()
+    except (httpx.HTTPError, ValueError) as e:
+        logger.error("Judge API call failed: %s", e)
+        return None
     text = "".join(block.get("text", "") for block in result.get("content", []))
     return _parse_judge_response(text)
+
+
+def _defang_candidate(s: str) -> str:
+    # Stop an untrusted title/body from textually closing the <candidate> block.
+    return s.replace("</candidate", "</ candidate")
 
 
 def judge_sketch(db: Session, entry: MemoryEntry) -> bool:
@@ -226,9 +244,14 @@ def judge_sketch(db: Session, entry: MemoryEntry) -> bool:
     Returns True iff promoted."""
     from datetime import UTC, datetime
 
+    if entry.status != "sketch":
+        return False
+
     prompt = (
-        f"{JUDGE_PROMPT}\n\n<candidate>\nkind: {entry.kind}\ntitle: {entry.title}\n"
-        f"body: {entry.body}\ncorroboration: {entry.corroboration_count}\n</candidate>"
+        f"{JUDGE_PROMPT}\n\n<candidate>\nkind: {entry.kind}\n"
+        f"title: {_defang_candidate(entry.title)}\n"
+        f"body: {_defang_candidate(entry.body)}\n"
+        f"corroboration: {entry.corroboration_count}\n</candidate>"
     )
     verdict = _call_judge_api(prompt)
     if verdict is None:
