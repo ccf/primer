@@ -246,8 +246,6 @@ def judge_sketch(db: Session, entry: MemoryEntry) -> bool:
     status=active (+ activated_at + activation_baseline snapshot); reject ->
     status=rejected (sticky). API failure leaves the sketch unchanged for retry.
     Returns True iff promoted."""
-    from datetime import UTC, datetime
-
     if entry.status != "sketch":
         return False
 
