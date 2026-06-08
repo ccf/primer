@@ -618,6 +618,136 @@ def test_pass_respects_judge_call_budget(db_session, monkeypatch):
     assert len(calls) == 1  # budget capped the second judge call
 
 
+def test_pass_skips_when_consolidation_kill_switch_off(db_session, monkeypatch):
+    # The kill-switch must be honored at RUNTIME, not just at job registration:
+    # an already-registered recurring job must stop promoting once it's flipped off.
+    monkeypatch.setattr(settings, "memory_enabled", True)
+    monkeypatch.setattr(settings, "redaction_enabled", True)
+    monkeypatch.setattr(settings, "memory_consolidation_enabled", False)
+    result = run_memory_consolidation_pass(db_session)
+    assert result == {"scopes_processed": 0, "skipped": "disabled"}
+
+
+def test_pass_prioritizes_oldest_scopes_within_cap(db_session, monkeypatch):
+    # With more dirty scopes than the per-pass cap, the cap must not arbitrarily
+    # page out (and starve) dirty scopes — scopes are ordered never-consolidated /
+    # oldest first, so the longest-waiting scope is processed, not a random page.
+    from datetime import datetime
+
+    import primer.server.services.memory_consolidation_service as cons
+    from primer.common.models import Engineer, GitRepository, MemoryScope
+    from primer.server.services.memory_service import create_sketch
+
+    monkeypatch.setattr(settings, "memory_enabled", True)
+    monkeypatch.setattr(settings, "redaction_enabled", True)
+    monkeypatch.setattr(settings, "memory_dirty_sketch_threshold", 1)
+    monkeypatch.setattr(settings, "memory_min_corroboration", 1)
+    monkeypatch.setattr(settings, "memory_consolidation_max_scopes_per_pass", 1)
+    monkeypatch.setattr(cons, "_embed_entries", lambda db, entries: None)
+    monkeypatch.setattr(cons, "_call_judge_api", lambda prompt: {"accept": True, "rationale": "ok"})
+
+    eng = Engineer(name="P", email="prio@x.io")
+    repo_never = GitRepository(full_name="acme/prio-never")
+    repo_recent = GitRepository(full_name="acme/prio-recent")
+    db_session.add_all([eng, repo_never, repo_recent])
+    db_session.flush()
+    never = MemoryScope(kind="project", name="never", repository_id=repo_never.id)
+    recent = MemoryScope(
+        kind="project",
+        name="recent",
+        repository_id=repo_recent.id,
+        last_consolidation_at=datetime(2026, 1, 1),
+    )
+    db_session.add_all([never, recent])
+    db_session.flush()
+    for sc in (never, recent):
+        create_sketch(
+            db_session,
+            scope=sc,
+            card={"kind": "project_fact", "title": "t", "body": f"Durable fact for {sc.name}."},
+            origin="passive_extraction",
+            engineer_id=eng.id,
+            session_id=None,
+            citation={"x": 1},
+        )
+    db_session.commit()
+
+    run_memory_consolidation_pass(db_session)
+    never_active = (
+        db_session.query(MemoryEntry)
+        .filter(MemoryEntry.scope_id == never.id, MemoryEntry.status == "active")
+        .count()
+    )
+    recent_active = (
+        db_session.query(MemoryEntry)
+        .filter(MemoryEntry.scope_id == recent.id, MemoryEntry.status == "active")
+        .count()
+    )
+    assert never_active == 1  # never-consolidated scope wins the single cap slot
+    assert recent_active == 0  # recently-consolidated scope waits for the next pass
+
+
+def test_judge_budget_restored_when_scope_rolls_back(db_session, monkeypatch):
+    # A scope that spends judge slots then raises is rolled back; its slots must be
+    # restored so a rare scope failure doesn't starve healthy scopes of the per-pass
+    # judge budget.
+    from datetime import datetime
+
+    import primer.server.services.memory_consolidation_service as cons
+    from primer.common.models import Engineer, GitRepository, MemoryScope
+    from primer.server.services.memory_service import create_sketch
+
+    monkeypatch.setattr(settings, "memory_enabled", True)
+    monkeypatch.setattr(settings, "redaction_enabled", True)
+    monkeypatch.setattr(settings, "memory_dirty_sketch_threshold", 1)
+    monkeypatch.setattr(settings, "memory_judge_max_calls_per_pass", 5)
+
+    eng = Engineer(name="B", email="bud@x.io")
+    repo_poison = GitRepository(full_name="acme/budget-poison")
+    repo_observer = GitRepository(full_name="acme/budget-observer")
+    db_session.add_all([eng, repo_poison, repo_observer])
+    db_session.flush()
+    poison = MemoryScope(kind="project", name="poison", repository_id=repo_poison.id)  # null->first
+    observer = MemoryScope(
+        kind="project",
+        name="observer",
+        repository_id=repo_observer.id,
+        last_consolidation_at=datetime(2026, 1, 1),
+    )
+    db_session.add_all([poison, observer])
+    db_session.flush()
+    for sc in (poison, observer):
+        create_sketch(
+            db_session,
+            scope=sc,
+            card={"kind": "project_fact", "title": "t", "body": f"Fact {sc.name} here now."},
+            origin="passive_extraction",
+            engineer_id=eng.id,
+            session_id=None,
+            citation={"x": 1},
+        )
+    db_session.flush()
+    # run_pass commits per scope and rolls back on failure; no-op both so the real
+    # rollback (whose budget restoration is what we're testing) doesn't tear down
+    # the conftest's per-test transaction holding these fixtures.
+    monkeypatch.setattr(db_session, "commit", lambda: None)
+    monkeypatch.setattr(db_session, "rollback", lambda: None)
+
+    seen = {}
+
+    def fake_consolidate(db, sc, budget=None):
+        if sc.name == "poison":
+            if budget is not None:
+                budget[0] -= 3  # spent 3 judge slots, then the scope blows up
+            raise RuntimeError("boom")
+        seen["observer_budget"] = budget[0] if budget is not None else None
+        return {"merged": 0, "promoted": 0}
+
+    monkeypatch.setattr(cons, "consolidate_scope", fake_consolidate)
+    run_memory_consolidation_pass(db_session)
+    assert seen["observer_budget"] == 5  # restored after poison's rollback, not 2
+
+
 def test_xact_lock_uses_transaction_scoped_function(db_session, monkeypatch):
     # On sqlite _try_scope_lock always returns True (single worker); just assert
     # no _release_scope_lock symbol exists (xact lock auto-releases).
