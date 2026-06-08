@@ -28,6 +28,7 @@ JOB_TYPE_FACET_EXTRACTION = "facet_extract_session"
 JOB_TYPE_FACET_BACKFILL = "facet_backfill"
 JOB_TYPE_MEMORY_EXTRACTION = "memory_extract_session"
 JOB_TYPE_MEMORY_BACKFILL = "memory_backfill"
+JOB_TYPE_MEMORY_CONSOLIDATION = "memory_consolidation"
 JOB_TYPE_NARRATIVE_REFRESH_ALL = "narrative_refresh_all"
 JOB_TYPE_DAILY_ANALYTICS_ROLLUP_REFRESH = "daily_analytics_rollup_refresh"
 
@@ -114,6 +115,13 @@ def ensure_recurring_jobs(db) -> None:
             db,
             job_type=JOB_TYPE_NARRATIVE_REFRESH_ALL,
             interval=timedelta(hours=settings.narrative_cache_ttl_hours),
+        )
+
+    if settings.memory_consolidation_enabled and settings.memory_enabled:
+        _ensure_recurring_job(
+            db,
+            job_type=JOB_TYPE_MEMORY_CONSOLIDATION,
+            interval=timedelta(hours=settings.memory_consolidation_interval_hours),
         )
 
 
@@ -375,6 +383,20 @@ def _run_job(db: Session | None, job_type: str, payload: dict[str, Any]) -> None
             repository_id=payload.get("repository_id"),
             limit=int(payload["limit"]) if payload.get("limit") else None,
         )
+        return
+
+    if job_type == JOB_TYPE_MEMORY_CONSOLIDATION:
+        from primer.server.services.memory_consolidation_service import (
+            run_memory_consolidation_pass,
+        )
+
+        owns_session = db is None
+        cons_db = db or SessionLocal()
+        try:
+            run_memory_consolidation_pass(cons_db)
+        finally:
+            if owns_session:
+                cons_db.close()
         return
 
     if job_type == JOB_TYPE_NARRATIVE_REFRESH_ALL:
