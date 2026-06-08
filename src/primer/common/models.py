@@ -1,6 +1,7 @@
 import uuid
 from datetime import date, datetime
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -753,6 +754,9 @@ class MemoryEntry(Base):
     concepts: Mapped[list | None] = mapped_column(JSON, nullable=True)
     files: Mapped[list | None] = mapped_column(JSON, nullable=True)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    embedding: Mapped[list[float] | None] = mapped_column(
+        Vector(384).with_variant(JSON(), "sqlite"), nullable=True
+    )
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="sketch")
     confidence_score: Mapped[float] = mapped_column(Float, nullable=False, server_default="0.0")
     corroboration_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
@@ -786,6 +790,9 @@ class MemoryEntry(Base):
     )
     events: Mapped[list["MemoryEvent"]] = relationship(
         back_populates="entry", cascade="all, delete-orphan"
+    )
+    superseded_by: Mapped["MemoryEntry | None"] = relationship(
+        "MemoryEntry", remote_side="MemoryEntry.id", foreign_keys=[superseded_by_id]
     )
 
 
@@ -831,6 +838,8 @@ class MemoryInjection(Base):
     surface: Mapped[str] = mapped_column(String(20), nullable=False)
     token_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     injected_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    entry: Mapped["MemoryEntry"] = relationship("MemoryEntry", foreign_keys=[memory_id])
 
 
 class MemoryEvent(Base):
