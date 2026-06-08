@@ -47,3 +47,24 @@ def test_memory_entry_has_embedding_and_supersede_relationship(db_session):
     original.embedding = [0.1] * 384
     db_session.flush()
     assert len(original.embedding) == 384
+
+
+from primer.server.services import memory_embedding_service as emb  # noqa: E402
+
+
+def test_embed_texts_returns_vectors(monkeypatch):
+    # Mock the model so CI never downloads sentence-transformers weights.
+    class _FakeModel:
+        def encode(self, texts, normalize_embeddings=True):
+            return [[float(len(t))] * 384 for t in texts]
+
+    monkeypatch.setattr(emb, "_get_model", lambda: _FakeModel())
+    monkeypatch.setattr(emb, "embeddings_available", lambda: True)
+    vecs = emb.embed_texts(["hello", "world!"])
+    assert len(vecs) == 2
+    assert len(vecs[0]) == 384
+
+
+def test_embeddings_unavailable_returns_none(monkeypatch):
+    monkeypatch.setattr(emb, "embeddings_available", lambda: False)
+    assert emb.embed_texts(["x"]) is None
