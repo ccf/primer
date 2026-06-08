@@ -515,6 +515,24 @@ def test_budget_exhausted_scope_not_stamped_so_strays_are_retried(db_session, mo
     assert scope_is_dirty(db_session, scope) is True  # stranded sketch retried next pass
 
 
+def test_judge_api_failure_leaves_scope_dirty_for_retry(db_session, monkeypatch):
+    # A transient judge API failure leaves the sketch in "sketch" status; the
+    # scope must NOT be stamped consolidated, or scope_is_dirty's created_at>cutoff
+    # filter would hide the sketch forever and it would never be re-judged.
+    import primer.server.services.memory_consolidation_service as cons
+
+    monkeypatch.setattr(cons, "_embed_entries", lambda db, entries: None)
+    monkeypatch.setattr(cons, "_call_judge_api", lambda prompt: None)  # transient API failure
+    monkeypatch.setattr(settings, "memory_min_corroboration", 1)
+    scope, _eng = _scope_with_sketches(db_session, ["A durable project fact to judge here."])
+    result = consolidate_scope(db_session, scope)
+    db_session.flush()
+    assert result["unresolved"] is True
+    assert scope.last_consolidation_at is None  # not stamped -> stays dirty
+    monkeypatch.setattr(settings, "memory_dirty_sketch_threshold", 1)
+    assert scope_is_dirty(db_session, scope) is True  # the unjudged sketch is retried
+
+
 def test_run_pass_processes_dirty_scopes(db_session, monkeypatch):
     import primer.server.services.memory_consolidation_service as cons
 
@@ -606,6 +624,23 @@ def test_xact_lock_uses_transaction_scoped_function(db_session, monkeypatch):
     import primer.server.services.memory_consolidation_service as cons
 
     assert not hasattr(cons, "_release_scope_lock")
+
+
+def test_scope_lock_key_is_deterministic_not_salted_hash():
+    # The advisory-lock key must be process-stable (NOT Python's PYTHONHASHSEED-
+    # salted hash()), or two worker processes would compute different keys for the
+    # same scope and the lock would fail to serialize them.
+    import hashlib
+
+    from primer.server.services.memory_consolidation_service import _scope_lock_key
+
+    sid = "abc-123-def-456-uuid"
+    assert _scope_lock_key(sid) == _scope_lock_key(sid)  # stable across calls
+    expected = int.from_bytes(
+        hashlib.blake2b(sid.encode(), digest_size=8).digest(), "big", signed=True
+    )
+    assert _scope_lock_key(sid) == expected  # matches an independent digest, not hash()
+    assert -(2**63) <= _scope_lock_key(sid) < 2**63  # valid signed 64-bit bigint
 
 
 def test_consolidation_constant_and_dispatch(monkeypatch):

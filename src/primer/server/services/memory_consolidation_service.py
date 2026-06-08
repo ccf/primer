@@ -3,6 +3,7 @@ corroboration, judge sketch->active, decay stale active entries. Runs as a
 recurring background job per dirty scope. Spec §7.
 """
 
+import hashlib
 import json
 import logging
 import math
@@ -298,6 +299,19 @@ def scope_is_dirty(db: Session, scope: MemoryScope) -> bool:
     return (sess_q.scalar() or 0) >= settings.memory_dirty_session_threshold
 
 
+def _scope_lock_key(scope_id: str) -> int:
+    """Deterministic, process-stable advisory-lock key for a scope (signed 64-bit
+    bigint). Uses blake2b, NOT Python's hash(): str hashing is salted per
+    interpreter (PYTHONHASHSEED), so two worker processes would derive different
+    keys for the same scope and pg_try_advisory_xact_lock would grant both,
+    defeating cross-process mutual exclusion. 8 bytes fills the pg_advisory key
+    space; distinct scope ids may still collide, but only vanishingly rarely, and
+    a collided scope just consolidates on the next pass."""
+    return int.from_bytes(
+        hashlib.blake2b(scope_id.encode(), digest_size=8).digest(), "big", signed=True
+    )
+
+
 def _try_scope_lock(db: Session, scope: MemoryScope) -> bool:
     """Transaction-level postgres advisory lock keyed on scope id, so two workers
     can't consolidate the same scope. `xact` so the lock auto-releases exactly at
@@ -307,9 +321,7 @@ def _try_scope_lock(db: Session, scope: MemoryScope) -> bool:
         return True
     from sqlalchemy import text
 
-    key = hash(scope.id) % (2**31)  # 31-bit positive bigint key
-    # Distinct scope ids may collide on this key; tolerated — the lock is only a
-    # guard against a rare double-run, and a collided scope just consolidates next pass.
+    key = _scope_lock_key(scope.id)
     return bool(db.execute(text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": key}).scalar())
 
 
@@ -341,6 +353,7 @@ def consolidate_scope(db: Session, scope: MemoryScope, budget: list[int] | None 
     )
     promoted = 0
     budget_exhausted = False
+    unresolved = False
     for sketch in sketches:
         if budget is not None and budget[0] <= 0:
             budget_exhausted = True
@@ -350,14 +363,25 @@ def consolidate_scope(db: Session, scope: MemoryScope, budget: list[int] | None 
                 budget[0] -= 1
             if judge_sketch(db, sketch):
                 promoted += 1
-    # Only stamp as fully consolidated when the budget didn't cut us short with
-    # eligible sketches still unjudged. Stamping here would push
-    # last_consolidation_at past the stranded sketches' created_at, hiding them
-    # from scope_is_dirty's `created_at > cutoff` filter — they'd never be judged.
-    if not budget_exhausted:
+            elif sketch.status == "sketch":
+                # judge_sketch returns False for both reject (status->rejected,
+                # terminal) and a transient API failure (status stays "sketch").
+                # The latter is unfinished work — don't let it be stamped away.
+                unresolved = True
+    # Stamp as fully consolidated ONLY when nothing was left unprocessed: not cut
+    # short by the budget AND no eligible sketch left in "sketch" by a transient
+    # judge failure. Stamping otherwise pushes last_consolidation_at past those
+    # sketches' created_at, hiding them from scope_is_dirty's `created_at > cutoff`
+    # filter forever (silent loss of legitimate promotions).
+    if not budget_exhausted and not unresolved:
         scope.last_consolidation_at = datetime.now(UTC)
     db.flush()
-    return {"merged": merged, "promoted": promoted, "budget_exhausted": budget_exhausted}
+    return {
+        "merged": merged,
+        "promoted": promoted,
+        "budget_exhausted": budget_exhausted,
+        "unresolved": unresolved,
+    }
 
 
 def run_memory_consolidation_pass(db: Session) -> dict:
