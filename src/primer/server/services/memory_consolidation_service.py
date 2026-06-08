@@ -389,18 +389,32 @@ def run_memory_consolidation_pass(db: Session) -> dict:
     total judge LLM calls across the pass at memory_judge_max_calls_per_pass."""
     if not memory_capture_active():
         return {"scopes_processed": 0, "skipped": "inactive"}
+    # Honor the consolidation kill-switch at runtime, not just at job registration:
+    # an already-registered recurring job must stop promoting once an operator sets
+    # memory_consolidation_enabled=False (capture keeps running; promotion pauses).
+    if not settings.memory_consolidation_enabled:
+        return {"scopes_processed": 0, "skipped": "disabled"}
+    # Order by last_consolidation_at (never-consolidated first, then oldest) and cap
+    # the number of dirty scopes PROCESSED — not a raw row limit before the dirty
+    # filter, which would arbitrarily page out dirty scopes and starve them across
+    # passes. Full scan is fine at the expected scale (tens of scopes); revisit with
+    # a DB-side dirty pre-filter if scope counts grow large.
     scopes = (
         db.query(MemoryScope)
         .filter(MemoryScope.memory_paused_at.is_(None))
-        .limit(settings.memory_consolidation_max_scopes_per_pass)
+        .order_by(MemoryScope.last_consolidation_at.asc().nullsfirst())
         .all()
     )
+    cap = settings.memory_consolidation_max_scopes_per_pass
     budget = [settings.memory_judge_max_calls_per_pass]
     processed = 0
     for scope in scopes:
+        if processed >= cap:
+            break  # per-pass work cap reached; remaining dirty scopes next pass
         if scope_is_dirty(db, scope):
             # Per-scope try/except: one poison scope (corrupt row, DB/embedding
             # error) must not abort the whole pass and starve every scope after it.
+            budget_before = budget[0]
             try:
                 result = consolidate_scope(db, scope, budget=budget)
                 db.commit()  # commit per scope; the xact advisory lock releases here
@@ -409,5 +423,10 @@ def run_memory_consolidation_pass(db: Session) -> dict:
             except Exception:
                 logger.exception("Consolidation failed for scope %s", scope.id)
                 db.rollback()
+                # The scope's judging rolled back and didn't persist; restore its
+                # budget slots so a rare scope failure doesn't starve healthy scopes.
+                # (Failures are rare and logged, so the per-pass call cap is only
+                # ever loosened in the exceptional path, never the normal one.)
+                budget[0] = budget_before
     logger.info("Memory consolidation pass: %d scopes processed", processed)
     return {"scopes_processed": processed}
