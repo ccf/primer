@@ -1,12 +1,13 @@
 """Tests for the memory consolidation engine (Plan 2b)."""
 
 from primer.common.config import settings
-from primer.common.models import MemoryEntry
+from primer.common.models import MemoryEntry, MemoryEvent
 from primer.server.services import memory_embedding_service as emb
 from primer.server.services.memory_consolidation_service import (
     _cosine,
     _jaccard,
     cluster_similar,
+    merge_sketches_in_scope,
 )
 
 
@@ -103,3 +104,89 @@ def test_cluster_similar_is_transitive_regardless_of_order():
     items = [("a", a, "x"), ("c", c, "z"), ("b", b, "y")]  # bridge 'b' last
     clusters = cluster_similar(items, threshold=0.7)
     assert [sorted(g) for g in clusters] == [["a", "b", "c"]]
+
+
+def _scope_with_sketches(db_session, bodies):
+    from primer.common.models import Engineer, GitRepository, MemoryScope
+
+    repo = GitRepository(full_name="acme/merge")
+    eng = Engineer(name="M", email="mm@x.io")
+    db_session.add_all([repo, eng])
+    db_session.flush()
+    scope = MemoryScope(kind="project", name="merge", repository_id=repo.id)
+    db_session.add(scope)
+    db_session.flush()
+    from primer.server.services.memory_service import create_sketch
+
+    for i, body in enumerate(bodies):
+        create_sketch(
+            db_session,
+            scope=scope,
+            card={"kind": "project_fact", "title": f"t{i}", "body": body},
+            origin="passive_extraction",
+            engineer_id=eng.id,
+            session_id=None,
+            citation={"excerpt": "x"},
+        )
+    return scope, eng
+
+
+def test_merge_collapses_near_duplicates(db_session, monkeypatch):
+    import primer.server.services.memory_consolidation_service as cons
+
+    # Force keyword path (no embeddings) for a deterministic sqlite test.
+    monkeypatch.setattr(cons, "_embed_entries", lambda db, entries: None)
+    scope, _eng = _scope_with_sketches(
+        db_session,
+        [
+            "Run alembic upgrade head before make build every time.",
+            "Run alembic upgrade head before make build, always.",
+            "The staging database resets nightly at 0200 UTC.",
+        ],
+    )
+    merged = merge_sketches_in_scope(db_session, scope, threshold=0.5)
+    db_session.flush()
+    survivors = (
+        db_session.query(MemoryEntry)
+        .filter(MemoryEntry.scope_id == scope.id, MemoryEntry.superseded_by_id.is_(None))
+        .count()
+    )
+    assert survivors == 2  # one alembic + the staging fact
+    assert merged >= 1
+    assert (
+        db_session.query(MemoryEvent).filter(MemoryEvent.event_kind == "merged_into").count() >= 1
+    )
+    losers = (
+        db_session.query(MemoryEntry)
+        .filter(MemoryEntry.scope_id == scope.id, MemoryEntry.superseded_by_id.isnot(None))
+        .all()
+    )
+    assert losers and all(le.status == "retired" for le in losers)
+    assert all(le.content_hash.startswith("merged:") for le in losers)
+
+
+def test_merge_does_not_block_future_rediscovery(db_session, monkeypatch):
+    # A future session re-deriving a merged-away loser's exact body must NOT be
+    # silently dropped — it creates a fresh sketch (the loser's hash was released).
+    import primer.server.services.memory_consolidation_service as cons
+    from primer.server.services.memory_service import create_sketch
+
+    monkeypatch.setattr(cons, "_embed_entries", lambda db, entries: None)
+    loser_body = "Run alembic upgrade head before make build, always."
+    scope, eng = _scope_with_sketches(
+        db_session,
+        ["Run alembic upgrade head before make build every time.", loser_body],
+    )
+    merge_sketches_in_scope(db_session, scope, threshold=0.5)
+    db_session.flush()
+    entry, created = create_sketch(
+        db_session,
+        scope=scope,
+        card={"kind": "project_fact", "title": "again", "body": loser_body},
+        origin="passive_extraction",
+        engineer_id=eng.id,
+        session_id=None,
+        citation={"x": 1},
+    )
+    assert (entry, created) != (None, False)  # NOT silently dropped
+    assert entry is not None
