@@ -109,6 +109,21 @@ class PrimerSettings(BaseSettings):
     memory_backfill_max_sessions: int = 200
     memory_dedup_similarity: float = 0.85  # used by consolidation (Plan 2b)
 
+    # Memory consolidation (Plan 2b)
+    memory_consolidation_enabled: bool = True
+    memory_consolidation_interval_hours: int = 24
+    memory_dirty_session_threshold: int = 10
+    memory_dirty_friction_threshold: int = 5
+    memory_dirty_sketch_threshold: int = 5
+    memory_min_corroboration: int = 2  # distinct independent engineers before judge eligibility
+    memory_consolidation_max_scopes_per_pass: int = 50
+    memory_judge_model: str = "claude-haiku-4-5-20251001"
+    memory_judge_max_tokens: int = 1024
+    memory_judge_max_calls_per_pass: int = 200  # cost cap: bound judge LLM calls per pass
+    memory_embedding_model: str = "BAAI/bge-small-en-v1.5"
+    memory_embedding_dim: int = 384
+    memory_model_cache_dir: str = ""  # empty -> sentence-transformers default cache
+
     # Durable background jobs
     background_jobs_enabled: bool = True
     background_job_poll_seconds: int = 15
