@@ -497,6 +497,24 @@ def test_consolidate_skips_paused_scope(db_session):
     assert scope.last_consolidation_at is None
 
 
+def test_budget_exhausted_scope_not_stamped_so_strays_are_retried(db_session, monkeypatch):
+    import primer.server.services.memory_consolidation_service as cons
+
+    monkeypatch.setattr(cons, "_embed_entries", lambda db, entries: None)
+    monkeypatch.setattr(cons, "_call_judge_api", lambda prompt: {"accept": True, "rationale": "ok"})
+    monkeypatch.setattr(settings, "memory_min_corroboration", 1)
+    # Two distinct (non-merging) sketches, judge budget of 1 -> one judged, one stranded.
+    scope, _eng = _scope_with_sketches(
+        db_session, ["First distinct durable fact here.", "Second distinct durable fact here."]
+    )
+    result = consolidate_scope(db_session, scope, budget=[1])
+    db_session.flush()
+    assert result["budget_exhausted"] is True
+    assert scope.last_consolidation_at is None  # NOT stamped -> stays dirty
+    monkeypatch.setattr(settings, "memory_dirty_sketch_threshold", 1)
+    assert scope_is_dirty(db_session, scope) is True  # stranded sketch retried next pass
+
+
 def test_run_pass_processes_dirty_scopes(db_session, monkeypatch):
     import primer.server.services.memory_consolidation_service as cons
 

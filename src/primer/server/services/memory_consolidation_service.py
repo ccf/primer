@@ -309,7 +309,9 @@ def _try_scope_lock(db: Session, scope: MemoryScope) -> bool:
         return True
     from sqlalchemy import text
 
-    key = hash(scope.id) % (2**31)
+    key = hash(scope.id) % (2**31)  # 31-bit positive bigint key
+    # Distinct scope ids may collide on this key; tolerated — the lock is only a
+    # guard against a rare double-run, and a collided scope just consolidates next pass.
     return bool(db.execute(text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": key}).scalar())
 
 
@@ -340,17 +342,24 @@ def consolidate_scope(db: Session, scope: MemoryScope, budget: list[int] | None 
         .all()
     )
     promoted = 0
+    budget_exhausted = False
     for sketch in sketches:
         if budget is not None and budget[0] <= 0:
-            break  # pass-level judge-call budget exhausted; remaining sketches next pass
+            budget_exhausted = True
+            break  # pass-level judge-call budget exhausted; this scope stays dirty
         if _judge_eligible(db, sketch):
             if budget is not None:
                 budget[0] -= 1
             if judge_sketch(db, sketch):
                 promoted += 1
-    scope.last_consolidation_at = datetime.now(UTC)
+    # Only stamp as fully consolidated when the budget didn't cut us short with
+    # eligible sketches still unjudged. Stamping here would push
+    # last_consolidation_at past the stranded sketches' created_at, hiding them
+    # from scope_is_dirty's `created_at > cutoff` filter — they'd never be judged.
+    if not budget_exhausted:
+        scope.last_consolidation_at = datetime.now(UTC)
     db.flush()
-    return {"merged": merged, "promoted": promoted}
+    return {"merged": merged, "promoted": promoted, "budget_exhausted": budget_exhausted}
 
 
 def run_memory_consolidation_pass(db: Session) -> dict:
@@ -368,8 +377,15 @@ def run_memory_consolidation_pass(db: Session) -> dict:
     processed = 0
     for scope in scopes:
         if scope_is_dirty(db, scope):
-            consolidate_scope(db, scope, budget=budget)
-            db.commit()  # commit per scope; the xact advisory lock releases here
-            processed += 1
+            # Per-scope try/except: one poison scope (corrupt row, DB/embedding
+            # error) must not abort the whole pass and starve every scope after it.
+            try:
+                result = consolidate_scope(db, scope, budget=budget)
+                db.commit()  # commit per scope; the xact advisory lock releases here
+                if "skipped" not in result:
+                    processed += 1
+            except Exception:
+                logger.exception("Consolidation failed for scope %s", scope.id)
+                db.rollback()
     logger.info("Memory consolidation pass: %d scopes processed", processed)
     return {"scopes_processed": processed}
