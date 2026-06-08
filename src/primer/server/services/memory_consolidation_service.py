@@ -7,14 +7,18 @@ import json
 import logging
 import math
 import re
+from datetime import UTC, datetime
 
 import httpx
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from primer.common.config import settings
+from primer.common.database import _is_sqlite
 from primer.common.models import MemoryEntry, MemoryEvent, MemoryEvidence, MemoryScope
+from primer.common.models import Session as SessionModel
 from primer.server.services import memory_embedding_service as emb
+from primer.server.services.memory_service import memory_capture_active
 
 logger = logging.getLogger(__name__)
 
@@ -275,3 +279,97 @@ def judge_sketch(db: Session, entry: MemoryEntry) -> bool:
     db.add(MemoryEvent(memory_id=entry.id, event_kind="promoted_to_active", actor="judge"))
     db.flush()
     return True
+
+
+def scope_is_dirty(db: Session, scope: MemoryScope) -> bool:
+    if scope.memory_paused_at is not None:
+        return False
+    cutoff = scope.last_consolidation_at
+    sketch_q = db.query(func.count(MemoryEntry.id)).filter(
+        MemoryEntry.scope_id == scope.id, MemoryEntry.status == "sketch"
+    )
+    if cutoff is not None:
+        sketch_q = sketch_q.filter(MemoryEntry.created_at > cutoff)
+    if (sketch_q.scalar() or 0) >= settings.memory_dirty_sketch_threshold:
+        return True
+    sess_q = db.query(func.count(SessionModel.id)).filter(
+        SessionModel.repository_id == scope.repository_id
+    )
+    if cutoff is not None:
+        sess_q = sess_q.filter(SessionModel.started_at > cutoff)
+    return (sess_q.scalar() or 0) >= settings.memory_dirty_session_threshold
+
+
+def _try_scope_lock(db: Session, scope: MemoryScope) -> bool:
+    """Transaction-level postgres advisory lock keyed on scope id, so two workers
+    can't consolidate the same scope. `xact` so the lock auto-releases exactly at
+    commit/rollback — held through the per-scope commit, no explicit unlock, no
+    leak. SQLite runs a single worker process -> always acquire."""
+    if _is_sqlite:
+        return True
+    from sqlalchemy import text
+
+    key = hash(scope.id) % (2**31)
+    return bool(db.execute(text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": key}).scalar())
+
+
+def _judge_eligible(db: Session, sketch: MemoryEntry) -> bool:
+    """Spec §7 step 3: a sketch is judge-eligible at the corroboration bar, OR if
+    it was an explicit `remember` (origin=remember_tool) — explicit human intent
+    qualifies with a single writer. Always recomputes corroboration_count as a
+    side effect."""
+    corr = compute_corroboration(db, sketch)
+    if corr >= settings.memory_min_corroboration:
+        return True
+    return sketch.origin == "remember_tool" and corr >= 1
+
+
+def consolidate_scope(db: Session, scope: MemoryScope, budget: list[int] | None = None) -> dict:
+    """Merge + ground + judge for one scope, then stamp last_consolidation_at.
+    Skips paused scopes. `budget` is a single-element mutable counter of remaining
+    judge calls for the whole pass (cost cap); None = unbounded (tests).
+    NB: decay is Plan 2c (see Task 8)."""
+    if scope.memory_paused_at is not None:
+        return {"skipped": "paused"}
+    if not _try_scope_lock(db, scope):
+        return {"skipped": "locked"}
+    merged = merge_sketches_in_scope(db, scope)
+    sketches = (
+        db.query(MemoryEntry)
+        .filter(MemoryEntry.scope_id == scope.id, MemoryEntry.status == "sketch")
+        .all()
+    )
+    promoted = 0
+    for sketch in sketches:
+        if budget is not None and budget[0] <= 0:
+            break  # pass-level judge-call budget exhausted; remaining sketches next pass
+        if _judge_eligible(db, sketch):
+            if budget is not None:
+                budget[0] -= 1
+            if judge_sketch(db, sketch):
+                promoted += 1
+    scope.last_consolidation_at = datetime.now(UTC)
+    db.flush()
+    return {"merged": merged, "promoted": promoted}
+
+
+def run_memory_consolidation_pass(db: Session) -> dict:
+    """Job handler: consolidate every dirty scope (bounded per pass), capping the
+    total judge LLM calls across the pass at memory_judge_max_calls_per_pass."""
+    if not memory_capture_active():
+        return {"scopes_processed": 0, "skipped": "inactive"}
+    scopes = (
+        db.query(MemoryScope)
+        .filter(MemoryScope.memory_paused_at.is_(None))
+        .limit(settings.memory_consolidation_max_scopes_per_pass)
+        .all()
+    )
+    budget = [settings.memory_judge_max_calls_per_pass]
+    processed = 0
+    for scope in scopes:
+        if scope_is_dirty(db, scope):
+            consolidate_scope(db, scope, budget=budget)
+            db.commit()  # commit per scope; the xact advisory lock releases here
+            processed += 1
+    logger.info("Memory consolidation pass: %d scopes processed", processed)
+    return {"scopes_processed": processed}

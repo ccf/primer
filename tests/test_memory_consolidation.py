@@ -9,8 +9,11 @@ from primer.server.services.memory_consolidation_service import (
     _parse_judge_response,
     cluster_similar,
     compute_corroboration,
+    consolidate_scope,
     judge_sketch,
     merge_sketches_in_scope,
+    run_memory_consolidation_pass,
+    scope_is_dirty,
 )
 
 
@@ -452,3 +455,132 @@ def test_judge_skips_non_sketch_entry(db_session, monkeypatch):
         db_session.query(MemoryEvent).filter(MemoryEvent.event_kind == "promoted_to_active").count()
         == 1
     )
+
+
+def test_scope_is_dirty_by_sketch_threshold(db_session, monkeypatch):
+    monkeypatch.setattr(settings, "memory_dirty_sketch_threshold", 2)
+    scope, _eng = _scope_with_sketches(db_session, ["aaa bbb ccc", "ddd eee fff"])
+    assert scope_is_dirty(db_session, scope) is True
+
+
+def test_consolidate_scope_runs_all_steps_and_stamps(db_session, monkeypatch):
+    import primer.server.services.memory_consolidation_service as cons
+
+    monkeypatch.setattr(cons, "_embed_entries", lambda db, entries: None)
+    monkeypatch.setattr(cons, "_call_judge_api", lambda prompt: {"accept": True, "rationale": "ok"})
+    monkeypatch.setattr(settings, "memory_min_corroboration", 1)
+    scope, _eng = _scope_with_sketches(
+        db_session, ["Run alembic before build always here.", "Totally separate staging fact."]
+    )
+    consolidate_scope(db_session, scope)
+    db_session.flush()
+    assert scope.last_consolidation_at is not None
+    actives = (
+        db_session.query(MemoryEntry)
+        .filter(MemoryEntry.scope_id == scope.id, MemoryEntry.status == "active")
+        .count()
+    )
+    assert actives == 2
+
+
+def test_consolidate_skips_paused_scope(db_session):
+    from datetime import UTC, datetime
+
+    scope, _eng = _scope_with_sketches(db_session, ["a fact here now"])
+    scope.memory_paused_at = datetime.now(UTC)
+    db_session.flush()
+    consolidate_scope(db_session, scope)  # no error, no work
+    assert scope.last_consolidation_at is None
+
+
+def test_run_pass_processes_dirty_scopes(db_session, monkeypatch):
+    import primer.server.services.memory_consolidation_service as cons
+
+    monkeypatch.setattr(settings, "memory_enabled", True)
+    monkeypatch.setattr(settings, "redaction_enabled", True)
+    monkeypatch.setattr(settings, "memory_dirty_sketch_threshold", 1)
+    monkeypatch.setattr(settings, "memory_min_corroboration", 1)
+    monkeypatch.setattr(cons, "_embed_entries", lambda db, entries: None)
+    monkeypatch.setattr(cons, "_call_judge_api", lambda prompt: {"accept": True, "rationale": "ok"})
+    _scope_with_sketches(db_session, ["A durable fact worth keeping around."])
+    db_session.commit()
+    result = run_memory_consolidation_pass(db_session)
+    assert result["scopes_processed"] >= 1
+
+
+def test_remember_origin_eligible_at_one_but_passive_needs_bar(db_session, monkeypatch):
+    # Solo-project safety: a passive sketch from ONE engineer (corroboration 1)
+    # is NOT judged when min=2; a remember-origin sketch IS (qualifies at 1).
+    import primer.server.services.memory_consolidation_service as cons
+    from primer.common.models import Engineer, GitRepository, MemoryEntry, MemoryScope
+    from primer.server.services.memory_service import create_sketch
+
+    monkeypatch.setattr(cons, "_embed_entries", lambda db, entries: None)
+    monkeypatch.setattr(cons, "_call_judge_api", lambda prompt: {"accept": True, "rationale": "ok"})
+    monkeypatch.setattr(settings, "memory_min_corroboration", 2)
+    repo = GitRepository(full_name="acme/solo")
+    eng = Engineer(name="S", email="s@x.io")
+    db_session.add_all([repo, eng])
+    db_session.flush()
+    scope = MemoryScope(kind="project", name="solo", repository_id=repo.id)
+    db_session.add(scope)
+    db_session.flush()
+    create_sketch(
+        db_session,
+        scope=scope,
+        card={"kind": "project_fact", "title": "p", "body": "Passive solo fact one."},
+        origin="passive_extraction",
+        engineer_id=eng.id,
+        session_id=None,
+        citation={"x": 1},
+    )
+    create_sketch(
+        db_session,
+        scope=scope,
+        card={"kind": "project_fact", "title": "r", "body": "Remembered solo fact two."},
+        origin="remember_tool",
+        engineer_id=eng.id,
+        session_id=None,
+        citation=None,
+        evidence_kind="explicit_remember",
+    )
+    consolidate_scope(db_session, scope)
+    db_session.flush()
+    actives = {
+        e.origin
+        for e in db_session.query(MemoryEntry)
+        .filter(MemoryEntry.scope_id == scope.id, MemoryEntry.status == "active")
+        .all()
+    }
+    assert actives == {"remember_tool"}  # passive stays sketch, remember activates
+
+
+def test_pass_respects_judge_call_budget(db_session, monkeypatch):
+    import primer.server.services.memory_consolidation_service as cons
+
+    monkeypatch.setattr(settings, "memory_enabled", True)
+    monkeypatch.setattr(settings, "redaction_enabled", True)
+    monkeypatch.setattr(settings, "memory_dirty_sketch_threshold", 1)
+    monkeypatch.setattr(settings, "memory_min_corroboration", 1)
+    monkeypatch.setattr(settings, "memory_judge_max_calls_per_pass", 1)
+    monkeypatch.setattr(cons, "_embed_entries", lambda db, entries: None)
+    calls = []
+    monkeypatch.setattr(
+        cons,
+        "_call_judge_api",
+        lambda prompt: calls.append(1) or {"accept": True, "rationale": "ok"},
+    )
+    _scope_with_sketches(
+        db_session, ["First distinct durable fact.", "Second distinct durable fact."]
+    )
+    db_session.commit()
+    run_memory_consolidation_pass(db_session)
+    assert len(calls) == 1  # budget capped the second judge call
+
+
+def test_xact_lock_uses_transaction_scoped_function(db_session, monkeypatch):
+    # On sqlite _try_scope_lock always returns True (single worker); just assert
+    # no _release_scope_lock symbol exists (xact lock auto-releases).
+    import primer.server.services.memory_consolidation_service as cons
+
+    assert not hasattr(cons, "_release_scope_lock")
