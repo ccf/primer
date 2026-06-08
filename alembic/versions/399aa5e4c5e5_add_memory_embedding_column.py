@@ -39,7 +39,10 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     bind = op.get_bind()
-    if bind.dialect.name != "sqlite":
-        op.execute("DROP INDEX IF EXISTS ix_memory_entries_embedding")
-    with op.batch_alter_table("memory_entries") as batch_op:
-        batch_op.drop_column("embedding")
+    if bind.dialect.name == "sqlite":
+        with op.batch_alter_table("memory_entries") as batch_op:
+            batch_op.drop_column("embedding")
+        return
+    # postgres: drop the HNSW index first, then the column (mirror upgrade's split)
+    op.execute("DROP INDEX IF EXISTS ix_memory_entries_embedding")
+    op.drop_column("memory_entries", "embedding")

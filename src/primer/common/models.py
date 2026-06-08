@@ -754,6 +754,12 @@ class MemoryEntry(Base):
     concepts: Mapped[list | None] = mapped_column(JSON, nullable=True)
     files: Mapped[list | None] = mapped_column(JSON, nullable=True)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    # pgvector on postgres, JSON list on sqlite. No psycopg2 register_vector hook
+    # is needed: the Vector type serializes a Python list to the text literal
+    # '[...]' on write (parsed by vector_in on column assignment) and parses text
+    # back on read — do NOT add a global register_vector connect-hook, it would
+    # query the vector type OID before CREATE EXTENSION runs and break fresh-DB
+    # bootstrapping. Dim is fixed at 384 (matches settings.memory_embedding_dim).
     embedding: Mapped[list[float] | None] = mapped_column(
         Vector(384).with_variant(JSON(), "sqlite"), nullable=True
     )
