@@ -110,6 +110,10 @@ class PrimerSettings(BaseSettings):
     memory_dedup_similarity: float = 0.85  # used by consolidation (Plan 2b)
 
     # Memory consolidation (Plan 2b)
+    # Kill-switch (not an enable-switch): consolidation runs only when the master
+    # gate memory_capture_active() is also on, so True-by-default means flipping
+    # PRIMER_MEMORY_ENABLED on yields a working end-to-end loop. Set False to keep
+    # capturing sketches while pausing promotion (e.g. judge cost/misbehavior).
     memory_consolidation_enabled: bool = True
     memory_consolidation_interval_hours: int = 24
     memory_dirty_session_threshold: int = 10
@@ -121,6 +125,9 @@ class PrimerSettings(BaseSettings):
     memory_judge_max_tokens: int = 1024
     memory_judge_max_calls_per_pass: int = 200  # cost cap: bound judge LLM calls per pass
     memory_embedding_model: str = "BAAI/bge-small-en-v1.5"
+    # MUST match the hardcoded Vector(384) column in models.MemoryEntry.embedding
+    # (the column dim is a DDL constant and cannot follow this value); the Batch B
+    # embedding service asserts the model's output width equals this at load time.
     memory_embedding_dim: int = 384
     memory_model_cache_dir: str = ""  # empty -> sentence-transformers default cache
 
