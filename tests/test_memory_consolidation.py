@@ -68,3 +68,30 @@ def test_embed_texts_returns_vectors(monkeypatch):
 def test_embeddings_unavailable_returns_none(monkeypatch):
     monkeypatch.setattr(emb, "embeddings_available", lambda: False)
     assert emb.embed_texts(["x"]) is None
+
+
+from primer.server.services.memory_consolidation_service import (  # noqa: E402
+    _cosine,
+    _jaccard,
+    cluster_similar,
+)
+
+
+def test_cosine_and_jaccard():
+    assert _cosine([1.0, 0.0], [1.0, 0.0]) == 1.0
+    assert abs(_cosine([1.0, 0.0], [0.0, 1.0])) < 1e-9
+    assert _jaccard("the build cache resets", "the build cache resets nightly") > 0.5
+    assert _jaccard("totally different", "nothing alike here") < 0.2
+
+
+def test_cluster_similar_groups_by_threshold():
+    # items: (id, embedding_or_None, body)
+    items = [
+        ("a", [1.0, 0.0], "run alembic before build"),
+        ("b", [0.99, 0.01], "run alembic before build please"),
+        ("c", [0.0, 1.0], "unrelated thing entirely"),
+    ]
+    clusters = cluster_similar(items, threshold=0.85)
+    # a and b cluster; c alone
+    assert ["a", "b"] in [sorted(g) for g in clusters]
+    assert ["c"] in [sorted(g) for g in clusters]
