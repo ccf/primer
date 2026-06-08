@@ -7,6 +7,7 @@ import logging
 import math
 import re
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from primer.common.config import settings
@@ -140,3 +141,23 @@ def merge_sketches_in_scope(db: Session, scope: MemoryScope, threshold: float | 
             merged += 1
     db.flush()
     return merged
+
+
+def compute_corroboration(db: Session, entry: MemoryEntry) -> int:
+    """Step 2 (spec §7/§8): distinct engineers who INDEPENDENTLY produced
+    evidence for this entry. Rows flagged independent=False (the writer was
+    exposed to the entry — set by the read path in 2c) never count. Writes the
+    result to entry.corroboration_count."""
+    count = (
+        db.query(func.count(func.distinct(MemoryEvidence.engineer_id)))
+        .filter(
+            MemoryEvidence.memory_id == entry.id,
+            MemoryEvidence.independent.is_(True),
+            MemoryEvidence.engineer_id.isnot(None),
+        )
+        .scalar()
+        or 0
+    )
+    entry.corroboration_count = count
+    db.flush()
+    return count
