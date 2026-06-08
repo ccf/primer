@@ -1,12 +1,13 @@
 """Tests for the memory consolidation engine (Plan 2b)."""
 
 from primer.common.config import settings
-from primer.common.models import MemoryEntry, MemoryEvent
+from primer.common.models import MemoryEntry, MemoryEvent, MemoryEvidence
 from primer.server.services import memory_embedding_service as emb
 from primer.server.services.memory_consolidation_service import (
     _cosine,
     _jaccard,
     cluster_similar,
+    compute_corroboration,
     merge_sketches_in_scope,
 )
 
@@ -190,3 +191,49 @@ def test_merge_does_not_block_future_rediscovery(db_session, monkeypatch):
     )
     assert (entry, created) != (None, False)  # NOT silently dropped
     assert entry is not None
+
+
+def test_corroboration_counts_distinct_independent_engineers(db_session):
+    from primer.common.models import Engineer, GitRepository, MemoryScope
+    from primer.server.services.memory_service import create_sketch
+
+    repo = GitRepository(full_name="acme/corr")
+    e1 = Engineer(name="E1", email="e1@x.io")
+    e2 = Engineer(name="E2", email="e2@x.io")
+    db_session.add_all([repo, e1, e2])
+    db_session.flush()
+    scope = MemoryScope(kind="project", name="corr", repository_id=repo.id)
+    db_session.add(scope)
+    db_session.flush()
+    card = {"kind": "project_fact", "title": "t", "body": "Same corroborated fact here."}
+    entry, _ = create_sketch(
+        db_session,
+        scope=scope,
+        card=card,
+        origin="passive_extraction",
+        engineer_id=e1.id,
+        session_id=None,
+        citation={"x": 1},
+    )
+    create_sketch(
+        db_session,
+        scope=scope,
+        card=card,
+        origin="passive_extraction",
+        engineer_id=e2.id,
+        session_id=None,
+        citation={"x": 2},
+    )
+    db_session.add(
+        MemoryEvidence(
+            memory_id=entry.id,
+            evidence_kind="transcript_citation",
+            engineer_id=e1.id,
+            independent=False,
+        )
+    )
+    db_session.flush()
+
+    n = compute_corroboration(db_session, entry)
+    assert n == 2  # e1 + e2 distinct independent; the exposed row ignored
+    assert entry.corroboration_count == 2
