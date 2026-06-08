@@ -103,6 +103,8 @@ Agent harness intelligence platform — measures how tool design, context manage
 | `deadweight_service.py` | Dead weight detection: zero-invocation and no-outcome-lift customization flagging |
 | `memory_service.py` | Hive-mind memory store: project scopes, sketch persistence, sticky dedup, flood control |
 | `memory_extraction_service.py` | Passive LLM memory-card extraction (post-facet job) + cold-start backfill |
+| `memory_consolidation_service.py` | Memory consolidation engine: merge near-duplicate sketches, corroboration grounding, LLM judge gate (sketch→active), decay |
+| `memory_embedding_service.py` | Local sentence-transformers BGE embeddings for consolidation (postgres only; SQLite uses keyword similarity) |
 
 ## Commands
 
@@ -168,6 +170,7 @@ cd frontend && npx tsc -b --noEmit  # Type check
 - **Async Ingest**: Session ingest enqueues a `session_ingest` background job and returns 202 immediately; the worker processes upsert + anomaly detection + facet extraction asynchronously
 - **PreCompact Hooks**: Sessions are captured incrementally on context compaction (not only at session end) via the PreCompact hook event
 - **Memory (hive mind)**: project-scoped shared memory behind `PRIMER_MEMORY_ENABLED` (requires redaction); write path only in Plan 2a — passive extraction job after facets + `remember` MCP tool; all writes quarantined as `sketch` until the consolidation engine (Plan 2b) promotes them
+- **Memory consolidation (Plan 2b)**: recurring `memory_consolidation` job promotes `sketch`→`active` via an LLM judge (haiku) gated on corroboration; merges near-duplicates by local BGE embeddings (postgres + pgvector) or keyword-Jaccard (SQLite); decays extinct entries with a grace period. `active`→`validated` and the read path are Plan 2c.
 
 ## Conventions
 
