@@ -18,7 +18,7 @@
 - `MemoryEntry` columns awaiting 2b writes: `confidence_score` (Float, 0.0), `corroboration_count` (Int, 0), `activated_at`, `activation_baseline` (JSON), `judge_critique` (Text), `superseded_by_id` (self-FK, **no ORM relationship yet**), `embedding` (**does not exist yet — add in Task 2**).
 - `MemoryEvidence`: `independent` Boolean (default true), `evidence_kind` (`transcript_citation`/`explicit_remember`), `engineer_id`, `session_id`. Indexes `ix_memory_evidence_memory_independent`, `ix_memory_evidence_session_kind`.
 - `MemoryScope`: `last_consolidation_at`, `memory_paused_at` (skip paused scopes), `repository_id`.
-- `MemoryEvent`: append-only; emit `merged_into`, `promoted_to_active`, `judge_rejected`, `decay_started`, `retired`, `rehabilitated` (event_kind is a free `String(40)` — no enum constraint).
+- `MemoryEvent`: append-only; 2b emits `merged_into`, `promoted_to_active`, `judge_rejected` (event_kind is a free `String(40)` — no enum constraint). `decay_started`/`rehabilitated`/`retired` are Plan 2c (decay deferred).
 - DB dialect: `from primer.common.database import _is_sqlite`. Migration dialect-guard pattern: `alembic/versions/7103e4887012_*` (`op.get_bind().dialect.name`).
 - Config: `PRIMER_MEMORY_*` settings block at `config.py` ~line 101-110 (memory_enabled, memory_dedup_similarity etc. present). New settings append after.
 
@@ -44,7 +44,7 @@ def test_consolidation_settings_present():
     assert settings.memory_consolidation_interval_hours == 24
     assert settings.memory_min_corroboration == 2
     assert settings.memory_dedup_similarity == 0.85
-    assert settings.memory_decay_grace_passes == 3
+    assert settings.memory_judge_max_calls_per_pass == 200
     assert settings.memory_judge_model  # non-empty
     assert settings.memory_embedding_model == "BAAI/bge-small-en-v1.5"
     assert settings.memory_embedding_dim == 384
@@ -66,15 +66,17 @@ Append to `src/primer/common/config.py` after the memory write-path settings blo
     memory_dirty_session_threshold: int = 10
     memory_dirty_friction_threshold: int = 5
     memory_dirty_sketch_threshold: int = 5
-    memory_min_corroboration: int = 2  # independent writers before judge eligibility
-    memory_decay_grace_passes: int = 3  # decaying -> retired after N consecutive passes
+    memory_min_corroboration: int = 2  # distinct independent engineers before judge eligibility
     memory_consolidation_max_scopes_per_pass: int = 50
     memory_judge_model: str = "claude-haiku-4-5-20251001"
     memory_judge_max_tokens: int = 1024
+    memory_judge_max_calls_per_pass: int = 200  # cost cap: bound judge LLM calls per pass
     memory_embedding_model: str = "BAAI/bge-small-en-v1.5"
     memory_embedding_dim: int = 384
     memory_model_cache_dir: str = ""  # empty -> sentence-transformers default cache
 ```
+
+> **Solo-project note:** `memory_min_corroboration` defaults to 2 (distinct independent engineers, per spec §7). On a single-developer project no passive memory ever reaches 2 — only `remember`-origin sketches activate (they qualify with 1 writer, Task 9). Single-dev installs that want passive memories to activate should set `PRIMER_MEMORY_MIN_CORROBORATION=1`. **Decay is intentionally NOT in 2b** — corroboration only grows during consolidation (nothing removes evidence until the read path exists), so there is no real decay signal yet. Decay is measurement-driven and lands in Plan 2c.
 
 - [ ] **Step 4: Run to verify it passes** — `pytest tests/test_memory_consolidation.py -v` → PASS
 
@@ -505,6 +507,38 @@ def test_merge_collapses_near_duplicates(db_session, monkeypatch):
     assert merged >= 1
     # a merged_into event was emitted
     assert db_session.query(MemoryEvent).filter(MemoryEvent.event_kind == "merged_into").count() >= 1
+    # losers are tombstoned as retired (NOT rejected), superseded, hash released
+    losers = (
+        db_session.query(MemoryEntry)
+        .filter(MemoryEntry.scope_id == scope.id, MemoryEntry.superseded_by_id.isnot(None))
+        .all()
+    )
+    assert losers and all(le.status == "retired" for le in losers)
+    assert all(le.content_hash.startswith("merged:") for le in losers)
+
+
+def test_merge_does_not_block_future_rediscovery(db_session, monkeypatch):
+    # A future session re-deriving a merged-away loser's exact body must NOT be
+    # silently dropped — it creates a fresh sketch (the loser's hash was released).
+    import primer.server.services.memory_consolidation_service as cons
+    from primer.server.services.memory_service import create_sketch
+
+    monkeypatch.setattr(cons, "_embed_entries", lambda db, entries: None)
+    loser_body = "Run alembic upgrade head before make build, always."
+    scope, eng = _scope_with_sketches(
+        db_session,
+        ["Run alembic upgrade head before make build every time.", loser_body],
+    )
+    merge_sketches_in_scope(db_session, scope, threshold=0.5)
+    db_session.flush()
+    # re-derive the loser's exact body in a later pass
+    entry, created = create_sketch(
+        db_session, scope=scope,
+        card={"kind": "project_fact", "title": "again", "body": loser_body},
+        origin="passive_extraction", engineer_id=eng.id, session_id=None, citation={"x": 1},
+    )
+    assert (entry, created) != (None, False)  # NOT silently dropped
+    assert entry is not None
 ```
 
 - [ ] **Step 2: Run to verify it fails** — `ImportError: merge_sketches_in_scope`
@@ -558,15 +592,26 @@ def merge_sketches_in_scope(db: Session, scope: MemoryScope, threshold: float | 
     for group in clusters:
         if len(group) < 2:
             continue
-        # canonical = oldest (stable); others fold into it
+        # canonical = oldest (stable); others fold into it as tombstones
         members = sorted((by_id[i] for i in group), key=lambda e: e.created_at)
         canonical, losers = members[0], members[1:]
         for loser in losers:
             db.query(MemoryEvidence).filter(MemoryEvidence.memory_id == loser.id).update(
                 {MemoryEvidence.memory_id: canonical.id}
             )
-            loser.status = "rejected"  # sticky: never re-proposed
+            # Tombstone the loser WITHOUT marking it `rejected`. `rejected` is the
+            # judge's sticky-block status, and the loser's content_hash is UNIQUE
+            # per scope — leaving it on a rejected/retired row with its real hash
+            # would (a) silently drop a future legitimate rediscovery of that exact
+            # body (the (scope_id, content_hash) dedup lookup would find this row),
+            # and (b) collide on the UNIQUE constraint. So RELEASE the real hash
+            # (namespace it) and use the terminal `retired` status, which is NOT in
+            # _DEDUP_BLOCKING_STATUSES. A future rediscovery of the loser's body
+            # then creates a fresh sketch (no hash match) which re-merges into the
+            # canonical next pass AND accretes its corroborating evidence.
+            loser.content_hash = f"merged:{loser.id}"
             loser.superseded_by_id = canonical.id
+            loser.status = "retired"
             db.add(
                 MemoryEvent(
                     memory_id=canonical.id,
@@ -580,7 +625,7 @@ def merge_sketches_in_scope(db: Session, scope: MemoryScope, threshold: float | 
     return merged
 ```
 
-Note: `_embed_entries` is patched out in the test to force the keyword path; the production path embeds on postgres. The loser is marked `rejected` + `superseded_by_id` so it's excluded from future passes and the supersession chain is queryable.
+Note: `_embed_entries` is patched out in the test to force the keyword path; the production path embeds on postgres. Merge losers become tombstones (`retired` + `superseded_by_id`, real hash released) so they are excluded from future sketch passes, the supersession chain is queryable, and — critically — a future rediscovery of the loser's exact body is NOT silently blocked (see the inline comment).
 
 - [ ] **Step 4: Run tests** — PASS
 
@@ -879,158 +924,16 @@ git commit -m "feat(memory): consolidation step 3 — LLM judge gate (sketch->ac
 
 ---
 
-### Task 8: Step 4 — decay scoring
+### Task 8: Decay — DEFERRED to Plan 2c (no work in 2b)
 
-**Files:**
-- Modify: `src/primer/server/services/memory_consolidation_service.py`
-- Modify: `tests/test_memory_consolidation.py`
-
-- [ ] **Step 1: Write the failing test**
-
-```python
-# append to tests/test_memory_consolidation.py
-from primer.server.services.memory_consolidation_service import decay_scope_entries
-
-
-def test_decay_marks_then_retires_extinct_actives(db_session):
-    from primer.common.models import Engineer, GitRepository, MemoryEntry, MemoryScope
-    from primer.server.services.memory_service import create_sketch
-
-    repo = GitRepository(full_name="acme/decay")
-    eng = Engineer(name="D", email="d@x.io")
-    db_session.add_all([repo, eng])
-    db_session.flush()
-    scope = MemoryScope(kind="project", name="decay", repository_id=repo.id)
-    db_session.add(scope)
-    db_session.flush()
-    entry, _ = create_sketch(
-        db_session, scope=scope,
-        card={"kind": "project_fact", "title": "t", "body": "An active fact to decay."},
-        origin="passive_extraction", engineer_id=eng.id, session_id=None, citation={"x": 1},
-    )
-    # make it active with zero corroboration (extinct: no independent support)
-    entry.status = "active"
-    entry.corroboration_count = 0
-    db_session.flush()
-
-    # pass 1: active -> decaying
-    decay_scope_entries(db_session, scope)
-    db_session.flush()
-    assert entry.status == "decaying"
-    assert entry.decay_passes == 1
-
-    # passes 2..grace: still decaying, counter climbs; final pass retires
-    for _ in range(settings.memory_decay_grace_passes - 1):
-        decay_scope_entries(db_session, scope)
-        db_session.flush()
-    assert entry.status == "retired"
-
-
-def test_decay_rehabilitates_recovered_entry(db_session):
-    from primer.common.models import Engineer, GitRepository, MemoryScope
-    from primer.server.services.memory_service import create_sketch
-
-    repo = GitRepository(full_name="acme/rehab")
-    eng = Engineer(name="R", email="r@x.io")
-    db_session.add_all([repo, eng])
-    db_session.flush()
-    scope = MemoryScope(kind="project", name="rehab", repository_id=repo.id)
-    db_session.add(scope)
-    db_session.flush()
-    entry, _ = create_sketch(
-        db_session, scope=scope,
-        card={"kind": "project_fact", "title": "t", "body": "Recovers later."},
-        origin="passive_extraction", engineer_id=eng.id, session_id=None, citation={"x": 1},
-    )
-    entry.status = "decaying"
-    entry.decay_passes = 1
-    entry.corroboration_count = 5  # recovered
-    db_session.flush()
-    decay_scope_entries(db_session, scope)
-    db_session.flush()
-    assert entry.status == "active"
-    assert entry.decay_passes == 0
-```
-
-Note: this introduces a `decay_passes` counter column — add it in Step 3 below (small model + migration addition folded into this task).
-
-- [ ] **Step 2: Run to verify it fails** — ImportError + missing `decay_passes`
-
-- [ ] **Step 3: Add the `decay_passes` column, then implement decay**
-
-In `models.py` `MemoryEntry`, add after `corroboration_count`:
-
-```python
-    decay_passes: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
-```
-
-Add a migration (`alembic revision -m "add memory decay_passes"`, dialect-agnostic — plain `op.add_column` works on both since it's an integer, use `batch_alter_table` for sqlite safety):
-
-```python
-def upgrade() -> None:
-    with op.batch_alter_table("memory_entries") as batch_op:
-        batch_op.add_column(sa.Column("decay_passes", sa.Integer(), nullable=False, server_default="0"))
-
-
-def downgrade() -> None:
-    with op.batch_alter_table("memory_entries") as batch_op:
-        batch_op.drop_column("decay_passes")
-```
-
-Append the decay logic to `memory_consolidation_service.py`:
-
-```python
-def decay_scope_entries(db: Session, scope: MemoryScope) -> dict:
-    """Step 4 (spec §7): decay scoring for active/decaying entries.
-
-    v1.0 decay trigger (no outcome lift until Plan 2c): an entry with zero
-    independent corroboration is 'extinct'. Extinct active -> decaying;
-    decaying that stays extinct increments decay_passes and retires after the
-    grace period; a decaying entry that has recovered corroboration is
-    rehabilitated back to active.
-    """
-    entries = (
-        db.query(MemoryEntry)
-        .filter(
-            MemoryEntry.scope_id == scope.id,
-            MemoryEntry.status.in_(("active", "decaying")),
-        )
-        .all()
-    )
-    marked = retired = rehabilitated = 0
-    for entry in entries:
-        extinct = (entry.corroboration_count or 0) < 1
-        if entry.status == "active":
-            if extinct:
-                entry.status = "decaying"
-                entry.decay_passes = 1
-                db.add(MemoryEvent(memory_id=entry.id, event_kind="decay_started", actor="system"))
-                marked += 1
-        else:  # decaying
-            if not extinct:
-                entry.status = "active"
-                entry.decay_passes = 0
-                db.add(MemoryEvent(memory_id=entry.id, event_kind="rehabilitated", actor="system"))
-                rehabilitated += 1
-            else:
-                entry.decay_passes = (entry.decay_passes or 0) + 1
-                if entry.decay_passes >= settings.memory_decay_grace_passes:
-                    entry.status = "retired"
-                    db.add(MemoryEvent(memory_id=entry.id, event_kind="retired", actor="system"))
-                    retired += 1
-    db.flush()
-    return {"marked": marked, "retired": retired, "rehabilitated": rehabilitated}
-```
-
-- [ ] **Step 4: Run tests + migration roundtrip** (as Task 2 step 6) — PASS
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add src/primer/common/models.py alembic/versions/ src/primer/server/services/memory_consolidation_service.py tests/test_memory_consolidation.py
-git commit -m "feat(memory): consolidation step 4 — decay scoring with grace period + rehabilitation"
-```
-
+Decay scoring is intentionally **not** implemented in Plan 2b. Decay is
+measurement-driven: the spec's triggers (outcome-lift collapse, pattern
+extinction) require the read/injection path and session-cohort measurement that
+land in Plan 2c. In 2b, corroboration only ever **grows** during a pass (evidence
+accretes; nothing removes it), so any corroboration-based decay signal is
+degenerate and could never correctly fire. The `decaying`/`retired` lifecycle and
+the `decay_passes` mechanism therefore move to Plan 2c. **Skip this task** — no
+column, no migration, no decay function in 2b.
 ---
 
 ### Task 9: The per-scope pass + dirty-scope selection + advisory lock
@@ -1100,6 +1003,63 @@ def test_run_pass_processes_dirty_scopes(db_session, monkeypatch):
     db_session.commit()
     result = run_memory_consolidation_pass(db_session)
     assert result["scopes_processed"] >= 1
+
+
+def test_remember_origin_eligible_at_one_but_passive_needs_bar(db_session, monkeypatch):
+    # Solo-project safety: a passive sketch from ONE engineer (corroboration 1)
+    # is NOT judged when min=2; a remember-origin sketch IS (qualifies at 1).
+    import primer.server.services.memory_consolidation_service as cons
+    from primer.common.models import Engineer, GitRepository, MemoryEntry, MemoryScope
+    from primer.server.services.memory_service import create_sketch
+
+    monkeypatch.setattr(cons, "_embed_entries", lambda db, entries: None)
+    monkeypatch.setattr(cons, "_call_judge_api", lambda prompt: {"accept": True, "rationale": "ok"})
+    monkeypatch.setattr(settings, "memory_min_corroboration", 2)
+    repo = GitRepository(full_name="acme/solo")
+    eng = Engineer(name="S", email="s@x.io")
+    db_session.add_all([repo, eng])
+    db_session.flush()
+    scope = MemoryScope(kind="project", name="solo", repository_id=repo.id)
+    db_session.add(scope)
+    db_session.flush()
+    create_sketch(db_session, scope=scope,
+                  card={"kind": "project_fact", "title": "p", "body": "Passive solo fact one."},
+                  origin="passive_extraction", engineer_id=eng.id, session_id=None, citation={"x": 1})
+    create_sketch(db_session, scope=scope,
+                  card={"kind": "project_fact", "title": "r", "body": "Remembered solo fact two."},
+                  origin="remember_tool", engineer_id=eng.id, session_id=None,
+                  citation=None, evidence_kind="explicit_remember")
+    consolidate_scope(db_session, scope)
+    db_session.flush()
+    actives = {e.origin for e in db_session.query(MemoryEntry).filter(
+        MemoryEntry.scope_id == scope.id, MemoryEntry.status == "active").all()}
+    assert actives == {"remember_tool"}  # passive stays sketch, remember activates
+
+
+def test_pass_respects_judge_call_budget(db_session, monkeypatch):
+    import primer.server.services.memory_consolidation_service as cons
+
+    monkeypatch.setattr(settings, "memory_enabled", True)
+    monkeypatch.setattr(settings, "redaction_enabled", True)
+    monkeypatch.setattr(settings, "memory_dirty_sketch_threshold", 1)
+    monkeypatch.setattr(settings, "memory_min_corroboration", 1)
+    monkeypatch.setattr(settings, "memory_judge_max_calls_per_pass", 1)
+    monkeypatch.setattr(cons, "_embed_entries", lambda db, entries: None)
+    calls = []
+    monkeypatch.setattr(cons, "_call_judge_api",
+                        lambda prompt: calls.append(1) or {"accept": True, "rationale": "ok"})
+    _scope_with_sketches(db_session, ["First distinct durable fact.", "Second distinct durable fact."])
+    db_session.commit()
+    run_memory_consolidation_pass(db_session)
+    assert len(calls) == 1  # budget capped the second judge call
+
+
+def test_xact_lock_uses_transaction_scoped_function(db_session, monkeypatch):
+    # On sqlite _try_scope_lock always returns True (single worker); just assert
+    # no _release_scope_lock symbol exists (xact lock auto-releases).
+    import primer.server.services.memory_consolidation_service as cons
+
+    assert not hasattr(cons, "_release_scope_lock")
 ```
 
 - [ ] **Step 2: Run to verify it fails** — ImportError
@@ -1136,55 +1096,61 @@ def scope_is_dirty(db: Session, scope: MemoryScope) -> bool:
 
 
 def _try_scope_lock(db: Session, scope: MemoryScope) -> bool:
-    """Postgres advisory lock keyed on scope id, so two workers can't consolidate
-    the same scope. SQLite runs a single worker process -> always acquire."""
+    """Transaction-level postgres advisory lock keyed on scope id, so two workers
+    can't consolidate the same scope. `xact` so the lock auto-releases exactly at
+    commit/rollback — held through the per-scope commit, no explicit unlock, no
+    leak. SQLite runs a single worker process -> always acquire."""
     if _is_sqlite:
         return True
     from sqlalchemy import text
 
     key = hash(scope.id) % (2**31)
-    return bool(db.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": key}).scalar())
+    return bool(db.execute(text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": key}).scalar())
 
 
-def _release_scope_lock(db: Session, scope: MemoryScope) -> None:
-    if _is_sqlite:
-        return
-    from sqlalchemy import text
+def _judge_eligible(db: Session, sketch: MemoryEntry) -> bool:
+    """Spec §7 step 3: a sketch is judge-eligible at the corroboration bar, OR if
+    it was an explicit `remember` (origin=remember_tool) — explicit human intent
+    qualifies with a single writer. Always recomputes corroboration_count as a
+    side effect."""
+    corr = compute_corroboration(db, sketch)
+    if corr >= settings.memory_min_corroboration:
+        return True
+    return sketch.origin == "remember_tool" and corr >= 1
 
-    key = hash(scope.id) % (2**31)
-    db.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": key})
 
-
-def consolidate_scope(db: Session, scope: MemoryScope) -> dict:
-    """Run all four consolidation steps for one scope, then stamp
-    last_consolidation_at. Skips paused scopes."""
+def consolidate_scope(db: Session, scope: MemoryScope, budget: list[int] | None = None) -> dict:
+    """Merge + ground + judge for one scope, then stamp last_consolidation_at.
+    Skips paused scopes. `budget` is a single-element mutable counter of remaining
+    judge calls for the whole pass (cost cap); None = unbounded (tests).
+    NB: decay is Plan 2c (see Task 8)."""
     if scope.memory_paused_at is not None:
         return {"skipped": "paused"}
     if not _try_scope_lock(db, scope):
         return {"skipped": "locked"}
-    try:
-        merged = merge_sketches_in_scope(db, scope)
-        # corroboration + judge over remaining sketches
-        sketches = (
-            db.query(MemoryEntry)
-            .filter(MemoryEntry.scope_id == scope.id, MemoryEntry.status == "sketch")
-            .all()
-        )
-        promoted = 0
-        for sketch in sketches:
-            if compute_corroboration(db, sketch) >= settings.memory_min_corroboration:
-                if judge_sketch(db, sketch):
-                    promoted += 1
-        decay = decay_scope_entries(db, scope)
-        scope.last_consolidation_at = datetime.now(UTC)
-        db.flush()
-        return {"merged": merged, "promoted": promoted, **decay}
-    finally:
-        _release_scope_lock(db, scope)
+    merged = merge_sketches_in_scope(db, scope)
+    sketches = (
+        db.query(MemoryEntry)
+        .filter(MemoryEntry.scope_id == scope.id, MemoryEntry.status == "sketch")
+        .all()
+    )
+    promoted = 0
+    for sketch in sketches:
+        if budget is not None and budget[0] <= 0:
+            break  # pass-level judge-call budget exhausted; remaining sketches next pass
+        if _judge_eligible(db, sketch):
+            if budget is not None:
+                budget[0] -= 1
+            if judge_sketch(db, sketch):
+                promoted += 1
+    scope.last_consolidation_at = datetime.now(UTC)
+    db.flush()
+    return {"merged": merged, "promoted": promoted}
 
 
 def run_memory_consolidation_pass(db: Session) -> dict:
-    """Job handler: consolidate every dirty scope (bounded per pass)."""
+    """Job handler: consolidate every dirty scope (bounded per pass), capping the
+    total judge LLM calls across the pass at memory_judge_max_calls_per_pass."""
     if not memory_capture_active():
         return {"scopes_processed": 0, "skipped": "inactive"}
     scopes = (
@@ -1193,15 +1159,18 @@ def run_memory_consolidation_pass(db: Session) -> dict:
         .limit(settings.memory_consolidation_max_scopes_per_pass)
         .all()
     )
+    budget = [settings.memory_judge_max_calls_per_pass]
     processed = 0
     for scope in scopes:
         if scope_is_dirty(db, scope):
-            consolidate_scope(db, scope)
-            db.commit()
+            consolidate_scope(db, scope, budget=budget)
+            db.commit()  # commit per scope; the xact advisory lock releases here
             processed += 1
     logger.info("Memory consolidation pass: %d scopes processed", processed)
     return {"scopes_processed": processed}
 ```
+
+Note: the advisory lock is `pg_try_advisory_xact_lock` (transaction-scoped) so it is held through the per-scope `db.commit()` in `run_memory_consolidation_pass` and auto-released — there is no early-release window and no explicit unlock to leak. Judge eligibility is origin-aware (`remember`-origin qualifies at corroboration 1) so explicit memories activate even on solo projects; passive memories still need the corroboration bar.
 
 - [ ] **Step 4: Run tests** — PASS
 
@@ -1344,6 +1313,8 @@ git commit -m "docs: memory consolidation engine shipped (Plan 2b)"
 
 ## Self-Review (completed)
 
-- **Spec coverage (Plan 2b slice):** §7 step 1 merge (Task 5), step 2 corroboration (Task 6), step 3 judge gate (Task 7), step 4 decay (Task 8), the recurring pass + dirty-scope + advisory lock (Task 9-10); §4 embedding column (Task 2, **384-dim** local BGE per the decided open-question #1); §12 config (Task 1). Deferred-from-2a ORM relationships fixed (Task 2). **Out of scope (Plan 2c):** `active→validated` post-activation measurement, the read/bundle/injection path, the token-ROI ledger, withholding experiments — all need the injection write path. Scope promotion is v1.1.
+- **Spec coverage (Plan 2b slice):** §7 step 1 merge (Task 5), step 2 corroboration (Task 6), step 3 judge gate (Task 7), the recurring pass + dirty-scope + advisory lock + origin-aware eligibility + judge budget cap (Task 9-10); §4 embedding column (Task 2, **384-dim** local BGE per the decided open-question #1); §12 config (Task 1). Deferred-from-2a ORM relationships fixed (Task 2). **Out of scope (Plan 2c):** §7 step 4 **decay** (no measurement signal until 2c — Task 8 is a deferral note), `active→validated` post-activation measurement, the read/bundle/injection path, the token-ROI ledger, withholding experiments — all need the injection write path. Scope promotion is v1.1.
 - **Placeholder scan:** every step has runnable code/commands; the one judgement call (HNSW `CONCURRENTLY` omitted) is explained inline.
-- **Type/name consistency:** `merge_sketches_in_scope`, `compute_corroboration`, `judge_sketch`, `decay_scope_entries`, `consolidate_scope`, `run_memory_consolidation_pass`, `embed_texts`/`embeddings_available`, `_cosine`/`_jaccard`/`cluster_similar`/`_similarity`, `JOB_TYPE_MEMORY_CONSOLIDATION` — used consistently across Tasks 3-10. Status strings (`sketch`/`active`/`decaying`/`retired`/`rejected`) and event kinds (`merged_into`/`promoted_to_active`/`judge_rejected`/`decay_started`/`rehabilitated`/`retired`) match the merged model.
+- **Type/name consistency:** `merge_sketches_in_scope`, `compute_corroboration`, `_judge_eligible`, `judge_sketch`, `consolidate_scope`, `run_memory_consolidation_pass`, `embed_texts`/`embeddings_available`, `_cosine`/`_jaccard`/`cluster_similar`/`_similarity`, `_try_scope_lock` (xact, no release), `JOB_TYPE_MEMORY_CONSOLIDATION` — used consistently. Status strings written by 2b: `active` (judge accept), `rejected` (judge reject), `retired` (merge tombstone). Event kinds: `merged_into`/`promoted_to_active`/`judge_rejected`. Decay (`decaying`/`decay_passes`/`rehabilitated`) is Plan 2c.
+
+**Revised after adversarial review (5 confirmed fixes):** merge losers are tombstoned (`retired` + namespaced hash + `superseded_by_id`), never `rejected` — so a future rediscovery isn't silently blocked; judge eligibility is origin-aware (`remember` qualifies at corroboration 1) so solo projects aren't inert; decay deferred to 2c (no real signal until measurement exists); a per-pass judge-call budget caps cost; the advisory lock is transaction-scoped (`pg_try_advisory_xact_lock`) so it's held through commit with no leak. pgvector `with_variant` dual-DB pattern was validated (no feasibility breakers).
