@@ -117,6 +117,8 @@ class PrimerSettings(BaseSettings):
     memory_consolidation_enabled: bool = True
     memory_consolidation_interval_hours: int = 24
     memory_dirty_session_threshold: int = 10
+    # Reserved for the Plan 2c friction-spike dirty trigger; not yet consumed by
+    # scope_is_dirty (which currently keys on sketch + session deltas only).
     memory_dirty_friction_threshold: int = 5
     memory_dirty_sketch_threshold: int = 5
     memory_min_corroboration: int = 2  # distinct independent engineers before judge eligibility
